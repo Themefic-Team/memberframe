@@ -6,14 +6,5 @@
   "icon": "icon.png",
   "main": "dist/index.html",
   "modes": ["canvas"],
-  "permissions": [
-    "createCodeFile",
-    "CodeFile.setFileContent",
-    "CodeFile.remove",
-    "addComponentInstance",
-    "setParent",
-    "Node.remove",
-    "setPluginData",
-    "getPluginData"
-  ]
+  "permissions": []
 }
