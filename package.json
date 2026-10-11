@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint:css": "node .agents/scripts/lint-zero-inline-css.js src"
+    "lint:css": "node .agents/scripts/lint-zero-inline-css.js src",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@framer/plugin": "^5.1.0",
@@ -24,6 +26,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
-    "vite-plugin-framer": "^1.1.1"
+    "vite-plugin-framer": "^1.1.1",
+    "vitest": "^5.0.3"
   }
 }

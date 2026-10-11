@@ -1,0 +1,35 @@
+/* ==========================================================================
+   SHELL LAYOUT
+
+   Per-feature CSS for the four-part shell, per PRD section 6.3. Everything
+   here is layout the reference design system does not cover. Component looks
+   come from components.css and every colour comes from a token: no hex below.
+   ========================================================================== */
+
+/* The reference sets .framefic-shell to height 100vh with min-height 590px.
+   Collapsed, the panel is a 48px iframe, so that floor has to come off or the
+   header is pushed out of a window it cannot scroll. */
+.framefic-shell.is-collapsed {
+  height: 48px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Padded tab panel filling the scroll area between the tab bar and the footer. */
+.tab-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Stack of rows or sections inside a tab panel. */
+.tab-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}

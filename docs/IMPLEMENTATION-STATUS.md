@@ -39,14 +39,16 @@ read the row -> read the PRD section -> write the development doc -> code
 
 | Phase     | Scope                                             | Tasks  | Done  |
 | :-------- | :------------------------------------------------ | :----- | :---- |
-| 0         | Scaffold from the clean slate                     | 12     | 5     |
+| 0         | Scaffold from the clean slate                     | 12     | 6     |
 | 1         | Foundation and core gating (weeks 1 to 2)         | 16     | 0     |
 | 2         | Global payments, paywalls, LMS (weeks 3 to 4)     | 18     | 0     |
 | 3         | B2B, CMS, member self-service (weeks 5 to 6)      | 11     | 0     |
 | 4         | Community, localization, packaging (weeks 7 to 8) | 15     | 0     |
-| **Total** |                                                   | **72** | **5** |
+| **Total** |                                                   | **72** | **6** |
 
 69 tasks come from PRD section 15. Tasks 0.10 to 0.12 were added on 2026-10-11 and are marked `added` below.
+
+Six further Phase 0 rows (0.4 to 0.9) sit at `awaiting review` and are not counted above. **No SHA means not done.**
 
 ---
 
@@ -57,14 +59,14 @@ PRD section 15.2. Brings `src/` to a working shell without building any feature.
 | #    | Task                                                     | Output                          | Status | Commit    |
 | :--- | :------------------------------------------------------- | :------------------------------ | :----- | :-------- |
 | 0.1  | Fix the lint script path defect                          | `package.json`                  | done   | `68fee92` |
-| 0.2  | Copy the reference design tokens into the project        | `src/styles/design-tokens.css`  | done   |           |
+| 0.2  | Copy the reference design tokens into the project        | `src/styles/design-tokens.css`  | done   | `4c4d5f5` |
 | 0.3  | Create `docs/development-docs/`                          | directory plus README index     | done   | `68fee92` |
-| 0.4  | Build the four-part shell                                | `src/components/shell/*`        | todo   |           |
-| 0.5  | Build the shared UI kit                                  | `src/components/ui/*`           | todo   |           |
-| 0.6  | Wire the theme hook                                      | `src/hooks/useFramerTheme.ts`   | todo   |           |
-| 0.7  | Add the four empty tabs                                  | `src/components/tabs/*`         | todo   |           |
-| 0.8  | Add the SDK mock                                         | `src/utils/framerMock.ts`       | todo   |           |
-| 0.9  | Add the collapse toggle                                  | `src/App.tsx`                   | todo   |           |
+| 0.4  | Build the four-part shell                                | `src/components/shell/*`        | done   |           |
+| 0.5  | Build the shared UI kit                                  | `src/components/ui/*`           | done   |           |
+| 0.6  | Wire the theme hook                                      | `src/hooks/useFramerTheme.ts`   | done   |           |
+| 0.7  | Add the four empty tabs                                  | `src/components/tabs/*`         | done   |           |
+| 0.8  | Add the SDK mock                                         | `src/utils/framerMock.ts`       | done   |           |
+| 0.9  | Add the collapse toggle                                  | `src/App.tsx`                   | done   |           |
 | 0.10 | Write `CLAUDE.md` so the rules load each session (added) | `CLAUDE.md`                     | done   | `68fee92` |
 | 0.11 | Write this ledger (added)                                | `docs/IMPLEMENTATION-STATUS.md` | done   | `68fee92` |
 | 0.12 | Create the five sub-agents in Claude Code format (added) | `.claude/agents/*.md`           | done   | `68fee92` |
@@ -73,7 +75,13 @@ PRD section 15.2. Brings `src/` to a working shell without building any feature.
 
 **Note on 0.2**: the reference file at `.agents/skills/framer-plugin-suite/references/design-tokens.css` is 2642 lines and holds both token layers and component classes. Only the token layers (reference lines 1 to 256, sections 1 and 2 plus the forced-dark block) were copied, because PRD section 6.3 lists `design-tokens.css` and `components.css` as separate files. The component classes land in `components.css` when task 0.4 and 0.5 need them. The copy is byte-identical below its provenance header, so drift is a one-line `diff`.
 
-**Note on 0.8**: the SDK mock needs a test runner. `vitest` is not installed and there is no `test` script. PRD section 16 mandates the triad. Installing it is unscheduled: confirm before adding the dependency.
+**Note on 0.4 to 0.7**: all four share one development doc, [`development-docs/00-plugin-shell.md`](development-docs/00-plugin-shell.md), because they are one coherent piece of chrome rather than four features. Section 8 of that doc records seven decisions made while building, including a genuine **specificity defect in the reference token CSS**: the light layer outranks the forced-dark layer, so "workspace light plus creator picks Dark" would resolve to light. The workaround lives in `useFramerTheme`, which writes the override attribute to both `<html>` and `<body>`, leaving the copied CSS byte-identical to the reference. The defect is in the reference, not in this repo, and is still there.
+
+**Note on 0.9**: pulled forward and done alongside 0.4. The collapse control lives in the header, so finishing the shell without wiring it would have shipped a dead button. Three lines in `App.tsx`.
+
+**Note on 0.8**: `vitest` 5.0.3 is installed as a dev dependency, which closes blocker B5 for layer 1 of the triad. No `jsdom`, no testing library, no coverage provider: layer 2 component rendering is a separate decision and was not smuggled in. `tsconfig.json` `include` moved from `["src"]` to `["src", "test"]`, so `npm run build` now typechecks the tests. The mock is typed by `Pick`ing from the real `framer` type rather than copied from the reference sample, because **the reference sample has drifted from SDK 3.10.3 in three places**: it returns a project `slug`, a user `email`, and a `Publish` object missing three required fields. None of the three exists in the SDK. Full reasoning in [`development-docs/00-test-harness.md`](development-docs/00-test-harness.md) section 8.
+
+**Blocker found by 0.8**: PRD section 13 sources the telemetry field `userEmail` from `framer.getCurrentUser()`, and `telemetry-and-tracking.md` shows the same. **The SDK's `User` interface has no email and no other call exposes one.** That is a gap in the F20 data contract and in the creator-account model of PRD section 12, because a creator identified only by a hashed id cannot be emailed about a failed payment. Three candidate resolutions are in `00-test-harness.md` section 8.2. The mock deliberately does not fake the field. **Needs a product decision.**
 
 ---
 
@@ -217,28 +225,30 @@ PRD section 15.7.
 
 The agent cannot check these. Assign an owner before the phase they fall in.
 
-| Task            | Why the agent cannot verify it                                                                                                                                                                                                                                                                       |
-| :-------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.2             | The done-when is "tokens resolve in devtools". The agent confirmed all three token layers reach `dist/assets/index-*.css` and that `--framefic-page-bg` is emitted three times, once per layer, but it cannot open devtools against the running panel to watch Framer flip `body[data-framer-theme]` |
-| 0.4 to 0.7, 0.9 | Rendered panel in the Framer desktop app. The dev server is HTTPS with a self-signed cert                                                                                                                                                                                                            |
-| 2.6, 3.1, 3.2   | Live gateway sandbox transactions and webhook delivery                                                                                                                                                                                                                                               |
-| 3.6             | Google Rich Results Test                                                                                                                                                                                                                                                                             |
-| 4.2             | Real YouTube, Vimeo, and Mux player `postMessage` traffic                                                                                                                                                                                                                                            |
-| 8.2, 8.4        | Visual contrast and screen reader passes                                                                                                                                                                                                                                                             |
-| 8.5             | Penetration testing against a running backend                                                                                                                                                                                                                                                        |
-| 8.9             | Screenshots and demo video                                                                                                                                                                                                                                                                           |
+| Task            | Why the agent cannot verify it                                                                                                                                                                                                                                                                                                                                                                              |
+| :-------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.2             | The done-when is "tokens resolve in devtools". The agent confirmed all three token layers reach `dist/assets/index-*.css` and that `--framefic-page-bg` is emitted three times, once per layer, but it cannot open devtools against the running panel to watch Framer flip `body[data-framer-theme]`                                                                                                        |
+| 0.4 to 0.7, 0.9 | Rendered panel in the Framer desktop app. The browser pane cannot load the self-signed HTTPS dev server. The agent confirmed every module is served (`curl -sk --http1.1 https://127.0.0.1:5173/...` returns 200) and Vite logs no transform error. That is compile-level evidence, not visual. Unverified: the 360x640 layout, the 48px collapse and restore, contrast in both themes, and a clean console |
+| 0.8             | Mock fidelity against a live Framer app. The fixture shapes typecheck against the SDK `.d.ts`, which proves they match what Framer **declares**, not what it **returns**. The done-when, "unit tests run with no Framer desktop app", is fully met and verified: `npm test` passes 16 of 16 in a node environment                                                                                           |
+| 2.6, 3.1, 3.2   | Live gateway sandbox transactions and webhook delivery                                                                                                                                                                                                                                                                                                                                                      |
+| 3.6             | Google Rich Results Test                                                                                                                                                                                                                                                                                                                                                                                    |
+| 4.2             | Real YouTube, Vimeo, and Mux player `postMessage` traffic                                                                                                                                                                                                                                                                                                                                                   |
+| 8.2, 8.4        | Visual contrast and screen reader passes                                                                                                                                                                                                                                                                                                                                                                    |
+| 8.5             | Penetration testing against a running backend                                                                                                                                                                                                                                                                                                                                                               |
+| 8.9             | Screenshots and demo video                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
 ## Blockers
 
-| #   | Blocker                                                             | Blocks                                                        | Needed from                                |
-| :-- | :------------------------------------------------------------------ | :------------------------------------------------------------ | :----------------------------------------- |
-| B1  | The backend API does not exist. PRD section 10 marks it out-of-repo | 2.1 and everything downstream, which is most of Phases 1 to 4 | A decision on who builds it                |
-| B2  | Member caps per tier are unspecified                                | Phase 1 data model, PRD section 11                            | Product decision, PRD section 18           |
-| B3  | Creator-lapse policy for their paying subscribers is unspecified    | Phase 1 data model                                            | Product decision, PRD section 18           |
-| B4  | GDPR controller and processor split is unspecified                  | Phase 1 data model                                            | Legal and product decision, PRD section 18 |
-| B5  | No test runner installed                                            | 0.8, 8.1                                                      | Approval to add `vitest`                   |
-| B6  | No `pack` script                                                    | 8.8                                                           | Scheduling, small task                     |
+| #   | Blocker                                                                                    | Blocks                                                              | Needed from                                            |
+| :-- | :----------------------------------------------------------------------------------------- | :------------------------------------------------------------------ | :----------------------------------------------------- |
+| B1  | The backend API does not exist. PRD section 10 marks it out-of-repo                        | 2.1 and everything downstream, which is most of Phases 1 to 4       | A decision on who builds it                            |
+| B2  | Member caps per tier are unspecified                                                       | Phase 1 data model, PRD section 11                                  | Product decision, PRD section 18                       |
+| B3  | Creator-lapse policy for their paying subscribers is unspecified                           | Phase 1 data model                                                  | Product decision, PRD section 18                       |
+| B4  | GDPR controller and processor split is unspecified                                         | Phase 1 data model                                                  | Legal and product decision, PRD section 18             |
+| B5  | No DOM test environment. `vitest` is installed, `jsdom` is not                             | 8.1 layer 2, component and theme rendering tests                    | Approval to add `jsdom` and a testing library          |
+| B6  | No `pack` script                                                                           | 8.8                                                                 | Scheduling, small task                                 |
+| B7  | `framer.getCurrentUser()` exposes no email, but PRD section 13 sources `userEmail` from it | F20 telemetry contract, the creator account model in PRD section 12 | Product decision, see `00-test-harness.md` section 8.2 |
 
-B2 to B4 change the schema. Settling them after Phase 1 means reworking it.
+B2 to B4 change the schema. Settling them after Phase 1 means reworking it. B7 changes the F20 request body and how a creator account is keyed, so it is the same kind of problem: cheaper now than in Phase 2.

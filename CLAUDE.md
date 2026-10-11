@@ -34,7 +34,7 @@ Seven known conflicts are already resolved in PRD section 17. Never silently re-
 
 ```
 read status row -> read PRD section -> write/update development doc -> code
-  -> npm run lint:css && npx tsc --noEmit && npm run build
+  -> npm run lint:css && npx tsc --noEmit && npm test && npm run build
   -> set the status row to "awaiting review"
   -> PROPOSE a commit message and stop
 ```
@@ -50,7 +50,7 @@ feat(F01): task 1.4 canvas code generator
 
 What changed and why, in prose.
 
-Gates: lint:css, tsc --noEmit, build all pass.
+Gates: lint:css, tsc --noEmit, test, build all pass.
 Needs human verification: <anything the agent could not check>
 ```
 
@@ -69,11 +69,14 @@ The user commits, so the agent cannot know the SHA in the same turn. Backfill it
 | Command | Checks |
 | :--- | :--- |
 | `npm run lint:css` | Zero `style={{ }}` in JSX. Mandatory, no exceptions |
-| `npx tsc --noEmit` | Types |
+| `npx tsc --noEmit` | Types in `src` and `test` |
+| `npm test` | `vitest run` over `test/**/*.test.ts` |
 | `npm run build` | `tsc && vite build` |
 | `npm run dev` | HTTPS on :5173, self-signed cert |
 
-No test runner is installed yet. PRD section 16 mandates a Vitest triad. Adding `vitest` is unscheduled work: ask first.
+`vitest` 5.0.3 arrived with task 0.8 and covers layer 1 of the PRD section 16 triad: pure logic, node environment, no DOM. **`jsdom` and a testing library are still not installed**, so no test renders a React component yet. Adding them is unscheduled work: ask first.
+
+Never import the `framer` singleton as a value in a test. It posts to a parent window that does not exist. Use `createFramerMock` from [`src/utils/framerMock.ts`](src/utils/framerMock.ts), and read [`docs/development-docs/00-test-harness.md`](docs/development-docs/00-test-harness.md) section 8 before widening it: the company reference mock contradicts the installed SDK in three places and must not be copied.
 
 ---
 
@@ -121,9 +124,10 @@ From [`instruction/INSTRUCTION.md`](instruction/INSTRUCTION.md), applies to UI c
 
 ## Repo Facts That Bite
 
-- **`src/` is a bare skeleton**: `main.tsx`, `App.tsx`, `App.css`. Everything else in PRD section 6.3 is unbuilt.
-- **`framer.json` permissions is `[]`.** Declare each permission in the task that first needs it (tasks 1.6 and 5.6), not preemptively.
-- **The dev server is HTTPS with a self-signed cert** (`@vitejs/plugin-basic-ssl`). The agent's browser pane cannot load it. Server-side checks with `curl -sk` work.
+- **`src/` holds the Phase 0 shell**: four-part shell, UI kit, theme hook, four tabs. The feature directories in PRD section 6.3 (`manage/`, `studio/`, `account/`, `canvas-components/`, `services/`) are still unbuilt.
+- **The three CSS files under `src/styles/` plus `App.css` are verbatim slices** of `.agents/skills/framer-plugin-suite/references/design-tokens.css`. Each carries a provenance header with the exact `diff` command that proves it has not drifted. Do not hand-edit them. New styling goes in a per-feature file like `shell.css`.
+- **`framer.json` permissions is `[]`.** Declare each permission in the task that first needs it (tasks 1.6 and 5.6), not preemptively. This is why the active tab and theme preference persist to `localStorage`: `setPluginData` is not permitted until 5.6.
+- **The dev server is HTTPS with a self-signed cert** (`@vitejs/plugin-basic-ssl`). The agent's browser pane cannot load it. Server-side checks work, but only in this exact shape: `curl -sk --http1.1 https://127.0.0.1:5173/...`. Both flags matter, and `localhost` fails where `127.0.0.1` succeeds. Vite's own log (via preview logs) is the better signal: a transform error shows up there.
 - **`Framer-Agent/` and `instruction/` are vendored copies** of the agent ecosystem where `.agent/` is the correct directory name. The live copy is `.agents/`. Do not "fix" paths inside those two trees.
 - **`.github/agents/` is GitHub Copilot format**, not Claude Code. Claude Code agents live in `.claude/agents/`.
 

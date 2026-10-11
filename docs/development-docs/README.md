@@ -29,6 +29,8 @@ Status values: `planned`, `in progress`, `done`.
 
 | Doc | Feature | PRD | Phase | Priority | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| `00-plugin-shell.md` | Plugin Shell, UI Kit, and Theme Sync | section 7, no F number | 0 | P0 | in progress |
+| `00-test-harness.md` | Test Harness and Framer SDK Mock | section 16.1, no F number | 0 | P0 | in progress |
 | `01-member-gate.md` | Zero-Code Visual Canvas Gating | F01 | 1 | P0 | planned |
 | `02-member-tier-cockpit.md` | In-Plugin Member and Tier Cockpit | F02 | 1 | P0 | planned |
 | `03-tri-gateway-payments.md` | Tri-Gateway Smart Payment Connect | F03 | 1 and 2 | P0 | planned |
