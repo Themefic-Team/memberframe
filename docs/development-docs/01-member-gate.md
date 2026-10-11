@@ -2,7 +2,7 @@
 
 * **Category:** Content Protection and Gating
 * **Module:** `01-member-gate`
-* **Status:** Implemented and Verified
+* **Status:** Prototype. The gate reads a `localStorage` flag and does not call `useMemberSession()` or any backend. Two known bugs are open as task M0-2: the `simulateState` control defaults to `locked`, and `all_paid` unlocks for any signed-in session. See [../project-review.md](../project-review.md), section 3.3.
 * **Target Environment:** Framer Canvas & Published Sites
 * **Component Location:** [src/canvas-components/MemberGate.tsx](file:///d:/project/Framer%20APP/memberframe/src/canvas-components/MemberGate.tsx)
 

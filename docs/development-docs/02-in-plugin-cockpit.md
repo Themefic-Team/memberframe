@@ -2,6 +2,8 @@
 
 Technical development specification, user flow, architectural wiring, and testing checklist for the MemberFrame In-Plugin Admin Cockpit.
 
+**Status:** Prototype. Tiers and members are sample data saved in browser `localStorage`. Tiers can be added and deleted but not edited. The Settings tab stores the Stripe publishable key only. There is no secret key field, no key validation, and no magic link sending, so the flows in section 2 that mention them describe the target, not the current build. See [../project-review.md](../project-review.md), section 3.1.
+
 ---
 
 ## 1. Overview and Problem Solved

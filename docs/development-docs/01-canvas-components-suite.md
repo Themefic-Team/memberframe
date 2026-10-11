@@ -1,7 +1,7 @@
 # Technical Specification: MemberFrame Canvas Components Suite
 
 * **Module:** `01-canvas-components-suite`
-* **Status:** Implemented and Verified
+* **Status:** Prototype. All 8 components render and insert, but their behaviour is simulated (no backend calls). Each component carries its own CSS string and `injectStyles` helper. They do not import `base-component-styles.ts`, so section 3 describes the pattern, not the shared file. See [../project-review.md](../project-review.md), section 3.2.
 * **Target Environment:** Framer Canvas Runtime & Published Websites
 * **Strict Architecture Standards:**
   * **Strict Zero Inline CSS Rule:** 100% external CSS string templates injected via `injectCanvasStyles`. 0 `style={{ ... }}` objects.
