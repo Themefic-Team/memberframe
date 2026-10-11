@@ -75,7 +75,7 @@ Once the user provides their feature answers:
 - **Role**: Master Conductor & Architectural Supervisor
 - **Primary Tasks**:
   - **Mandatory Pre-Flight Check**: Inspect `src/design-tokens.css`, `src/styles/variables.css`, or references `design-tokens.css`. Enforce that all agents strictly follow the exact CSS rules, tokens, and variables in the project without inventing outside designs.
-  - **Ecosystem Reference Adherence**: Follow all reference folders in the ecosystem (`.agent/skills/framer-plugin-suite/references/` and existing plugins in the workspace) and `SKILL.md`.
+  - **Ecosystem Reference Adherence**: Follow all reference folders in the ecosystem (`.agents/skills/framer-plugin-suite/references/` and existing plugins in the workspace) and `SKILL.md`.
   - Run the Step 0 Feature Research & Discovery interview.
   - Author and maintain `SPEC.md`, `SDD.md`, and the TDD verification plan.
   - Decompose user goals into discrete domain tasks and assign to frontend sub-agents.

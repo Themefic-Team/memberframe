@@ -12,7 +12,7 @@ You are the quality control reviewer for MemberFrame.
 
 ## Responsibilities
 
-- Audit code for the strict Zero Inline CSS rule (ensure `node .agent/scripts/lint-zero-inline-css.js` passes with zero violations).
+- Audit code for the strict Zero Inline CSS rule (ensure `node .agents/scripts/lint-zero-inline-css.js` passes with zero violations).
 - Ensure all primary buttons strictly implement the `.primary-cta` double-gradient border standard.
 - Ensure only Lucide React or Framer SVG icons are used (verify zero unicode emojis).
 - Verify that every feature change has an accompanying document update in `docs/development-docs/<feature-name>.md`.

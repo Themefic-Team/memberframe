@@ -6,7 +6,7 @@
  * Rejects any occurrence of style={{ ... }} in React components.
  *
  * Usage:
- *   node .agent/scripts/lint-zero-inline-css.js [directory]
+ *   node .agents/scripts/lint-zero-inline-css.js [directory]
  */
 
 import fs from "fs";

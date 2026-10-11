@@ -78,7 +78,7 @@ TypeScript interfaces for all state objects, local storage payloads, and API req
 
 ## 6. Verification and Testing Checklist
 - [ ] Light mode and dark mode color contrast verified with `data-framer-theme`.
-- [ ] Zero inline CSS compliance verified (`node .agent/scripts/lint-zero-inline-css.js`).
+- [ ] Zero inline CSS compliance verified (`node .agents/scripts/lint-zero-inline-css.js`).
 - [ ] Framer Property Controls render cleanly in canvas sidebar.
 - [ ] Backend API endpoints return proper status codes and handle network errors gracefully.
 - [ ] All action buttons utilize `.primary-cta` double-gradient standard.

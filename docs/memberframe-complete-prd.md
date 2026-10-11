@@ -2016,6 +2016,8 @@ npm run lint:css
 
 **Fix**: change `.agent/scripts/` to `.agents/scripts/` in `package.json`. The same wrong path appears in `final-feature-specifications.md` §7 and `.agents/rules/framer-sdd-standards.md` §4 and should be corrected in both. This is task 0.1 in Section 15.2.
 
+**Status: RESOLVED on 2026-10-11** (task 0.1). Fixed in `package.json` plus eight further files carrying the same stale path: `.agents/rules/feature-development-docs.md`, `.agents/rules/framer-sdd-standards.md`, `.agents/scripts/lint-zero-inline-css.js`, `.agents/skills/framer-plugin-suite/references/orchestrator-and-subagents.md`, `.agents/skills/framer-plugin-suite/references/tdd-and-verification.md`, `.github/agents/reviewer.agent.md`, `.github/agents/tester.agent.md`, and `docs/final-feature-specifications.md`. The `.agent/` paths inside `Framer-Agent/` and `instruction/` were left alone: those are vendored copies of the agent ecosystem where `.agent/` is the real directory name. First successful run: `[Zero-Inline-CSS Linter PASSED] Successfully checked 2 files. 0 inline style violations found!`
+
 ### 18.2. Open: Does $4.99 Per Month Cover Backend Cost?
 
 The company standard price was set for frontend-only plugins. MemberFrame carries PostgreSQL, OTP email dispatch, webhook processing, S3 or R2 signing, and dunning jobs for every creator site. At $4.99 per month, and especially at $99.99 once for unlimited agency sites, per-site infrastructure cost is a real question.

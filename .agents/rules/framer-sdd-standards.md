@@ -38,9 +38,9 @@ Whenever generating or editing code in this workspace:
      - `framer-telemetry-tracking`: `getSiteInfo()`, `/api/user/site-info` sync, `componentsCount`, `framer.mode` safety.
 
 3. **Mandatory Pre-Flight Check: `design-tokens.css` & Ecosystem Reference Adherence**:
-   - Before writing or modifying any UI or CSS, the agent **MUST FIRST CHECK** if `design-tokens.css` (or `src/styles/variables.css`) exists in the project or references (`.agent/skills/framer-plugin-suite/references/design-tokens.css`).
+   - Before writing or modifying any UI or CSS, the agent **MUST FIRST CHECK** if `design-tokens.css` (or `src/styles/variables.css`) exists in the project or references (`.agents/skills/framer-plugin-suite/references/design-tokens.css`).
    - If design tokens exist, the agent **MUST STRICTLY FOLLOW THE EXACT CSS RULES, TOKENS, AND VARIABLES** defined in the project. Do not introduce outside or arbitrary styling.
-   - The agent **MUST CONSULT AND FOLLOW all reference folders in the ecosystem** (`.agent/skills/framer-plugin-suite/references/` and existing plugins in the workspace) as well as **`SKILL.md`**.
+   - The agent **MUST CONSULT AND FOLLOW all reference folders in the ecosystem** (`.agents/skills/framer-plugin-suite/references/` and existing plugins in the workspace) as well as **`SKILL.md`**.
    - Standard window geometry MUST be initialized in `src/App.tsx`:
      ```typescript
      framer.showUI({

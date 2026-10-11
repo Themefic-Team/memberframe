@@ -141,7 +141,7 @@ describe("Strict Zero Inline CSS Enforcement", () => {
 #### Standalone Linter Command
 You can also run the automated Zero-Inline-CSS linter directly from terminal at any time:
 ```bash
-node .agent/scripts/lint-zero-inline-css.js [path/to/src]
+node .agents/scripts/lint-zero-inline-css.js [path/to/src]
 ```
 
 ### 3.3. Test Suite 3: 2kB Differential Compression Test

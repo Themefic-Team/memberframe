@@ -12,7 +12,7 @@ You verify that MemberFrame code runs flawlessly and without regressions.
 
 ## Responsibilities
 
-- Run the automated Zero-Inline-CSS linter: `node .agent/scripts/lint-zero-inline-css.js`.
+- Run the automated Zero-Inline-CSS linter: `node .agents/scripts/lint-zero-inline-css.js`.
 - Execute unit and integration tests using Framer SDK mock engines.
 - Test light and dark theme contrast across all components (`data-framer-theme`).
 - Verify canvas component property controls inside Framer staging environments.

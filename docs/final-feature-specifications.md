@@ -579,14 +579,14 @@ Sprint 1: Days 1 to 5 (Core Engine) ➔ Sprint 2: Days 6 to 10 (Gateways & LMS) 
 * Implement `<ProtectedDownload>` asset vault with 60-second expiring signed URLs.
 * Build `<TeamManagement>` multi-seat B2B invitation workflows.
 * Wire client Pro-Lock, 7-day trial ticker, and automatic watermark removal post-purchase.
-* Run automated Zero-Inline-CSS linter: `node .agent/scripts/lint-zero-inline-css.js`.
+* Run automated Zero-Inline-CSS linter: `node .agents/scripts/lint-zero-inline-css.js`.
 * Execute `npm run pack` to generate the production marketplace bundle.
 
 ---
 
 ## 7. Verification and Quality Assurance Standards
 
-1. **Zero Inline CSS Compliance:** Every component must pass the standalone linter (`node .agent/scripts/lint-zero-inline-css.js`) with zero inline `style={{ ... }}` violations.
+1. **Zero Inline CSS Compliance:** Every component must pass the standalone linter (`node .agents/scripts/lint-zero-inline-css.js`) with zero inline `style={{ ... }}` violations.
 2. **Theme Synchronization:** All components must dynamically inherit colors from `design-tokens.css` when switching between Framer light and dark modes (`data-framer-theme`).
 3. **Primary CTA Standard:** All primary actions strictly utilize the signature `.primary-cta` double-gradient border pattern.
 4. **Icon Standard:** Exclusively Lucide React and Framer SVG icons with `stroke="currentColor"`. Zero unicode emojis.
