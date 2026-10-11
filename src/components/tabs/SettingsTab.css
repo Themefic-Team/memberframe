@@ -1,0 +1,78 @@
+/* ==========================================================================
+   Settings Tab Stylesheet (Gateways & Preferences Cockpit)
+   ========================================================================== */
+
+.settings-tab-container {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.settings-card {
+  background-color: var(--framefic-surface, #201f1f);
+  border: 1px solid var(--framefic-surface-border, #3b3a3a);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--framefic-surface-border, #3b3a3a);
+}
+
+.settings-card-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--title, #edf0f7);
+  margin: 0;
+}
+
+.theme-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+}
+
+.theme-btn {
+  height: 30px;
+  border-radius: 8px;
+  background-color: var(--bg-card-inner, #2b2b2b);
+  border: 1px solid var(--framefic-surface-border, #3b3a3a);
+  color: var(--paragraph-faint, #8993a4);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.theme-btn:hover {
+  color: var(--title, #edf0f7);
+}
+
+.theme-btn.active {
+  background-color: rgba(82, 113, 255, 0.2);
+  border-color: var(--secondary-default, #5271ff);
+  color: #708aff;
+  font-weight: 600;
+}

@@ -9,8 +9,8 @@
  *   node .agent/scripts/lint-zero-inline-css.js [directory]
  */
 
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
 
 const targetDir = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(process.cwd(), "src");
 

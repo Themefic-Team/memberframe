@@ -1,0 +1,22 @@
+/* ==========================================================================
+   MemberFrame App Stylesheet
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  background-color: var(--framefic-page-bg, #201f1f);
+  color: var(--paragraph, #c7ccd6);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

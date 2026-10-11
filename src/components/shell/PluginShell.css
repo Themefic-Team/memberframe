@@ -1,0 +1,195 @@
+/* ==========================================================================
+   MemberFrame Plugin Shell Stylesheet (360x640 Geometry)
+   ========================================================================== */
+
+.framefic-shell {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--framefic-page-bg, #201f1f);
+  color: var(--paragraph, #c7ccd6);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Header (48px) */
+.framefic-header {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background-color: var(--framefic-surface, #201f1f);
+  border-bottom: 1px solid var(--framefic-surface-border, #3b3a3a);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.framefic-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.framefic-header-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #5271ff 0%, #3b51b8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.framefic-header-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--title, #edf0f7);
+  letter-spacing: -0.1px;
+}
+
+.framefic-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--paragraph-faint, #8993a4);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.icon-btn:hover {
+  color: var(--title, #edf0f7);
+  background-color: var(--bg-card-inner, #2b2b2b);
+}
+
+/* Tab Bar (36px) */
+.framefic-tab-bar {
+  height: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background-color: var(--framefic-surface, #201f1f);
+  border-bottom: 1px solid var(--framefic-surface-border, #3b3a3a);
+  box-sizing: border-box;
+}
+
+.framefic-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.framefic-tab {
+  height: 100%;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--paragraph-faint, #8993a4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  position: relative;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.framefic-tab:hover {
+  color: var(--title, #edf0f7);
+}
+
+.framefic-tab.active {
+  color: var(--title, #edf0f7);
+  font-weight: 600;
+}
+
+.framefic-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, #5271ff 0%, #708aff 100%);
+  border-radius: 2px 2px 0 0;
+}
+
+.framefic-tab-spacer {
+  flex: 1;
+}
+
+/* Content Scroll Area */
+.framefic-content-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.framefic-content-area::-webkit-scrollbar {
+  width: 5px;
+}
+
+.framefic-content-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.framefic-content-area::-webkit-scrollbar-thumb {
+  background: var(--framefic-surface-border, #3b3a3a);
+  border-radius: 4px;
+}
+
+/* Footer (40px) */
+.framefic-footer {
+  height: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background-color: var(--framefic-surface, #201f1f);
+  border-top: 1px solid var(--framefic-surface-border, #3b3a3a);
+  box-sizing: border-box;
+}
+
+.framefic-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--paragraph-faint, #8993a4);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.framefic-footer-link:hover {
+  color: var(--secondary-default, #5271ff);
+}
+
+.framefic-footer-version {
+  font-size: 11px;
+  color: var(--paragraph-faint, #8993a4);
+}

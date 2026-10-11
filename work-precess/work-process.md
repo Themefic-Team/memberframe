@@ -29,9 +29,12 @@ Before writing code, verify your machine has the required development tooling in
 
 ### 2.2. Plugin Manifest Configuration (`framer.json`)
 The `framer.json` manifest defines plugin permissions, window modes, and marketplace metadata:
+> [!IMPORTANT]
+> **Framer Manifest ID Rule:** Framer developer manifests strictly enforce that the `"id"` property must be **exactly 6 characters long** (e.g. `"memfrm"`). Using shorter or longer IDs causes Framer to reject the plugin with `Failed to load framer.json "id" property must be 6 characters long`.
+
 ```json
 {
-  "id": "com.memberframe.plugin",
+  "id": "memfrm",
   "name": "MemberFrame",
   "version": "1.0.0",
   "description": "The ultimate native membership and recurring monetization suite for Framer.",
@@ -39,10 +42,12 @@ The `framer.json` manifest defines plugin permissions, window modes, and marketp
   "main": "dist/index.html",
   "modes": ["canvas"],
   "permissions": [
-    "readProject",
-    "writeProject",
-    "createCodeFiles",
-    "readCodeFiles",
+    "createCodeFile",
+    "CodeFile.setFileContent",
+    "CodeFile.remove",
+    "addComponentInstance",
+    "setParent",
+    "Node.remove",
     "setPluginData",
     "getPluginData"
   ]

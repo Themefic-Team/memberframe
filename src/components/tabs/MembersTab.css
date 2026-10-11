@@ -1,0 +1,170 @@
+/* ==========================================================================
+   Members Tab Stylesheet (In-Framer Subscriber Cockpit)
+   ========================================================================== */
+
+.members-tab-container {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+/* Search and Filters */
+.members-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.search-icon-tile {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--paragraph-faint, #8993a4);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding-left: 32px !important;
+}
+
+.filter-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.filter-pill {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--framer-color-divider, rgba(255, 255, 255, 0.08));
+  background-color: var(--framer-color-bg-tertiary, #313030);
+  color: var(--paragraph-faint, #8993a4);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.filter-pill:hover {
+  color: var(--title, #edf0f7);
+}
+
+.filter-pill.active {
+  background-color: rgba(82, 113, 255, 0.2);
+  border-color: var(--secondary-default, #5271ff);
+  color: #708aff;
+  font-weight: 600;
+}
+
+/* Members Table / List */
+.members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.member-row {
+  background-color: var(--framefic-surface, #201f1f);
+  border: 1px solid var(--framefic-surface-border, #3b3a3a);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.member-row:hover {
+  border-color: var(--framer-color-divider-focus, rgba(255, 255, 255, 0.18));
+}
+
+.member-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.member-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background-color: var(--bg-card-inner, #2b2b2b);
+  border: 1px solid var(--framefic-surface-border, #3b3a3a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--title, #edf0f7);
+  flex-shrink: 0;
+}
+
+.member-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.member-email {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--title, #edf0f7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-subtext {
+  font-size: 10px;
+  color: var(--paragraph-faint, #8993a4);
+}
+
+.member-badges-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.empty-state-card {
+  padding: 24px 16px;
+  text-align: center;
+  background-color: var(--framefic-surface, #201f1f);
+  border: 1px dashed var(--framefic-surface-border, #3b3a3a);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.empty-state-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--title, #edf0f7);
+  margin: 0;
+}
+
+.empty-state-desc {
+  font-size: 11px;
+  color: var(--paragraph-faint, #8993a4);
+  margin: 0;
+}

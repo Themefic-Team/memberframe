@@ -1,0 +1,391 @@
+/* ==========================================================================
+   MemberFrame Modular UI Kit Styles
+   Strict Zero Inline CSS Rule · Design Token Integration
+   ========================================================================== */
+
+/* Buttons */
+.mf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.mf-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Button Sizes */
+.mf-btn--sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.mf-btn--md {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.mf-btn--lg {
+  height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mf-btn--full {
+  width: 100%;
+}
+
+/* Button Variants */
+.mf-btn--secondary {
+  background: var(--framefic-btn-secondary-bg, rgba(255, 255, 255, 0.05));
+  border-color: var(--framefic-btn-secondary-border, rgba(255, 255, 255, 0.1));
+  color: var(--title, #edf0f7);
+}
+
+.mf-btn--secondary:hover:not(:disabled) {
+  background: var(--framefic-btn-secondary-hover, rgba(255, 255, 255, 0.1));
+  border-color: var(--framefic-surface-border, rgba(255, 255, 255, 0.16));
+}
+
+.mf-btn--ghost {
+  background: transparent;
+  color: var(--paragraph, #c7ccd6);
+}
+
+.mf-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--title, #edf0f7);
+}
+
+.mf-btn--danger {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: #fca5a5;
+}
+
+.mf-btn--danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.22);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+/* Form Fields */
+.mf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.mf-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--title, #edf0f7);
+}
+
+.mf-label__required {
+  color: #f87171;
+  margin-left: 2px;
+}
+
+.mf-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.mf-input-wrapper__icon-left {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  color: var(--paragraph, #8d9ba8);
+}
+
+.mf-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--framefic-input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--framefic-input-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 8px);
+  color: var(--title, #edf0f7);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  transition: all var(--transition-fast, 150ms ease);
+  outline: none;
+}
+
+.mf-input--has-icon-left {
+  padding-left: 34px;
+}
+
+.mf-input:focus {
+  border-color: var(--secondary-default, #5271ff);
+  box-shadow: 0 0 0 3px rgba(82, 113, 255, 0.2);
+}
+
+.mf-input--error {
+  border-color: #f87171 !important;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.2) !important;
+}
+
+.mf-hint {
+  font-size: 11px;
+  color: var(--paragraph, #8d9ba8);
+  line-height: 1.4;
+}
+
+.mf-error {
+  font-size: 11px;
+  color: #f87171;
+  font-weight: 500;
+}
+
+/* Select */
+.mf-select {
+  appearance: none;
+  width: 100%;
+  height: 36px;
+  padding: 0 32px 0 12px;
+  background: var(--framefic-input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--framefic-input-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 8px);
+  color: var(--title, #edf0f7);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.mf-select:focus {
+  border-color: var(--secondary-default, #5271ff);
+}
+
+.mf-select-chevron {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  color: var(--paragraph, #8d9ba8);
+  display: flex;
+  align-items: center;
+}
+
+/* Toggle Switch */
+.mf-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--framefic-surface, #201f1f);
+  border: 1px solid var(--framefic-surface-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast, 150ms ease);
+}
+
+.mf-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mf-toggle__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mf-toggle__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--title, #edf0f7);
+}
+
+.mf-toggle__desc {
+  font-size: 11px;
+  color: var(--paragraph, #8d9ba8);
+}
+
+.mf-toggle__pill {
+  width: 36px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  position: relative;
+  transition: background var(--transition-fast, 150ms ease);
+  flex-shrink: 0;
+}
+
+.mf-toggle__pill--active {
+  background: var(--secondary-default, #5271ff);
+}
+
+.mf-toggle__knob {
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform var(--transition-fast, 150ms ease);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.mf-toggle__knob--active {
+  transform: translateX(16px);
+}
+
+/* Badges */
+.mf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.mf-badge--success {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.mf-badge--warning {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.mf-badge--danger {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.mf-badge--brand {
+  background: rgba(82, 113, 255, 0.15);
+  color: #708aff;
+  border: 1px solid rgba(82, 113, 255, 0.3);
+}
+
+.mf-badge--neutral {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paragraph, #c7ccd6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Modal */
+.mf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 999;
+  animation: mfFadeIn 150ms ease;
+}
+
+.mf-modal {
+  width: 100%;
+  max-width: 320px;
+  background: var(--framefic-surface, #201f1f);
+  border: 1px solid var(--framefic-surface-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: mfScaleUp 150ms ease;
+}
+
+.mf-modal__header {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--framefic-surface-border, rgba(255, 255, 255, 0.08));
+}
+
+.mf-modal__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--title, #edf0f7);
+  margin: 0;
+}
+
+.mf-modal__close-btn {
+  background: none;
+  border: none;
+  color: var(--paragraph, #8d9ba8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color var(--transition-fast, 150ms ease);
+}
+
+.mf-modal__close-btn:hover {
+  color: var(--title, #edf0f7);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mf-modal__body {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--paragraph, #c7ccd6);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mf-modal__footer {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--framefic-surface-border, rgba(255, 255, 255, 0.08));
+}
+
+@keyframes mfFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mfScaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}

@@ -10,8 +10,9 @@ In accordance with `.agent/rules/feature-development-docs.md`, whenever any feat
 
 | Sequence | Feature Name | Priority Tier | Technical Document Link |
 | :--- | :--- | :--- | :--- |
+| **00-Setup** | Setup, Standards & Workspace Orientation | Foundational | [00-workspace-setup-and-standards.md](00-workspace-setup-and-standards.md) |
 | **00** | Plugin Shell and Window Geometry | P0: Core MVP | [00-plugin-shell.md](00-plugin-shell.md) |
-| **01** | Visual Canvas Gating (`<MemberGate>`) | P0: Core MVP | [01-member-gate.md](01-member-gate.md) |
+| **01** | Canvas Components Suite (8 Components) | P0 & P1 | [01-canvas-components-suite.md](01-canvas-components-suite.md) |
 | **02** | In-Plugin Cockpit (Members & Tiers) | P0: Core MVP | [02-in-plugin-cockpit.md](02-in-plugin-cockpit.md) |
 | **03** | Tri-Gateway Payments (Stripe/Lemon/Razorpay) | P0 & P2 | [03-tri-gateway-payments.md](03-tri-gateway-payments.md) |
 | **04** | Live Preview Studio & State Simulator | P1: Enhancement | [04-live-preview-studio.md](04-live-preview-studio.md) |
