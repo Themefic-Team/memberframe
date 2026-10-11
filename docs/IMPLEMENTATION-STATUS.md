@@ -51,18 +51,18 @@ PRD section 15.2. Brings `src/` to a working shell without building any feature.
 
 | # | Task | Output | Status | Commit |
 | :--- | :--- | :--- | :--- | :--- |
-| 0.1 | Fix the lint script path defect | `package.json` | done | |
+| 0.1 | Fix the lint script path defect | `package.json` | done | `68fee92` |
 | 0.2 | Copy the reference design tokens into the project | `src/styles/design-tokens.css` | todo | |
-| 0.3 | Create `docs/development-docs/` | directory plus README index | done | |
+| 0.3 | Create `docs/development-docs/` | directory plus README index | done | `68fee92` |
 | 0.4 | Build the four-part shell | `src/components/shell/*` | todo | |
 | 0.5 | Build the shared UI kit | `src/components/ui/*` | todo | |
 | 0.6 | Wire the theme hook | `src/hooks/useFramerTheme.ts` | todo | |
 | 0.7 | Add the four empty tabs | `src/components/tabs/*` | todo | |
 | 0.8 | Add the SDK mock | `src/utils/framerMock.ts` | todo | |
 | 0.9 | Add the collapse toggle | `src/App.tsx` | todo | |
-| 0.10 | Write `CLAUDE.md` so the rules load each session (added) | `CLAUDE.md` | done | |
-| 0.11 | Write this ledger (added) | `docs/IMPLEMENTATION-STATUS.md` | done | |
-| 0.12 | Create the five sub-agents in Claude Code format (added) | `.claude/agents/*.md` | done | |
+| 0.10 | Write `CLAUDE.md` so the rules load each session (added) | `CLAUDE.md` | done | `68fee92` |
+| 0.11 | Write this ledger (added) | `docs/IMPLEMENTATION-STATUS.md` | done | `68fee92` |
+| 0.12 | Create the five sub-agents in Claude Code format (added) | `.claude/agents/*.md` | done | `68fee92` |
 
 **Exit criteria**: panel opens in Framer with zero console errors, all four tabs navigate, theme switches cleanly, `npm run lint:css` passes, `tsc --noEmit` passes, `npm run build` succeeds.
 
