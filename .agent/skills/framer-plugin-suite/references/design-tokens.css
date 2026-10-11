@@ -1,0 +1,2642 @@
+/* ==========================================================================
+   FRAMER framefic UNIFIED DESIGN SYSTEM TOKENS & STYLE GUIDELINE
+   Standardized Company Theme & Component Design Tokens
+   Dual-Theme Synchronization: Dark Mode (Default) & Light Mode
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+/* --------------------------------------------------------------------------
+   1. COLOR TOKENS: DARK THEME (DEFAULT)
+   Figma Foundations v0.3.7 · Calfic / Pixelfic UI Kit
+   -------------------------------------------------------------------------- */
+:root {
+  --font-body: "DM Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+
+  /* Brand Tokens (Pixelfic / Calfic Accent) */
+  --px-brand-primary: #5271ff;
+  --px-brand-primary-hover: #4761db;
+  --px-brand-primary-pressed: #3b51b8;
+  --px-brand-on-primary: #ffffff;
+  --px-brand-subtle: rgba(82, 113, 255, 0.20);
+  --px-brand-action: #4761db;
+  --px-brand-action-hover: #3b51b8;
+  --px-brand-action-pressed: #3b51b8;
+  --px-brand-gradient-start: #5271ff;
+  --px-brand-gradient-end: #3b51b8;
+  --px-brand-gradient: linear-gradient(180deg, #5271ff 0%, #3b51b8 100%);
+
+  /* Accent Blues & Legacy Mappings */
+  --primary-default: var(--px-brand-primary, #5271ff);
+  --primary-dark: var(--px-brand-primary-pressed, #3b51b8);
+  --secondary-default: var(--px-brand-primary, #5271ff);
+  --accent-blue: var(--px-brand-primary, #5271ff);
+  --accent-blue-hover: var(--px-brand-primary-hover, #4761db);
+  --framefic-color-1: var(--px-brand-primary, #5271ff);
+  --framefic-btn-bg: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%));
+  --framefic-cta-gradient-border: linear-gradient(180deg, #708aff 0%, #3b51b8 100%);
+  --framefic-cta-gradient-bg: linear-gradient(var(--secondary-default, #5271ff), var(--secondary-default, #5271ff));
+
+  /* Framer Runtime Theme Colours (Dark) */
+  --framer-color-bg: #201f1f;
+  --framer-color-bg-secondary: #292828;
+  --framer-color-bg-tertiary: #313030;
+  --framer-color-divider: rgba(255, 255, 255, 0.07);
+  --framer-color-text: #fcfcfd;
+  --framer-color-text-secondary: #95a3b2;
+  --framer-color-text-tertiary: #6f7b87;
+  --framer-color-text-reversed: #201f1f;
+  --framer-color-tint: #0099ff;
+  --framer-color-tint-dark: #0088e6;
+  --framer-color-tint-extra-dark: #0077cc;
+
+  /* Pixelfic Additions (Dark) */
+  --px-color-bg-raised: #292828;
+  --px-color-border-brand: rgba(82, 113, 255, 0.20);
+  --px-color-border-highlight: rgba(255, 255, 255, 0.06);
+  --px-color-border-subtle: #1b1f22;
+  --px-color-glow-brand: rgba(82, 113, 255, 0.14);
+  --px-color-shadow-deep: rgba(0, 0, 0, 0.18);
+  --px-color-shadow-soft: rgba(0, 0, 0, 0.06);
+  --px-color-focus-halo: rgba(82, 113, 255, 0.20);
+  --px-color-focus-ring: #0099ff;
+  --px-color-pro-bg: rgba(139, 92, 246, 0.20);
+  --px-color-pro-border: rgba(139, 92, 246, 0.30);
+  --px-color-pro-text: #c4b5fd;
+  --px-color-overlay: rgba(0, 0, 0, 0.50);
+  --px-color-pressed: #232323;
+  --px-color-skeleton: #2d3339;
+  --px-color-danger: #f87171;
+  --px-color-danger-subtle: #3a1414;
+  --px-color-info: #60a5fa;
+  --px-color-info-subtle: #0f2140;
+  --px-color-success: #00e454;
+  --px-color-success-subtle: #062e13;
+  --px-color-warning: #ffc745;
+  --px-color-warning-subtle: #2e2206;
+  --px-color-text-brand: #8fa3ff;
+  --px-toast-bg: rgba(41, 40, 40, 0.82);
+  --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Dark Theme Surfaces & Cards */
+  --framefic-page-bg: #201f1f;
+  --framefic-page-bg2: #292828;
+  --framefic-surface: #201f1f;
+  --framefic-surface-2: #292828;
+  --framefic-surface-3: #313030;
+  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --bg-panel: #1b1f22;
+  --bg-card: #201f1f;
+  --bg-card-inner: #292828;
+  --surface: #201f1f;
+  --foreground: #1b1f22;
+
+  /* Dark Theme Typography */
+  --title: #fcfcfd;
+  --framefic-heading: #fcfcfd;
+  --paragraph: #95a3b2;
+  --paragraph-faint: #6f7b87;
+  --framefic-text-muted: #95a3b2;
+  --framefic-text-soft: #6f7b87;
+  --framefic-input-text: #fcfcfd;
+  --framefic-input-option: #fcfcfd;
+
+  /* Dark Theme Borders & Strokes */
+  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke-faint: #1b1f22;
+
+  /* Dark Theme Semantics */
+  --warning-bg: #2e2206;
+  --warning-text: #ffc745;
+  --positive-bg: #062e13;
+  --positive-text: #00e454;
+  --negative-default: #f87171;
+
+  /* Dark Theme Shadows & Overlays */
+  --framefic-overlay: rgba(0, 0, 0, 0.50);
+  --framefic-shadow: rgba(0, 0, 0, 0.18);
+  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06));
+  --framefic-frosted-bg: rgba(32, 31, 31, 0.75);
+  --framefic-frosted-border: rgba(255, 255, 255, 0.07);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Legacy mappings */
+  --fill_background: var(--bg-card);
+  --fill_foreground: var(--bg-card-inner);
+  --border_default: var(--border-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   2. COLOR TOKENS: LIGHT THEME SYNCHRONIZATION
+   Triggered automatically when Framer workspace is Light
+   OR when user selects "Light" in SettingsPage (data-user-theme="light")
+   -------------------------------------------------------------------------- */
+body[data-framer-theme="light"]:not([data-user-theme="dark"]),
+html[data-user-theme="light"] body {
+  /* Framer Runtime Theme Colours (Light) */
+  --framer-color-bg: #ffffff;
+  --framer-color-bg-secondary: #f5f5f5;
+  --framer-color-bg-tertiary: #ededed;
+  --framer-color-divider: rgba(0, 0, 0, 0.05);
+  --framer-color-text: #1b1f22;
+  --framer-color-text-secondary: #5c6670;
+  --framer-color-text-tertiary: #8a939c;
+  --framer-color-text-reversed: #ffffff;
+  --framer-color-tint: #0099ff;
+  --framer-color-tint-dark: #0088e6;
+  --framer-color-tint-extra-dark: #0077cc;
+
+  /* Pixelfic Additions (Light) */
+  --px-color-bg-raised: #ffffff;
+  --px-color-border-brand: rgba(82, 113, 255, 0.20);
+  --px-color-border-highlight: rgba(255, 255, 255, 0);
+  --px-color-border-subtle: #f5f5f5;
+  --px-color-glow-brand: rgba(82, 113, 255, 0.14);
+  --px-color-shadow-deep: rgba(0, 0, 0, 0.05);
+  --px-color-shadow-soft: rgba(0, 0, 0, 0.02);
+  --px-color-focus-halo: rgba(82, 113, 255, 0.20);
+  --px-color-focus-ring: #0099ff;
+  --px-color-pro-bg: #f5f3ff;
+  --px-color-pro-border: rgba(139, 92, 246, 0.30);
+  --px-color-pro-text: #6d28d9;
+  --px-color-overlay: rgba(0, 0, 0, 0.50);
+  --px-color-pressed: #dddddd;
+  --px-color-skeleton: #ededed;
+  --px-color-danger: #dc2626;
+  --px-color-danger-subtle: #fef2f2;
+  --px-color-info: #2563eb;
+  --px-color-info-subtle: #eff6ff;
+  --px-color-success: #15803d;
+  --px-color-success-subtle: #f0fdf4;
+  --px-color-warning: #b45309;
+  --px-color-warning-subtle: #fffbeb;
+  --px-color-text-brand: #4761db;
+  --px-toast-bg: rgba(255, 255, 255, 0.88);
+  --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 28px -10px rgba(0, 0, 0, 0.05), inset 0 1px 0 #ffffff;
+
+  /* Light Theme Surfaces & Cards */
+  --framefic-page-bg: #ffffff;
+  --framefic-page-bg2: #f5f5f5;
+  --framefic-surface: #ffffff;
+  --framefic-surface-2: #f5f5f5;
+  --framefic-surface-3: #ededed;
+  --framefic-surface-border: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-inner: #f5f5f5;
+  --surface: #ffffff;
+  --foreground: #f5f5f5;
+
+  /* Light Theme Typography */
+  --title: #1b1f22;
+  --framefic-heading: #1b1f22;
+  --paragraph: #5c6670;
+  --paragraph-faint: #8a939c;
+  --framefic-text-muted: #5c6670;
+  --framefic-text-soft: #8a939c;
+  --framefic-input-text: #1b1f22;
+  --framefic-input-option: #1b1f22;
+
+  /* Light Theme Borders & Strokes */
+  --border-subtle: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  --stroke: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  --stroke-faint: #f5f5f5;
+
+  /* Light Theme Semantics */
+  --warning-bg: #fffbeb;
+  --warning-text: #b45309;
+  --positive-bg: #f0fdf4;
+  --positive-text: #15803d;
+  --negative-default: #dc2626;
+
+  /* Light Theme Shadows & Overlays */
+  --framefic-overlay: rgba(0, 0, 0, 0.50);
+  --framefic-shadow: rgba(0, 0, 0, 0.05);
+  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02));
+  --framefic-frosted-bg: rgba(255, 255, 255, 0.85);
+  --framefic-frosted-border: rgba(0, 0, 0, 0.05);
+
+  /* Legacy mappings */
+  --fill_background: var(--bg-card);
+  --fill_foreground: var(--bg-card-inner);
+  --border_default: var(--border-subtle);
+}
+
+/* Force Dark Mode when user selects "Dark" in Settings (even if Framer is Light) */
+html[data-user-theme="dark"] body {
+  --framefic-page-bg: #201f1f;
+  --framefic-page-bg2: #292828;
+  --framefic-surface: #201f1f;
+  --framefic-surface-2: #292828;
+  --framefic-surface-3: #313030;
+  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --bg-panel: #1b1f22;
+  --bg-card: #201f1f;
+  --bg-card-inner: #292828;
+  --surface: #201f1f;
+  --foreground: #1b1f22;
+  --title: #fcfcfd;
+  --framefic-heading: #fcfcfd;
+  --paragraph: #95a3b2;
+  --paragraph-faint: #6f7b87;
+  --framefic-text-muted: #95a3b2;
+  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke-faint: #1b1f22;
+  --framefic-overlay: rgba(0, 0, 0, 0.50);
+  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06));
+}
+
+/* --------------------------------------------------------------------------
+   3. THE AUTHORITATIVE PRIMARY BUTTON SPECIFICATION (.primary-cta, .btn-primary)
+   Figma Foundations v0.3.7 · Node 13124:656 (Button · Type=Primary)
+   Used for ALL Primary Action Buttons across all plugins & dialogs
+   -------------------------------------------------------------------------- */
+.primary-cta,
+.btn-primary {
+  /* Font & Dimensions */
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600 !important;
+  letter-spacing: 0.15px;
+  line-height: 1;
+  width: 100%;
+  height: 36px;
+  padding: 0 16px;
+
+  /* Figma Brand Gradient (180deg #5271FF -> #3B51B8) */
+  background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%)) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 10px; /* Figma radius/10 for Medium 36px CTA */
+
+  /* Dual-Layer Elevation: Whisper Indigo Glow + Lit Top Highlight Edge */
+  box-shadow: 0 2px 6px -2px var(--px-color-glow-brand, rgba(82, 113, 255, 0.14)),
+              inset 0 1px 0 rgba(255, 255, 255, 0.20);
+
+  /* Flex Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  cursor: pointer;
+  box-sizing: border-box;
+  text-decoration: none;
+  user-select: none;
+  outline: none;
+
+  /* Smooth Transitions */
+  transition: opacity 0.15s ease,
+              box-shadow 0.2s ease,
+              background 0.2s ease,
+              transform 0.1s ease;
+}
+
+/* Hover State */
+.primary-cta:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4761db 0%, #3448a6 100%) !important;
+  box-shadow: 0 4px 14px rgba(82, 113, 255, 0.32),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Active / Pressed State */
+.primary-cta:active:not(:disabled),
+.btn-primary:active:not(:disabled) {
+  background: #3b51b8 !important;
+  transform: scale(0.985);
+  box-shadow: 0 1px 3px rgba(82, 113, 255, 0.20),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Focus Visible State (Keyboard Navigation) */
+.primary-cta:focus-visible,
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(82, 113, 255, 0.45),
+              0 2px 6px -2px rgba(82, 113, 255, 0.14),
+              inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+/* Disabled & Loading States */
+.primary-cta:disabled,
+.primary-cta[disabled],
+.btn-primary:disabled,
+.btn-primary[disabled] {
+  opacity: 0.50;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: grayscale(0.2);
+}
+
+/* Small Variant (30px Height, 8px Radius) */
+.primary-cta.btn-sm,
+.btn-primary.btn-sm {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  border-radius: 8px; /* Figma radius/8 for Small 30px CTA */
+}
+
+/* Icon Sizing inside .primary-cta */
+.primary-cta svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   4. ACTIONS & BUTTON SYSTEM (Figma Node 13085:7951 & 13030:281)
+   Variants: Primary, Secondary, Ghost, Danger | Sizes: Small (30px), Medium (36px)
+   -------------------------------------------------------------------------- */
+
+/* Base Button */
+.btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-md, 8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  box-sizing: border-box;
+  text-decoration: none;
+  user-select: none;
+  outline: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+/* Button Sizes */
+.btn-sm {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  border-radius: var(--radius-md, 8px);
+}
+
+.btn-md {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+/* Primary Button (.btn-primary, .primary-cta) */
+.btn-primary {
+  background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%)) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 2px 6px -2px var(--px-color-glow-brand, rgba(82, 113, 255, 0.14)),
+              inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4761db 0%, #3448a6 100%) !important;
+  box-shadow: 0 4px 14px rgba(82, 113, 255, 0.32),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-primary:active:not(:disabled),
+.btn-primary.is-pressed {
+  background: #3b51b8 !important;
+  transform: scale(0.985);
+  box-shadow: 0 1px 3px rgba(82, 113, 255, 0.20),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+.btn-primary:disabled,
+.btn-primary[aria-disabled="true"] {
+  opacity: 0.50;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+/* Secondary Button (.btn-secondary, .secondary-cta) */
+.btn-secondary,
+.secondary-cta {
+  background-color: var(--framer-color-bg-tertiary, #ededed) !important;
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05)) !important;
+  color: var(--framer-color-text, var(--title, #1b1f22)) !important;
+  box-shadow: none;
+}
+
+.btn-secondary:hover:not(:disabled),
+.secondary-cta:hover:not(:disabled) {
+  background-color: var(--framer-color-bg-secondary, #f5f5f5) !important;
+  border-color: var(--framer-color-divider, rgba(0, 0, 0, 0.05)) !important;
+  color: var(--framer-color-text, var(--title, #1b1f22)) !important;
+}
+
+.btn-secondary:active:not(:disabled),
+.secondary-cta:active:not(:disabled),
+.btn-secondary.is-pressed {
+  background-color: var(--px-color-pressed, #dddddd) !important;
+  border-color: var(--framer-color-divider, rgba(0, 0, 0, 0.05)) !important;
+  transform: scale(0.985);
+}
+
+.btn-secondary:focus-visible,
+.secondary-cta:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring, #0099ff) !important;
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+.btn-secondary:disabled,
+.secondary-cta:disabled,
+.btn-secondary[aria-disabled="true"] {
+  opacity: 0.50;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+/* Ghost Button (.btn-ghost) */
+.btn-ghost {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--framer-color-text, var(--title, #1b1f22)) !important;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--framer-color-bg-tertiary, #ededed) !important;
+  border-color: transparent !important;
+}
+
+.btn-ghost:active:not(:disabled),
+.btn-ghost.is-pressed {
+  background-color: var(--px-color-pressed, #dddddd) !important;
+  border-color: transparent !important;
+  transform: scale(0.985);
+}
+
+.btn-ghost:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring, #0099ff) !important;
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+.btn-ghost:disabled,
+.btn-ghost[aria-disabled="true"] {
+  opacity: 0.50;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+/* Danger Button (.btn-danger) */
+.btn-danger {
+  background-color: var(--px-color-danger-subtle, #fef2f2) !important;
+  border: 1px solid transparent !important;
+  color: var(--px-color-danger, #dc2626) !important;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--px-color-danger-subtle, #fef2f2) !important;
+  border-color: rgba(220, 38, 38, 0.25) !important;
+}
+
+.btn-danger:active:not(:disabled),
+.btn-danger.is-pressed {
+  background-color: var(--px-color-pressed, #dddddd) !important;
+  border-color: transparent !important;
+  transform: scale(0.985);
+}
+
+.btn-danger:focus-visible {
+  outline: none;
+  border-color: var(--px-color-danger, #dc2626) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.20);
+}
+
+.btn-danger:disabled,
+.btn-danger[aria-disabled="true"] {
+  opacity: 0.50;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+/* Button Icon Sizing */
+.btn svg,
+.secondary-cta svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   5. BASE RESET & APP CONTAINER
+   -------------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background-color: var(--framefic-page-bg);
+  color: var(--title);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.app-container {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: var(--framefic-page-bg);
+}
+
+/* --------------------------------------------------------------------------
+   6. STICKY TRIAL COUNTDOWN BANNER
+   -------------------------------------------------------------------------- */
+.framefic-trial-sticky-banner {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #18202b 0%, #0f172a 100%);
+  border-bottom: 1px solid rgba(112, 138, 255, 0.35);
+  color: #f1f5f9;
+  font-size: 11px;
+}
+
+.framefic-trial-sticky-banner strong {
+  color: #708aff;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.framefic-trial-sticky-upgrade-btn {
+  background: var(--framefic-btn-bg);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.framefic-trial-sticky-upgrade-btn:hover {
+  opacity: 0.9;
+}
+
+/* --------------------------------------------------------------------------
+   7. NAVBAR & TABS (DARK / LIGHT SYNCED)
+   -------------------------------------------------------------------------- */
+.frameflow-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: var(--framefic-surface);
+  border-bottom: 1px solid var(--framefic-surface-border);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.navbar-tabs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.navbar-tab {
+  background: transparent;
+  border: none;
+  color: var(--paragraph-faint);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.navbar-tab:hover {
+  color: var(--title);
+  background-color: var(--bg-card-inner);
+}
+
+.navbar-tab.active {
+  color: var(--title);
+  background-color: var(--bg-card-inner);
+  font-weight: 600;
+}
+
+.navbar-profile {
+  background: transparent;
+  border: none;
+  color: var(--paragraph-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.navbar-profile:hover,
+.navbar-profile.active {
+  color: var(--title);
+  background-color: var(--bg-card-inner);
+}
+
+/* --------------------------------------------------------------------------
+   8. INPUTS, SELECTS & CONTRAST FIXES
+   -------------------------------------------------------------------------- */
+.crest-field {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.crest-field label {
+  color: var(--title);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: block;
+  letter-spacing: -0.1px;
+}
+
+.crest-field input,
+.crest-field select {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--framefic-surface-border) !important;
+  background: var(--bg-card-inner) !important;
+  color: var(--title) !important;
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 8px 12px;
+  height: 36px;
+  width: 100%;
+  box-shadow: var(--framefic-card-shadow);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.crest-field input:focus,
+.crest-field select:focus {
+  outline: none;
+  border-color: var(--secondary-default) !important;
+  box-shadow: 0 0 0 2px rgba(82, 113, 255, 0.25);
+}
+
+.crest-field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23708AFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 16px !important;
+  padding-right: 32px !important;
+}
+
+/* Select option contrast fix in both themes */
+select option {
+  background-color: var(--bg-card-inner) !important;
+  color: var(--title) !important;
+}
+
+/* --------------------------------------------------------------------------
+   9. SWITCH TOGGLES (DARK / LIGHT SYNCED)
+   -------------------------------------------------------------------------- */
+.crest-switcher-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.crest-switch-label {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 20px;
+}
+
+.crest-switch-label input {
+  display: none;
+}
+
+.crest-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  border: 1.25px solid #6c7a89;
+  background: var(--bg-card-inner);
+  transition: all 0.3s ease;
+}
+
+.crest-switch-slider::before {
+  position: absolute;
+  content: "";
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  top: 4px;
+  left: 4px;
+  background-color: #6c7a89;
+  transition: all 0.3s ease;
+}
+
+.crest-switch-label input:checked + .crest-switch-slider {
+  background-color: var(--secondary-default);
+  border-color: var(--secondary-default);
+}
+
+.crest-switch-label input:checked + .crest-switch-slider::before {
+  left: 100%;
+  margin-left: -14px;
+  background-color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   10. FOOTER & AUTHOR LINK
+   -------------------------------------------------------------------------- */
+.author-link {
+  margin-top: auto;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--framefic-surface-border);
+}
+
+.author-link a {
+  color: var(--paragraph-faint);
+  font-size: 11px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s ease;
+}
+
+.author-link a:hover {
+  color: var(--secondary-default);
+}
+
+/* --------------------------------------------------------------------------
+   11. RUNTIME IN-CANVAS PRO-LOCK BANNER CLASSES
+   External CSS used in place of inline styles in generated code
+   -------------------------------------------------------------------------- */
+.framefic-locked-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 70px;
+  background-color: rgba(78, 79, 83, 0.47);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.framefic-locked-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--framefic-frosted-bg, rgba(43, 48, 59, 0.35));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  z-index: 999;
+  padding: 16px;
+  gap: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.framefic-lock-icon-badge {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.framefic-lock-icon-badge svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--secondary-default, #708aff);
+}
+
+.framefic-lock-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.framefic-lock-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: #ffffff;
+}
+
+.framefic-lock-description {
+  font-size: 11px;
+  opacity: 0.85;
+  max-width: 400px;
+  line-height: 1.4;
+  color: #f1f5f9;
+}
+
+/* --------------------------------------------------------------------------
+   12. TRIAL WATERMARK & DUPLICATE LIMIT CLASSES
+   Rendered in generated canvas code only during trial. Removed on purchase.
+   -------------------------------------------------------------------------- */
+.framefic-trial-watermark {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  z-index: 50;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.framefic-watermark-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-decoration: none;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 10px;
+  line-height: 1;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.framefic-watermark-link:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(112, 138, 255, 0.5);
+}
+
+.framefic-watermark-text {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.framefic-watermark-brand {
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Canvas Duplicate Limit Message (When user exceeds 1 instance on trial) */
+.framefic-duplicate-limit-container {
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: var(--framefic-surface-2, #242323);
+  border: 1px dashed var(--framefic-surface-border, #3b3a3a);
+  border-radius: var(--radius-md, 8px);
+}
+
+.framefic-duplicate-limit-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  max-width: 320px;
+}
+
+.framefic-limit-badge {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffc745;
+  background: rgba(255, 199, 69, 0.12);
+  border: 1px solid rgba(255, 199, 69, 0.25);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 999px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.framefic-limit-desc {
+  font-family: var(--font-body, "DM Sans", sans-serif);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--paragraph, #c7ccd6);
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   13. HERO CARD COMPONENT (Figma Node 13124:638 / 13085:8245)
+   Pastel aurora welcome/AI hero card on the Home tab
+   -------------------------------------------------------------------------- */
+.hero-card {
+  width: 100%;
+  border-radius: 20px;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  background: var(--px-color-bg-raised, #ffffff);
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)),
+              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)),
+              inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
+}
+
+/* Soft aurora glow backdrop effect */
+.hero-card::before {
+  content: "";
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(82, 113, 255, 0.12) 0%, rgba(139, 92, 246, 0.08) 50%, transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+.hero-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-card-title {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--title);
+  margin: 0;
+}
+
+.hero-card-desc {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 400;
+  color: var(--paragraph);
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   14. HELP TILES (Figma Node 13034:69 / 13085:8245)
+   Row of 3 equal-width shortcut cards (Guide · Contact us · Changelog)
+   -------------------------------------------------------------------------- */
+.help-tile-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.help-tile {
+  flex: 1;
+  min-height: 96px;
+  border-radius: 14px;
+  padding: 16px 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--px-color-bg-raised, var(--bg-card));
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)),
+              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)),
+              inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.help-tile:hover {
+  border-color: var(--px-color-border-brand, rgba(82, 113, 255, 0.20)) !important;
+  box-shadow: 0 1px 3px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.05)),
+              0 10px 28px -4px var(--px-color-shadow-deep, rgba(0, 0, 0, 0.08)),
+              inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
+  transform: translateY(-1px);
+}
+
+.help-tile-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--px-brand-subtle, rgba(82, 113, 255, 0.15));
+  color: var(--px-color-text-brand, #4761db);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.help-tile-icon-box svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.help-tile-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--px-brand-primary, #5271ff);
+  border: 1.5px solid var(--px-color-bg-raised, #ffffff);
+}
+
+.help-tile-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--title);
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   15. MORE FROM PIXELFIC framefic CARDS (Figma Node 13034:99 / 13085:8245)
+   Stacked list promoting sibling Framer plugins
+   -------------------------------------------------------------------------- */
+.framefic-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.framefic-card {
+  width: 100%;
+  min-height: 84px;
+  border-radius: 14px;
+  padding: 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--px-color-bg-raised, var(--bg-card));
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)),
+              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)),
+              inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.framefic-card:hover {
+  border-color: var(--px-color-border-brand, rgba(82, 113, 255, 0.20)) !important;
+  box-shadow: 0 1px 3px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.05)),
+              0 10px 28px -4px var(--px-color-shadow-deep, rgba(0, 0, 0, 0.08)),
+              inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
+  transform: translateY(-1px);
+}
+
+.framefic-card-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%));
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px -2px var(--px-color-glow-brand, rgba(82, 113, 255, 0.14));
+}
+
+.framefic-card-logo svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+}
+
+.framefic-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.framefic-card-name {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.005em;
+  color: var(--title);
+  margin: 0;
+}
+
+.framefic-card-desc {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--paragraph);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.framefic-card-open {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--paragraph-faint);
+  flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.framefic-card:hover .framefic-card-open {
+  color: var(--title);
+  background: var(--framer-color-bg-secondary);
+}
+
+.framefic-card-open svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.framefic-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Home Tab Layout & Sections */
+.home-tab-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.section-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.section-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--title);
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   16. BADGE SYSTEM (Figma Node 13034:112 / 13085:8245)
+   Status and tier pill labels (Height 18px, Padding 0 8px)
+   -------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  box-sizing: border-box;
+  user-select: none;
+  width: fit-content;
+}
+
+/* PRO Badge (Purple) */
+.badge-pro {
+  background: var(--px-color-pro-bg, #f5f3ff);
+  color: var(--px-color-pro-text, #6d28d9);
+  border: 1px solid var(--px-color-pro-border, rgba(139, 92, 246, 0.30));
+}
+
+/* Brand Badge (Indigo highlight, e.g., AI drafts included) */
+.badge-brand {
+  background: var(--px-brand-subtle, rgba(82, 113, 255, 0.15));
+  color: var(--px-color-text-brand, #4761db);
+  border: 1px solid transparent;
+}
+
+/* New Badge */
+.badge-new {
+  background: var(--px-brand-action, #4761db);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+/* Neutral Badge */
+.badge-neutral {
+  background: var(--framer-color-bg-tertiary, #ededed);
+  color: var(--paragraph, #5c6670);
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+}
+
+/* Success Badge */
+.badge-success {
+  background: var(--px-color-success-subtle, #f0fdf4);
+  color: var(--px-color-success, #15803d);
+  border: 1px solid rgba(21, 128, 61, 0.25);
+}
+
+/* Warning Badge */
+.badge-warning {
+  background: var(--px-color-warning-subtle, #fffbeb);
+  color: var(--px-color-warning, #b45309);
+  border: 1px solid rgba(180, 83, 9, 0.25);
+}
+
+/* Danger Badge */
+.badge-danger {
+  background: var(--px-color-danger-subtle, #fef2f2);
+  color: var(--px-color-danger, #dc2626);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   17. ICON BUTTONS (Figma Node 13031:89 / Actions · Doc 13085:7951)
+   Compact 30x30 actions (Close, Collapse, Copy, Link, Account)
+   Variants: Type=Secondary, Type=Ghost | States: Default, Hover, Pressed, Disabled
+   -------------------------------------------------------------------------- */
+.icon-button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: var(--radius-md, 8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-sizing: border-box;
+  outline: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  user-select: none;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--framer-color-text, var(--title, #1b1f22));
+  padding: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Keyboard Focus Ring (Figma: 1px tint focus ring + 3px halo) */
+.icon-button:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+/* Secondary Icon Button: fill bg/tertiary, stroke divider */
+.icon-button.secondary,
+.icon-button-secondary {
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  border-color: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  color: var(--framer-color-text, var(--title, #1b1f22));
+}
+
+.icon-button.secondary:hover:not(:disabled),
+.icon-button-secondary:hover:not(:disabled) {
+  background-color: var(--framer-color-bg-secondary, #f5f5f5);
+  border-color: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+}
+
+.icon-button.secondary:active:not(:disabled),
+.icon-button-secondary:active:not(:disabled),
+.icon-button.secondary.is-pressed,
+.icon-button-secondary.is-pressed {
+  background-color: var(--px-color-pressed, #dddddd);
+  border-color: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  transform: scale(0.97);
+}
+
+.icon-button.secondary:disabled,
+.icon-button-secondary:disabled,
+.icon-button.secondary[aria-disabled="true"],
+.icon-button-secondary[aria-disabled="true"] {
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  border-color: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  opacity: 0.50;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+/* Ghost Icon Button: transparent fill, hover bg/tertiary, pressed #ddd */
+.icon-button.ghost,
+.icon-button-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--framer-color-text, var(--title, #1b1f22));
+}
+
+.icon-button.ghost:hover:not(:disabled),
+.icon-button-ghost:hover:not(:disabled) {
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  border-color: transparent;
+}
+
+.icon-button.ghost:active:not(:disabled),
+.icon-button-ghost:active:not(:disabled),
+.icon-button.ghost.is-pressed,
+.icon-button-ghost.is-pressed {
+  background-color: var(--px-color-pressed, #dddddd);
+  border-color: transparent;
+  transform: scale(0.97);
+}
+
+.icon-button.ghost:disabled,
+.icon-button-ghost:disabled,
+.icon-button.ghost[aria-disabled="true"],
+.icon-button-ghost[aria-disabled="true"] {
+  background-color: transparent;
+  border-color: transparent;
+  opacity: 0.50;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+/* Icon glyph sizing */
+.icon-button svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  fill: none;
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   18. PIXELFIC framefic SHELL ARCHITECTURE (Figma Node 13085:8133)
+   Anatomy: Header (48px) + Tab bar (36px) + Content Area + Footer (40px)
+   -------------------------------------------------------------------------- */
+.framefic-shell {
+  width: 100%;
+  height: 100vh;
+  min-height: 590px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--framefic-page-bg, var(--framer-color-bg, #ffffff));
+  color: var(--title);
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 1. framefic Header (Height 48px) */
+.framefic-header {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
+  background-color: var(--framer-color-bg, #ffffff);
+  border-bottom: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-sizing: border-box;
+  z-index: 10;
+}
+
+.framefic-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.framefic-header-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%));
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px -1px var(--px-color-glow-brand, rgba(82, 113, 255, 0.14));
+}
+
+.framefic-header-logo svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.framefic-header-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.005em;
+  color: var(--title);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.framefic-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 2. Tab Bar (Height 36px) */
+.framefic-tab-bar {
+  height: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 16px;
+  background-color: var(--framer-color-bg, #ffffff);
+  border-bottom: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-sizing: border-box;
+  gap: 20px;
+  z-index: 9;
+}
+
+.framefic-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+}
+
+.framefic-tab {
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--paragraph-faint);
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.15s ease;
+  user-select: none;
+  text-decoration: none;
+}
+
+.framefic-tab:hover {
+  color: var(--title);
+}
+
+.framefic-tab.active {
+  color: var(--title);
+  font-weight: 600;
+}
+
+/* 2px Gradient Pill Indicator at Tab Bottom */
+.framefic-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%));
+}
+
+.framefic-tab-spacer {
+  flex: 1;
+}
+
+/* 3. Content Area (Scrolls) */
+.framefic-content-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* 4. framefic Footer (Height 40px, Pinned Bottom) */
+.framefic-footer {
+  height: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background-color: var(--framer-color-bg-secondary, #f5f5f5);
+  border-top: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph-faint);
+  margin-top: auto;
+  z-index: 10;
+}
+
+.framefic-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--paragraph-faint);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.framefic-footer-link svg {
+  width: 12px;
+  height: 12px;
+  color: var(--px-color-text-brand, #4761db);
+  stroke: currentColor;
+}
+
+.framefic-footer-link:hover {
+  color: var(--title);
+}
+
+.framefic-footer-version {
+  color: var(--paragraph-faint);
+  font-size: 11px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.framefic-footer-version:hover {
+  color: var(--title);
+}
+
+/* --------------------------------------------------------------------------
+   19. PIXELFIC / FRAMER FORM CONTROLS & FIELD ROWS (Figma Node 13085:8044)
+   Standardized 30px Controls, 8px Radius, Field Row Pattern
+   -------------------------------------------------------------------------- */
+
+/* Field Rows Layout Pattern */
+.field-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* space/8 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.field-row-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  gap: 12px; /* space/12 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.field-row-label,
+.field-row > label {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--framer-color-text-secondary, #5c6670);
+  margin: 0;
+  flex-shrink: 0;
+  user-select: none;
+  cursor: default;
+}
+
+.field-row-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 160px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.field-row-control.fill {
+  width: 100%;
+  flex: 1;
+}
+
+.field-error-message {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--px-color-danger, #dc2626);
+  margin-top: 4px;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+/* Text Field (.framefic-input, .framefic-text-field) */
+.framefic-input,
+.framefic-text-field {
+  height: 30px;
+  min-height: 30px;
+  width: 160px;
+  max-width: 100%;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid transparent;
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  color: var(--framer-color-text, #1b1f22);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.framefic-input::placeholder,
+.framefic-text-field::placeholder {
+  color: var(--framer-color-text-tertiary, #8a939c);
+  font-weight: 500;
+}
+
+.framefic-input:hover:not(:disabled):not(:focus),
+.framefic-text-field:hover:not(:disabled):not(:focus) {
+  background-color: var(--framer-color-bg-secondary, #f5f5f5);
+}
+
+.framefic-input:focus,
+.framefic-input.is-focus,
+.framefic-text-field:focus,
+.framefic-text-field.is-focus {
+  outline: none;
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+}
+
+.framefic-input.is-error,
+.framefic-input[aria-invalid="true"],
+.framefic-text-field.is-error,
+.framefic-text-field[aria-invalid="true"] {
+  border-color: var(--px-color-danger, #dc2626);
+}
+
+.framefic-input.is-error:focus,
+.framefic-input[aria-invalid="true"]:focus,
+.framefic-text-field.is-error:focus,
+.framefic-text-field[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.20);
+}
+
+.framefic-input:disabled,
+.framefic-text-field:disabled {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+/* Text Field with Icon Wrapper */
+.framefic-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 160px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.framefic-input-wrap.fill {
+  width: 100%;
+  flex: 1;
+}
+
+.framefic-input-wrap .framefic-input,
+.framefic-input-wrap .framefic-text-field {
+  width: 100%;
+}
+
+.framefic-input-wrap.has-leading-icon .framefic-input,
+.framefic-input-wrap.has-leading-icon .framefic-text-field {
+  padding-left: 30px;
+}
+
+.framefic-input-icon {
+  position: absolute;
+  left: 8px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--framer-color-text-tertiary, #8a939c);
+  pointer-events: none;
+}
+
+.framefic-input-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+/* Select Control (.framefic-select) */
+.framefic-select {
+  height: 30px;
+  min-height: 30px;
+  width: 160px;
+  max-width: 100%;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid transparent;
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  color: var(--framer-color-text, #1b1f22);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  padding: 0 28px 0 10px;
+  box-sizing: border-box;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a939c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+body[data-framer-theme="dark"] .framefic-select,
+:root .framefic-select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2395a3b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+}
+
+body[data-framer-theme="light"] .framefic-select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a939c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+}
+
+.framefic-select:hover:not(:disabled):not(:focus) {
+  background-color: var(--framer-color-bg-secondary, #f5f5f5);
+}
+
+.framefic-select:focus,
+.framefic-select.is-focus {
+  outline: none;
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+}
+
+.framefic-select:disabled {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+.framefic-select option {
+  background-color: var(--framer-color-bg-tertiary, #ededed) !important;
+  color: var(--framer-color-text, #1b1f22) !important;
+}
+
+/* Checkbox Control (.framefic-checkbox) */
+.framefic-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--framer-color-text, #1b1f22);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.framefic-checkbox input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  margin: 0;
+}
+
+.framefic-checkbox-box {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 4px;
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.framefic-checkbox input:checked + .framefic-checkbox-box,
+.framefic-checkbox.is-checked .framefic-checkbox-box,
+.framefic-checkbox.is-indeterminate .framefic-checkbox-box {
+  background-color: var(--px-brand-primary, #5271ff);
+  border-color: var(--px-brand-primary, #5271ff);
+}
+
+.framefic-checkbox-icon {
+  width: 10px;
+  height: 10px;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: all 0.15s ease;
+}
+
+.framefic-checkbox input:checked + .framefic-checkbox-box .framefic-checkbox-icon,
+.framefic-checkbox.is-checked .framefic-checkbox-icon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.framefic-checkbox-dash {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.framefic-checkbox.is-indeterminate .framefic-checkbox-dash,
+.framefic-checkbox input:indeterminate + .framefic-checkbox-box .framefic-checkbox-dash {
+  opacity: 1;
+}
+
+.framefic-checkbox input:focus-visible + .framefic-checkbox-box,
+.framefic-checkbox.is-focus .framefic-checkbox-box {
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+.framefic-checkbox.is-disabled,
+.framefic-checkbox input:disabled ~ * {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+/* Toggle Switch Control (.framefic-toggle) */
+.framefic-toggle {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  width: 28px;
+  height: 16px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.framefic-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  margin: 0;
+}
+
+.framefic-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  box-sizing: border-box;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.framefic-toggle-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--framer-color-text-secondary, #5c6670);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease;
+}
+
+.framefic-toggle input:checked + .framefic-toggle-track,
+.framefic-toggle.is-checked .framefic-toggle-track {
+  background-color: var(--px-brand-primary, #5271ff);
+  border-color: var(--px-brand-primary, #5271ff);
+}
+
+.framefic-toggle input:checked + .framefic-toggle-track .framefic-toggle-knob,
+.framefic-toggle.is-checked .framefic-toggle-knob {
+  background-color: #ffffff;
+  transform: translateX(12px);
+}
+
+.framefic-toggle input:focus-visible + .framefic-toggle-track,
+.framefic-toggle.is-focus .framefic-toggle-track {
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+.framefic-toggle.is-disabled,
+.framefic-toggle input:disabled ~ * {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+/* Radio Control (.framefic-radio) */
+.framefic-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--framer-color-text, #1b1f22);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.framefic-radio input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  margin: 0;
+}
+
+.framefic-radio-circle {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  border: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.framefic-radio input:checked + .framefic-radio-circle,
+.framefic-radio.is-checked .framefic-radio-circle {
+  background-color: var(--px-brand-primary, #5271ff);
+  border-color: var(--px-brand-primary, #5271ff);
+}
+
+.framefic-radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+
+.framefic-radio input:checked + .framefic-radio-circle .framefic-radio-dot,
+.framefic-radio.is-checked .framefic-radio-dot {
+  transform: scale(1);
+}
+
+.framefic-radio input:focus-visible + .framefic-radio-circle,
+.framefic-radio.is-focus .framefic-radio-circle {
+  border-color: var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
+}
+
+.framefic-radio.is-disabled,
+.framefic-radio input:disabled ~ * {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+/* Segmented Control (.framefic-segmented & .framefic-segment) */
+.framefic-segmented {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 2px;
+  border-radius: var(--radius-md, 8px);
+  background-color: var(--framer-color-bg-tertiary, #ededed);
+  box-sizing: border-box;
+  gap: 2px;
+  width: 100%;
+}
+
+.framefic-segment {
+  flex: 1;
+  height: 24px;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: var(--radius-sm, 6px);
+  border: none;
+  background: transparent;
+  color: var(--framer-color-text-secondary, #5c6670);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  cursor: pointer;
+  text-decoration: none;
+  outline: none;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.framefic-segment:hover:not(.is-active):not(:disabled) {
+  color: var(--framer-color-text, #1b1f22);
+}
+
+.framefic-segment.is-active,
+.framefic-segment[aria-selected="true"] {
+  background-color: var(--px-color-bg-raised, #ffffff);
+  color: var(--framer-color-text, #1b1f22);
+  font-weight: 600;
+  box-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
+              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.framefic-segment:focus-visible {
+  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #0099ff);
+}
+
+.framefic-segment:disabled,
+.framefic-segment.is-disabled {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   20. FEEDBACK SYSTEM: TOAST, BANNER, EMPTY STATE
+   Figma Nodes 13085:8408 (Section · Feedback), 13085:8413 (Panel · Light),
+   13085:8422 (Panel · Dark), 13035:133 (Banner), 13035:134 (Empty state),
+   13035:75 (Toast)
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   20.1. BANNER SYSTEM (.plugin-banner & .framefic-banner)
+   Persistent screen state: Info / Success / Warning / Danger
+   Border-radius 14px, Padding 12px, Gap 10px, Min-height 64px
+   -------------------------------------------------------------------------- */
+.plugin-banner,
+.framefic-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  width: 100%;
+  min-height: 64px;
+  box-sizing: border-box;
+  position: relative;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Banner Variants (Default / Dark) */
+.plugin-banner.banner-info,
+.framefic-banner.banner-info {
+  background-color: var(--px-color-info-subtle, #0f2140);
+}
+
+.plugin-banner.banner-info .banner-icon svg,
+.framefic-banner.banner-info .banner-icon svg {
+  stroke: var(--px-color-info, #60a5fa);
+  color: var(--px-color-info, #60a5fa);
+}
+
+.plugin-banner.banner-success,
+.framefic-banner.banner-success {
+  background-color: var(--px-color-success-subtle, #062e13);
+}
+
+.plugin-banner.banner-success .banner-icon svg,
+.framefic-banner.banner-success .banner-icon svg {
+  stroke: var(--px-color-success, #00e454);
+  color: var(--px-color-success, #00e454);
+}
+
+.plugin-banner.banner-warning,
+.framefic-banner.banner-warning {
+  background-color: var(--px-color-warning-subtle, #2e2206);
+}
+
+.plugin-banner.banner-warning .banner-icon svg,
+.framefic-banner.banner-warning .banner-icon svg {
+  stroke: var(--px-color-warning, #ffc745);
+  color: var(--px-color-warning, #ffc745);
+}
+
+.plugin-banner.banner-danger,
+.framefic-banner.banner-danger {
+  background-color: var(--px-color-danger-subtle, #3a1414);
+}
+
+.plugin-banner.banner-danger .banner-icon svg,
+.framefic-banner.banner-danger .banner-icon svg {
+  stroke: var(--px-color-danger, #f87171);
+  color: var(--px-color-danger, #f87171);
+}
+
+/* Light Theme Banner Overrides (Synchronized via CSS Variables) */
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-info,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-info,
+html[data-user-theme="light"] body .plugin-banner.banner-info,
+html[data-user-theme="light"] body .framefic-banner.banner-info {
+  background-color: var(--px-color-info-subtle, #eff6ff);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-info .banner-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-info .banner-icon svg,
+html[data-user-theme="light"] body .plugin-banner.banner-info .banner-icon svg,
+html[data-user-theme="light"] body .framefic-banner.banner-info .banner-icon svg {
+  stroke: var(--px-color-info, #2563eb);
+  color: var(--px-color-info, #2563eb);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-success,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-success,
+html[data-user-theme="light"] body .plugin-banner.banner-success,
+html[data-user-theme="light"] body .framefic-banner.banner-success {
+  background-color: var(--px-color-success-subtle, #f0fdf4);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-success .banner-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-success .banner-icon svg,
+html[data-user-theme="light"] body .plugin-banner.banner-success .banner-icon svg,
+html[data-user-theme="light"] body .framefic-banner.banner-success .banner-icon svg {
+  stroke: var(--px-color-success, #15803d);
+  color: var(--px-color-success, #15803d);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-warning,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-warning,
+html[data-user-theme="light"] body .plugin-banner.banner-warning,
+html[data-user-theme="light"] body .framefic-banner.banner-warning {
+  background-color: var(--px-color-warning-subtle, #fffbeb);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-warning .banner-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-warning .banner-icon svg,
+html[data-user-theme="light"] body .plugin-banner.banner-warning .banner-icon svg,
+html[data-user-theme="light"] body .framefic-banner.banner-warning .banner-icon svg {
+  stroke: var(--px-color-warning, #b45309);
+  color: var(--px-color-warning, #b45309);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-danger,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-danger,
+html[data-user-theme="light"] body .plugin-banner.banner-danger,
+html[data-user-theme="light"] body .framefic-banner.banner-danger {
+  background-color: var(--px-color-danger-subtle, #fef2f2);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-banner.banner-danger .banner-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-banner.banner-danger .banner-icon svg,
+html[data-user-theme="light"] body .plugin-banner.banner-danger .banner-icon svg,
+html[data-user-theme="light"] body .framefic-banner.banner-danger .banner-icon svg {
+  stroke: var(--px-color-danger, #dc2626);
+  color: var(--px-color-danger, #dc2626);
+}
+
+/* Banner Sub-elements */
+.banner-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px; /* Optical alignment with 18px line-height title */
+}
+
+.banner-icon svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-title {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--title, #fcfcfd);
+  margin: 0;
+  padding: 0;
+}
+
+.banner-message {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--paragraph, #95a3b2);
+  margin: 0;
+  padding: 0;
+  word-break: break-word;
+}
+
+.banner-action-wrap {
+  margin-top: 6px;
+  align-self: flex-start;
+}
+
+.banner-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm, 6px);
+  background-color: var(--framer-color-bg-tertiary, #313030);
+  border: 1px solid var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  color: var(--title, #fcfcfd);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  cursor: pointer;
+  outline: none;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.banner-action-btn:hover {
+  background-color: var(--px-color-pressed, #232323);
+}
+
+.banner-action-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #0099ff);
+}
+
+/* --------------------------------------------------------------------------
+   20.2. EMPTY STATE SYSTEM (.empty-state & .framefic-empty-state)
+   Area has no content: Min-height 200px, Radius 16px, Border hairline,
+   40x40 icon tile, 14px title, 12px description, single next step action
+   -------------------------------------------------------------------------- */
+.empty-state,
+.framefic-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  min-height: 200px;
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  background: transparent;
+  box-sizing: border-box;
+  gap: 8px;
+}
+
+.empty-state-icon-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: var(--framer-color-bg-tertiary, #313030);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
+.empty-state-icon-tile svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--paragraph, #95a3b2);
+  color: var(--paragraph, #95a3b2);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .empty-state-icon-tile svg,
+html[data-user-theme="light"] body .empty-state-icon-tile svg {
+  stroke: var(--paragraph, #5c6670);
+  color: var(--paragraph, #5c6670);
+}
+
+.empty-state-title {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.07px;
+  color: var(--title, #fcfcfd);
+  margin: 0;
+  padding: 0;
+}
+
+.empty-state-desc {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--paragraph, #95a3b2);
+  margin: 0;
+  padding: 0;
+  max-width: 280px;
+  text-align: center;
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .empty-state-desc,
+html[data-user-theme="light"] body .empty-state-desc {
+  color: var(--paragraph, #5c6670);
+}
+
+.empty-state-action {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   20.3. TOAST SYSTEM (.plugin-toast & .framefic-toast)
+   Action finished brief confirmation: Height 40px, Radius 14px,
+   Frosted glass (bg/raised 82% + 16px blur) + popover shadow, <= 45 chars
+   -------------------------------------------------------------------------- */
+.toast-viewport {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1100;
+  pointer-events: none;
+  width: max-content;
+  max-width: calc(100% - 32px);
+}
+
+.plugin-toast,
+.framefic-toast {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  gap: 8px;
+  box-sizing: border-box;
+  background-color: var(--px-toast-bg, rgba(41, 40, 40, 0.82));
+  border: 1px solid var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  box-shadow: var(--px-toast-shadow, 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: auto;
+  user-select: none;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  animation: toast-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-icon svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Toast Variants (Default / Dark) */
+.plugin-toast.toast-neutral .toast-icon svg,
+.plugin-toast.toast-info .toast-icon svg,
+.framefic-toast.toast-neutral .toast-icon svg,
+.framefic-toast.toast-info .toast-icon svg {
+  stroke: var(--framer-color-text-secondary, #95a3b2);
+  color: var(--framer-color-text-secondary, #95a3b2);
+}
+
+.plugin-toast.toast-success .toast-icon svg,
+.framefic-toast.toast-success .toast-icon svg {
+  stroke: var(--px-color-success, #00e454);
+  color: var(--px-color-success, #00e454);
+}
+
+.plugin-toast.toast-error .toast-icon svg,
+.framefic-toast.toast-error .toast-icon svg {
+  stroke: var(--px-color-danger, #f87171);
+  color: var(--px-color-danger, #f87171);
+}
+
+/* Light Theme Toast Overrides (Synchronized via CSS Variables) */
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-toast.toast-neutral .toast-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-toast.toast-neutral .toast-icon svg,
+html[data-user-theme="light"] body .plugin-toast.toast-neutral .toast-icon svg,
+html[data-user-theme="light"] body .framefic-toast.toast-neutral .toast-icon svg {
+  stroke: var(--framer-color-text-secondary, #5c6670);
+  color: var(--framer-color-text-secondary, #5c6670);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-toast.toast-success .toast-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-toast.toast-success .toast-icon svg,
+html[data-user-theme="light"] body .plugin-toast.toast-success .toast-icon svg,
+html[data-user-theme="light"] body .framefic-toast.toast-success .toast-icon svg {
+  stroke: var(--px-color-success, #15803d);
+  color: var(--px-color-success, #15803d);
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .plugin-toast.toast-error .toast-icon svg,
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .framefic-toast.toast-error .toast-icon svg,
+html[data-user-theme="light"] body .plugin-toast.toast-error .toast-icon svg,
+html[data-user-theme="light"] body .framefic-toast.toast-error .toast-icon svg {
+  stroke: var(--px-color-danger, #dc2626);
+  color: var(--px-color-danger, #dc2626);
+}
+
+.toast-message {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--title, #fcfcfd);
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.toast-action {
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--px-color-text-brand, #8fa3ff);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-left: auto;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  outline: none;
+  transition: opacity 0.15s ease, text-decoration 0.15s ease;
+}
+
+body[data-framer-theme="light"]:not([data-user-theme="dark"]) .toast-action,
+html[data-user-theme="light"] body .toast-action {
+  color: var(--px-color-text-brand, #4761db);
+}
+
+.toast-action:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.toast-action:focus-visible {
+  outline: 2px solid var(--px-color-focus-ring, #0099ff);
+  border-radius: 2px;
+}
+
+
+
+
