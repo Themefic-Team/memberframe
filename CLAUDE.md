@@ -35,11 +35,32 @@ Seven known conflicts are already resolved in PRD section 17. Never silently re-
 ```
 read status row -> read PRD section -> write/update development doc -> code
   -> npm run lint:css && npx tsc --noEmit && npm run build
-  -> commit:  feat(F01): task 1.4 canvas code generator
-  -> tick the row in docs/IMPLEMENTATION-STATUS.md with the commit SHA
+  -> set the status row to "awaiting review"
+  -> PROPOSE a commit message and stop
 ```
 
-One task per commit. `git log --oneline | grep task` is the second ledger and it cannot be faked. If the status file claims a task is done and no commit mentions it, that is a bug in the record.
+### The Agent Does Not Commit
+
+**Never run `git commit`, `git push`, or `git add`.** The user reviews every change before it enters history. This is absolute: it holds even when a task is finished, the gates are green, and committing looks like the obvious next step. There is no implied permission.
+
+At the end of a task, output a proposed message in a fenced block, one task per commit, and say plainly that the work is unstaged and waiting:
+
+```
+feat(F01): task 1.4 canvas code generator
+
+What changed and why, in prose.
+
+Gates: lint:css, tsc --noEmit, build all pass.
+Needs human verification: <anything the agent could not check>
+```
+
+Use `git status`, `git diff`, and `git log` freely. Those are reads.
+
+### Recording The SHA
+
+The user commits, so the agent cannot know the SHA in the same turn. Backfill it at the **start** of the next session: read `git log --oneline`, match the task ID in the subject, and move the row from `awaiting review` to `done` with the SHA.
+
+`git log --oneline | grep task` is the second ledger and it cannot be faked. A `done` row with no matching commit is a defect in the record: report it, do not quietly fix it.
 
 ---
 

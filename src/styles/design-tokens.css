@@ -1,0 +1,272 @@
+/* ==========================================================================
+   PROVENANCE: do not hand-edit.
+
+   Verbatim copy of the token layers (sections 1 and 2 plus the forced-dark
+   block) of:
+     .agents/skills/framer-plugin-suite/references/design-tokens.css
+
+   Component classes from sections 3 onward of that reference belong in
+   src/styles/components.css and the per-component CSS files, not here.
+   See PRD section 6.3. This file holds variables only.
+
+   Copied 2026-10-11 for PRD task 0.2 from reference lines 1 to 256.
+   Check for drift:
+     diff <(tail -n +17 src/styles/design-tokens.css) \
+          <(sed -n '1,256p' .agents/skills/framer-plugin-suite/references/design-tokens.css)
+   ========================================================================== */
+/* ==========================================================================
+   FRAMER framefic UNIFIED DESIGN SYSTEM TOKENS & STYLE GUIDELINE
+   Standardized Company Theme & Component Design Tokens
+   Dual-Theme Synchronization: Dark Mode (Default) & Light Mode
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+/* --------------------------------------------------------------------------
+   1. COLOR TOKENS: DARK THEME (DEFAULT)
+   Figma Foundations v0.3.7 · Calfic / Pixelfic UI Kit
+   -------------------------------------------------------------------------- */
+:root {
+  --font-body: "DM Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+
+  /* Brand Tokens (Pixelfic / Calfic Accent) */
+  --px-brand-primary: #5271ff;
+  --px-brand-primary-hover: #4761db;
+  --px-brand-primary-pressed: #3b51b8;
+  --px-brand-on-primary: #ffffff;
+  --px-brand-subtle: rgba(82, 113, 255, 0.20);
+  --px-brand-action: #4761db;
+  --px-brand-action-hover: #3b51b8;
+  --px-brand-action-pressed: #3b51b8;
+  --px-brand-gradient-start: #5271ff;
+  --px-brand-gradient-end: #3b51b8;
+  --px-brand-gradient: linear-gradient(180deg, #5271ff 0%, #3b51b8 100%);
+
+  /* Accent Blues & Legacy Mappings */
+  --primary-default: var(--px-brand-primary, #5271ff);
+  --primary-dark: var(--px-brand-primary-pressed, #3b51b8);
+  --secondary-default: var(--px-brand-primary, #5271ff);
+  --accent-blue: var(--px-brand-primary, #5271ff);
+  --accent-blue-hover: var(--px-brand-primary-hover, #4761db);
+  --framefic-color-1: var(--px-brand-primary, #5271ff);
+  --framefic-btn-bg: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%));
+  --framefic-cta-gradient-border: linear-gradient(180deg, #708aff 0%, #3b51b8 100%);
+  --framefic-cta-gradient-bg: linear-gradient(var(--secondary-default, #5271ff), var(--secondary-default, #5271ff));
+
+  /* Framer Runtime Theme Colours (Dark) */
+  --framer-color-bg: #201f1f;
+  --framer-color-bg-secondary: #292828;
+  --framer-color-bg-tertiary: #313030;
+  --framer-color-divider: rgba(255, 255, 255, 0.07);
+  --framer-color-text: #fcfcfd;
+  --framer-color-text-secondary: #95a3b2;
+  --framer-color-text-tertiary: #6f7b87;
+  --framer-color-text-reversed: #201f1f;
+  --framer-color-tint: #0099ff;
+  --framer-color-tint-dark: #0088e6;
+  --framer-color-tint-extra-dark: #0077cc;
+
+  /* Pixelfic Additions (Dark) */
+  --px-color-bg-raised: #292828;
+  --px-color-border-brand: rgba(82, 113, 255, 0.20);
+  --px-color-border-highlight: rgba(255, 255, 255, 0.06);
+  --px-color-border-subtle: #1b1f22;
+  --px-color-glow-brand: rgba(82, 113, 255, 0.14);
+  --px-color-shadow-deep: rgba(0, 0, 0, 0.18);
+  --px-color-shadow-soft: rgba(0, 0, 0, 0.06);
+  --px-color-focus-halo: rgba(82, 113, 255, 0.20);
+  --px-color-focus-ring: #0099ff;
+  --px-color-pro-bg: rgba(139, 92, 246, 0.20);
+  --px-color-pro-border: rgba(139, 92, 246, 0.30);
+  --px-color-pro-text: #c4b5fd;
+  --px-color-overlay: rgba(0, 0, 0, 0.50);
+  --px-color-pressed: #232323;
+  --px-color-skeleton: #2d3339;
+  --px-color-danger: #f87171;
+  --px-color-danger-subtle: #3a1414;
+  --px-color-info: #60a5fa;
+  --px-color-info-subtle: #0f2140;
+  --px-color-success: #00e454;
+  --px-color-success-subtle: #062e13;
+  --px-color-warning: #ffc745;
+  --px-color-warning-subtle: #2e2206;
+  --px-color-text-brand: #8fa3ff;
+  --px-toast-bg: rgba(41, 40, 40, 0.82);
+  --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Dark Theme Surfaces & Cards */
+  --framefic-page-bg: #201f1f;
+  --framefic-page-bg2: #292828;
+  --framefic-surface: #201f1f;
+  --framefic-surface-2: #292828;
+  --framefic-surface-3: #313030;
+  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --bg-panel: #1b1f22;
+  --bg-card: #201f1f;
+  --bg-card-inner: #292828;
+  --surface: #201f1f;
+  --foreground: #1b1f22;
+
+  /* Dark Theme Typography */
+  --title: #fcfcfd;
+  --framefic-heading: #fcfcfd;
+  --paragraph: #95a3b2;
+  --paragraph-faint: #6f7b87;
+  --framefic-text-muted: #95a3b2;
+  --framefic-text-soft: #6f7b87;
+  --framefic-input-text: #fcfcfd;
+  --framefic-input-option: #fcfcfd;
+
+  /* Dark Theme Borders & Strokes */
+  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke-faint: #1b1f22;
+
+  /* Dark Theme Semantics */
+  --warning-bg: #2e2206;
+  --warning-text: #ffc745;
+  --positive-bg: #062e13;
+  --positive-text: #00e454;
+  --negative-default: #f87171;
+
+  /* Dark Theme Shadows & Overlays */
+  --framefic-overlay: rgba(0, 0, 0, 0.50);
+  --framefic-shadow: rgba(0, 0, 0, 0.18);
+  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06));
+  --framefic-frosted-bg: rgba(32, 31, 31, 0.75);
+  --framefic-frosted-border: rgba(255, 255, 255, 0.07);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Legacy mappings */
+  --fill_background: var(--bg-card);
+  --fill_foreground: var(--bg-card-inner);
+  --border_default: var(--border-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   2. COLOR TOKENS: LIGHT THEME SYNCHRONIZATION
+   Triggered automatically when Framer workspace is Light
+   OR when user selects "Light" in SettingsPage (data-user-theme="light")
+   -------------------------------------------------------------------------- */
+body[data-framer-theme="light"]:not([data-user-theme="dark"]),
+html[data-user-theme="light"] body {
+  /* Framer Runtime Theme Colours (Light) */
+  --framer-color-bg: #ffffff;
+  --framer-color-bg-secondary: #f5f5f5;
+  --framer-color-bg-tertiary: #ededed;
+  --framer-color-divider: rgba(0, 0, 0, 0.05);
+  --framer-color-text: #1b1f22;
+  --framer-color-text-secondary: #5c6670;
+  --framer-color-text-tertiary: #8a939c;
+  --framer-color-text-reversed: #ffffff;
+  --framer-color-tint: #0099ff;
+  --framer-color-tint-dark: #0088e6;
+  --framer-color-tint-extra-dark: #0077cc;
+
+  /* Pixelfic Additions (Light) */
+  --px-color-bg-raised: #ffffff;
+  --px-color-border-brand: rgba(82, 113, 255, 0.20);
+  --px-color-border-highlight: rgba(255, 255, 255, 0);
+  --px-color-border-subtle: #f5f5f5;
+  --px-color-glow-brand: rgba(82, 113, 255, 0.14);
+  --px-color-shadow-deep: rgba(0, 0, 0, 0.05);
+  --px-color-shadow-soft: rgba(0, 0, 0, 0.02);
+  --px-color-focus-halo: rgba(82, 113, 255, 0.20);
+  --px-color-focus-ring: #0099ff;
+  --px-color-pro-bg: #f5f3ff;
+  --px-color-pro-border: rgba(139, 92, 246, 0.30);
+  --px-color-pro-text: #6d28d9;
+  --px-color-overlay: rgba(0, 0, 0, 0.50);
+  --px-color-pressed: #dddddd;
+  --px-color-skeleton: #ededed;
+  --px-color-danger: #dc2626;
+  --px-color-danger-subtle: #fef2f2;
+  --px-color-info: #2563eb;
+  --px-color-info-subtle: #eff6ff;
+  --px-color-success: #15803d;
+  --px-color-success-subtle: #f0fdf4;
+  --px-color-warning: #b45309;
+  --px-color-warning-subtle: #fffbeb;
+  --px-color-text-brand: #4761db;
+  --px-toast-bg: rgba(255, 255, 255, 0.88);
+  --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 28px -10px rgba(0, 0, 0, 0.05), inset 0 1px 0 #ffffff;
+
+  /* Light Theme Surfaces & Cards */
+  --framefic-page-bg: #ffffff;
+  --framefic-page-bg2: #f5f5f5;
+  --framefic-surface: #ffffff;
+  --framefic-surface-2: #f5f5f5;
+  --framefic-surface-3: #ededed;
+  --framefic-surface-border: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-inner: #f5f5f5;
+  --surface: #ffffff;
+  --foreground: #f5f5f5;
+
+  /* Light Theme Typography */
+  --title: #1b1f22;
+  --framefic-heading: #1b1f22;
+  --paragraph: #5c6670;
+  --paragraph-faint: #8a939c;
+  --framefic-text-muted: #5c6670;
+  --framefic-text-soft: #8a939c;
+  --framefic-input-text: #1b1f22;
+  --framefic-input-option: #1b1f22;
+
+  /* Light Theme Borders & Strokes */
+  --border-subtle: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  --stroke: var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  --stroke-faint: #f5f5f5;
+
+  /* Light Theme Semantics */
+  --warning-bg: #fffbeb;
+  --warning-text: #b45309;
+  --positive-bg: #f0fdf4;
+  --positive-text: #15803d;
+  --negative-default: #dc2626;
+
+  /* Light Theme Shadows & Overlays */
+  --framefic-overlay: rgba(0, 0, 0, 0.50);
+  --framefic-shadow: rgba(0, 0, 0, 0.05);
+  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.02));
+  --framefic-frosted-bg: rgba(255, 255, 255, 0.85);
+  --framefic-frosted-border: rgba(0, 0, 0, 0.05);
+
+  /* Legacy mappings */
+  --fill_background: var(--bg-card);
+  --fill_foreground: var(--bg-card-inner);
+  --border_default: var(--border-subtle);
+}
+
+/* Force Dark Mode when user selects "Dark" in Settings (even if Framer is Light) */
+html[data-user-theme="dark"] body {
+  --framefic-page-bg: #201f1f;
+  --framefic-page-bg2: #292828;
+  --framefic-surface: #201f1f;
+  --framefic-surface-2: #292828;
+  --framefic-surface-3: #313030;
+  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --bg-panel: #1b1f22;
+  --bg-card: #201f1f;
+  --bg-card-inner: #292828;
+  --surface: #201f1f;
+  --foreground: #1b1f22;
+  --title: #fcfcfd;
+  --framefic-heading: #fcfcfd;
+  --paragraph: #95a3b2;
+  --paragraph-faint: #6f7b87;
+  --framefic-text-muted: #95a3b2;
+  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --stroke-faint: #1b1f22;
+  --framefic-overlay: rgba(0, 0, 0, 0.50);
+  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06));
+}
