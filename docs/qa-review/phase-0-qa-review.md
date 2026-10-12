@@ -111,7 +111,7 @@ was mechanically confirmed, which is never the same as a visual pass.
 | 0.4  | Build the four-part shell        | Header, tab bar, scroll area, footer all render at 360x640          | Partial. Four components plus barrel exist, geometry present in CSS at 48px, 36px, and 40px                           | Yes, QA-01 and QA-02                   |
 | 0.5  | Build the shared UI kit          | Nine named components                                               | Pass on existence. All nine export from `src/components/ui/index.ts`                                                  | Yes, QA-12. See the gap in section 7.4 |
 | 0.6  | Wire the theme hook              | Switching Framer theme re-renders with no hardcoded hex             | Partial. Hook exists, zero hex confirmed by A8                                                                        | Yes, QA-07 to QA-09                    |
-| 0.7  | Add the four empty tabs          | Home, Builder, Manage, Settings navigate and persist the active tab | Partial. Four tab components, one registry in `tabs.ts`, persistence to `localStorage` under `memberframe.active-tab` | Yes, QA-03 and QA-04                   |
+| 0.7  | Add the four empty tabs          | Home, Builder, Manage, Settings navigate and persist the active tab | Partial. Four tab components, one registry in `tabs.ts`, persistence to `localStorage` under `memberframe.active-tab`. **Failed QA-03 on first run, see DEF-01. Fixed, awaiting retest** | Yes, QA-03 and QA-04                   |
 | 0.8  | Add the SDK mock                 | Unit tests run with no Framer desktop app                           | **Pass, fully.** 16 of 16 in a node environment, no Framer process                                                    | No, see section 7.3                    |
 | 0.9  | Add the collapse toggle          | Collapses to 48px, restores to 640px                                | Partial. Constants are 360, 640, and 48 in `App.tsx`, passed to `framer.showUI`                                       | Yes, QA-05 and QA-06                   |
 | 0.10 | Write `CLAUDE.md`                | Rules load each session                                             | Pass. In commit `68fee92`                                                                                             | No                                     |
@@ -374,11 +374,65 @@ Two requests for the same family. Harmless to function, worth one line of cleanu
 
 Add one row per Fail. Keep the QA id so the fix can be traced back.
 
-| ID  | QA case | Severity | What was observed | Expected | Owner | State |
-| :-- | :------ | :------- | :---------------- | :------- | :---- | :---- |
-|     |         |          |                   |          |       |       |
+| ID     | QA case | Severity | What was observed                                                        | Expected                        | Owner | State            |
+| :----- | :------ | :------- | :----------------------------------------------------------------------- | :------------------------------ | :---- | :--------------- |
+| DEF-01 | QA-03   | Major    | Only the Home tab is visible. Builder, Manage, and Settings are rendered but overflow out of the panel | All four tabs visible and clickable | agent | Fixed, needs retest |
 
 Severity: Blocker stops Phase 1, Major breaks a done-when, Minor is cosmetic.
+
+### DEF-01: Three Of Four Tabs Overflow Out Of The Panel
+
+Reported by the reviewer with a Framer devtools screenshot showing
+`button#tab-settings.framefic-tab` measured at `244.117 x 35.4`.
+
+**Root cause.** `framer-plugin/framer.css` ships a global `button { width: 100% }`. Every button
+that declares no width of its own inherits it. `.framefic-tab` declared none, so each of the four
+tabs expanded to the full width of the tab bar. The tab bar is a row flex container, so the four
+of them laid out end to end: measured scroll width 1035px inside a visible 244px, with only the
+first tab inside the panel.
+
+This also explains two things the reviewer saw that looked unrelated. The tab label sat in the
+middle of the bar rather than at the left, because the same `framer.css` rule sets
+`justify-content: center`, so "Home" was centred inside a 244px button. And the blue line near the
+account icon was the active tab's 2px gradient pill, stretched across the full width of whichever
+oversized tab was selected.
+
+**Why the rest of the kit survived it.** `.icon-button` pins `width: 30px`, `.primary-cta` and
+`.btn-primary` set `width: 100%` on purpose, and `.framefic-segment` uses `flex: 1` so its basis
+wins. Only `.framefic-tab` and `.btn` declared no width at all.
+
+**Fix.** A four-line reset in [`src/styles/shell.css`](../../src/styles/shell.css):
+
+```css
+.framefic-tab,
+.btn {
+  width: auto;
+}
+```
+
+It cannot go in `components.css`. That file is a verbatim slice of the reference design system and
+editing it would break the drift check in section 3.1.
+
+**Verified.** Measured against the built stylesheet with the real shell markup, before and after:
+
+| Tab | Width before | Width after | Inside the panel after |
+| :--- | :--- | :--- | :--- |
+| Home | 244px | 38px | Yes |
+| Builder | 244px | 44px | Yes |
+| Manage | 244px | 50px | Yes |
+| Settings | 244px | 51px | Yes |
+
+Tabs list scroll width went from 1035px to 244px, so it no longer overflows. The last tab ends at
+260px, which leaves room for the spacer and the 30px account button inside 360px.
+
+**Still needs a human.** The measurement was taken in a browser against the built CSS, not in the
+Framer desktop app. Re-run QA-03 there. The reviewer must reload the plugin, since the dev server
+has to re-serve the stylesheet.
+
+**Escaped the gates, and will again.** All four gates were green while this defect was live.
+`lint:css` checks for inline styles, `tsc` checks types, and the build checks that CSS compiles.
+None of them lays out a box. This is exactly the layer-2 visual coverage that blocker B5 describes
+and that `jsdom` plus a testing library would catch.
 
 ---
 

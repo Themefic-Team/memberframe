@@ -4,7 +4,7 @@ The task ledger. One row per numbered task in [`memberframe-complete-prd.md`](me
 
 **Read this first in every session.** It is the single source of truth for what is done. The PRD says what to build; this says where we are.
 
-Last updated: 2026-10-11
+Last updated: 2026-10-12
 
 ---
 
@@ -37,18 +37,24 @@ read the row -> read the PRD section -> write the development doc -> code
 
 ## Progress
 
-| Phase     | Scope                                             | Tasks  | Done  |
-| :-------- | :------------------------------------------------ | :----- | :---- |
-| 0         | Scaffold from the clean slate                     | 12     | 6     |
-| 1         | Foundation and core gating (weeks 1 to 2)         | 16     | 0     |
-| 2         | Global payments, paywalls, LMS (weeks 3 to 4)     | 18     | 0     |
-| 3         | B2B, CMS, member self-service (weeks 5 to 6)      | 11     | 0     |
-| 4         | Community, localization, packaging (weeks 7 to 8) | 15     | 0     |
-| **Total** |                                                   | **72** | **6** |
+| Phase     | Scope                                             | Tasks  | Done   |
+| :-------- | :------------------------------------------------ | :----- | :----- |
+| 0         | Scaffold from the clean slate                     | 12     | 12     |
+| 1         | Foundation and core gating (weeks 1 to 2)         | 16     | 0      |
+| 2         | Global payments, paywalls, LMS (weeks 3 to 4)     | 18     | 0      |
+| 3         | B2B, CMS, member self-service (weeks 5 to 6)      | 11     | 0      |
+| 4         | Community, localization, packaging (weeks 7 to 8) | 15     | 0      |
+| **Total** |                                                   | **72** | **12** |
 
 69 tasks come from PRD section 15. Tasks 0.10 to 0.12 were added on 2026-10-11 and are marked `added` below.
 
-Six further Phase 0 rows (0.4 to 0.9) sit at `awaiting review` and are not counted above. **No SHA means not done.**
+**A second track opened on 2026-10-12.** The fourteen feature plans in [`docs/features-plan/`](features-plan/) are delivered feature by feature rather than task by task, and they are tracked in their own table under [Feature Plans](#feature-plans) below. The phase tables stay authoritative for the PRD's own 72 tasks. FP-02, email and password authentication, is the first one delivered and sits at `awaiting review`.
+
+**Phase 0 is closed.** Rows 0.4 to 0.9 were backfilled to `done` against `cd5c248` on 2026-10-12. `done` here means a commit exists, not that a human has seen the rendered panel: the Framer-side checks for 0.2 and 0.4 to 0.7 are still open in [`qa-review/phase-0-qa-review.md`](qa-review/phase-0-qa-review.md).
+
+**Caveat on 0.7**: `cd5c248` shipped the tab bar with defect DEF-01, where three of the four tabs overflowed out of the panel. The one-rule fix in `src/styles/shell.css` is written and gate-green but **not yet committed**, so the row is `done` on an SHA that does not contain its own fix. The follow-up commit closes this.
+
+**Phase 1 shows 0 done and that is accurate.** All sixteen rows, 1.1 to 1.8 and 2.1 to 2.8, sit at `awaiting review` with the work unstaged in the tree. `done` requires a commit, and `git log` is the second ledger: a row claiming `done` with no matching SHA is a defect in the record, so the count stays at 0 until the user commits. Phase 1 is now feature complete against PRD section 15.4 and its **exit criteria are not met**, because they end with "a visitor signs in by OTP, pays through Stripe, and the gate unlocks on the published site", and all three of those need the backend. The QA script for the phase is [`qa-review/phase-1-qa-review.md`](qa-review/phase-1-qa-review.md), written on 2026-10-12 and unsigned.
 
 ---
 
@@ -61,12 +67,12 @@ PRD section 15.2. Brings `src/` to a working shell without building any feature.
 | 0.1  | Fix the lint script path defect                          | `package.json`                  | done   | `68fee92` |
 | 0.2  | Copy the reference design tokens into the project        | `src/styles/design-tokens.css`  | done   | `4c4d5f5` |
 | 0.3  | Create `docs/development-docs/`                          | directory plus README index     | done   | `68fee92` |
-| 0.4  | Build the four-part shell                                | `src/components/shell/*`        | done   |           |
-| 0.5  | Build the shared UI kit                                  | `src/components/ui/*`           | done   |           |
-| 0.6  | Wire the theme hook                                      | `src/hooks/useFramerTheme.ts`   | done   |           |
-| 0.7  | Add the four empty tabs                                  | `src/components/tabs/*`         | done   |           |
-| 0.8  | Add the SDK mock                                         | `src/utils/framerMock.ts`       | done   |           |
-| 0.9  | Add the collapse toggle                                  | `src/App.tsx`                   | done   |           |
+| 0.4  | Build the four-part shell                                | `src/components/shell/*`        | done   | `cd5c248` |
+| 0.5  | Build the shared UI kit                                  | `src/components/ui/*`           | done   | `cd5c248` |
+| 0.6  | Wire the theme hook                                      | `src/hooks/useFramerTheme.ts`   | done   | `cd5c248` |
+| 0.7  | Add the four empty tabs                                  | `src/components/tabs/*`         | done   | `cd5c248` |
+| 0.8  | Add the SDK mock                                         | `src/utils/framerMock.ts`       | done   | `cd5c248` |
+| 0.9  | Add the collapse toggle                                  | `src/App.tsx`                   | done   | `cd5c248` |
 | 0.10 | Write `CLAUDE.md` so the rules load each session (added) | `CLAUDE.md`                     | done   | `68fee92` |
 | 0.11 | Write this ledger (added)                                | `docs/IMPLEMENTATION-STATUS.md` | done   | `68fee92` |
 | 0.12 | Create the five sub-agents in Claude Code format (added) | `.claude/agents/*.md`           | done   | `68fee92` |
@@ -91,33 +97,86 @@ PRD section 15.4. **Goal**: a creator can configure a tier, gate a frame, and ta
 
 ### Week 1
 
-| #   | Task                                                       | Feature  | Files                                                                            | Status | Commit |
-| :-- | :--------------------------------------------------------- | :------- | :------------------------------------------------------------------------------- | :----- | :----- |
-| 1.1 | Build the Live Preview Studio with the five-state switcher | F04      | `components/studio/PreviewStudio.tsx`, `StateSwitcher.tsx`                       | todo   |        |
-| 1.2 | Build the simulated session context                        | F04      | `hooks/useMemberSession.ts`                                                      | todo   |        |
-| 1.3 | Build the Builder tab customizer using `.field-row`        | F01, F04 | `components/tabs/BuilderTab.tsx`                                                 | todo   |        |
-| 1.4 | Build the canvas code generator service                    | F01      | `services/canvasComponentCodeGenerator.ts`                                       | todo   |        |
-| 1.5 | Build the Framer canvas service wrapper                    | F01      | `services/framerCanvasService.ts`                                                | todo   |        |
-| 1.6 | Declare the first `framer.json` permissions                | F01      | `createCodeFile`, `CodeFile.setFileContent`, `addComponentInstance`, `setParent` | todo   |        |
-| 1.7 | Author `<MemberGate>` with all seven property controls     | F01      | `canvas-components/MemberGate.tsx`                                               | todo   |        |
-| 1.8 | Implement the shared `isEntitled` resolver                 | F01      | `utils/entitlement.ts`                                                           | todo   |        |
+| #   | Task                                                       | Feature  | Files                                                                            | Status           | Commit |
+| :-- | :--------------------------------------------------------- | :------- | :------------------------------------------------------------------------------- | :--------------- | :----- |
+| 1.1 | Build the Live Preview Studio with the five-state switcher | F04      | `components/studio/PreviewStudio.tsx`, `StateSwitcher.tsx`                       | awaiting review  |        |
+| 1.2 | Build the simulated session context                        | F04      | `hooks/useMemberSession.ts`, `types/member.ts`                                   | awaiting review  |        |
+| 1.3 | Build the Builder tab customizer using `.field-row`        | F01, F04 | `components/tabs/BuilderTab.tsx`, `types/canvas.ts`, `ui/{TextField,Select,Slider}.tsx` | awaiting review  |        |
+| 1.4 | Build the canvas code generator service                    | F01      | `services/canvasComponentCodeGenerator.ts`, `services/index.ts`, `config/backend.ts` | awaiting review  |        |
+| 1.5 | Build the Framer canvas service wrapper                    | F01      | `services/framerCanvasService.ts`, `components/tabs/BuilderTab.tsx`, `utils/framerMock.ts` | awaiting review  |        |
+| 1.6 | Declare the first `framer.json` permissions                | F01      | `framer.json`: `addComponentInstance`, `createCodeFile`, `setCodeFileContent`, `setParent` | awaiting review  |        |
+| 1.7 | Author `<MemberGate>` with all seven property controls     | F01      | `canvas-components/MemberGate.tsx`, `types/framer-canvas.d.ts`                   | awaiting review  |        |
+| 1.8 | Implement the shared `isEntitled` resolver                 | F01      | `utils/entitlement.ts`                                                           | awaiting review  |        |
+
+**Note on 1.1 to 1.3**: one development doc, [`development-docs/04-live-preview-studio.md`](development-docs/04-live-preview-studio.md). Task 1.3 spans F01 and F04 because the customizer edits a draft of F01's property controls; the component itself is documented in `01-member-gate.md` with tasks 1.4 to 1.8.
+
+**Note on 1.4 to 1.7**: one development doc, [`development-docs/01-member-gate.md`](development-docs/01-member-gate.md). The deploy path is `BuilderTab` to `generateMemberGateCode` to `deployMemberGate`, and the component it writes is authored as a real typechecked `.tsx` file rather than a template string, so `tsc --noEmit` and `npm run lint:css` both cover the code that ends up on a creator's published site. Reasoning in section 3.2 of that doc.
+
+**Note on 1.8, corrected by 1.7**: pulled forward and done alongside 1.1, the same call made for 0.9. F04's first acceptance criterion is that all five simulated states render distinctly, and nothing can tell Silver from VIP from a failed payment without resolving entitlement, so the resolver is a prerequisite of 1.1 rather than a later task. Covered by `test/entitlement.test.ts`.
+
+The earlier version of this note said tasks 1.4 and 1.7 "must import it, never reimplement it". **That is not possible for 1.7 and the note was wrong.** `MemberGate.tsx` is deployed into the creator's Framer project, where it can import only `react`, `framer`, and `lucide-react`, so it cannot reach `src/utils/entitlement.ts` and must carry its own copy. That is what PRD section 11.3 describes when it says the resolver is "implemented identically in the plugin, the canvas components, and the backend". The copies are held together by `test/memberGateParity.test.ts`, which extracts both function bodies, normalizes away comments and spacing, and fails if they differ. Verified to fail: changing `>=` to `>` in the canvas copy breaks three of its assertions. Task 1.4 does import the plugin's copy and must continue to. **The backend's third copy is out of repo and nothing in this repository can check it**, which is the remaining hole in section 11.3's guarantee.
+
+**Two new PRD conflicts found by 1.2. Both need a decision**, and neither is among the seven already resolved in PRD section 17. Full write-up in [`04-live-preview-studio.md`](development-docs/04-live-preview-studio.md) section 5.1.
+
+| # | Conflict | Resolved as | Confirm before |
+| :-- | :--- | :--- | :--- |
+| C1 | PRD section 11.3's `isEntitled` reads `session.gracePeriodEndsAt`, but the `MemberSessionData` interface in F01 never declares it. The specified resolver does not typecheck against the specified interface | Field declared. Section 11.3 is the security-critical contract and F18 cannot exist without a grace window | The backend schema is written. This is a column |
+| C2 | Two incompatible tier key spaces. F01's `requiredTier` control uses `free_member` / `tier_1` / `tier_2` / `vip`, while `MemberSessionData.activeTier` is commented `free` / `silver` / `gold` / `vip`. Section 11.3 compares them through one lookup, which no single tier table can satisfy. Read literally, a Silver subscriber fails a Silver gate | The control values win, because they are embedded in generated canvas code and visible in Framer's sidebar. The others are display names and now live on `SiteTierRecord.name` | Task 1.7 |
+
+C2 is the more dangerous of the two. It fails closed rather than open, so it is not a security hole, but it is a silent total gating failure: the lookup misses, `held` is `undefined`, and every gate stays shut with no error anywhere. `test/entitlement.test.ts` pins that behaviour so it cannot regress unnoticed.
+
+**Five more conflicts found by 1.4 to 1.7. One needs a decision, four are resolved and recorded only so the resolution is not re-litigated.** Full write-up in [`01-member-gate.md`](development-docs/01-member-gate.md) section 5.1.
+
+| # | Conflict | Resolved as | Confirm before |
+| :-- | :--- | :--- | :--- |
+| C3 | Task 1.6 lists `CodeFile.setFileContent` as a `framer.json` permission. It is not one. The SDK maps that **method key** to the **permission** `setCodeFileContent`, and the two namespaces are not interchangeable | `framer.json` declares `addComponentInstance`, `createCodeFile`, `setCodeFileContent`, `setParent`. `framer.isAllowedTo` is called with the method keys. `getCodeFiles` is unprotected and is deliberately not declared | Nothing. The SDK is the authority and it is checkable. Recorded because the wrong string fails silently |
+| C4 | F01 says the runtime hook "checks the local JWT and cached tier entitlement". PRD section 14.1 S2 forbids a JWT in `localStorage` and puts the session in an HTTP-only cookie | S2 wins. The gate reads no token anywhere and calls `GET /api/member/session` with `credentials: "include"`. A test asserts the component's code contains no `localStorage`, `sessionStorage`, or `document.cookie` | Nothing. S2 is the security requirement |
+| C5 | `isEntitled` compares ranks from the site's tier table. `GET /api/member/session` returns no tier table, and the canvas component cannot read the plugin's | The gate falls back to the default four-tier ladder. **Recommended fix: add `tiers` to the `/api/member/session` response**, since it is the only call the gate makes | **The backend schema is written.** Same deadline as C1 |
+| C6 | PRD section 9.3 requirement 3 mandates `IS_LOCKED` and the lock-state marker in every component. `CLAUDE.md` puts F19 licensing after the core workflow | Both honoured. The static declarations, the markers, the Pro-Lock banner, and the trial watermark are in the component, because they are what F19's patcher rewrites. The 1-instance duplicate registry is **not**: that is enforcement behaviour and belongs to F19 | Nothing |
+| C7 | The reference master template uses `style={{ }}` for its own dynamic values | The rule wins, unconditionally. Dynamic values are CSS custom properties inside `cssContent`. Precedence puts the references above the PRD but not above `.agents/rules/` | Nothing |
+
+C5 is the one to look at. It fails closed, so no content leaks, but a creator who adds a fifth tier or re-ranks the ladder gets gates that stay shut when they should open. Renaming a tier is safe, because keys are what get compared.
 
 ### Week 2
 
 | #   | Task                                                     | Feature | Files                                        | Status  | Commit |
 | :-- | :------------------------------------------------------- | :------ | :------------------------------------------- | :------ | :----- |
-| 2.1 | Build the API client with the five-case error contract   | All     | `services/apiClient.ts`, `config/backend.ts` | blocked |        |
-| 2.2 | Build the Manage tab with the members and tiers segments | F02     | `components/tabs/ManageTab.tsx`, `manage/*`  | todo    |        |
-| 2.3 | Build the tier editor with rank uniqueness validation    | F02     | `components/manage/TierEditor.tsx`           | todo    |        |
-| 2.4 | Build the Settings tab with the gateway key vault        | F03     | `components/tabs/SettingsTab.tsx`            | todo    |        |
-| 2.5 | Author `<MemberAuth>` with OTP and Google SSO            | F05     | `canvas-components/MemberAuth.tsx`           | todo    |        |
-| 2.6 | Wire Stripe checkout session creation                    | F03     | `services/checkoutService.ts`                | todo    |        |
-| 2.7 | Build the Home tab with the hero card and quick start    | F02     | `components/tabs/HomeTab.tsx`                | todo    |        |
-| 2.8 | Write development docs for F01 through F05               | Rule    | `docs/development-docs/01` to `05-*.md`      | todo    |        |
+| 2.1 | Build the API client with the five-case error contract   | All     | `services/apiClient.ts`, `config/backend.ts` | awaiting review |        |
+| 2.2 | Build the Manage tab with the members and tiers segments | F02     | `components/tabs/ManageTab.tsx`, `manage/{MembersTable,MemberRow,MemberFlyout,memberFilters}`, `services/siteService.ts`, `hooks/useDebouncedValue.ts`, `types/site.ts`, `styles/manage.css` | awaiting review |        |
+| 2.3 | Build the tier editor with rank uniqueness validation    | F02     | `components/manage/TierEditor.tsx`, `manage/tierValidation.ts`, `utils/money.ts` | awaiting review |        |
+| 2.4 | Build the Settings tab with the gateway key vault        | F03     | `components/tabs/SettingsTab.tsx`, `settings/{GatewayVault.tsx,gatewayKeys.ts}`, `styles/settings.css`, `ui/TextField.tsx` | awaiting review |        |
+| 2.5 | Author `<MemberAuth>` with OTP and Google SSO            | F05     | `canvas-components/MemberAuth.tsx`, generator generalised, `studio/componentRegistry.ts` | awaiting review |        |
+| 2.6 | Wire Stripe checkout session creation                    | F03     | `services/checkoutService.ts`                | awaiting review |        |
+| 2.7 | Build the Home tab with the hero card and quick start    | F02     | `components/tabs/HomeTab.tsx`, `App.tsx`     | awaiting review |        |
+| 2.8 | Write development docs for F01 through F05               | Rule    | `development-docs/{00-api-client,01,02,03,05}-*.md`, `00-plugin-shell.md` section 9 | awaiting review |        |
 
-**2.1 is blocked**: the backend does not exist. PRD section 10 defines the contract and marks it out-of-repo. Every task downstream of the API client inherits this block. Decide who builds the API before Phase 1 starts.
+**2.1 was `blocked` and is now `awaiting review`, which needs explaining.** The backend still does not exist. What was blocked was never the authoring: PRD section 10.1 puts "request shapes, error handling, retry, degraded UI" in this repository and persistence in the other one, so the client is this repo's to write against the contract. What is blocked is **verification**. Not one of the five PRD section 10.6 cases has been observed against a server, and the tests prove only that this module maps a 403 to `forbidden`.
+
+The practical consequence runs through every Week 2 surface: with no backend and no creator token (conflict C10), every `/api/site/*` call resolves `unauthorized`, so the Manage tab and the gateway vault render their signed-out states and nothing else. Each surface is prop driven and fully built, so the API arriving is a wiring change rather than a UI change.
+
+**Note on 2.5**: the generator was generalised from one function into a descriptor plus a shared core, because `<MemberAuth>` is the second component and the marker handling, the config swap, and the F19 lock-state assertion are identical for all fifteen. Doing it at the second is where the shape is visible and the abstraction is still cheap. `<MemberAuth>` is deployable but has no panel customizer, so the registry gained a `deployable` flag separate from `previewReady`: collapsing the two would have forced a choice between refusing to insert a component that exists and claiming a preview that does not. **No task in the plan builds its panel preview or customizer.**
+
+**Note on 2.7**: PRD section 15.4 attributes the Home tab to F02. Its content is panel chrome rather than member administration, so it is documented in [`00-plugin-shell.md`](development-docs/00-plugin-shell.md) section 9 instead of the F02 doc.
+
+**Note on 2.8**: met. Five feature docs exist for F01 through F05, plus a new `00-api-client.md` for the cross-cutting client, whose ledger Feature column reads "All" and which would otherwise have to be documented five times. All are `in progress` rather than `done`, which is accurate: each carries an unticked human verification table.
+
+**Seven more conflicts found in Week 2, two needing a decision.** Full write-ups in [`00-api-client.md`](development-docs/00-api-client.md) section 5.1, [`02-member-tier-cockpit.md`](development-docs/02-member-tier-cockpit.md) section 5.1, [`03-tri-gateway-payments.md`](development-docs/03-tri-gateway-payments.md) section 5.1, and [`05-member-auth.md`](development-docs/05-member-auth.md) section 5.1.
+
+| # | Conflict | Resolved as | Confirm before |
+| :-- | :--- | :--- | :--- |
+| C8 | `SiteTierRecord` is declared twice with different shapes: three fields in section 11.3's resolver, ten in F02 | F02's is the entity and keeps the name. The resolver narrows to `TierLadderEntry`, a `Pick` of what rank comparison actually reads. Renamed in both copies of `isEntitled` together, so the parity test still passes | Nothing. F02's is a superset |
+| C9 | F02 types `SiteTierRecord.key` as `string` and intends custom tier keys. F01's `requiredTier` control is a fixed `Enum` of five, so a custom key can never be selected on a gate | Phase 1 offers the four known keys and the tier editor says so. **The fix already exists in the architecture**: the gate's component file is generated per creator, so the generator can emit the site's own tier keys as the `Enum` options once `GET /api/site/tiers` exists, which also resolves C5 | **Before custom tiers are offered in the UI** |
+| C10 | F02 needs a creator session token for every `/api/site/*` call. **No task in the 72-task plan builds the exchange**, and creator identity first appears at tasks 4.4 and 4.7, in Phase 2 | The client injects `getCreatorToken`, Week 2 supplies `null`, and every affected surface renders its signed-out state. Where the token is stored is a security decision, and it is refused here rather than buried in an infrastructure file | **Yes. A task needs adding to Phase 1, or 2.2 to 2.4 need moving to Phase 2.** This is a schedule defect, not a code defect |
+| C11 | F05 is member sign-in by OTP, and PRD section 10.4 lists no OTP endpoint. The only OTP routes are in section 10.2, which serves the plugin panel: its send route takes a `framerUserId` a visitor cannot have, and its verify route returns a token in the body where F05 requires an HTTP-only cookie | `<MemberAuth>` calls `POST /api/member/send-otp` and `POST /api/member/verify-otp`, declared in the component as **proposals rather than quotations** | **Yes, before the backend routes are written** |
+| C12 | Minor units are assumed to have two decimal places | The exponent is a parameter defaulting to 2. Correct for USD, EUR, GBP, and INR, which is the whole supported union, and wrong for JPY and KWD | Only if a zero-decimal or three-decimal currency is added |
+| C13 | F03's key prefix list gives `pk_live_` and `pk_test_` as the Stripe markers. Those are **publishable** prefixes, and the vault also asks for a secret key, which begins `sk_` or `rk_` | The list is treated as incomplete. All three prefixes are recognised, and a secret pasted into the publishable field is caught by field rather than by validity | Nothing, but the PRD line is worth correcting |
+| C14 | F03's `SiteGatewayConfig` carries three `*Encrypted` secret fields on the interface the client uses, and the same feature requires that a secret is never in a client response | The client type splits in two: a write shape that holds plaintext only while saving, and a read shape with **no field that can hold a secret** | Nothing. The acceptance criterion outranks the illustrative interface |
+
+C10 is the one to act on. It is not a code problem and no amount of care here fixes it: three Week 2 surfaces need an authenticated creator, and nothing in the plan authenticates one.
 
 **Exit criteria**: a creator creates a tier, gates a frame with `<MemberGate>`, a visitor signs in by OTP, pays through Stripe, and the gate unlocks on the published site. Linter and typecheck pass. Five development docs exist.
+
+**QA script**: [`qa-review/phase-1-qa-review.md`](qa-review/phase-1-qa-review.md). 20 automated checks, 48 manual cases QA-101 to QA-148, and a sign-off block. Two of the seven exit criteria above are closed by machine, four are blocked on the backend, and one, gating a frame, has never run against Framer.
 
 ---
 
@@ -221,6 +280,112 @@ PRD section 15.7.
 
 ---
 
+## Feature Plans
+
+A second track, added 2026-10-12. The fourteen plans in [`docs/features-plan/`](features-plan/) are
+feature-driven rather than task-driven: each one spans several PRD tasks and several files, and the
+unit of work is the feature, not the row.
+
+**They do not replace the phase tables above.** A feature plan is delivered against the PRD features
+it implements, so FP-02 extends F05 and its development record lives in that feature's doc. The two
+tracks disagree on nothing: where a plan goes beyond its PRD feature, the extra surface is recorded
+as a conflict and listed below.
+
+Status values are the same as everywhere else: `todo`, `in progress`, `awaiting review`, `done`,
+`blocked`. **`done` still requires a commit**, so a finished plan sits at `awaiting review` until
+the user commits it.
+
+| # | Plan | PRD feature | Files | Status | Commit |
+| :-- | :--- | :--- | :--- | :--- | :--- |
+| FP-01 | Lock Pages and On-Page Content | F01 | `canvas-components/MemberGate.tsx` | todo | |
+| FP-02 | Email and Password Authentication | F05 | `canvas-components/MemberAuth.tsx`, `utils/credentials.ts`, `types/canvas.ts`, `services/canvasComponentCodeGenerator.ts` | awaiting review | |
+| FP-03 | OTP Passwordless Auth | F05 | `canvas-components/MemberAuth.tsx` | todo | |
+| FP-04 | Google Sign In | F05 | `canvas-components/MemberAuth.tsx` | todo | |
+| FP-05 | GitHub Sign In | F05 | `canvas-components/MemberAuth.tsx` | todo | |
+| FP-06 | ReCAPTCHA Bot Defense | F21 | not started | todo | |
+| FP-07 | Soft Paywall, Read More | F07, F08 | not started | todo | |
+| FP-08 | Member Dashboard | F06 | not started | todo | |
+| FP-09 | Custom Profile Fields | F16 | not started | todo | |
+| FP-10 | Member Bookmarking | F14 | not started | todo | |
+| FP-11 | LMS Mark As Complete | F11 | not started | todo | |
+| FP-12 | Upgrade To Download | F10 | not started | todo | |
+| FP-13 | Shared Password Access | F22 | not started | todo | |
+| FP-14 | Multi-Language Support | F23 | not started | todo | |
+| FP-15 | Backend Architecture, Node and Prisma | sections 6, 10, 11, 14 | `backend/` in this repo. Specified in [`memberframe-backend-prd.md`](memberframe-backend-prd.md) | awaiting review, partial | |
+
+**FP-02 is `awaiting review` and the work is unstaged.** It adds the password path to
+`<MemberAuth>`: sign-in, sign-up, forgot-password, and the reset form, three more property controls
+for thirteen in total, and a password policy duplicated into the component with a parity test that
+has been proved able to fail. Recorded in
+[`05-member-auth.md`](development-docs/05-member-auth.md) section 9.
+
+**What is verified and what is not**: four gates green, 453 tests, and nine generated variants parse
+under esbuild including three injection attempts. **Not one of the four new endpoints exists**, so
+no password has been submitted anywhere, and nothing has been seen rendered. The lockout, the
+timing-safe responses, and the session invalidation on reset are all server side and all unverifiable
+here.
+
+**The data-storage question that prompted this track is answered** in
+[`00-member-data-model.md`](development-docs/00-member-data-model.md): member data goes in the
+backend, never in a Framer CMS collection and never in plugin data. Three of the five reasons are
+structural, the decisive one being that a CMS collection can only be written by a plugin running in
+the creator's editor, so it cannot record a visitor's signup at all.
+
+**FP-15 changed stack twice and is now partly built, in `backend/`.** The plan file proposed
+Laravel 11, PostgreSQL, Redis, and a Vue 3 creator dashboard. The decision on 2026-10-12 was Node
+with Prisma and MySQL, no dashboard at all, and the code in this repository rather than a separate
+one. [`memberframe-backend-prd.md`](memberframe-backend-prd.md) is the authoritative specification
+and section 1.3 records every deviation from the plan file.
+
+**What is built and passing**: the Prisma schema with eight models, a hand-written migration for the
+three MySQL specifics Prisma cannot express, typed configuration that refuses to boot on a bad
+value, per-site tenant resolution with an origin allowlist, scrypt password hashing, opaque
+revocable sessions, and six member endpoints covering register, sign in, forgot, reset, logout, and
+logout everywhere. 67 tests, `tsc --noEmit` clean, `npm audit` zero vulnerabilities.
+
+**What is not built**: creator authentication, which is conflict C10 and still blocks the plugin's
+Manage and Settings tabs; OTP send and verify, which answer 501 while `<MemberAuth>` ships with that
+path enabled (conflict C24); payments and webhooks; and any integration test at all. **Every route
+is typechecked and has never run against a database**, so the lockout, the timing-safe responses, and
+the session invalidation on reset are specified and unverified.
+
+**The four root gates are unaffected.** The root `tsconfig.json` includes only `src` and `test` and
+the root vitest config only `test/**`, so the backend is invisible to the Framer build. Verified
+after the fact: lint:css 65 files, tsc clean, 453 tests, build 370.63 kB.
+
+**The biggest gain from putting it in this repository** is `backend/test/parity.test.ts`. PRD section
+11.3 requires `isEntitled` to be identical in the plugin, the canvas components, and the backend and
+calls divergence a security defect. Two of the three were already compared. **The backend copy had
+nothing watching it, and it is the copy that actually decides access**, because the other two run in
+a browser where their verdict is advisory. The same test covers the password policy, with the sign
+reversed: there the browser copies are hints and the server copy is the rule.
+
+**Dropping the dashboard resolved C19 and left four responsibilities homeless**, listed in backend
+PRD section 8.2. Three can wait. The fourth, MemberFrame's own billing for creators, cannot: F19 and
+PRD section 12 require creators to pay, and that flow now has nowhere to live.
+
+### Conflicts Found In The Feature-Plan Track
+
+| # | Conflict | Resolved as | Confirm before |
+| :-- | :--- | :--- | :--- |
+| C15 | FP-02 section 2.1 names "Argon2id/bcrypt" without choosing. **bcrypt silently truncates at 72 bytes**, so with bcrypt two different long passwords unlock the same account | The client caps length at 128 and the doc recommends Argon2id. The choice is the backend's and it is not a preference | **Before the backend hashes anything** |
+| C16 | FP-02 asks `register` to return `email_already_exists`, which **is** a user-enumeration oracle, while the same plan's rule 3 forbids enumeration on sign-in and reset | Implemented as specified. A sign-up form that silently fails to create an account is unusable, and the leak is bounded to a path that already requires a chosen password. Sign-in and reset stay silent | Nothing, but it should be a deliberate decision rather than an inconsistency nobody noticed |
+| C17 | FP-02 puts `siteId` in all four request bodies | Omitted. The backend derives the site from the request origin; a client-supplied `siteId` is a cross-site read waiting to be tried | Nothing. The PRD line is worth correcting |
+| C18 | FP-02's reset flow needs a page at `/reset-password` on the creator's site, and **no plan or task tells the creator to create one** | `<MemberAuth>` self-detects `?token=` and switches to the reset view, so one instance serves both. The creator still has to make the page and set the path the backend emails | **Yes. Someone has to document this for creators**, or every reset link 404s |
+| C19 | FP-15's Vue dashboard rebuilds the members CRM, the tier editor, and the gateway vault. All three are already built in the plugin, and PRD section 2.3 calls the In-Framer-First Mandate absolute | **Resolved on 2026-10-12: no dashboard at all.** Stronger than the cut-back version first proposed, and it removes the duplication rather than bounding it. Four responsibilities are now homeless, listed in backend PRD section 8.2 | **One is still open**: MemberFrame's own creator billing, which F19 and PRD section 12 require and which now has nowhere to live |
+| C20 | FP-15 specifies Laravel 11.x, which **reached end of life in March 2026** | Moot. The stack is Node, Express, Prisma, and MySQL as of 2026-10-12. Recorded because it was a real defect in the plan file and would have bitten a PHP build on day one | Nothing |
+| C21 | PRD section 11.2 soft deletes members to preserve invoice history, and the natural foreign key from `invoices` cascades them away on a hard delete | Members are only ever soft deleted, so the cascade never fires. A hard delete would take the invoices with it | Decide before any data-retention or GDPR tooling is written, which is blocker B4 |
+| C22 | FP-15 puts webhook idempotency in a 24-hour Redis cache, and PRD section 10.5 makes non-replay a correctness requirement. A cache key can be evicted, and a gateway can replay days later | A MySQL `webhook_events` table with `UNIQUE(gateway, event_id)`. Insert before processing, and a failed insert is the answer | Nothing. Strictly stronger than the plan |
+| C23 | FP-02 and the backend PRD both say Argon2id, and `backend/src/lib/password.ts` uses scrypt | Argon2id in Node needs a native addon and node-gyp, which fails often enough on Windows to matter for a surface handling passwords. scrypt is memory-hard, in Node's standard library, OWASP-acceptable as an alternative, and free of bcrypt's 72-byte truncation. Every stored hash carries its algorithm tag, so adding Argon2id later rehashes members as they sign in, with no migration and no forced reset | **Yes, before launch.** It is weaker against a well-funded GPU attacker and the upgrade is one file |
+| C24 | `<MemberAuth>` ships with the email path enabled by default, and the backend answers 501 for OTP send and verify | A visitor who clicks "Email me a code instead" reaches a dead end. 501 rather than 404 so the network panel distinguishes "not built" from "broken" | **Yes.** Either build the OTP pair, backend PRD phase B2 item 11, or reconsider the component default |
+| C25 | `npm audit` on the first backend install reported 15 high-severity nodemailer advisories, several of them delivery to an attacker-controlled domain through IDN, punycode, or RFC 5322 comment mis-parsing | Upgraded to nodemailer 10.1.0 before writing any sending code. Zero vulnerabilities now | Nothing, but **re-run `npm audit` in `backend/` before any release**. This is the dependency that carries password reset tokens |
+
+Two need a decision rather than a fix. **C19** is a product scope question: whether the web
+dashboard rebuilds three surfaces the plugin already has. **C18** is unowned: the component handles
+the reset page, and nothing tells the creator the page has to exist.
+
+---
+
 ## Tasks Needing Human Verification
 
 The agent cannot check these. Assign an owner before the phase they fall in.
@@ -229,7 +394,12 @@ The agent cannot check these. Assign an owner before the phase they fall in.
 | :-------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0.2             | The done-when is "tokens resolve in devtools". The agent confirmed all three token layers reach `dist/assets/index-*.css` and that `--framefic-page-bg` is emitted three times, once per layer, but it cannot open devtools against the running panel to watch Framer flip `body[data-framer-theme]`                                                                                                        |
 | 0.4 to 0.7, 0.9 | Rendered panel in the Framer desktop app. The browser pane cannot load the self-signed HTTPS dev server. The agent confirmed every module is served (`curl -sk --http1.1 https://127.0.0.1:5173/...` returns 200) and Vite logs no transform error. That is compile-level evidence, not visual. Unverified: the 360x640 layout, the 48px collapse and restore, contrast in both themes, and a clean console |
+| 1.1 to 1.3      | Rendered panel again, plus four F04 acceptance criteria the agent cannot reach: that the five states look distinct, that a keystroke reaches the preview inside one frame, that a workspace theme flip re-renders it at WCAG AA, and a clean console. The agent proved the five states resolve distinctly as **logic** in `test/entitlement.test.ts`, and that no network path exists in the subtree, which is grep-verifiable. Pixels, timing, and contrast need a human. F04's fifth criterion, "renders correctly for all 15 canvas components", is **deferred by arithmetic**: 14 of the 15 are not authored yet |
+| 1.4 to 1.7      | **The deploy path has never run against Framer.** It is the first code that writes to a creator's project, and every step of it is unverified end to end: that `createCodeFile` accepts the generated file, that Framer reports a component export with an `insertURL` soon enough for the insert to find one, that the instance lands on the canvas, and that all seven controls appear in the sidebar with their `hidden` behaviour. The agent proved the logic against `createFramerMock` and proved the real SDK satisfies the narrow interface at compile time, which catches a signature change but not a behaviour difference. Two specific unknowns are called out: `src/types/framer-canvas.d.ts` is a hand-written shim for the `framer` module and **a shim cannot be wrong in a way the compiler notices**, so `RenderTarget` needs confirming; and whether a second "Add to canvas" really overwrites rather than creating a second file. The four locked states, the entitled render, and contrast in both colour schemes are pixels |
+| 2.1 to 2.8      | **Nothing in Week 2 has spoken to a backend or been seen rendered.** Those are different gaps and both are open. The API client's five cases are tested against an injected `fetch`, which proves the mapping and not the contract; no request has reached a server, so CORS, the real status codes, and whether `Retry-After` is even sent are all unverified. On the rendering side: the members table at 360px with no horizontal scroll, the search debounce feeling responsive rather than laggy, the revoke confirmation being unskippable, inline key errors appearing under their field, the Test mode badge being noticeable enough to act on, and contrast in both themes. For `<MemberAuth>`: all ten sidebar controls, the focus trap and Tab cycling, Escape, a real OAuth popup round trip, a real popup block producing the inline error, and a real six-digit code arriving. One non-engineering check too: the four provider brand marks are monochrome glyphs drawn to inherit colour, and each provider publishes brand guidelines for sign-in buttons, so that usage needs a human sign-off before release |
 | 0.8             | Mock fidelity against a live Framer app. The fixture shapes typecheck against the SDK `.d.ts`, which proves they match what Framer **declares**, not what it **returns**. The done-when, "unit tests run with no Framer desktop app", is fully met and verified: `npm test` passes 16 of 16 in a node environment                                                                                           |
+| FP-02           | **No password has been submitted anywhere**, because none of the four endpoints exists. What that leaves unverified is most of the feature: the five-attempt lockout, whether an unknown address and a wrong password really do take the same time to answer, whether a reset invalidates other sessions, and whether the emailed link resolves at all. Two of those, timing safety and session invalidation, are the ones most likely to be quietly missing in a first backend. On the rendering side: the sign-in and sign-up tabs, the show and hide toggle, the strength meter moving as someone types, inline problems appearing under the field rather than as a banner, the Tab order through email, password, toggle, and submit, and contrast on the meter's weak state in both colour schemes. One creator-facing gap too, conflict C18: the reset page has to exist on the creator's site and nothing tells them so |
+| FP-15           | **No endpoint has run against a database.** The backend typechecks and its pure logic is tested, and `backend/src/routes/member.ts` has never served a request. That leaves unverified everything the frontend could not verify either: the five-failure lockout, whether an unknown address and a wrong password really take the same time to answer, whether a reset invalidates other sessions, and whether a 401 arrives where the contract says it should. Also unverified: the Prisma migration against a real MySQL 8, which is where the hand-written generated column and the `utf8mb4_0900_as_ci` collation either apply or silently do not. `npm run db:check` reports both, and nobody has run it against a server. Above all, **the cross-origin session cookie has not been tested in any browser**, which is the Stage 0 spike in backend PRD section 2.3 and the one result that could invalidate the session design for every canvas component already built |
 | 2.6, 3.1, 3.2   | Live gateway sandbox transactions and webhook delivery                                                                                                                                                                                                                                                                                                                                                      |
 | 3.6             | Google Rich Results Test                                                                                                                                                                                                                                                                                                                                                                                    |
 | 4.2             | Real YouTube, Vimeo, and Mux player `postMessage` traffic                                                                                                                                                                                                                                                                                                                                                   |
@@ -243,12 +413,14 @@ The agent cannot check these. Assign an owner before the phase they fall in.
 
 | #   | Blocker                                                                                    | Blocks                                                              | Needed from                                            |
 | :-- | :----------------------------------------------------------------------------------------- | :------------------------------------------------------------------ | :----------------------------------------------------- |
-| B1  | The backend API does not exist. PRD section 10 marks it out-of-repo                        | 2.1 and everything downstream, which is most of Phases 1 to 4       | A decision on who builds it                            |
+| B1  | The backend API does not exist. PRD section 10 marks it out-of-repo                        | 2.1 and everything downstream, which is most of Phases 1 to 4. As of 1.7 this is now visible in shipped output: a deployed `<MemberGate>` calls `GET /api/member/session`, gets nothing, and renders its locked state on every visit. Correct per S11 and useless to a creator until the endpoint exists | **Now fully specified** in [`memberframe-backend-prd.md`](memberframe-backend-prd.md), still unbuilt. The open question is no longer who builds it but the Stage 0 cookie spike in that document, section 2.3 |
 | B2  | Member caps per tier are unspecified                                                       | Phase 1 data model, PRD section 11                                  | Product decision, PRD section 18                       |
 | B3  | Creator-lapse policy for their paying subscribers is unspecified                           | Phase 1 data model                                                  | Product decision, PRD section 18                       |
 | B4  | GDPR controller and processor split is unspecified                                         | Phase 1 data model                                                  | Legal and product decision, PRD section 18             |
-| B5  | No DOM test environment. `vitest` is installed, `jsdom` is not                             | 8.1 layer 2, component and theme rendering tests                    | Approval to add `jsdom` and a testing library          |
+| B5  | No DOM test environment. `vitest` is installed, `jsdom` is not                             | 8.1 layer 2, component and theme rendering tests. Every F04 rendering criterion, and from 1.7 the four F01 locked states and the entitled render as well. `test/memberGateParity.test.ts` reaches what it can by asserting on the component's source text, which is a real guard and not a substitute for rendering it | Approval to add `jsdom` and a testing library          |
 | B6  | No `pack` script                                                                           | 8.8                                                                 | Scheduling, small task                                 |
 | B7  | `framer.getCurrentUser()` exposes no email, but PRD section 13 sources `userEmail` from it | F20 telemetry contract, the creator account model in PRD section 12 | Product decision, see `00-test-harness.md` section 8.2 |
+| B8  | No runtime schema validation. The API client guarantees the transport contract and casts the response body, so a backend returning the wrong shape typechecks and then fails at the first property access | Every consumer of `services/*`. Mitigated by treating responses defensively, not solved | Approval to add a validation dependency, the same kind of decision `jsdom` was |
+| B9  | **No task builds creator authentication**, yet every `/api/site/*` endpoint needs a creator session token. Conflict C10 | 2.2, 2.3, and 2.4 are built and permanently signed out. Also F19 trial eligibility, which keys on creator identity | A task added to Phase 1, or those three tasks moved to Phase 2 |
 
 B2 to B4 change the schema. Settling them after Phase 1 means reworking it. B7 changes the F20 request body and how a creator account is keyed, so it is the same kind of problem: cheaper now than in Phase 2.

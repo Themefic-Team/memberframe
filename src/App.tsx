@@ -38,6 +38,8 @@ export const App: React.FC = () => {
 
   const toggleCollapse = useCallback(() => setCollapsed((current) => !current), []);
   const openBuilder = useCallback(() => setActiveTab("builder"), [setActiveTab]);
+  const openManage = useCallback(() => setActiveTab("manage"), [setActiveTab]);
+  const openSettings = useCallback(() => setActiveTab("settings"), [setActiveTab]);
 
   return (
     <ToastProvider>
@@ -48,7 +50,13 @@ export const App: React.FC = () => {
         onToggleCollapse={toggleCollapse}
         onClose={handleClose}
       >
-        {activeTab === "home" ? <HomeTab onOpenBuilder={openBuilder} /> : null}
+        {activeTab === "home" ? (
+          <HomeTab
+            onOpenBuilder={openBuilder}
+            onOpenManage={openManage}
+            onOpenSettings={openSettings}
+          />
+        ) : null}
         {activeTab === "builder" ? <BuilderTab /> : null}
         {activeTab === "manage" ? <ManageTab /> : null}
         {activeTab === "settings" ? (

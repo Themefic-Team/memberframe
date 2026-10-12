@@ -201,3 +201,37 @@ PRD section 7.2 puts it in the tab bar, and the Account sheet is a later feature
 ### 8.7. Task 0.9 arrived early
 
 Task 0.9 is the collapse toggle in `App.tsx`. The header owns the control, so building the shell without wiring it would have left a dead button. The state and the second `showUI` call are three lines in `App.tsx` and are included here. The task is recorded as `awaiting review` alongside 0.4 to 0.7.
+
+---
+
+## 9. The Home Tab, PRD Task 2.7
+
+Its ledger row carries F02, because PRD section 15.4 lists it that way. The content is panel chrome rather than member administration, so it is recorded here with the shell it belongs to rather than in [`02-member-tier-cockpit.md`](02-member-tier-cockpit.md). The attribution is noted in the ledger so the two do not look inconsistent.
+
+### 9.1. What It Renders
+
+| Region | Class | Content |
+| :--- | :--- | :--- |
+| Hero | `.hero-card` | Title, one line of description, and the tab's one `.primary-cta`, "Open builder" |
+| Quick start | `.help-tile-row` | Three tiles: gate a frame, set up tiers, connect payments |
+| Learn more | `.framefic-card-list` | Documentation, support, and a cross-promo card |
+
+Every class above already existed in `components.css` with nothing rendering it, the same situation `TextField` and `Select` were in at task 1.3. The styling is the reference design system's; only the markup is new. No per-feature CSS file was needed, which is why there is no `home.css`.
+
+### 9.2. It Does Not Claim To Know What The Creator Has Done
+
+The obvious quick start is a checklist with ticks: tier created, gateway connected, frame gated. All three facts are unavailable.
+
+Two of them need the backend, which does not exist (blocker B1), and a creator session token, which no task in the plan builds (conflict C10 in [`00-api-client.md`](00-api-client.md)). The third, whether any frame on the canvas carries a gate, needs `framer.getCodeFiles()` plus a walk of the canvas tree, and it would still only prove a component file exists rather than that it is bound to a frame.
+
+A checklist with three permanently unticked boxes reads as a broken product. So the three tiles are routes rather than states: each one navigates to the tab that does the work and asserts nothing about progress. When the backend lands, the tiles can gain real state and nothing here has to be unpicked first.
+
+### 9.3. One Primary CTA
+
+"Open builder", per PRD section 7.3. The three tiles are buttons and the three cards are links, so none of them is a second `.primary-cta`.
+
+The external links open in a new tab. The panel is an iframe inside the Framer app, so navigating it in place would replace the plugin with a web page and leave no way back.
+
+### 9.4. The Two Placeholder URLs Are Still Placeholders
+
+Section 8.6 recorded that `BRANDING.companyUrl` and `changelogUrl` are invented. Task 2.7 adds two more paths built on the first: a documentation path and a support path. Both are centralised in `config/branding.ts` so correcting them is one edit, and both are still unconfirmed. PRD task 8.8 owns getting the real addresses.

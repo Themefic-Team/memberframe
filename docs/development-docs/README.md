@@ -31,11 +31,13 @@ Status values: `planned`, `in progress`, `done`.
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `00-plugin-shell.md` | Plugin Shell, UI Kit, and Theme Sync | section 7, no F number | 0 | P0 | in progress |
 | `00-test-harness.md` | Test Harness and Framer SDK Mock | section 16.1, no F number | 0 | P0 | in progress |
-| `01-member-gate.md` | Zero-Code Visual Canvas Gating | F01 | 1 | P0 | planned |
-| `02-member-tier-cockpit.md` | In-Plugin Member and Tier Cockpit | F02 | 1 | P0 | planned |
-| `03-tri-gateway-payments.md` | Tri-Gateway Smart Payment Connect | F03 | 1 and 2 | P0 | planned |
-| `04-live-preview-studio.md` | Live Preview Studio with State Simulator | F04 | 1 | P0 | planned |
-| `05-member-auth.md` | Multi-Provider Auth and Passwordless OTP | F05 | 1 | P0 | planned |
+| `00-api-client.md` | Backend API Client | sections 10.1 and 10.6, no F number | 1 | P0 | in progress |
+| `00-member-data-model.md` | Member Data Model, And Why Not The CMS | sections 10, 11, 14.1, no F number | 1 | P0 | in progress |
+| `01-member-gate.md` | Zero-Code Visual Canvas Gating | F01 | 1 | P0 | in progress |
+| `02-member-tier-cockpit.md` | In-Plugin Member and Tier Cockpit | F02 | 1 | P0 | in progress |
+| `03-tri-gateway-payments.md` | Tri-Gateway Smart Payment Connect | F03 | 1 and 2 | P0 | in progress |
+| `04-live-preview-studio.md` | Live Preview Studio with State Simulator | F04 | 1 | P0 | in progress |
+| `05-member-auth.md` | Multi-Provider Auth, Passwordless OTP, and Email Password | F05, feature plan FP-02 | 1 | P0 | in progress |
 | `06-member-dashboard.md` | Canvas-Native Member Billing Portal | F06 | 3 | P0 | planned |
 | `07-metered-paywall.md` | Dynamic Metered Soft Paywall | F07 | 2 | P1 | planned |
 | `08-schema-injection.md` | SEO-Preserving Schema.org Injection | F08 | 2 | P1 | planned |
@@ -56,7 +58,11 @@ Status values: `planned`, `in progress`, `done`.
 | `23-localization.md` | Multi-Language Localization | F23 | 4 | P2 | planned |
 | `24-outbound-webhooks.md` | Outbound Webhooks and Zapier Events | F24 | 4 | P3 | planned |
 
-24 features, 24 docs. PRD task 8.7 requires all 24 complete before packaging.
+24 features, 24 docs, plus three `00-` infrastructure docs that have no F number: the shell, the test harness, and the API client.
+
+PRD task 8.7 requires all 24 feature docs complete before packaging.
+
+**Task 2.8, development docs for F01 through F05, is met.** All five exist and all five are `in progress` rather than `done`, which is accurate: every one of them carries an unticked human verification table, because nothing in Phase 1 has been seen rendered in Framer or spoken to a backend.
 
 ---
 

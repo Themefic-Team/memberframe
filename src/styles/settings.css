@@ -1,0 +1,126 @@
+/* ==========================================================================
+   SETTINGS TAB: GATEWAY KEY VAULT
+
+   Per-feature CSS for F03, PRD task 2.4.
+
+   Cannot live in components.css, which is a verbatim slice of the reference
+   design system guarded by a provenance diff. Same constraint as shell.css,
+   builder.css, and manage.css.
+
+   Every colour is a token. No hex value appears in this file.
+   ========================================================================== */
+
+.gateway-vault {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gateway-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--framefic-surface);
+}
+
+.gateway-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gateway-section-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--px-brand-subtle);
+  color: var(--px-color-text-brand);
+}
+
+.gateway-section-logo svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+}
+
+/* min-width: 0 so a long status line truncates rather than pushing the badges
+   out of the 360px panel. */
+.gateway-section-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gateway-section-name {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--title);
+}
+
+.gateway-section-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--framefic-text-muted);
+}
+
+/* The verified badge carries an icon, which the kit's .badge does not size. */
+.gateway-section-head .badge svg {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+}
+
+/* A disabled key field is a gateway that arrives in a later phase. It stays
+   visible so the vault does not present the product as Stripe-only, which is
+   the competitor limitation F03 exists to beat. */
+.gateway-section .framefic-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-help {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--framefic-text-muted);
+}
+
+.settings-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding-top: 4px;
+  box-sizing: border-box;
+}
+
+.settings-cta-note {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--px-color-danger);
+  text-align: center;
+}

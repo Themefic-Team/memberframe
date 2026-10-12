@@ -1,0 +1,374 @@
+/* ==========================================================================
+   BUILDER TAB AND LIVE PREVIEW STUDIO
+
+   Per-feature CSS for F04 and the F01 customizer, PRD tasks 1.1 to 1.3.
+   Everything the reference design system does not cover: the preview viewport,
+   the range slider, and the gate preview's own classes.
+
+   This cannot live in components.css. That file is a verbatim slice of
+   .agents/skills/framer-plugin-suite/references/design-tokens.css guarded by a
+   provenance diff, and hand-editing it breaks the drift check. Same constraint
+   that put the DEF-01 tab bar fix in shell.css.
+
+   Every colour is a token. No hex value appears in this file.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   1. STUDIO SHELL
+   -------------------------------------------------------------------------- */
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* The preview surface. Renders at the panel's true width so a creator judges
+   proportions as they will appear, not as a scaled thumbnail. The default blur
+   radius is declared here and overwritten per keystroke by PreviewStudio. */
+.studio-viewport {
+  --memberframe-preview-blur: 8px;
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 168px;
+  padding: 16px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--framefic-surface-border);
+  background-color: var(--framefic-page-bg);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.studio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.studio-caption {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph-faint);
+}
+
+.studio-session-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   2. PRIMARY CTA BLOCK
+   -------------------------------------------------------------------------- */
+.studio-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.studio-cta-note {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph-faint);
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   3. PENDING PREVIEW PLACEHOLDER
+   -------------------------------------------------------------------------- */
+.studio-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 8px;
+}
+
+.studio-pending-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--paragraph-faint);
+  background-color: var(--framer-color-bg-tertiary);
+}
+
+.studio-pending-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.studio-pending-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.studio-pending-body {
+  margin: 0;
+  max-width: 220px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph-faint);
+}
+
+/* --------------------------------------------------------------------------
+   4. RANGE SLIDER
+
+   The one genuinely new control. The kit has an input, a select, a segmented
+   control, a toggle, and a checkbox, but no range input, so there was nothing
+   to reuse. Geometry follows the PRD section 7.5 control rules: 30px tall
+   overall, so the row lines up with every select beside it.
+   -------------------------------------------------------------------------- */
+.framefic-slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.framefic-slider-input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  height: 4px;
+  min-height: 4px;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--framer-color-bg-tertiary);
+  cursor: pointer;
+}
+
+.framefic-slider-input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--framefic-surface-border);
+  background-color: var(--framefic-surface);
+  box-shadow: var(--framefic-card-shadow);
+  cursor: pointer;
+}
+
+.framefic-slider-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--framefic-surface-border);
+  background-color: var(--framefic-surface);
+  cursor: pointer;
+}
+
+/* The 3px halo PRD section 7.5 specifies. --px-brand-subtle is already
+   rgba(82, 113, 255, 0.20), the exact value the rule names. */
+.framefic-slider-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--px-brand-subtle);
+}
+
+/* Tabular figures so the row does not jitter as the number changes width. */
+.framefic-slider-value {
+  min-width: 34px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--title);
+  text-align: right;
+}
+
+/* --------------------------------------------------------------------------
+   5. MEMBER GATE PREVIEW
+
+   Classes prefixed `memberframe-` per PRD section 9.3 rule 2, matching the
+   canvas component authored in task 1.7 so the preview and the published
+   component name the same parts the same way. They share names, not code.
+   -------------------------------------------------------------------------- */
+.memberframe-gate-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.memberframe-gate-note {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph-faint);
+  text-align: center;
+}
+
+.memberframe-gate-hidden-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--paragraph-faint);
+  background-color: var(--framer-color-bg-tertiary);
+}
+
+.memberframe-gate-hidden-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+/* Stands in for whatever the creator connects to `contentSlot`. */
+.memberframe-slot-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 84px;
+  padding: 12px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px dashed var(--framefic-surface-border);
+  background-color: var(--framefic-surface);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.memberframe-slot-stub-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.memberframe-slot-stub-hint {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph-faint);
+  max-width: 200px;
+}
+
+/* The frosted blur fallback. The radius is the only value the creator drags,
+   so it arrives as a custom property rather than a class. */
+.memberframe-blur-overlay {
+  width: 100%;
+  filter: blur(var(--memberframe-preview-blur));
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Blur lifts the content, so the card sits over it rather than under it. */
+.memberframe-gate-container.is-blur-state .memberframe-lock-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 24px);
+}
+
+.memberframe-lock-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--framefic-surface-border);
+  background-color: var(--framefic-surface);
+  box-shadow: var(--framefic-card-shadow);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.memberframe-lock-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: var(--secondary-default);
+  background-color: var(--px-brand-subtle);
+}
+
+.memberframe-lock-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.memberframe-lock-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--title);
+}
+
+.memberframe-lock-description {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph);
+}
+
+.memberframe-lock-reason {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph-faint);
+}
+
+/* Looks like the canvas component's button but is a span, because a real
+   button would be a second .primary-cta in this view and PRD section 7.5
+   permits exactly one. Clicking inside a preview should not start a checkout. */
+.memberframe-lock-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  margin-top: 4px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: var(--px-brand-gradient);
+  color: var(--px-brand-on-primary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  user-select: none;
+}

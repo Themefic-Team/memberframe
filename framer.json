@@ -6,5 +6,10 @@
   "icon": "icon.png",
   "main": "dist/index.html",
   "modes": ["canvas"],
-  "permissions": []
+  "permissions": [
+    "addComponentInstance",
+    "createCodeFile",
+    "setCodeFileContent",
+    "setParent"
+  ]
 }

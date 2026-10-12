@@ -19,6 +19,15 @@ export type { IconButtonProps, IconButtonVariant } from "./IconButton";
 export { Segmented } from "./Segmented";
 export type { SegmentedOption, SegmentedProps } from "./Segmented";
 
+export { Select } from "./Select";
+export type { SelectOption, SelectProps } from "./Select";
+
+export { Slider } from "./Slider";
+export type { SliderProps } from "./Slider";
+
+export { TextField } from "./TextField";
+export type { TextFieldProps } from "./TextField";
+
 export { ToastProvider, useToast } from "./Toast";
 export type { ToastRequest, ToastTone } from "./Toast";
 

@@ -31,6 +31,11 @@
  * Only the calls MemberFrame actually makes. `FramerPluginAPI` has several
  * hundred members and a mock claiming to implement all of them would be a lie.
  * Widen `SdkMembers` when a feature needs another call.
+ *
+ * Widened by task 1.5 with the four canvas calls the F01 deploy path needs:
+ * `createCodeFile`, `CodeFile.setFileContent`, `addComponentInstance`, and
+ * `setParent`. `MockCodeFile` gained `exports`, because `insertURL` lives there
+ * and insertion is impossible without it.
  */
 
 import type { framer, Mode, ProjectInfo, PublishInfo, UIOptions, User } from "framer-plugin";
@@ -69,18 +74,43 @@ type SdkMembers = Pick<
  * Convention for F19 Pro-Lock and F20 telemetry: service functions take
  * `MockCodeFile`, never `CodeFile`. That keeps them testable without a cast.
  */
+/**
+ * One export of a code file.
+ *
+ * The SDK's `CodeFileExport` is a union: a component export carries an
+ * `insertURL` and an override export does not. Both are assignable to this
+ * shape, so the narrowing runs the same safe direction as `MockCodeFile`.
+ *
+ * `insertURL` is what `addComponentInstance` consumes, and Framer only knows it
+ * after it has compiled the file. Widened in task 1.5 for that reason.
+ */
+export interface MockCodeFileExport {
+  readonly name: string;
+  readonly isDefaultExport: boolean;
+  readonly type: string;
+  readonly insertURL?: string;
+}
+
 export interface MockCodeFile {
   readonly id: string;
   readonly name: string;
   readonly path: string;
   readonly content: string;
+  readonly exports: ReadonlyArray<MockCodeFileExport>;
   setFileContent(code: string): Promise<MockCodeFile>;
   remove(): Promise<void>;
 }
 
-interface CodeFileMembers {
+/** A canvas node, narrowed to the one member the deploy path reads. */
+export interface MockCanvasNode {
+  readonly id: string;
+}
+
+interface CanvasMembers {
   getCodeFiles(): Promise<readonly MockCodeFile[]>;
   createCodeFile(name: string, code: string): Promise<MockCodeFile>;
+  addComponentInstance(options: { url: string }): Promise<MockCanvasNode>;
+  setParent(nodeId: string, parentId: string, index?: number): Promise<void>;
 }
 
 /** Everything the mock recorded, for assertions. */
@@ -92,10 +122,13 @@ export interface MockCallLog {
   setPluginData: Array<{ key: string; value: string | null }>;
   getCodeFiles: number;
   createCodeFile: Array<{ name: string; code: string }>;
+  setFileContent: Array<{ id: string; code: string }>;
+  addComponentInstance: Array<{ url: string }>;
+  setParent: Array<{ nodeId: string; parentId: string; index?: number }>;
   closePlugin: Array<{ message?: string }>;
 }
 
-export interface FramerMock extends SdkMembers, CodeFileMembers {
+export interface FramerMock extends SdkMembers, CanvasMembers {
   /** Every call the mock saw. */
   readonly calls: MockCallLog;
   /** The backing store for `getPluginData` and `setPluginData`. Seed it directly. */
@@ -174,6 +207,9 @@ function emptyCallLog(): MockCallLog {
     setPluginData: [],
     getCodeFiles: 0,
     createCodeFile: [],
+    setFileContent: [],
+    addComponentInstance: [],
+    setParent: [],
     closePlugin: [],
   };
 }
@@ -196,6 +232,7 @@ export function createFramerMock(overrides: Partial<FramerMock> = {}): FramerMoc
   const calls = emptyCallLog();
   const pluginData = new Map<string, string>();
   let nextCodeFileId = 0;
+  let nextNodeId = 0;
   const codeFiles: MockCodeFile[] = [];
   const mode: Mode = overrides.mode ?? "canvas";
 
@@ -203,14 +240,30 @@ export function createFramerMock(overrides: Partial<FramerMock> = {}): FramerMoc
     const id = `code-file-${nextCodeFileId++}`;
     let content = code;
 
+    /**
+     * The default export, as Framer reports it once the file has compiled.
+     *
+     * A test covering the not-yet-compiled case overrides `createCodeFile`
+     * wholesale and returns a file with no exports, which is the real SDK
+     * behaviour right after creation.
+     */
+    const exportEntry: MockCodeFileExport = {
+      name: name.replace(/\.tsx?$/, ""),
+      isDefaultExport: true,
+      type: "component",
+      insertURL: `https://framer.com/m/${id}.js`,
+    };
+
     const file: MockCodeFile = {
       id,
       name,
       path: `/code/${name}`,
+      exports: [exportEntry],
       get content() {
         return content;
       },
       async setFileContent(next: string) {
+        calls.setFileContent.push({ id, code: next });
         content = next;
         return file;
       },
@@ -296,6 +349,15 @@ export function createFramerMock(overrides: Partial<FramerMock> = {}): FramerMoc
       const file = makeCodeFile(name, code);
       codeFiles.push(file);
       return file;
+    },
+
+    addComponentInstance: async (options: { url: string }) => {
+      calls.addComponentInstance.push({ url: options.url });
+      return { id: `node-${nextNodeId++}` };
+    },
+
+    setParent: async (nodeId: string, parentId: string, index?: number) => {
+      calls.setParent.push({ nodeId, parentId, index });
     },
 
     ...overrides,

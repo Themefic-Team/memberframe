@@ -1,0 +1,425 @@
+/* ==========================================================================
+   MANAGE TAB: MEMBERS TABLE AND TIER EDITOR
+
+   Per-feature CSS for F02, PRD tasks 2.2 and 2.3.
+
+   Cannot live in components.css. That file is a verbatim slice of
+   .agents/skills/framer-plugin-suite/references/design-tokens.css guarded by a
+   provenance diff, and hand-editing it breaks the drift check. Same constraint
+   that put the DEF-01 fix in shell.css and the studio in builder.css.
+
+   Every colour is a token. No hex value appears in this file.
+
+   The 360px constraint drives most of what follows. F02 requires the table to
+   stay usable at that width with no horizontal page scroll, so there is no
+   table element and no columns: each row is a three-part flex with the identity
+   column allowed to shrink and truncate, which is the only layout that cannot
+   push the panel sideways.
+   ========================================================================== */
+
+.members-panel,
+.tiers-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------------------
+   1. TOOLBAR AND FILTERS
+   -------------------------------------------------------------------------- */
+.members-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.members-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* A pill is a filter, not a button, so it is quieter than .btn until active. */
+.member-pill {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--framefic-surface-border);
+  background: var(--framefic-surface);
+  color: var(--paragraph);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.member-pill:hover {
+  border-color: var(--px-color-border-brand);
+  color: var(--title);
+}
+
+.member-pill.is-active {
+  background: var(--px-brand-subtle);
+  border-color: var(--px-color-border-brand);
+  color: var(--px-color-text-brand);
+  font-weight: 600;
+}
+
+.member-pill:focus-visible,
+.member-row:focus-visible,
+.tier-row:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring, var(--px-brand-primary));
+  box-shadow: 0 0 0 3px var(--px-brand-subtle);
+}
+
+.members-count,
+.tiers-count {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--framefic-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   2. MEMBER ROW
+   -------------------------------------------------------------------------- */
+.members-list,
+.tiers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  text-align: left;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--framefic-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.member-row:hover {
+  border-color: var(--px-color-border-brand);
+}
+
+.member-row.is-selected {
+  border-color: var(--px-color-border-brand);
+  background: var(--framefic-surface-2);
+}
+
+.member-row-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--framer-color-bg-tertiary);
+  color: var(--framer-color-text-tertiary);
+}
+
+.member-row-avatar svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.member-row-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* min-width: 0 is what allows the text children to truncate instead of
+   forcing the row wider than the panel. Without it, a long email scrolls the
+   whole panel sideways, which F02 forbids. */
+.member-row-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.member-row-name,
+.member-row-email,
+.member-row-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.member-row-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--title);
+}
+
+.member-row-email {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--paragraph);
+}
+
+.member-row-meta {
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--framefic-text-muted);
+}
+
+.member-row-trailing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.member-row-chevron {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  color: var(--framer-color-text-tertiary);
+}
+
+/* Row-shaped, not a spinner, so the toolbar above does not jump when rows
+   arrive. Height matches .member-row exactly. */
+.member-row-skeleton {
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--radius-md, 10px);
+  background: var(--px-color-skeleton);
+  opacity: 0.6;
+}
+
+/* --------------------------------------------------------------------------
+   3. ROW ACTION FLYOUT
+   -------------------------------------------------------------------------- */
+.member-flyout {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--px-color-border-brand);
+  border-radius: var(--radius-md, 10px);
+  background: var(--framefic-surface-2);
+}
+
+.member-flyout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.member-flyout-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.member-flyout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.member-flyout-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--px-color-danger);
+  background: var(--px-color-danger-subtle);
+}
+
+.member-flyout-confirm-text {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--title);
+}
+
+.member-flyout-confirm-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.member-flyout-confirm-buttons .btn {
+  flex: 1;
+}
+
+.member-flyout-note {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--framefic-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   4. PAGINATION
+   -------------------------------------------------------------------------- */
+.members-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.members-pager-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--paragraph);
+}
+
+/* --------------------------------------------------------------------------
+   5. TIER ROW AND TIER FORM
+   -------------------------------------------------------------------------- */
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  text-align: left;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--framefic-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.tier-row:hover {
+  border-color: var(--px-color-border-brand);
+}
+
+/* A hidden tier is still editable, so it dims rather than disappears. */
+.tier-row.is-inactive {
+  opacity: 0.6;
+}
+
+/* The rank is the field that decides which tier outranks which, per PRD
+   section 11.2, so it is shown on every row rather than hidden in the form. */
+.tier-row-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--px-brand-subtle);
+  color: var(--px-color-text-brand);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tier-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tier-row-name,
+.tier-row-prices {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.tier-row-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--title);
+}
+
+.tier-row-prices {
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--framefic-text-muted);
+}
+
+.tier-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--px-color-border-brand);
+  border-radius: var(--radius-md, 10px);
+  background: var(--framefic-surface-2);
+}
+
+.tier-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tier-form-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.tier-form-cta,
+.tiers-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding-top: 2px;
+  box-sizing: border-box;
+}

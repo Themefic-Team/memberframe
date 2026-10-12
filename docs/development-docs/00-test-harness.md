@@ -236,3 +236,25 @@ The environment is `node`, not `jsdom`. Every item in layer 1 of the triad is pu
 Ledger blocker B5 recorded that no test runner was installed and that adding one was unscheduled work needing approval. The user authorised task 0.8 after being told it required the dependency. Installed: `vitest` 5.0.3 as a dev dependency, 16 transitive packages, `npm audit` reporting 0 vulnerabilities. No `jsdom`, no testing library, no coverage provider. B5 is now closed for layer 1 and remains open for layer 2.
 
 `tsconfig.json` `include` moved from `["src"]` to `["src", "test"]`, so `npm run build` typechecks the tests too. A test that no longer compiles should break the build, not sit rotting outside it.
+
+### 8.9. Widened for the canvas deploy path, task 1.5
+
+Section 8.5 set the rule: widen the mock in the task that first needs another call. Task 1.5 needed four.
+
+| Added | Why |
+| :--- | :--- |
+| `createCodeFile`, `CodeFile.setFileContent` | Write `MemberGate.tsx` into the creator's project, or overwrite it on a second deploy |
+| `addComponentInstance` | Insert the instance once the file exists |
+| `setParent` | Move the new instance under a chosen parent |
+| `MockCodeFile.exports` | `addComponentInstance` consumes `insertURL`, which lives on a code file's component export. Insertion is impossible without it |
+
+`CodeFileMembers` was renamed `CanvasMembers`, because three of the four calls are canvas operations rather than file operations.
+
+Two notes on fidelity, both of which the service's tests depend on:
+
+- **A real `CodeFileExport` is a union.** A component export carries `insertURL`, an override export does not. `MockCodeFileExport` declares `insertURL` optional and `type` as a string, so both members of the real union are assignable to it, which keeps the narrowing running the same safe direction as `MockCodeFile` itself. The service filters on `type === "component"` for exactly this reason, and a test feeds it an override-only file to prove the filter is load bearing.
+- **The mock reports exports immediately, and Framer does not.** Framer compiles a file before it can say what the file exports, so `exports` can be empty on the object `createCodeFile` just returned while the same file in `getCodeFiles()` already carries them. The mock does not model that by default, because defaulting to the awkward case would make every happy-path test read like a workaround. `test/framerCanvasService.test.ts` overrides `createCodeFile` and `getCodeFiles` to stage it explicitly, which also documents the behaviour at the place that cares.
+
+The deploy path takes a narrow `CanvasDeps` interface rather than the mock type, and `framerCanvasService.ts` ends with a compile-time assertion that the real `framer` satisfies it. That assertion is what makes the mock trustworthy here: if Framer changes one of these four signatures, `tsc --noEmit` fails in the service rather than the tests passing against a mock that has drifted.
+
+`SdkMembers` itself is unchanged at eleven calls. `isAllowedTo` was already among them, which is what let task 1.5 add a permission guard without widening it.
