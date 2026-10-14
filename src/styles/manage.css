@@ -37,6 +37,13 @@
   box-sizing: border-box;
 }
 
+.members-toolbar .framefic-select {
+  width: auto;
+  min-width: 90px;
+  max-width: 115px;
+  flex-shrink: 0;
+}
+
 .members-pills {
   display: flex;
   flex-wrap: wrap;

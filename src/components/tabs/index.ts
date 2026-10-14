@@ -1,4 +1,5 @@
 export { BuilderTab } from "./BuilderTab";
+export { ConnectTab } from "./ConnectTab";
 export { HomeTab } from "./HomeTab";
 export type { HomeTabProps } from "./HomeTab";
 export { ManageTab } from "./ManageTab";

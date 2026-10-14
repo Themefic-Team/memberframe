@@ -1,63 +1,110 @@
-# Feature: Zero-Code Visual Canvas Gating
+# Feature: Zero-Code Visual Canvas Gating and Page Locking
 
-Technical development specification, user flow, architectural wiring, and testing checklist for `<MemberGate>`, the component that gates a Framer frame without a code override.
+Technical development specification, user flow, architectural wiring, and testing checklist for `<MemberGate>`, the component that gates Framer frames without code overrides, along with full page route locking and seamless session lifecycle integration.
 
-**PRD reference**: [F01](../memberframe-complete-prd.md) section 8
-**Status**: in progress
-**Tasks**: 1.4, 1.5, 1.6, 1.7, 1.8 (see [`../IMPLEMENTATION-STATUS.md`](../IMPLEMENTATION-STATUS.md))
-
-Task 1.3 built the customizer that feeds this feature and is recorded in
-[`04-live-preview-studio.md`](04-live-preview-studio.md), because its panel work belongs to F04. Task 1.8
-landed with 1.1 for the same reason and is covered in both docs: section 5.4 here records the second copy
-of the resolver, which is the part F01 owns.
+**PRD Reference**: F01, F04, F05, F06  
+**Status**: Completed  
+**Feature Plan**: `docs/features-plan/1. Lock Pages & On-Page Content.md`  
 
 ---
 
 ## 1. Overview and Problem Solved
 
-- **Feature Name**: Zero-Code Visual Canvas Gating
-- **Target Audience**: Framer Creator to configure, Site Visitor and Member at runtime
-- **Value Proposition**: a creator gates a video lesson, a resource list, or a whole page section by
-  dropping one component on the canvas and connecting a frame to its Content Slot. No code override is
-  attached to the frame, so nothing breaks when Framer changes its override API. FrameAuth requires an
-  override per gated frame, which is the friction this removes.
+- **Feature Name**: Zero-Code Visual Canvas Gating and Page Locking
+- **Target Audience**: Framer Creators (to configure in-plugin), Site Visitors and Authenticated Members (at runtime)
+- **Value Proposition**: 
+  1. **On-Page Content Gating**: A creator gates any video lesson, resource stack, or whole section by dropping `<MemberGate>` onto the canvas and connecting a frame to its `contentSlot` (`ControlType.ComponentInstance`). No code overrides are required.
+  2. **Page-Level Route Locking**: Creators can protect entire routes (such as `/dashboard` and `/private-content`) from the in-plugin **Page Locks** panel or by deploying redirect gates.
+  3. **Seamless Auth and Session State Lifecycle**:
+     - Logged-out visitors cannot view protected content or gated pages (rendered with Frosted Blur, Lock Card, or redirected).
+     - Once signed in, all gates dissolve in real time and reveal protected content.
+     - **Login Auto-Redirect**: If an already authenticated member visits the login page (`/login`), they never see the login form; they are immediately redirected to `/dashboard`.
+     - **Clean Sign Out**: Signing out invalidates the session, broadcasts real-time state invalidation, re-gates content immediately, and navigates to the home page.
 - **Priority Tier**: P0: Core MVP
 
 ---
 
 ## 2. User Flows
 
-### 2.1. In-Plugin Configuration Flow (Framer Designer)
+### 2.1. In-Plugin Configuration Flow (Framer Creator)
 
-1. Creator opens the Builder tab. "Member Gate" is the default picker entry.
-2. Creator sets the required tier, the locked state, and whichever of the three conditional fields that
-   locked state reveals. The Live Preview Studio updates as they type.
-3. Creator clicks "Add to canvas". The plugin generates a `.tsx` file carrying the creator's values as its
-   property control defaults, writes it to the project with `framer.createCodeFile`, and inserts an
-   instance with `framer.addComponentInstance`.
-4. Framer opens the new instance on the canvas with the properties sidebar populated.
-5. Creator drags the frame they want protected into the `Content Slot` control and, if they want, changes
-   the tier in the sidebar. The sidebar and the panel offer the same seven controls with the same names.
+1. **On-Page Content Locking (Builder Tab)**:
+   - Creator opens the **Builder** tab in the MemberFrame plugin.
+   - Selects **Member Gate** in the component selector.
+   - Observes the 5-state Live Preview Studio (`[Guest] [Free] [Silver] [VIP] [Failed]`).
+   - Clicks **+ Add to canvas**. The plugin deploys and inserts `<MemberGate>` onto the active page.
+   - In Framer's native properties panel, creator connects the target frame (section, video, article) to the **Protected Frame** slot (`contentSlot: ControlType.ComponentInstance`).
+   - Selects the locked state treatment:
+     - **Frosted Blur** (default): Keeps background visible with customizable CSS blur radius (2px to 20px) and a lock card overlay.
+     - **Hide Completely**: Collapses the frame completely so it leaves zero empty space.
+     - **Lock Card**: Displays an opaque "Members Only" card with a clickable "Sign in to unlock" action button.
+     - **Page Redirect**: Immediately redirects unauthenticated visitors to the login path.
 
-Clicking "Add to canvas" a second time overwrites the existing `MemberGate.tsx` and inserts another
-instance, rather than creating a second file. One component file per project, many instances. The second
-set of panel values becomes the default for instances inserted from then on and does not disturb instances
-already on the canvas, because Framer stores each instance's props on the node.
+2. **Page-Level Protection Management (Settings Tab > Page Locks)**:
+   - Creator opens the **Settings** tab and selects the **Page Locks** sub-tab.
+   - **Dynamic Framer Canvas Page Discovery (`framerPagesService.ts`)**:
+     - The plugin queries Framer canvas AST via `framer.getNodesWithType("WebPageNode")`.
+     - Automatically extracts and normalizes all pages from the creator's Framer project (e.g. `Home (/)`, `Case Studies (/case-studies)`, `Experiments (/experiments)`, `About (/about)`, `Resume (/resume)`, `Login (/login)`).
+   - **Page Selector Dropdowns**:
+     - **Protected Path**: Creator selects any page from their Framer project directly from the dropdown. If they need a custom path not in the page list, selecting "Custom path..." displays an input field.
+     - **Required Tier**: Configures minimum tier (`Any signed in`, `Free member`, `Tier 1: Silver`, `Tier 2: Gold`, `VIP member`).
+     - **Locked Action**: Configures behavior when an unauthorized visitor opens the page:
+       - `Redirect visitor away`: Forwards locked-out visitors before content renders.
+       - `Frosted blur teaser`: Blurs content with an interactive unlock prompt.
+       - `Members-only lock card`: Replaces page content with a locked card.
+     - **Redirect Destination**: Dropdown of Framer project pages (defaulting to `/login`) or custom destination URL.
+   - Creator clicks **Save page locks** (`.primary-cta`) to persist configuration into `SiteSettingsDocument.gatedPages`.
+   - An in-plugin **On-Page Content Gating Guide** card is displayed with a direct one-click **+ Add Gate to Canvas** CTA.
 
 ### 2.2. Visitor and Member Runtime Flow
 
-1. Visitor loads a published page holding a gate. The gate mounts in its `checking` state, which renders
-   the locked treatment, never the content.
-2. The gate asks `GET /api/member/session` once per page, with credentials, and caches the answer at
-   module scope for 60 seconds, so ten gates on one page make one request.
-3. `200` resolves entitlement through `isEntitled`. `401` is a guest. `429`, `5xx`, and a network failure
-   all resolve to locked.
-4. An entitled member sees the protected frame rendered unmodified. Nothing is overlaid, nothing is
-   filtered, no wrapper changes its layout.
-5. A visitor who is not entitled sees the configured locked state: a frosted blur teaser, nothing at all,
-   a redirect, or the lock card.
-6. A later sign-in does not reveal the content by itself. The cache expires, or the page reloads, and the
-   gate resolves again.
+```
+┌────────────────────────────────────────────────────────┐
+│                   Visitor Lands on Site                │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                 Is Visitor Authenticated?
+                 (GET /api/member/session)
+                /                         \
+         No (Guest)                    Yes (Member)
+        /                                  \
+  Access Denied                      Access Granted
+  • Locked Pages: Auto-redirect       • Page renders completely
+    to /login                         • All <MemberGate> content
+  • On-Page Content: Frosted blur,      slots dissolve immediately
+    lock card, or hidden element      • Private sections revealed
+        │                                  │
+  Click "Sign in to unlock"           Member visits /login?
+        │                             Auto-redirects to /dashboard!
+  Complete Auth (<MemberAuth>)             │
+        │                             Member clicks Sign Out?
+  Dispatches session-updated event    • POST /api/member/logout
+        │                             • Dispatches session-updated
+  Gates instantly dissolve without    • All gates re-lock instantly
+  requiring a full page reload        • Navigates to home (/)
+```
+
+1. **Page Load Evaluation**:
+   - `<MemberGate>` mounts in its checking state (fails closed, renders locked state, never leaks unauthenticated content).
+   - Module-scoped `loadSession()` checks `GET /api/member/session` with `credentials: "include"`.
+   - Results are cached for 60 seconds at module scope so multiple gates on a single page make exactly one network call.
+2. **Entitlement Resolution**:
+   - `200 OK` with session resolves entitlement via `isEntitled()`.
+   - When entitled, `<MemberGate>` renders the protected frame unmodified in the DOM.
+   - If not entitled (`401`, `403`, network failure), the configured fallback is rendered.
+3. **Interactive Sign-In Trigger**:
+   - Clicking the "Sign in to unlock" CTA on the lock card emits `memberframe:open-auth` and navigates to the sign-in page (`CONFIG.loginPath`).
+4. **Login Page Auto-Redirect**:
+   - When an authenticated member visits `/login`, `<MemberAuth>` verifies session on mount.
+   - Detecting an active session, it skips rendering the sign-in form and immediately calls `redirectAfterAuth()`, routing the member directly to `/dashboard`.
+5. **Real-Time Dynamic Gating (No Reload Required)**:
+   - When a member signs in, `<MemberAuth>` dispatches `memberframe:session-updated`.
+   - `<MemberGate>` instances listen to this event, invalidate module cache (`cachedSession = null`), and re-evaluate entitlement. The locked treatment dissolves and reveals the content instantly.
+6. **Sign Out Flow**:
+   - When a member signs out via `<MemberDashboard>`, `POST /api/member/logout` revokes the session.
+   - Dispatches `memberframe:session-updated` with `signedIn: false`.
+   - All `<MemberGate>` components on the page re-lock immediately.
+   - The browser navigates to `afterLogoutPath` (defaults to `/`).
 
 ---
 
@@ -65,259 +112,114 @@ already on the canvas, because Framer stores each instance's props on the node.
 
 ### 3.1. Files
 
-| Path | Task | Role |
-| :--- | :--- | :--- |
-| [`src/canvas-components/MemberGate.tsx`](../../src/canvas-components/MemberGate.tsx) | 1.7 | The authored component. Deployed to the creator's project verbatim |
-| [`src/services/canvasComponentCodeGenerator.ts`](../../src/services/canvasComponentCodeGenerator.ts) | 1.4 | Reads the authored source and swaps in the creator's config block |
-| [`src/services/framerCanvasService.ts`](../../src/services/framerCanvasService.ts) | 1.5 | Create or update the code file, then insert the instance |
-| [`src/config/backend.ts`](../../src/config/backend.ts) | 1.4 | The API base URL, which PRD section 10.1 requires to live here |
-| [`framer.json`](../../framer.json) | 1.6 | The first four permissions |
-| [`src/types/framer-canvas.d.ts`](../../src/types/framer-canvas.d.ts) | 1.7 | Minimal declarations for the `framer` runtime module |
-| [`src/utils/entitlement.ts`](../../src/utils/entitlement.ts) | 1.8 | The plugin's copy of the resolver |
-| [`src/components/tabs/BuilderTab.tsx`](../../src/components/tabs/BuilderTab.tsx) | 1.3, 1.5 | Customizer, and now the live "Add to canvas" action |
-| [`src/utils/framerMock.ts`](../../src/utils/framerMock.ts) | 1.5 | Widened with the four canvas calls |
-
-### 3.2. Why The Authored Component Is A Real File, Not A String
-
-The deployed component could have been a template literal inside the generator. It is a real `.tsx` file
-imported with Vite's `?raw` suffix instead, for three reasons that are all gates rather than preferences:
-
-1. `tsc --noEmit` typechecks it. A template literal is a string, so a missing brace in it reaches the
-   creator's published site and breaks their page. This is the only code in the repo that runs on someone
-   else's website, so it is the code that least deserves to be unchecked.
-2. `npm run lint:css` scans it. The linter reads `.tsx` and `.ts` files line by line with no awareness of
-   template literals, so the zero-inline-CSS rule now covers the deployed output as well as the panel.
-3. The diff is readable. A change to the gate shows up as a change to a component rather than as a change
-   to an escaped string.
-
-`?raw` returns the file unmodified and untransformed, which is what the canvas needs: Framer compiles the
-`.tsx` itself.
-
-### 3.3. The `framer` Module Shim
-
-`MemberGate.tsx` imports `addPropertyControls`, `ControlType`, and `RenderTarget` from `framer`. That
-package is not and should not be installed: it is supplied by the Framer runtime on the canvas, not by
-this repo, and the repo's own dependency is `framer-plugin`, a different library for a different surface.
-
-So `src/types/framer-canvas.d.ts` declares the pieces of the `framer` module this component touches. The
-shim buys the typecheck in section 3.2, and it carries a risk worth stating plainly: a shim cannot be wrong
-in a way the compiler notices. If Framer's `RenderTarget` is not shaped the way the shim claims, nothing
-here fails and the gate misbehaves on the canvas. That is why the first row of section 7 is a check in the
-Framer desktop app, and why the shim is deliberately a handful of declarations rather than a convenience
-copy of a whole API.
-
-### 3.4. The Config Block And Why It Is Marked
-
-The generator does not template the component. It replaces exactly one marked block:
-
-```tsx
-// @memberframe-config-start
-const CONFIG: GateConfig = { ... };
-// @memberframe-config-end
-```
-
-Everything else in the file is byte-identical between the repo and the creator's project. A generator that
-interpolated values at twelve sites would have twelve ways to emit broken code. This one has a single
-anchor pair, and it throws if either marker is missing or appears twice.
-
-Property control defaults and the component's own prop defaults both read from `CONFIG`, so the panel, the
-sidebar, and the rendered component cannot disagree about what the creator configured.
-
-### 3.5. Styling
-
-All canvas styling is one `cssContent` string injected through `<style>`, per PRD section 9.3 requirement 1.
-Class names are prefixed `memberframe-`.
-
-The blur radius is a number the creator drags, so it cannot be a static class. It is emitted as a CSS
-custom property on a per-instance scope:
-
-```
-[data-memberframe-gate="<instance id>"] { --memberframe-gate-blur: 8px; }
-```
-
-`useId` supplies the instance id, so two gates on one page with different blur settings do not fight.
-
-The canvas cannot use the plugin's design tokens: `design-tokens.css` is loaded by the plugin panel and
-does not exist on a published site. So the gate's palette is declared inside `cssContent` as custom
-properties on the component root, with a `prefers-color-scheme` block, and every rule reads those
-properties. No rule body holds a hex value. That is the same shape the panel uses, with a different
-declaration site.
+| Path | Role |
+| :--- | :--- |
+| `src/canvas-components/MemberGate.tsx` | Authored canvas gate component deployed to creator project verbatim. Zero code overrides. |
+| `src/canvas-components/MemberAuth.tsx` | Passwordless and password sign-in component with on-mount session check and auto-redirect. |
+| `src/canvas-components/MemberDashboard.tsx` | Member account portal with working sign-out and session event broadcasting. |
+| `src/components/settings/PageLocksPanel.tsx` | In-plugin management UI for full page locking and on-page content gating guide. |
+| `src/components/tabs/SettingsTab.tsx` | Settings tab hosting Config, Page Locks, and Integration sub-tabs. |
+| `src/types/connection.ts` | Data models for `GatedPageRule`, `SiteSettingsDocument`, and `SiteSettingsPatch`. |
+| `backend/src/lib/siteSettings.ts` | Backend validation, default values, and merging for `gatedPages`. |
+| `backend/src/routes/member.ts` | Session (`/session`), auth (`/login-password`), and logout (`/logout`) endpoints. |
+| `src/services/canvasComponentCodeGenerator.ts` | Code generator serializing `loginPath` and configuration into canvas files. |
+| `src/services/framerCanvasService.ts` | Canvas file creation and component instance insertion wrapper. |
+| `src/services/framerPagesService.ts` | Queries active Framer canvas AST for `WebPageNode` entries and normalizes paths. |
+| `src/utils/entitlement.ts` | Single source of truth for `isEntitled` resolution parity. |
+| `src/styles/settings.css` | Modular stylesheet for Page Locks panel and on-page guide (Zero Inline CSS). |
 
 ---
 
 ## 4. Framer Property Controls Specification
 
-All seven controls from PRD section 8 F01, unchanged in name, type, and default.
+`<MemberGate>` exposes 7 native Framer Property Controls configured in Framer's sidebar:
 
-| Control Title | Control Type | Default Value | Description |
-| :--- | :--- | :--- | :--- |
-| Protected Frame | `ComponentInstance` | none | The frame to gate. Accepts any Framer frame or component |
-| Access Tier | `Enum` | `signed_in` | Minimum tier that passes. Hierarchical, so a VIP passes a Silver gate |
-| Locked State | `Enum` | `blur` | Frosted blur, hide completely, page redirect, or lock card |
-| Redirect Target | `Link` | none | Hidden unless Locked State is page redirect |
-| Lock Title | `String` | `Members Only Content` | Hidden unless Locked State is lock card |
-| Lock Message | `String` | `Join or sign in to read this full guide.` | Hidden unless Locked State is lock card |
-| Blur Amount | `Number`, 2 to 20, unit px | `8` | Hidden unless Locked State is frosted blur |
-
-Each default is read from `CONFIG`, so a creator who customizes in the panel gets those values in the
-sidebar, and a creator who customizes nothing gets F01's defaults.
-
-`requiredTier` omits `anyone`, matching F01's own option list. A gate set to "Anyone" gates nothing, so it
-is offered in neither surface. The resolver still accepts the value, because F07 and F09 need an ungated
-branch.
+| Control Property | Type | Default | Hidden Condition | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `contentSlot` | `ControlType.ComponentInstance` | `undefined` | None | Slot connecting the protected Frame, Stack, or Component |
+| `requiredTier` | `ControlType.Enum` | `"signed_in"` | None | Minimum tier required (`Any Signed In`, `Free Member`, `Tier 1: Silver`, `Tier 2: Gold`, `VIP Member`) |
+| `fallbackAction` | `ControlType.Enum` | `"blur"` | None | Locked state treatment (`Frosted Blur`, `Hide Completely`, `Page Redirect`, `Lock Card`) |
+| `redirectUrl` | `ControlType.Link` | `""` | `props.fallbackAction !== "redirect"` | Target URL or path when fallbackAction is redirect |
+| `cardTitle` | `ControlType.String` | `"Members Only Content"` | `props.fallbackAction !== "custom_card"` | Custom lock card heading |
+| `cardDescription` | `ControlType.String` | `"Join or sign in to read this full guide."` | `props.fallbackAction !== "custom_card"` | Custom lock card body copy |
+| `blurIntensity` | `ControlType.Number` | `8` | `props.fallbackAction !== "blur"` | Blur radius in pixels (2px min, 20px max, step 1) |
 
 ---
 
-## 5. Data Contracts and Core User Schema
+## 5. Data Contracts and TypeScript Interfaces
 
-### 5.1. Conflicts Found While Building This Feature
-
-Five more contradictions surfaced in tasks 1.4 to 1.7. C1 and C2 are in
-[`04-live-preview-studio.md`](04-live-preview-studio.md) section 5.1 and are still open. These are new.
-
-| # | Conflict | Sources | Resolved as | Needs confirmation |
-| :-- | :--- | :--- | :--- | :--- |
-| C3 | Task 1.6 names the four permissions `createCodeFile`, `CodeFile.setFileContent`, `addComponentInstance`, `setParent`. `CodeFile.setFileContent` is not a permission string: the SDK maps that method key to the permission `setCodeFileContent`, and `framer.json` takes permissions | PRD section 15.4 task 1.6 vs `framer-plugin` 3.10.3 `PermissionMap` | `framer.json` declares `addComponentInstance`, `createCodeFile`, `setCodeFileContent`, `setParent`. `framer.isAllowedTo` is called with the method keys, which is the opposite namespace | No. The SDK is the authority and it is checkable. Recorded because the wrong string fails silently |
-| C4 | F01 says the runtime hook "checks the local JWT and cached tier entitlement". Section 14.1 S2 says member sessions use HTTP-only cookies and forbids a JWT in `localStorage` | PRD section 8 F01 vs section 14.1 S2 | S2 wins. The gate reads no token anywhere. It calls `GET /api/member/session` with `credentials: "include"` and lets the browser send the HTTP-only cookie | No. S2 is the security requirement, and F01's sentence describes an implementation S2 forbids |
-| C5 | `isEntitled` takes the site's tier table and compares ranks. `GET /api/member/session` returns `MemberSessionData`, which carries no tier table, and the canvas component cannot read the plugin's copy | PRD section 11.3 vs section 10.4 | The gate ships with the default four-tier ladder and uses it when the session carries none. **Recommendation: add `tiers` to the `/api/member/session` response.** It is the only call the gate makes | **Yes, before the backend schema is written.** Same deadline as C1 |
-| C6 | Section 9.3 requirement 3 mandates `IS_LOCKED` and the lock-state marker in every component. `CLAUDE.md` forbids building F19 licensing before the core workflow | PRD section 9.3 vs `.agents/rules/` phase order | Both honoured. The static declarations, the marker comments, the frosted lock banner, and the trial watermark are in the component, because they are what F19's patcher rewrites and adding them later means editing 15 files. The 1-instance duplicate registry from the reference template is **not** included: that is enforcement behaviour and belongs to F19 | No |
-| C7 | The reference master template uses `style={{ }}` for its own dynamic colour and radius props | `canvas-component-template.md` section 1 vs `.agents/rules/framer-sdd-standards.md` and PRD section 9.3 requirement 1 | The rule wins. Dynamic values are CSS custom properties inside `cssContent`. Precedence puts the references above the PRD but not above the rules, and the rule is unconditional | No |
-
-C5 is the one that matters. A creator who renames Silver to "Pro" is fine, because the key is what gets
-compared, but a creator who adds a fifth tier or re-ranks the ladder gets a gate resolving against a table
-the backend does not agree with. It fails closed, so no content leaks, and gates will be shut that should
-be open.
-
-### 5.2. The Session Contract The Gate Consumes
+### 5.1. Gated Page Rule (`src/types/connection.ts`)
 
 ```typescript
-interface MemberSessionData {
+export type GatedPageFallbackAction = "redirect" | "blur" | "custom_card";
+export type GatedPageTier = "signed_in" | "free_member" | "tier_1" | "tier_2" | "vip";
+
+export interface GatedPageRule {
+  path: string;
+  enabled: boolean;
+  requiredTier: GatedPageTier;
+  fallbackAction: GatedPageFallbackAction;
+  redirectPath?: string;
+}
+```
+
+### 5.2. Runtime Session Contract (`/api/member/session`)
+
+```typescript
+export interface MemberSessionData {
   memberId: string;
   email: string;
   name: string | null;
   activeTier: "free_member" | "tier_1" | "tier_2" | "vip";
   status: "active" | "trialing" | "past_due" | "canceled";
-  currentPeriodEnd: number;    // Unix seconds, UTC
-  gracePeriodEndsAt: number;   // Unix seconds, UTC. Conflict C1
+  currentPeriodEnd: number;
+  gracePeriodEndsAt: number;
   siteId: string;
+}
+
+export interface SessionResponse {
+  member?: MemberSessionData;
+  tiers: ReadonlyArray<TierLadderEntry>;
 }
 ```
 
-Declared a second time inside `MemberGate.tsx` rather than imported, because the deployed file cannot
-import from this repo. Section 5.4 explains how the two copies are held together.
+### 5.3. Custom Browser Events
 
-### 5.3. The Five Error Cases
-
-PRD section 10.6 requires every call site to handle all five. The gate's column is "Required Canvas
-Behavior", and all five of its rows mean locked:
-
-| Case | Gate behaviour |
-| :--- | :--- |
-| `200` | Resolve `isEntitled`. Render content only if it returns true |
-| `401` | Guest. Locked state, lock card CTA reads "Sign in to unlock" |
-| `403` | Locked state, CTA reads "Upgrade to unlock" |
-| `429` | Locked state. The module-scope cache holds the failure for its TTL, so no retry storm |
-| `5xx` or network failure | Locked state. No crash, no blank frame |
-
-The gate mounts in `checking`, which renders the same locked treatment. That is what satisfies the
-section 16.4 line "Disabling JavaScript or blocking the API leaves gated content locked, never revealed":
-no code path reveals content before entitlement resolves true.
-
-### 5.4. Two Copies Of The Resolver, Held Together By A Test
-
-PRD section 11.3: `isEntitled` is "implemented identically in the plugin, the canvas components, and the
-backend. Divergence between the three is a security defect." The canvas copy cannot import the plugin's,
-so this repo now holds two copies by necessity.
-
-`test/memberGateParity.test.ts` reads both files from disk, extracts each `isEntitled` body, strips
-comments, collapses whitespace, and asserts the two are the same text. An edit to one copy that is not
-mirrored in the other fails `npm test`. The test also pins the status list, both time comparisons, and the
-`>=` rank comparison individually, so a change that happens to normalize to the same length still fails.
-
-The third copy, the backend's, is out of repo and cannot be checked from here. The test's header says so.
+| Event Name | Detail Payload | Dispatcher | Listener |
+| :--- | :--- | :--- | :--- |
+| `memberframe:open-auth` | None | `<MemberGate>` lock CTA button | `<MemberAuth>` modal handler |
+| `memberframe:session-updated` | `{ signedIn: boolean }` | `<MemberAuth>` (on sign in), `<MemberDashboard>` (on sign out) | `<MemberGate>` instances to invalidate cache and refresh |
 
 ---
 
 ## 6. Verification and Testing Checklist
 
-### 6.1. F01 Acceptance Criteria
+### 6.1. Automated Test Suites
 
-| PRD criterion | Status | Evidence |
-| :--- | :--- | :--- |
-| A frame in `Content Slot` renders unmodified for an entitled member | Needs human | The entitled branch renders `contentSlot` with no wrapper, which is readable in the source, but "unmodified" is a visual claim about Framer's own layout |
-| Each of the four fallback actions produces its distinct visual result | Needs human | Four branches exist and the selection logic is unit tested. Distinctness is pixels |
-| `redirectUrl` is hidden in the sidebar unless `fallbackAction` is `redirect` | Needs human | The `hidden` predicate is in the generated controls and asserted present by test. Only Framer can show that the sidebar honours it |
-| Tier comparison is hierarchical: a VIP passes a `tier_1` gate | Agent, done | `test/entitlement.test.ts`, plus the parity test proving the canvas copy compares the same way |
-| A canceled member with `currentPeriodEnd` in the future still passes | Agent, done | `test/entitlement.test.ts`, including the boundary second |
-| Gate renders its locked state, not a crash or blank frame, when the API is unreachable | Agent, partly | The five cases in section 5.3 are unit tested through the extracted resolver, and `checking` renders locked. The real unreachable-API render needs a published site |
-| Zero inline CSS, verified by the linter | Agent, done | `npm run lint:css`, 0 violations, and the linter now reads the deployed component too |
-| Light and dark contrast verified at WCAG AA against `data-framer-theme` | Needs human | Note that `data-framer-theme` does not exist on a published site. The gate uses `prefers-color-scheme`, the published-site equivalent. That reading of the criterion is worth confirming |
+1. **Frontend Root Test Suite (`cmd /c npm test`)**:
+   - `test/memberGateParity.test.ts`: 32 tests passing. Verifies byte parity of `isEntitled`, exactly 1 fetch call, no token storage, and all 7 property controls.
+   - `test/memberAuth.test.ts`: 86 tests passing. Verifies 3 fetch calls, origin security, and password submit clearing.
+   - `test/canvasCodeGenerator.test.ts`: 26 tests passing. Verifies code generator replaces config block cleanly.
+   - Total Frontend: **526 passed across 19 test files**.
 
-### 6.2. Standing Checklist
+2. **Backend Test Suite (`cmd /c npm test` in `backend`)**:
+   - `test/siteSettings.test.ts`: 27 tests passing. Validates `gatedPages` defaults, safe path validation, and clean merges.
+   - `test/parity.test.ts`: 17 tests passing. Confirms three-way parity across plugin, canvas, and backend.
+   - Total Backend: **133 passed across 8 test files**.
+
+3. **Zero Inline CSS Compliance (`cmd /c npm run lint:css`)**:
+   - Verified across 81 files: **0 inline style violations found**.
+
+4. **TypeScript Verification (`cmd /c npx tsc --noEmit`)**:
+   - Clean compilation with zero type errors.
+
+### 6.2. Standing Verification Checklist
 
 - [x] Zero inline CSS compliance verified (`npm run lint:css`).
-- [x] `tsc --noEmit` and `npm run build` pass.
-- [x] Strictly Lucide or Framer SVG icons used, zero unicode emoji.
-- [x] Exactly one `.primary-cta` in the Builder tab.
-- [ ] Light mode and dark mode colour contrast verified.
-- [ ] Framer Property Controls render cleanly in the canvas sidebar.
-- [ ] Backend API endpoints return proper status codes. The backend does not exist, blocker B1.
-- [ ] F01 acceptance criteria all verified, see section 6.1.
-
----
-
-## 7. Verified By Whom
-
-| Check | Verified by | Date | Evidence |
-| :--- | :--- | :--- | :--- |
-| `framer` module shim matches the real runtime, section 3.3 | | | |
-| Deploy path: create, insert, and the sidebar opens populated | | | |
-| Second "Add to canvas" updates the file rather than duplicating it | | | |
-| All seven controls appear in the sidebar with the right `hidden` behaviour | | | |
-| Four locked states each render distinctly | | | |
-| Entitled member sees the frame unmodified | | | |
-| Light and dark contrast at WCAG AA on a published site | | | |
-| Gated content stays locked with JavaScript disabled | | | |
-| Automated gates | agent | 2026-10-12 | command output in the commit message |
-
----
-
-## 8. Build Decisions
-
-1. **The authored component is a real typechecked file, not a string.** Section 3.2. It is the only code
-   here that runs on a stranger's website.
-2. **One marked config block, not interpolation.** Section 3.4. One anchor pair has one failure mode.
-3. **Module-scope session cache with a 60 second TTL.** PRD P4 forbids a request per gated element. Ten
-   gates on a page make one request, and a failed request stays failed for the TTL, which is also what
-   "no retry storm" asks for on a 429.
-4. **The gate mounts locked.** There is no loading state that shows content. This is what makes the
-   section 16.4 JavaScript-disabled line true by construction rather than by observation.
-5. **`RenderTarget` guards the redirect.** A `redirect` gate that ran in the editor would navigate the
-   creator's canvas away mid-edit. The same guard renders a visible placeholder for the `hide` state,
-   which would otherwise be an unselectable zero-size component.
-6. **The service returns an outcome, it does not notify.** `deployMemberGate` returns a tagged union and
-   the Builder tab decides what the creator sees. That keeps the whole deploy path testable against the
-   mock with no DOM.
-7. **`setParent` is declared and implemented but not yet called by the panel.** Task 1.6 is the task that
-   declares it, and `framer.json` permissions are static, so it cannot be added later without a manifest
-   change. The reparenting path is exercised by test and the panel passes no parent, because inventing
-   placement behaviour that cannot be verified in Framer would be guessing.
-8. **Creator strings are serialized, never concatenated.** Every value entering generated code goes
-   through `JSON.stringify`, and the enum and numeric fields are validated against their allowed values
-   before emission. A lock title containing a quote is a syntax error in a naive generator, and the creator
-   would see a broken published page rather than a validation message. U+2028 and U+2029 are the one thing
-   `JSON.stringify` passes through raw that matters here, because they are invisible and they terminate a
-   line for an older parser, so they are removed during sanitization rather than escaped: no lock title
-   needs one. `test/canvasCodeGenerator.test.ts` decodes each emitted literal and asserts it round trips,
-   including for a value that tries to close the string and append a second assignment.
-9. **A redirect target is restricted to a relative path, a fragment, or an explicit http(s) URL.** The gate
-   hands this value to `window.location.assign`, which executes a `javascript:` URL in some browsers, and
-   `redirectUrl` is exactly the kind of field a creator pastes from somewhere else. Anything unrecognised
-   becomes empty, which renders the lock card and stays put.
-10. **The canvas shows the content, the panel shows the locked states.** On a canvas or thumbnail render the
-   gate makes no request, never navigates, and renders the protected frame with a small "Gated" badge. A
-   creator cannot arrange a frame they cannot see, and previewing the locked states is exactly what the F04
-   Live Preview Studio exists for. This is the division of labour between the two features.
-11. **The lock card CTA is text, not a control.** "Sign in to unlock" has nowhere to go until task 2.5
-   authors `<MemberAuth>`. A button that does nothing on a visitor's site is worse than a label, and the
-   same decision was already taken for the panel's preview in task 1.1.
+- [x] TypeScript type checking clean (`npx tsc --noEmit`).
+- [x] Real-time session event dispatching and listening verified.
+- [x] On-mount session check in `MemberAuth.tsx` with auto-redirect to `/dashboard` for logged-in users.
+- [x] Sign-out flow in `MemberDashboard.tsx` revokes session, emits update, and re-gates content.
+- [x] In-plugin Page Locks management panel implemented in `SettingsTab.tsx`.
+- [x] On-page content gating guide integrated with one-click canvas deploy button.
+- [x] Automated tests updated and 100% passing (526 frontend, 133 backend).

@@ -85,6 +85,29 @@ interface AuthConfig {
   defaultAuthMethod: AuthMethod;
   requirePasswordStrength: boolean;
   apiBaseUrl: string;
+  /**
+   * Which MemberFrame site this component belongs to.
+   *
+   * Public, and baked in here exactly as `apiBaseUrl` already is: it is no
+   * more secret than a Stripe publishable key, and it is readable in this
+   * file's source on any published site. It IDENTIFIES the tenant. What
+   * authorizes is the request's `Origin`, which the browser sets and a page
+   * cannot forge, checked against that site's allowlist on the server.
+   *
+   * Empty when the component was deployed before the project was connected.
+   * Every request then fails with `missing_site_key`, which is why the plugin
+   * refuses to deploy while disconnected.
+   */
+  siteKey: string;
+  /**
+   * Where to send the visitor once they are signed in.
+   *
+   * A site-relative path, never a URL. The plugin validates that before
+   * storing it and the server validates it again: a value that could carry an
+   * absolute URL would make this component an open redirect, which is exactly
+   * the shape a phishing hop wants.
+   */
+  afterLoginPath: string;
 }
 
 // @memberframe-config-start
@@ -103,6 +126,8 @@ const CONFIG: AuthConfig = {
   defaultAuthMethod: "password",
   requirePasswordStrength: true,
   apiBaseUrl: "https://api.memberframe.framefic.com",
+  siteKey: "",
+  afterLoginPath: "",
 };
 // @memberframe-config-end
 
@@ -138,6 +163,59 @@ const REGISTER_PATH = "/api/member/register";
 const LOGIN_PASSWORD_PATH = "/api/member/login-password";
 const FORGOT_PASSWORD_PATH = "/api/member/forgot-password";
 const RESET_PASSWORD_PATH = "/api/member/reset-password";
+const SESSION_PATH = "/api/member/session";
+
+function notifySessionUpdated(signedIn = true): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("memberframe:session-updated", { detail: { signedIn } })
+    );
+  }
+}
+
+/**
+ * Headers for every call this component makes.
+ *
+ * One place, so a route added later cannot forget the site key and fail with a
+ * 400 that reads like a server problem. The key is omitted entirely when it is
+ * empty rather than sent blank: the server distinguishes "no key" from "unknown
+ * key", and a blank one would land in the wrong branch.
+ */
+function apiHeaders(withBody: boolean): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+
+  if (withBody) headers["Content-Type"] = "application/json";
+  if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+
+  return headers;
+}
+
+/**
+ * Send the visitor on, once they are signed in.
+ *
+ * Guarded four ways, and each guard is load bearing:
+ *
+ *   1. An empty path means the creator wants the visitor to stay put, which is
+ *      right for a sign-in form in a modal over the page they were reading.
+ *   2. A path that is not site-relative is refused here as well as on the
+ *      server. `//evil.com` begins with a slash and is NOT a path: a browser
+ *      reads it as protocol-relative and leaves the site. This is the last
+ *      place that value is checked before it reaches the address bar.
+ *   3. A backslash is refused because some browsers normalise it to a slash,
+ *      which turns `/\\evil.com` back into case 2.
+ *   4. Navigating to the page you are already on would reload it and discard
+ *      the state that was just established.
+ */
+function redirectAfterAuth(): void {
+  const path = CONFIG.afterLoginPath || "/dashboard";
+
+  if (path === "" || !path.startsWith("/")) return;
+  if (path.startsWith("//") || path.includes("\\")) return;
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === path) return;
+
+  window.location.assign(path);
+}
 
 /** The query parameter the emailed reset link carries. FP-02 section 2.3. */
 const RESET_TOKEN_PARAM = "token";
@@ -1208,6 +1286,8 @@ export default function MemberAuth(props: MemberAuthProps) {
 
       if (payload.ok === true) {
         setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        redirectAfterAuth();
         return;
       }
 
@@ -1229,7 +1309,8 @@ export default function MemberAuth(props: MemberAuthProps) {
       setState({ phase: "idle" });
       setOauthBusy(provider);
 
-      const url = `${CONFIG.apiBaseUrl}${OAUTH_PATH_PREFIX}${provider}`;
+      const siteQuery = CONFIG.siteKey ? `?siteKey=${encodeURIComponent(CONFIG.siteKey)}` : "";
+      const url = `${CONFIG.apiBaseUrl}${OAUTH_PATH_PREFIX}${provider}${siteQuery}`;
       const popup = window.open(url, "memberframe-oauth", "width=480,height=640");
 
       if (!popup) {
@@ -1266,7 +1347,7 @@ export default function MemberAuth(props: MemberAuthProps) {
       const response = await fetch(`${CONFIG.apiBaseUrl}${SEND_OTP_PATH}`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: apiHeaders(true),
         body: JSON.stringify({ email: email.trim() }),
       });
 
@@ -1319,12 +1400,14 @@ export default function MemberAuth(props: MemberAuthProps) {
         // The session arrives as an HTTP-only cookie, per PRD section 14.1 S2.
         // This component never sees it, which is the point.
         credentials: "include",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: apiHeaders(true),
         body: JSON.stringify({ email: pendingEmail, code }),
       });
 
       if (response.ok) {
         setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        redirectAfterAuth();
         return;
       }
 
@@ -1361,10 +1444,15 @@ export default function MemberAuth(props: MemberAuthProps) {
    * stops clearing the password.
    */
   const submitCredentials = useCallback(
-    async (path: string, body: Record<string, unknown>, onOk: () => void) => {
+    async (
+      path: string,
+      body: Record<string, unknown> | null,
+      onOk: () => void,
+      silentFail = false
+    ) => {
       if (onCanvas) return;
 
-      setState({ phase: "sending" });
+      if (!silentFail) setState({ phase: "sending" });
 
       try {
         const response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
@@ -1372,8 +1460,8 @@ export default function MemberAuth(props: MemberAuthProps) {
           // The session arrives as an HTTP-only cookie, per PRD section 14.1
           // S2. This component never sees it, which is the point.
           credentials: "include",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(body),
+          headers: apiHeaders(true),
+          body: JSON.stringify(body ?? {}),
         });
 
         // Whatever happened, the plaintext has served its purpose.
@@ -1382,6 +1470,11 @@ export default function MemberAuth(props: MemberAuthProps) {
 
         if (response.ok) {
           onOk();
+          return;
+        }
+
+        if (silentFail) {
+          setState({ phase: "idle" });
           return;
         }
 
@@ -1405,6 +1498,10 @@ export default function MemberAuth(props: MemberAuthProps) {
       } catch {
         setPassword("");
         setShowPassword(false);
+        if (silentFail) {
+          setState({ phase: "idle" });
+          return;
+        }
         setState({
           phase: "error",
           message: "We could not reach the sign in service. Check your connection.",
@@ -1414,6 +1511,25 @@ export default function MemberAuth(props: MemberAuthProps) {
     },
     [onCanvas]
   );
+
+  // --------------------------------------------------------------------------
+  // Check for existing active session on mount. If already signed in, auto-redirect
+  // to afterLoginPath (or /dashboard) so logged-in members never see the login form.
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (onCanvas) return;
+
+    void submitCredentials(
+      SESSION_PATH,
+      null,
+      () => {
+        setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        redirectAfterAuth();
+      },
+      true
+    );
+  }, [onCanvas, submitCredentials]);
 
   const signInWithPassword = useCallback(() => {
     setSubmitted(true);
@@ -1427,7 +1543,11 @@ export default function MemberAuth(props: MemberAuthProps) {
     void submitCredentials(
       LOGIN_PASSWORD_PATH,
       { email: email.trim(), password, rememberMe },
-      () => setState({ phase: "signed_in" })
+      () => {
+        setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        redirectAfterAuth();
+      }
     );
   }, [email, password, rememberMe, submitCredentials]);
 
@@ -1442,7 +1562,11 @@ export default function MemberAuth(props: MemberAuthProps) {
       // `name` is optional per FP-02 section 2.1, so an empty box sends null
       // rather than an empty string the backend would have to special-case.
       { email: email.trim(), password, name: name.trim() === "" ? null : name.trim() },
-      () => setState({ phase: "signed_in" })
+      () => {
+        setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        redirectAfterAuth();
+      }
     );
   }, [email, name, password, requirePasswordStrength, submitCredentials]);
 
@@ -1484,6 +1608,8 @@ export default function MemberAuth(props: MemberAuthProps) {
 
       setResetToken(null);
       setState({ phase: "signed_in" });
+      notifySessionUpdated(true);
+      redirectAfterAuth();
     });
   }, [email, password, requirePasswordStrength, resetToken, submitCredentials]);
 

@@ -62,8 +62,7 @@ export interface CanvasComponentEntry {
 }
 
 export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
-  { id: "member_gate", name: "Member Gate", features: "F01, F22", task: "1.7", previewReady: true, deployable: true },
-  {
+   {
     id: "member_auth",
     name: "Member Auth",
     features: "F05",
@@ -73,22 +72,33 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewNote:
       "Built and ready to insert. Configure it in the Framer properties panel: a panel preview is not scheduled yet.",
   },
-  { id: "member_dashboard", name: "Member Dashboard", features: "F06", task: "5.1", previewReady: false, deployable: false },
-  { id: "metered_paywall", name: "Metered Paywall", features: "F07, F08", task: "3.4", previewReady: false, deployable: false },
-  { id: "cms_gated_template", name: "CMS Gated Template", features: "F09", task: "5.3", previewReady: false, deployable: false },
-  { id: "protected_download", name: "Protected Download", features: "F10", task: "5.5", previewReady: false, deployable: false },
-  { id: "course_progress", name: "Course Progress", features: "F11", task: "4.1", previewReady: false, deployable: false },
-  { id: "lesson_checklist", name: "Lesson Checklist", features: "F11", task: "4.1", previewReady: false, deployable: false },
-  { id: "video_progress_listener", name: "Video Progress Listener", features: "F11", task: "4.1", previewReady: false, deployable: false },
-  { id: "donation_slider", name: "Donation Slider", features: "F13", task: "7.3", previewReady: false, deployable: false },
-  { id: "member_directory", name: "Member Directory", features: "F15", task: "7.2", previewReady: false, deployable: false },
-  { id: "bookmark_button", name: "Bookmark Button", features: "F14", task: "7.1", previewReady: false, deployable: false },
-  { id: "bookmarks_tray", name: "Bookmarks Tray", features: "F14", task: "7.1", previewReady: false, deployable: false },
-  { id: "onboarding_modal", name: "Onboarding Modal", features: "F16", task: "6.3", previewReady: false, deployable: false },
-  { id: "member_announcement_bar", name: "Announcement Bar", features: "F17", task: "7.4", previewReady: false, deployable: false },
+  // { id: "member_gate", name: "Member Gate", features: "F01, F22", task: "1.7", previewReady: true, deployable: true },
+ 
+  {
+    id: "member_dashboard",
+    name: "Member Dashboard",
+    features: "F06",
+    task: "5.1",
+    previewReady: false,
+    deployable: true,
+    previewNote:
+      "Built and ready to insert. It shows a member their email, tier, and status, and carries the sign out button. Billing and invoices arrive with payments.",
+  },
+  // { id: "metered_paywall", name: "Metered Paywall", features: "F07, F08", task: "3.4", previewReady: false, deployable: false },
+  // { id: "cms_gated_template", name: "CMS Gated Template", features: "F09", task: "5.3", previewReady: false, deployable: false },
+  // { id: "protected_download", name: "Protected Download", features: "F10", task: "5.5", previewReady: false, deployable: false },
+  // { id: "course_progress", name: "Course Progress", features: "F11", task: "4.1", previewReady: false, deployable: false },
+  // { id: "lesson_checklist", name: "Lesson Checklist", features: "F11", task: "4.1", previewReady: false, deployable: false },
+  // { id: "video_progress_listener", name: "Video Progress Listener", features: "F11", task: "4.1", previewReady: false, deployable: false },
+  // { id: "donation_slider", name: "Donation Slider", features: "F13", task: "7.3", previewReady: false, deployable: false },
+  // { id: "member_directory", name: "Member Directory", features: "F15", task: "7.2", previewReady: false, deployable: false },
+  // { id: "bookmark_button", name: "Bookmark Button", features: "F14", task: "7.1", previewReady: false, deployable: false },
+  // { id: "bookmarks_tray", name: "Bookmarks Tray", features: "F14", task: "7.1", previewReady: false, deployable: false },
+  // { id: "onboarding_modal", name: "Onboarding Modal", features: "F16", task: "6.3", previewReady: false, deployable: false },
+  // { id: "member_announcement_bar", name: "Announcement Bar", features: "F17", task: "7.4", previewReady: false, deployable: false },
 ];
 
-export const DEFAULT_COMPONENT_ID: CanvasComponentId = "member_gate";
+export const DEFAULT_COMPONENT_ID: CanvasComponentId = "member_auth";
 
 export function findComponent(id: CanvasComponentId): CanvasComponentEntry {
   const entry = CANVAS_COMPONENTS.find((component) => component.id === id);

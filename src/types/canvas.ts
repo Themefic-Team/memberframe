@@ -165,3 +165,43 @@ export const AUTH_PROVIDER_LABELS: Record<AuthProvider, string> = {
   github: "GitHub",
   discord: "Discord",
 };
+
+/* ==========================================================================
+   MEMBER DASHBOARD, feature plan FP-08, PRD feature F06
+   ========================================================================== */
+
+/**
+ * What the Builder tab can edit about `<MemberDashboard>`.
+ *
+ * `apiBaseUrl`, `siteKey`, `loginPath`, and `afterLogoutPath` are absent on
+ * purpose. All four are properties of the CONNECTION rather than of the
+ * component: the first two come from the connected site and the last two from
+ * the settings document, and the generator bakes all four in at deploy time.
+ * Offering them in the customizer would invite a creator to set a login path
+ * here that disagrees with the one `<MemberGate>` redirects to, which is a
+ * dead end nobody would think to look for.
+ */
+export interface MemberDashboardConfig {
+  headline: string;
+  showTier: boolean;
+  showBilling: boolean;
+  showSignOut: boolean;
+  signedOutMessage: string;
+  accentColor: string;
+  borderRadius: number;
+}
+
+export const DASHBOARD_RADIUS_MIN = 0;
+export const DASHBOARD_RADIUS_MAX = 32;
+
+/** Defaults copied from the component's own property controls, so the panel and
+ * the Framer sidebar open on the same values. */
+export const DEFAULT_MEMBER_DASHBOARD_CONFIG: MemberDashboardConfig = {
+  headline: "Your account",
+  showTier: true,
+  showBilling: true,
+  showSignOut: true,
+  signedOutMessage: "Sign in to see your account.",
+  accentColor: "#5271ff",
+  borderRadius: 12,
+};

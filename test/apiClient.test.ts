@@ -339,3 +339,34 @@ describe("failureMessage", () => {
     expect(message).not.toMatch(/\d/);
   });
 });
+
+describe("baseUrl normalization for local and remote environments", () => {
+  it("normalizes base URLs ending with /api or trailing slashes", async () => {
+    let requestedUrl = "";
+    const fetchSpy = vi.fn(async (url: string | URL | Request) => {
+      requestedUrl = String(url);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const clientWithApiSuffix = new ApiClient({
+      getCreatorToken: () => null,
+      fetchImpl: fetchSpy,
+      baseUrl: "http://127.0.0.1:4000/api/",
+    });
+
+    await clientWithApiSuffix.get("/api/member/session");
+    expect(requestedUrl).toBe("http://127.0.0.1:4000/api/member/session");
+
+    const clientPlain = new ApiClient({
+      getCreatorToken: () => null,
+      fetchImpl: fetchSpy,
+      baseUrl: "http://127.0.0.1:4000",
+    });
+
+    await clientPlain.get("/api/member/session");
+    expect(requestedUrl).toBe("http://127.0.0.1:4000/api/member/session");
+  });
+});

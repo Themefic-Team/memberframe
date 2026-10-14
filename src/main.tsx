@@ -19,6 +19,7 @@ import "./styles/shell.css";
 import "./styles/builder.css";
 import "./styles/manage.css";
 import "./styles/settings.css";
+import "./styles/connect.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

@@ -3,6 +3,11 @@ export {
   CONFIG_END_MARKER,
   CodeGenerationError,
   LOCK_STATE_SIGNATURE,
+  DISCONNECTED_DEPLOY_CONTEXT,
+  MEMBER_DASHBOARD_DESCRIPTOR,
+  MEMBER_DASHBOARD_FILE_NAME,
+  generateMemberDashboardCode,
+  normalizeDashboardConfig,
   MEMBER_AUTH_DESCRIPTOR,
   MEMBER_AUTH_FILE_NAME,
   MEMBER_GATE_DESCRIPTOR,
@@ -17,6 +22,7 @@ export {
 } from "./canvasComponentCodeGenerator";
 export type {
   CanvasComponentDescriptor,
+  DeployContext,
   GeneratedCanvasFile,
 } from "./canvasComponentCodeGenerator";
 
@@ -55,6 +61,23 @@ export {
 } from "./checkoutService";
 export type { CheckoutOutcome, CheckoutRequest, CheckoutSession } from "./checkoutService";
 
+export {
+  SCAFFOLD_METHODS,
+  membershipPages,
+  normalizePagePath,
+  scaffoldMembershipPages,
+  scaffoldSummary,
+} from "./pageScaffoldService";
+export type {
+  MembershipPageSpec,
+  PageResult,
+  ScaffoldComponent,
+  ScaffoldDeps,
+  ScaffoldFailure,
+  ScaffoldOutcome,
+  ScaffoldSuccess,
+} from "./pageScaffoldService";
+
 export { REPARENT_METHOD, WRITE_METHODS, deployCanvasComponent } from "./framerCanvasService";
 export type {
   CanvasCodeFile,
@@ -67,3 +90,10 @@ export type {
   DeployOutcome,
   DeploySuccess,
 } from "./framerCanvasService";
+
+export {
+  DEFAULT_FALLBACK_PAGES,
+  formatWebPagePath,
+  getFramerProjectPages,
+} from "./framerPagesService";
+export type { FramerProjectPage } from "./framerPagesService";

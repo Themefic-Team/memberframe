@@ -48,7 +48,8 @@ component they insert, against a 40kB per-component budget (PRD P3).
 - **Services**: [`src/services/apiClient.ts`](../../src/services/apiClient.ts),
   [`src/services/checkoutService.ts`](../../src/services/checkoutService.ts)
 - **Config**: [`src/config/backend.ts`](../../src/config/backend.ts), which already held the base URL from
-  task 1.4
+  task 1.4, and [`src/config/devProxy.ts`](../../src/config/devProxy.ts), which decides the local
+  development proxy described in section 3.6
 - **Backend API Endpoints**: all of PRD sections 10.2, 10.3, and 10.4 that the panel calls
 - **Styling**: none
 
@@ -136,6 +137,44 @@ It goes in `Authorization: Bearer`. The safety rules in this repository forbid p
 in a URL, and PRD section 10.2's `GET /api/subscription-status?siteId=&userId=&email=` already puts an
 email in a query string, which is the backend's contract to answer for. This client will not add to it.
 
+### 3.6. In Local Development The Panel Calls Its Own Origin
+
+Found on 2026-10-13 with the backend running. The Connect tab showed "The server did not respond" and
+the console showed `CORS request did not succeed. Status code: (null)` for
+`http://127.0.0.1:4000/api/site/config` and `/api/connect/start`.
+
+It was not a CORS misconfiguration. The same two requests sent with `curl` returned the correct
+`Access-Control-Allow-*` headers, a 204 preflight, and a 401 body. A null status means the browser never
+received a response. The panel is an HTTPS iframe inside `framer.com`, and a request from there to a
+plain HTTP loopback port is a public page reaching into the developer's machine, which the browser
+stops before the server sees it. No response header fixes a request that never arrives.
+
+So under `vite dev` the dev server forwards `/api` to the backend, and the panel calls its own origin,
+which the browser already loads the panel from:
+
+| Piece | File | Behaviour |
+| :--- | :--- | :--- |
+| The decision | `src/config/devProxy.ts` | `devProxyTarget` returns an origin only for plain HTTP on loopback |
+| The proxy | `vite.config.ts` | `server.proxy["/api"]`, only for `vite dev`, only when the decision says so |
+| The flag | `vite.config.ts` `define` | `__MF_DEV_API_PROXY__`, true only when the proxy is configured |
+| The base | `src/config/backend.ts` | `PANEL_API_BASE_URL` is empty when the flag is true, else `API_BASE_URL` |
+
+One function decides both halves on purpose. A panel that calls its own origin while nothing forwards
+gets a 404 for every request, and a build that shipped that way would be broken for every creator, so
+the flag is false for `vite build` and undefined under Vitest.
+
+**Canvas components are not covered.** The generator still bakes the absolute `API_BASE_URL` into
+`<MemberGate>` and `<MemberAuth>`, because a relative URL on a published site resolves against the
+creator's own domain. A component on the canvas in local development therefore still calls
+`http://127.0.0.1:4000` directly and can meet the same block. That path also carries the session cookie
+and the origin allowlist, so it needs its own decision. The tunnel steps in `backend/README.md` are the
+existing answer for it.
+
+**Which browser rule did the blocking was not confirmed.** The evidence is that the server answers
+correctly and the browser reports no status. Whether that is the browser's local network access
+restriction or an extension in the way was not established, because the agent cannot drive that browser.
+The proxy removes the cross-origin loopback request altogether, so it holds in either case.
+
 ---
 
 ## 4. Framer Property Controls Specification
@@ -189,7 +228,11 @@ tests assert that a malformed body resolves `unavailable` rather than `ok` with 
 - [x] An absent token still sends the request, so the server decides, not the client.
 - [x] `undefined` query values are dropped rather than serialized.
 - [x] `tsc --noEmit` and `npm run build` pass.
-- [ ] Any request reaching a real server. The backend does not exist, blocker B1.
+- [x] `devProxyTarget` accepts plain HTTP loopback only, and returns the origin without a path.
+- [x] A same-origin base produces a root-relative request URL.
+- [x] `https://127.0.0.1:5173/api/site/config` returns the backend's 401 through the dev server, checked
+      with `curl` on 2026-10-13.
+- [ ] The Connect tab completing a send and verify inside the Framer editor. Needs a human, section 7.
 
 ---
 
@@ -199,6 +242,7 @@ tests assert that a malformed body resolves `unavailable` rather than `ok` with 
 | :--- | :--- | :--- | :--- |
 | A real response from a real backend | | | |
 | CORS allows the plugin origin | | | |
+| Connect tab sends a code in the Framer editor with no console CORS error | | | |
 | `Retry-After` is actually sent by the server on 429 | | | |
 | Automated gates | agent | 2026-10-12 | command output in the commit message |
 
@@ -219,3 +263,5 @@ which proves this module maps a 403 to `forbidden`, and proves nothing about whe
    that owns it, and that task does not exist yet, which is the finding.
 6. **No runtime schema validation, stated rather than implied.** Section 5.3. The transport contract is
    guaranteed; the shape contract is not.
+7. **A dev proxy rather than a looser server.** Section 3.6. The server's CORS policy was already
+   correct, so there was nothing on that side to change.

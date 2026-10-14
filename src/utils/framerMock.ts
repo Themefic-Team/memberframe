@@ -111,6 +111,7 @@ interface CanvasMembers {
   createCodeFile(name: string, code: string): Promise<MockCodeFile>;
   addComponentInstance(options: { url: string }): Promise<MockCanvasNode>;
   setParent(nodeId: string, parentId: string, index?: number): Promise<void>;
+  getNodesWithType(type: string): Promise<readonly any[]>;
 }
 
 /** Everything the mock recorded, for assertions. */
@@ -125,6 +126,7 @@ export interface MockCallLog {
   setFileContent: Array<{ id: string; code: string }>;
   addComponentInstance: Array<{ url: string }>;
   setParent: Array<{ nodeId: string; parentId: string; index?: number }>;
+  getNodesWithType: Array<{ type: string }>;
   closePlugin: Array<{ message?: string }>;
 }
 
@@ -210,6 +212,7 @@ function emptyCallLog(): MockCallLog {
     setFileContent: [],
     addComponentInstance: [],
     setParent: [],
+    getNodesWithType: [],
     closePlugin: [],
   };
 }
@@ -358,6 +361,24 @@ export function createFramerMock(overrides: Partial<FramerMock> = {}): FramerMoc
 
     setParent: async (nodeId: string, parentId: string, index?: number) => {
       calls.setParent.push({ nodeId, parentId, index });
+    },
+
+    getNodesWithType: async (type: string) => {
+      calls.getNodesWithType.push({ type });
+      if (type === "WebPageNode") {
+        return [
+          { id: "page-home", name: "Home", path: "/" },
+          { id: "page-case-studies", name: "Case Studies", path: "/case-studies" },
+          { id: "page-experiments", name: "Experiments", path: "/experiments" },
+          { id: "page-about", name: "About", path: "/about" },
+          { id: "page-resume", name: "Resume", path: "/resume" },
+          { id: "page-login", name: "Login", path: "/login" },
+          { id: "page-reset-password", name: "Reset Password", path: "/reset-password" },
+          { id: "page-dashboard", name: "Dashboard", path: "/dashboard" },
+          { id: "page-404", name: "404", path: "/404" },
+        ];
+      }
+      return [];
     },
 
     ...overrides,

@@ -30,7 +30,7 @@
  * file owned by a task that was not given it.
  */
 
-import { API_BASE_URL } from "../config/backend";
+import { PANEL_API_BASE_URL } from "../config/backend";
 
 /**
  * Every outcome of every call, mapped one for one onto PRD section 10.6.
@@ -149,16 +149,32 @@ export class ApiClient {
     return this.request<T>("POST", path, body);
   }
 
+  /**
+   * PUT, for the settings document.
+   *
+   * Distinct from PATCH because the body is the whole addressable thing rather
+   * than a field edit, which is how `PUT /api/site/settings` reads even though
+   * the server merges: the client sends a settings document, complete or
+   * partial, and gets the stored one back.
+   */
+  put<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
+    return this.request<T>("PUT", path, body);
+  }
+
   patch<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
     return this.request<T>("PATCH", path, body);
   }
 
   private async request<T>(
-    method: "GET" | "POST" | "PATCH",
+    method: "GET" | "POST" | "PATCH" | "PUT",
     path: string,
     body?: unknown
   ): Promise<ApiResult<T>> {
-    const base = this.deps.baseUrl ?? API_BASE_URL;
+    // Empty under `vite dev` with a local backend, which makes the request
+    // same-origin for the dev server to forward. See `config/devProxy.ts`.
+    const rawBase = this.deps.baseUrl ?? PANEL_API_BASE_URL;
+    const base = rawBase.replace(/\/api\/?$/, "").replace(/\/+$/, "");
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
     const doFetch = this.deps.fetchImpl ?? globalThis.fetch;
     const timeoutMs = this.deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -185,7 +201,7 @@ export class ApiClient {
     let response: Response;
 
     try {
-      response = await doFetch(`${base}${path}`, {
+      response = await doFetch(`${base}${cleanPath}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -289,12 +305,41 @@ export function failureMessage(failure: ApiFailure): { title: string; message: s
 }
 
 /**
+ * The creator session token, or null before the panel is connected.
+ *
+ * Held here rather than read from the connection store, and the direction of
+ * that dependency is the point: `services/connectionStore.ts` imports the
+ * `framer` singleton, and this module is imported by tests. A test that
+ * transitively loaded `framer` would be posting messages to a parent window
+ * that does not exist, which is the rule in `00-test-harness.md` section 8.
+ *
+ * So the store pushes the token in, and this module never reaches out.
+ */
+let creatorToken: string | null = null;
+
+/**
+ * Set or clear the token for every subsequent request.
+ *
+ * Called by `connectionStore` after loading stored plugin data, after a
+ * successful verify, and with null on disconnect or on a 401.
+ */
+export function setCreatorToken(token: string | null): void {
+  creatorToken = token;
+}
+
+/** Exported for tests and for the Connect tab's own status line. */
+export function hasCreatorToken(): boolean {
+  return creatorToken !== null;
+}
+
+/**
  * The client the panel uses.
  *
- * Token provider returns null, per C10. Every `/api/site/*` call resolves
- * `unauthorized` until a task builds creator sign-in, and every consuming
- * surface renders its signed-out state rather than half working.
+ * Conflict C10 is now closed: the token is real, issued by
+ * `POST /api/connect/verify`, and every `/api/site/*` call carries it. Before
+ * a creator connects it is null and those calls resolve `unauthorized`, which
+ * is still the correct answer and still what each consuming surface renders.
  */
 export const apiClient = new ApiClient({
-  getCreatorToken: () => null,
+  getCreatorToken: () => creatorToken,
 });

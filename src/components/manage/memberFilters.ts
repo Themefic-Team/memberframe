@@ -23,7 +23,7 @@ export type TierFilter = "all" | TierKey;
 export type StatusFilter = "all" | MemberStatus;
 
 export const TIER_FILTERS: ReadonlyArray<{ value: TierFilter; label: string }> = [
-  { value: "all", label: "All" },
+  { value: "all", label: "Any tier" },
   { value: "free_member", label: "Free" },
   { value: "tier_1", label: "Silver" },
   { value: "tier_2", label: "Gold" },

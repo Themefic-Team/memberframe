@@ -52,7 +52,11 @@ model User {
   name            String    @db.VarChar(255)
   email           String    @unique @db.VarChar(255)
   emailVerifiedAt DateTime? @map("email_verified_at") @db.DateTime(3)
-  passwordHash    String    @map("password_hash") @db.VarChar(255)
+  /// Nullable since the connect flow. A creator who arrived through the plugin
+  /// proved an address by email code and never chose a password, so there is
+  /// nothing to store. Same reasoning as Member.passwordHash, and the same
+  /// rule: NULL is a failed credential check, never a bypass.
+  passwordHash    String?   @map("password_hash") @db.VarChar(255)
 
   /// What `framer.getCurrentUser()` can supply. Nullable and NOT unique:
   /// blocker B7 records that the SDK exposes no email, so a creator arriving
@@ -63,7 +67,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  sites Site[]
+  sites    Site[]
+  sessions CreatorSession[]
 
   @@index([framerUserId])
   @@map("users")
@@ -91,7 +96,12 @@ model Site {
   /// `Allow-Credentials: true` and `Allow-Origin: *` mutually exclusive.
   allowedOrigins Json @map("allowed_origins")
 
-  framerSiteId String? @map("framer_site_id") @db.VarChar(255)
+  /// The Framer project id from framer.getProjectInfo(). Unique, because one
+  /// Framer project is one tenant: a second connect attempt for the same
+  /// project must find this row rather than make another. MySQL treats every
+  /// NULL in a unique index as distinct, so a site created some other way and
+  /// never connected does not occupy the slot.
+  framerSiteId String? @unique @map("framer_site_id") @db.VarChar(255)
 
   /// Per-site salt for F22 shared-password grants. Rotating it invalidates
   /// every outstanding grant for this site and nothing else.
@@ -104,6 +114,7 @@ model Site {
   updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
   user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings       SiteSettings?
   tiers          Tier[]
   members        Member[]
   otps           MemberOtp[]
@@ -332,6 +343,128 @@ model EmailLog {
 
   @@index([toAddress, createdAt])
   @@map("email_logs")
+}
+
+// ============================================================================
+// SITE SETTINGS: ONE JSON DOCUMENT, NOT A COLUMN PER SWITCH
+// ============================================================================
+
+/// Everything a creator configures about one site, as a single JSON document.
+///
+/// A deliberate instruction, and the right one. The alternative is a column per
+/// setting, and this product adds settings continuously: a login path, a
+/// redirect, an auth method, a locale, a from-address. Each would be an
+/// ALTER TABLE on a table holding a row per customer, and a deploy window where
+/// the code expects a column the database does not have yet.
+///
+/// What is given up is real, and worth stating rather than discovering:
+///
+///   1. **The database no longer validates the shape.** Nothing stops a null
+///      where a boolean belongs. lib/siteSettings.ts is therefore the only
+///      writer: it validates on the way in and fills defaults on the way out,
+///      so a row written by an older version still reads.
+///   2. **A setting cannot be indexed or queried across sites.** "Which sites
+///      allow registration" is a full scan. Nothing asks that today. A setting
+///      that needs to be queried should be promoted to its own column, which is
+///      a migration rather than a redesign.
+///   3. **Concurrent writes are last-write-wins.** Two plugin panels open on one
+///      project would overwrite each other. "version" makes that detectable: a
+///      write carrying a stale version is refused instead of silently winning.
+///
+/// Keyed by site_id and nothing else: one row per site, created with the site,
+/// so a read never has to handle "no row yet".
+model SiteSettings {
+  siteId String @id @map("site_id") @db.Char(36)
+
+  /// The whole document. Shape and defaults in lib/siteSettings.ts, which owns
+  /// SETTINGS_SCHEMA_VERSION and upgrades an older document on read.
+  ///
+  /// NEVER a secret. Gateway keys live encrypted in their own table (backend
+  /// PRD phase B3) because this document is returned to the panel whole.
+  settings Json @db.Json
+
+  /// Bumped on every write. See the note above.
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@map("site_settings")
+}
+
+// ============================================================================
+// CREATOR IDENTITY
+// ============================================================================
+// Conflict C10 closes here. Every /api/site/* route needed a creator session
+// and no task in the 72-task plan built one, so the plugin's Manage and
+// Settings tabs have been signed out since the project began.
+//
+// The creator proves an address with a six-digit code, exactly as a member
+// does, and gets an opaque session token. Separate tables from the member ones
+// throughout: a creator and a member are different principals with very
+// different blast radii, and sharing a table is how a member session ends up
+// accepted on a creator route.
+
+/// A six-digit code sent to a creator's address during connect.
+///
+/// Not keyed to a user row, because the address may have no account yet: the
+/// connect flow doubles as sign-up. Which also means this table must never
+/// reveal whether an address is already registered.
+model CreatorOtp {
+  id    String @id @default(uuid(7)) @db.Char(36)
+  email String @db.VarChar(255)
+
+  codeHash String @map("code_hash") @db.VarChar(255)
+
+  /// Three attempts, then dead, matching the member OTP. A fourth attempt is
+  /// rejected AND invalidates the code, so guessing cannot be extended.
+  attempts Int @default(0)
+
+  /// What the code is for, carried through verification so a code minted for
+  /// one Framer project cannot be used to claim another.
+  framerProjectId String @map("framer_project_id") @db.VarChar(255)
+
+  expiresAt         DateTime  @map("expires_at") @db.DateTime(3)
+  resendAvailableAt DateTime  @map("resend_available_at") @db.DateTime(3)
+  consumedAt        DateTime? @map("consumed_at") @db.DateTime(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@index([email, framerProjectId, expiresAt])
+  @@index([expiresAt])
+  @@map("creator_otps")
+}
+
+/// An opaque creator session, held by the plugin panel.
+///
+/// Sent as "Authorization: Bearer", not as a cookie, and that is what makes the
+/// panel work at all: the panel is an iframe on an origin we do not control, so
+/// a cross-site cookie there would hit exactly the Safari and Firefox blocking
+/// that backend PRD section 2.3 calls the project's largest risk. A bearer
+/// header has no such problem, and a request carrying no cookie cannot be
+/// CSRF'd, which is why the creator API needs no CSRF token.
+///
+/// Only the hash is stored, as everywhere else.
+model CreatorSession {
+  id        String @id @default(uuid(7)) @db.Char(36)
+  userId    String @map("user_id") @db.Char(36)
+  tokenHash String @unique @map("token_hash") @db.VarChar(255)
+
+  /// Diagnostics only, never used to authorize. See MemberSession.
+  userAgent String? @map("user_agent") @db.VarChar(512)
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+
+  expiresAt  DateTime  @map("expires_at") @db.DateTime(3)
+  revokedAt  DateTime? @map("revoked_at") @db.DateTime(3)
+  lastSeenAt DateTime? @map("last_seen_at") @db.DateTime(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("creator_sessions")
 }
 
 // ============================================================================

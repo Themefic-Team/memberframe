@@ -5,11 +5,15 @@
   "description": "The ultimate native membership and recurring monetization suite for Framer.",
   "icon": "icon.png",
   "main": "dist/index.html",
-  "modes": ["canvas"],
+  "modes": [
+    "canvas"
+  ],
   "permissions": [
     "addComponentInstance",
     "createCodeFile",
+    "createWebPage",
     "setCodeFileContent",
-    "setParent"
+    "setParent",
+    "setPluginData"
   ]
 }

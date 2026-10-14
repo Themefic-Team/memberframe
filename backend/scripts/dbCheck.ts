@@ -100,6 +100,36 @@ async function main(): Promise<void> {
       }\n\n`
     );
 
+    // The second hand-written migration. Without the collation, a creator
+    // connect code minted for one address verifies against an accented
+    // spelling of it; without the CHECK, a scalar can reach the settings
+    // column. Neither shows up as an error anywhere until it matters.
+    const creatorCollation = await prisma.$queryRaw<Array<{ collation: string | null }>>`
+      SELECT COLLATION_NAME AS collation
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'creator_otps'
+        AND COLUMN_NAME = 'email'
+    `;
+
+    const settingsCheck = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) AS count
+      FROM information_schema.TABLE_CONSTRAINTS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'site_settings'
+        AND CONSTRAINT_NAME = 'chk_site_settings_is_object'
+    `;
+
+    const hasSettingsCheck = Number(settingsCheck[0]?.count ?? 0) > 0;
+    const creatorEmailCollation = creatorCollation[0]?.collation ?? "not created yet";
+
+    process.stdout.write(
+      `    creator_otps.email    ${creatorEmailCollation}\n`
+    );
+    process.stdout.write(
+      `    settings is an object ${hasSettingsCheck ? "enforced" : "NOT enforced. Run the creator_identity migration"}\n\n`
+    );
+
     if (!hasGenerated) {
       process.stdout.write(`  Run: npm run db:migrate\n\n`);
       process.exitCode = 1;

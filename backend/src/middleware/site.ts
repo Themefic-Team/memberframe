@@ -106,38 +106,142 @@ export const resolveSite: RequestHandler = (req, res, next) => {
 };
 
 async function resolve(req: Request, res: Response): Promise<void> {
+  const origin = req.header("origin");
   const header = req.header(SITE_KEY_HEADER);
+  const queryKey =
+    typeof req.query?.["siteKey"] === "string"
+      ? req.query["siteKey"]
+      : typeof req.query?.["site"] === "string"
+        ? req.query["site"]
+        : undefined;
+  const querySiteId = typeof req.query?.["siteId"] === "string" ? req.query["siteId"] : undefined;
+  const queryState =
+    typeof req.query?.["state"] === "string"
+      ? req.query["state"]
+      : typeof req.body?.["state"] === "string"
+        ? req.body["state"]
+        : undefined;
 
-  if (!header || header.trim() === "") {
-    throw badRequest(
-      "missing_site_key",
-      undefined
+  let site: {
+    id: string;
+    siteName: string;
+    siteKey: string;
+    allowedOrigins: unknown;
+    defaultLocale: string;
+  } | null = null;
+
+  const keyToLookup = (header && header.trim() !== "") ? header.trim() : (queryKey && queryKey.trim() !== "") ? queryKey.trim() : undefined;
+
+  if (keyToLookup) {
+    site = await prisma.site.findUnique({
+      where: { siteKey: keyToLookup },
+      select: {
+        id: true,
+        siteName: true,
+        siteKey: true,
+        allowedOrigins: true,
+        defaultLocale: true,
+      },
+    });
+  } else if (querySiteId && querySiteId.trim() !== "") {
+    site = await prisma.site.findUnique({
+      where: { id: querySiteId.trim() },
+      select: {
+        id: true,
+        siteName: true,
+        siteKey: true,
+        allowedOrigins: true,
+        defaultLocale: true,
+      },
+    });
+  } else if (queryState) {
+    try {
+      const decoded = JSON.parse(Buffer.from(queryState, "base64url").toString("utf8")) as { siteId?: string };
+      if (decoded.siteId) {
+        site = await prisma.site.findUnique({
+          where: { id: decoded.siteId },
+          select: {
+            id: true,
+            siteName: true,
+            siteKey: true,
+            allowedOrigins: true,
+            defaultLocale: true,
+          },
+        });
+      }
+    } catch {
+      // not base64url JSON
+    }
+  } else if (origin !== undefined && origin !== "") {
+    // Canvas components on published Framer sites identify by their Origin
+    const normalized = origin.trim().replace(/\/+$/, "");
+    const allSites = await prisma.site.findMany({
+      select: {
+        id: true,
+        siteName: true,
+        siteKey: true,
+        allowedOrigins: true,
+        defaultLocale: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    const matching = allSites.filter((s) =>
+      originAllowed(normalized, parseAllowedOrigins(s.allowedOrigins))
     );
+    if (matching.length > 0) {
+      site = matching[0] ?? null;
+    }
   }
 
-  const site = await prisma.site.findUnique({
-    where: { siteKey: header.trim() },
-    select: {
-      id: true,
-      siteName: true,
-      siteKey: true,
-      allowedOrigins: true,
-      defaultLocale: true,
-    },
-  });
+  // Fallback to Referer header for browser popups/redirects
+  if (!site) {
+    const referer = req.header("referer");
+    if (referer) {
+      try {
+        const refOrigin = new URL(referer).origin.replace(/\/+$/, "");
+        const allSites = await prisma.site.findMany({
+          select: {
+            id: true,
+            siteName: true,
+            siteKey: true,
+            allowedOrigins: true,
+            defaultLocale: true,
+          },
+          orderBy: { createdAt: "asc" },
+        });
+        const matching = allSites.filter((s) =>
+          originAllowed(refOrigin, parseAllowedOrigins(s.allowedOrigins))
+        );
+        if (matching.length > 0) {
+          site = matching[0] ?? null;
+        }
+      } catch {
+        // invalid URL
+      }
+    }
+  }
 
   // An unknown key is a 400 rather than a 404. A 404 would confirm that some
   // other key does exist, which turns this endpoint into a key oracle.
-  if (!site) throw badRequest("unknown_site");
+  if (!site) {
+    if (origin !== undefined) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Vary", "Origin");
+    }
+    throw badRequest(header ? "unknown_site" : "missing_site_key");
+  }
 
   const allowed = parseAllowedOrigins(site.allowedOrigins);
-  const origin = req.header("origin");
 
   // A request with no `Origin` at all is not from a browser: curl, a server,
   // or a mobile app. Allowed through, because the cookie is what authorizes
   // and a non-browser client cannot be CSRF'd. Browsers always send it on a
   // cross-origin request.
   if (origin !== undefined && !originAllowed(origin, allowed)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
     throw unauthorized("origin_not_allowed");
   }
 

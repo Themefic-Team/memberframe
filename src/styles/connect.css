@@ -1,0 +1,160 @@
+/**
+ * Connect tab styling.
+ *
+ * Per-feature file, per the repo rule: the three files sliced from
+ * `design-tokens.css` carry a provenance header and must not be hand edited,
+ * so new styling goes here.
+ *
+ * Zero hardcoded hex. Every colour is a design token, which is also what makes
+ * both themes work without a second block: the tokens are redefined under the
+ * theme attributes in `design-tokens.css` and everything here follows.
+ */
+
+.connect-status {
+  margin: 0;
+  padding: 16px 0;
+  color: var(--paragraph);
+  font-size: 13px;
+}
+
+.connect-help {
+  margin: 0;
+  color: var(--paragraph);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/*
+ * An inline field problem, not a banner.
+ *
+ * PRD section 7.5 puts a field validation error under its field and reserves
+ * the banner for persistent screen state. A bad email address is the former.
+ */
+.connect-problem {
+  margin: 0;
+  color: var(--px-color-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+   The connected summary
+   --------------------------------------------------------------------------- */
+
+.connect-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: 10px;
+  background: var(--framefic-surface);
+}
+
+.connect-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--framefic-page-bg);
+  color: var(--secondary-default);
+}
+
+.connect-summary-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.connect-summary-body {
+  min-width: 0;
+}
+
+.connect-summary-name {
+  margin: 0;
+  color: var(--title);
+  font-size: 13px;
+  font-weight: 600;
+  /* The panel is 360px and a project name is creator supplied. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-summary-meta {
+  margin: 2px 0 0;
+  color: var(--paragraph);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Read-only values in a field row
+   --------------------------------------------------------------------------- */
+
+.connect-value {
+  color: var(--title);
+  font-size: 12px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The site key, shown in full.
+ *
+ * It is public: baked into every generated canvas component and readable in
+ * the page source of any published site. Monospace because the one thing a
+ * creator does with it is compare it against a request header.
+ */
+.connect-value-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  user-select: all;
+}
+
+/* ---------------------------------------------------------------------------
+   The allowed origin list
+   --------------------------------------------------------------------------- */
+
+.connect-origin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.connect-origin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: 8px;
+  background: var(--framefic-surface);
+  color: var(--title);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.connect-origin svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  stroke: currentColor;
+  color: var(--paragraph);
+}
+
+.connect-origin span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

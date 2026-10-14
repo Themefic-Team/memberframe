@@ -121,8 +121,8 @@ export const env = {
   isProduction: nodeEnv === "production",
   isTest: nodeEnv === "test",
 
-  port: int("PORT", 4000),
-  apiBaseUrl: str("API_BASE_URL", "http://127.0.0.1:4000"),
+  port: int("PORT", 4001),
+  apiBaseUrl: str("API_BASE_URL", "http://127.0.0.1:4001"),
 
   database: {
     // Under test there is no .env and no MySQL, and a unit test that imports

@@ -104,12 +104,19 @@ export function notFoundHandler(req: Request, res: Response): void {
  */
 export function errorHandler(
   error: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
   // Already answered. Writing a second status would throw inside the handler.
   if (res.headersSent) return;
+
+  const origin = req.header("origin");
+  if (origin && !res.getHeader("Access-Control-Allow-Origin")) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
+  }
 
   // 1. A route said what it meant.
   if (error instanceof ApiError) {

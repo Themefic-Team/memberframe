@@ -31,16 +31,21 @@
 
 import memberGateSource from "../canvas-components/MemberGate.tsx?raw";
 import memberAuthSource from "../canvas-components/MemberAuth.tsx?raw";
-import { API_BASE_URL, SESSION_CACHE_TTL_MS } from "../config/backend";
+import memberDashboardSource from "../canvas-components/MemberDashboard.tsx?raw";
+import { SESSION_CACHE_TTL_MS, deployBaseUrl } from "../config/backend";
 import {
   AUTH_RADIUS_MAX,
   AUTH_RADIUS_MIN,
   BLUR_MAX,
   BLUR_MIN,
+  DASHBOARD_RADIUS_MAX,
+  DASHBOARD_RADIUS_MIN,
   DEFAULT_MEMBER_AUTH_CONFIG,
+  DEFAULT_MEMBER_DASHBOARD_CONFIG,
   DEFAULT_MEMBER_GATE_CONFIG,
   type GateFallbackAction,
   type MemberAuthConfig,
+  type MemberDashboardConfig,
   type MemberGateConfig,
 } from "../types/canvas";
 import type { RequiredTier } from "../types/member";
@@ -195,16 +200,62 @@ function encodeLiteral(value: string): string {
  */
 export function buildConfigBlock<Config>(
   descriptor: CanvasComponentDescriptor<Config>,
-  config: Config
+  config: Config,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): string {
   return [
     CONFIG_START_MARKER,
     `const CONFIG: ${descriptor.configTypeName} = {`,
-    ...descriptor.serializeFields(descriptor.normalize(config)),
+    ...descriptor.serializeFields(descriptor.normalize(config), context),
     "};",
     CONFIG_END_MARKER,
   ].join("\n");
 }
+
+/**
+ * What the panel knows when it deploys, which the authored file cannot.
+ *
+ * The three fields have one thing in common: they are properties of the
+ * CONNECTION rather than of the component, so a creator never sets them in the
+ * customizer and they change when the project is reconnected rather than when
+ * the component is reconfigured.
+ *
+ * Passing them explicitly rather than reading module state is what makes the
+ * generator testable: a test can prove that a disconnected deploy emits an
+ * empty site key without arranging global state to say so.
+ */
+export interface DeployContext {
+  /** Where the published site will send its requests. */
+  apiBaseUrl: string;
+  /** The public site key. Empty when the project is not connected. */
+  siteKey: string;
+  /** Site-relative. Empty means the visitor stays where they are. */
+  afterLoginPath: string;
+  /** Site-relative. Where `<MemberDashboard>` sends a signed-out visitor. */
+  loginPath: string;
+  /** Site-relative. Where signing out lands. */
+  afterLogoutPath: string;
+}
+
+/**
+ * The context for a panel that is not connected to a site.
+ *
+ * The site key is empty, which makes every request from the deployed component
+ * fail with `missing_site_key`. That is deliberate and it is why the Builder
+ * tab refuses to deploy while disconnected: a component that silently talked to
+ * the wrong tenant would be far worse than one that plainly does not work.
+ *
+ * The base URL comes from `deployBaseUrl()` rather than `API_BASE_URL`, so a
+ * developer running against `127.0.0.1` cannot bake an address into a
+ * component that no published site could ever reach. See `config/backend.ts`.
+ */
+export const DISCONNECTED_DEPLOY_CONTEXT: DeployContext = {
+  apiBaseUrl: deployBaseUrl(),
+  siteKey: "",
+  afterLoginPath: "",
+  loginPath: "/login",
+  afterLogoutPath: "/",
+};
 
 export interface GeneratedCanvasFile<Config = unknown> {
   /** Passed straight to `framer.createCodeFile`. Extension included. */
@@ -237,7 +288,7 @@ export interface CanvasComponentDescriptor<Config> {
   /** Clamp and whitelist before emission. */
   normalize: (config: Config) => Config;
   /** The object body, one `  key: value,` line each, markers excluded. */
-  serializeFields: (config: Config) => ReadonlyArray<string>;
+  serializeFields: (config: Config, context: DeployContext) => ReadonlyArray<string>;
 }
 
 /**
@@ -277,11 +328,12 @@ function occurrences(haystack: string, needle: string): number {
 export function generateComponentCode<Config>(
   descriptor: CanvasComponentDescriptor<Config>,
   config: Config,
-  sourceOverride?: string
+  sourceOverride?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): GeneratedCanvasFile<Config> {
   const source = sourceOverride ?? descriptor.source;
   const normalized = descriptor.normalize(config);
-  const code = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized));
+  const code = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized, context));
 
   return { fileName: descriptor.fileName, code, config: normalized };
 }
@@ -338,23 +390,26 @@ export const MEMBER_GATE_DESCRIPTOR: CanvasComponentDescriptor<MemberGateConfig>
   source: memberGateSource,
   configTypeName: "GateConfig",
   normalize: normalizeGateConfig,
-  serializeFields: (config) => [
+  serializeFields: (config, context) => [
     `  requiredTier: ${encodeLiteral(config.requiredTier)},`,
     `  fallbackAction: ${encodeLiteral(config.fallbackAction)},`,
     `  redirectUrl: ${encodeLiteral(config.redirectUrl)},`,
     `  cardTitle: ${encodeLiteral(config.cardTitle)},`,
     `  cardDescription: ${encodeLiteral(config.cardDescription)},`,
     `  blurIntensity: ${config.blurIntensity},`,
-    `  apiBaseUrl: ${encodeLiteral(API_BASE_URL)},`,
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
     `  sessionTtlMs: ${SESSION_CACHE_TTL_MS},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+    `  loginPath: ${encodeLiteral(context.loginPath || "/login")},`,
   ],
 };
 
 export function generateMemberGateCode(
   config: MemberGateConfig,
-  source?: string
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): GeneratedCanvasFile<MemberGateConfig> {
-  return generateComponentCode(MEMBER_GATE_DESCRIPTOR, config, source);
+  return generateComponentCode(MEMBER_GATE_DESCRIPTOR, config, source, context);
 }
 
 /* ==========================================================================
@@ -428,7 +483,7 @@ export const MEMBER_AUTH_DESCRIPTOR: CanvasComponentDescriptor<MemberAuthConfig>
   source: memberAuthSource,
   configTypeName: "AuthConfig",
   normalize: normalizeAuthConfig,
-  serializeFields: (config) => [
+  serializeFields: (config, context) => [
     `  authMode: ${encodeLiteral(config.authMode)},`,
     `  headline: ${encodeLiteral(config.headline)},`,
     `  welcomeMessage: ${encodeLiteral(config.welcomeMessage)},`,
@@ -442,13 +497,78 @@ export const MEMBER_AUTH_DESCRIPTOR: CanvasComponentDescriptor<MemberAuthConfig>
     `  enablePasswordAuth: ${config.enablePasswordAuth},`,
     `  defaultAuthMethod: ${encodeLiteral(config.defaultAuthMethod)},`,
     `  requirePasswordStrength: ${config.requirePasswordStrength},`,
-    `  apiBaseUrl: ${encodeLiteral(API_BASE_URL)},`,
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+    `  afterLoginPath: ${encodeLiteral(context.afterLoginPath)},`,
   ],
 };
 
 export function generateMemberAuthCode(
   config: MemberAuthConfig,
-  source?: string
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): GeneratedCanvasFile<MemberAuthConfig> {
-  return generateComponentCode(MEMBER_AUTH_DESCRIPTOR, config, source);
+  return generateComponentCode(MEMBER_AUTH_DESCRIPTOR, config, source, context);
+}
+
+/* ==========================================================================
+   MEMBER DASHBOARD, feature plan FP-08, PRD feature F06
+   ========================================================================== */
+
+export const MEMBER_DASHBOARD_FILE_NAME = "MemberDashboard.tsx";
+
+/**
+ * Clamp and whitelist before emission.
+ *
+ * Same contract as the other two normalizers: every field is replaced rather
+ * than merged, so a property the panel does not know about cannot survive into
+ * the emitted block, and the radius is clamped rather than trusted.
+ */
+export function normalizeDashboardConfig(config: MemberDashboardConfig): MemberDashboardConfig {
+  return {
+    headline: String(config.headline ?? "").slice(0, 120),
+    showTier: config.showTier !== false,
+    showBilling: config.showBilling !== false,
+    showSignOut: config.showSignOut !== false,
+    signedOutMessage: String(config.signedOutMessage ?? "").slice(0, 240),
+    // The same sanitizer the component applies at runtime. Applying it here as
+    // well means an unsafe value never reaches the creator's project file, not
+    // merely that it is ignored once it is there.
+    accentColor: isSafeCssColor(config.accentColor)
+      ? config.accentColor
+      : DEFAULT_MEMBER_DASHBOARD_CONFIG.accentColor,
+    borderRadius: Math.max(
+      DASHBOARD_RADIUS_MIN,
+      Math.min(DASHBOARD_RADIUS_MAX, Math.round(Number(config.borderRadius) || 0))
+    ),
+  };
+}
+
+export const MEMBER_DASHBOARD_DESCRIPTOR: CanvasComponentDescriptor<MemberDashboardConfig> = {
+  id: "member_dashboard",
+  fileName: MEMBER_DASHBOARD_FILE_NAME,
+  source: memberDashboardSource,
+  configTypeName: "DashboardConfig",
+  normalize: normalizeDashboardConfig,
+  serializeFields: (config, context) => [
+    `  headline: ${encodeLiteral(config.headline)},`,
+    `  showTier: ${config.showTier},`,
+    `  showBilling: ${config.showBilling},`,
+    `  showSignOut: ${config.showSignOut},`,
+    `  signedOutMessage: ${encodeLiteral(config.signedOutMessage)},`,
+    `  accentColor: ${encodeLiteral(config.accentColor)},`,
+    `  borderRadius: ${config.borderRadius},`,
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+    `  loginPath: ${encodeLiteral(context.loginPath)},`,
+    `  afterLogoutPath: ${encodeLiteral(context.afterLogoutPath)},`,
+  ],
+};
+
+export function generateMemberDashboardCode(
+  config: MemberDashboardConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<MemberDashboardConfig> {
+  return generateComponentCode(MEMBER_DASHBOARD_DESCRIPTOR, config, source, context);
 }

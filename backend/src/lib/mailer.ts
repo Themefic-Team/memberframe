@@ -264,3 +264,43 @@ export function passwordChangedMail(to: string, siteName: string, siteId: string
     ].join("\n"),
   };
 }
+
+/**
+ * The connect code, sent to a creator rather than to a member.
+ *
+ * `siteId` is deliberately absent: at the moment this is sent the site may not
+ * exist, and if it does exist the address has not yet proved it may know that.
+ * `EmailLog.siteId` is nullable for exactly this row.
+ *
+ * The copy names MemberFrame rather than the creator's site. A creator who
+ * receives this is signing in to the plugin, not to their own membership, and
+ * conflating the two is how someone pastes a creator code into a member form.
+ */
+export function creatorCodeMail(to: string, code: string): Mail {
+  const minutes = Math.round(env.otp.ttlSeconds / 60);
+
+  return {
+    to,
+    siteId: null,
+    template: "creator_connect",
+    subject: `Your MemberFrame connect code`,
+    text: [
+      `Your connect code is ${code}`,
+      "",
+      `It works for ${minutes} minutes and can be used once.`,
+      "",
+      "Enter it in the MemberFrame plugin to connect this Framer project.",
+      "",
+      "If you did not ask for this code, you can ignore this message. Nobody",
+      "can connect your project without it.",
+    ].join("\n"),
+    html: [
+      `<p>Your connect code is</p>`,
+      `<p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p>`,
+      `<p>It works for ${minutes} minutes and can be used once.</p>`,
+      `<p>Enter it in the MemberFrame plugin to connect this Framer project.</p>`,
+      `<p style="color:#5b6472;font-size:13px">If you did not ask for this code,`,
+      `you can ignore this message. Nobody can connect your project without it.</p>`,
+    ].join(""),
+  };
+}

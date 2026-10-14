@@ -12,10 +12,17 @@ import { defineConfig } from "vitest/config";
  * the SDK mock, compression, the lock patcher, and the `isEntitled` truth table.
  * Nothing there needs a DOM. Component rendering is layer 2 and will need
  * `jsdom`, which is a separate dependency and a separate decision.
+ *
+ * `VITE_API_BASE_URL` is blanked because Vitest reads the developer's `.env`,
+ * which is gitignored and points at a local backend. Left alone, the generator
+ * tests assert against whatever host that machine happens to have configured,
+ * so the suite passes on one checkout and fails on the next. Blank falls
+ * through to `DEFAULT_API_BASE_URL` in `config/backend.ts`.
  */
 export default defineConfig({
   test: {
     environment: "node",
     include: ["test/**/*.test.ts"],
+    env: { VITE_API_BASE_URL: "" },
   },
 });

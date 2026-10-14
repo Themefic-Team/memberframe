@@ -38,6 +38,12 @@ Status values: `planned`, `in progress`, `done`.
 | `03-tri-gateway-payments.md` | Tri-Gateway Smart Payment Connect | F03 | 1 and 2 | P0 | in progress |
 | `04-live-preview-studio.md` | Live Preview Studio with State Simulator | F04 | 1 | P0 | in progress |
 | `05-member-auth.md` | Multi-Provider Auth, Passwordless OTP, and Email Password | F05, feature plan FP-02 | 1 | P0 | in progress |
+| `06-connect-and-pages.md` | Connect Handshake and Automatic Page Scaffolding | FP-01, FP-02 | 1 | P0 | in progress |
+| `07-panel-restructure-plan.md` | Panel Restructuring: Cockpit, Studio, Settings & Vault | Architectural Restructure | 1 | P0 | in progress |
+| `08-google-oauth-setup.md` | Google OAuth Sign-In Setup and Runtime Architecture | F05, OAuth 2.0 | 1 | P0 | done |
+| `09-github-oauth-setup.md` | GitHub OAuth Sign-In Setup and Runtime Architecture | F05, OAuth 2.0 | 1 | P0 | done |
+| `10-apple-signin-setup.md` | Apple Sign-In Setup and Runtime Architecture | F05, OAuth 2.0 | 1 | P0 | done |
+| `11-discord-oauth-setup.md` | Discord OAuth Sign-In Setup and Runtime Architecture | F05, OAuth 2.0 | 1 | P0 | done |
 | `06-member-dashboard.md` | Canvas-Native Member Billing Portal | F06 | 3 | P0 | planned |
 | `07-metered-paywall.md` | Dynamic Metered Soft Paywall | F07 | 2 | P1 | planned |
 | `08-schema-injection.md` | SEO-Preserving Schema.org Injection | F08 | 2 | P1 | planned |

@@ -16,8 +16,36 @@
  * anyway.
  */
 
-/** PRD section 10.1 names this host and no other. */
-export const API_BASE_URL = "https://api.memberframe.framefic.com";
+import { panelApiBaseUrl } from "./devProxy";
+
+export const DEFAULT_API_BASE_URL = "https://api.memberframe.framefic.com";
+export const LOCAL_DEV_API_BASE_URL = "http://127.0.0.1:4001";
+
+/**
+ * Backend host configuration.
+ * Defaults to production host, or can be overridden via VITE_API_BASE_URL
+ * (for local development, set VITE_API_BASE_URL=http://127.0.0.1:4000).
+ */
+export const API_BASE_URL =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) ||
+  DEFAULT_API_BASE_URL;
+
+/**
+ * The base URL for requests the panel itself makes.
+ *
+ * Identical to `API_BASE_URL` everywhere except under `vite dev` with a plain
+ * HTTP loopback backend, where it is empty and the request goes to the panel's
+ * own origin for the dev server to forward. `vite.config.ts` sets the flag only
+ * when it has actually configured that proxy, and `config/devProxy.ts` explains
+ * why the direct request cannot work.
+ *
+ * The `typeof` guard is for the test run, which uses `vitest.config.ts` and so
+ * never defines the flag.
+ */
+export const PANEL_API_BASE_URL = panelApiBaseUrl(
+  API_BASE_URL,
+  typeof __MF_DEV_API_PROXY__ !== "undefined" && __MF_DEV_API_PROXY__
+);
 
 /**
  * Member runtime endpoints, PRD section 10.4. Paths only: a consumer joins them
@@ -38,3 +66,42 @@ export const MEMBER_ENDPOINTS = {
  * section 10.6 asks for on a 429: no retry storm.
  */
 export const SESSION_CACHE_TTL_MS = 60_000;
+
+/**
+ * Is this a URL only the developer's own machine can reach?
+ *
+ * The distinction matters because two different things want a base URL and
+ * they are not the same thing:
+ *
+ *   - The plugin panel runs on the developer's machine, so `127.0.0.1` is
+ *     exactly right for it, which is what `VITE_API_BASE_URL` is for.
+ *   - A generated canvas component runs on a creator's PUBLISHED site, on
+ *     someone else's browser, which cannot reach the developer's loopback
+ *     address at all.
+ *
+ * Baking the panel's dev URL into a deployed component produces a membership
+ * that works perfectly in the panel and fails silently everywhere else, with a
+ * network error no creator could interpret. Backend PRD section 9.1 covers the
+ * supported way to develop against a published site, which is a tunnel with a
+ * stable HTTPS hostname.
+ */
+export function isLoopbackUrl(value: string): boolean {
+  try {
+    const host = new URL(value).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The base URL to bake into a generated component.
+ *
+ * `API_BASE_URL` when it is reachable from the open internet, and the
+ * production default when it is not. Refusing to emit a loopback URL is a
+ * guard rather than a preference: the alternative is a component that cannot
+ * work and does not say why.
+ */
+export function deployBaseUrl(configured: string = API_BASE_URL): string {
+  return isLoopbackUrl(configured) ? DEFAULT_API_BASE_URL : configured;
+}

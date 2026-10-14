@@ -14,9 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SIMULATED_STATE,
-  SIMULATED_STATES,
   buildSimulatedSession,
-  simulatedStateCaption,
   type SimulatedState,
 } from "../src/hooks/useMemberSession";
 import { DEFAULT_SITE_TIERS } from "../src/types/member";
@@ -24,38 +22,9 @@ import { DEFAULT_SITE_TIERS } from "../src/types/member";
 const NOW = 1_760_000_000;
 const DAY = 86_400;
 
-const ALL_STATES: ReadonlyArray<SimulatedState> = ["guest", "free", "silver", "vip", "failed"];
-
-describe("the state list", () => {
-  it("offers exactly the five states PRD section 7.4 specifies", () => {
-    expect(SIMULATED_STATES.map((state) => state.value)).toEqual(ALL_STATES);
-  });
-
+describe("the default state", () => {
   it("opens on Guest, the state a creator never sees by accident", () => {
     expect(DEFAULT_SIMULATED_STATE).toBe("guest");
-  });
-
-  it("keeps every switcher label short enough for a fifth of the panel", () => {
-    // Five segments share roughly 328px of content width, so about 65px each.
-    // A label longer than this truncates or forces the track to overflow.
-    for (const state of SIMULATED_STATES) {
-      expect(state.label.length).toBeLessThanOrEqual(8);
-    }
-  });
-
-  it("gives every state a caption, in prose rather than enum values", () => {
-    // PRD section 7.6 rule 4, and rule 6: a sentence ends with a period.
-    for (const state of SIMULATED_STATES) {
-      expect(state.caption.length).toBeGreaterThan(0);
-      expect(state.caption).toMatch(/\.$/);
-      expect(state.caption).not.toMatch(/past_due|free_member|tier_1|tier_2/);
-    }
-  });
-
-  it("resolves a caption for every state and never throws", () => {
-    for (const state of ALL_STATES) {
-      expect(simulatedStateCaption(state)).not.toBe("");
-    }
   });
 });
 

@@ -124,3 +124,707 @@
   color: var(--px-color-danger);
   text-align: center;
 }
+
+.settings-cta-note.is-info {
+  color: var(--paragraph);
+}
+
+/*
+ * A problem on the membership path group.
+ *
+ * One message for five fields rather than one each: at 360px five inline
+ * errors is a wall, and the rule is identical for all five.
+ */
+.settings-help-problem {
+  color: var(--px-color-danger);
+}
+
+/* ---------------------------------------------------------------------------
+   Integration catalogue
+   ---------------------------------------------------------------------------
+   One column, not three. The reference layout is three across because it is a
+   full-width web page; this panel is 360px and a three-column grid there is
+   three unreadable cards.
+*/
+
+.integration-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.integration-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--framefic-surface);
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.integration-card.is-configured {
+  border-color: var(--secondary-default);
+}
+
+.integration-card.is-open {
+  border-color: var(--px-color-border-brand);
+  background: var(--framefic-surface-2);
+}
+
+/* Accordion trigger row */
+.integration-card-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.integration-card-bar:hover {
+  background-color: var(--bg-card-inner);
+}
+
+.integration-card-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.integration-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--px-brand-subtle);
+  color: var(--px-color-text-brand);
+}
+
+.integration-card-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.integration-card-title {
+  margin: 0;
+  color: var(--title);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.integration-card-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.integration-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--paragraph-faint);
+  transition: transform 0.2s ease, color 0.15s ease;
+}
+
+.integration-chevron svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.integration-chevron.is-open {
+  transform: rotate(180deg);
+  color: var(--title);
+}
+
+/* Expanded Tier-style Edit Form (Screenshot 2) */
+.integration-tier-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  padding-top: 10px;
+  box-sizing: border-box;
+  border-top: 1px solid var(--px-color-border-brand);
+  background: var(--framefic-surface-2);
+}
+
+.integration-tier-form .tier-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.integration-tier-form .tier-form-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.integration-tier-form .tier-form-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding-top: 4px;
+  box-sizing: border-box;
+}
+
+.integration-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--framefic-page-bg);
+  color: var(--paragraph);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.integration-badge.is-connected {
+  background: var(--secondary-default);
+  color: var(--framefic-page-bg);
+}
+
+.integration-badge.is-partial {
+  color: var(--px-color-danger);
+}
+
+.integration-card-desc {
+  margin: 0;
+  color: var(--paragraph);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/*
+ * Why connecting this does nothing yet. The same honesty rule the component
+ * picker follows: a card that takes a key and silently drops it is worse than
+ * one that says it is not ready.
+ */
+.integration-card-pending {
+  margin: 0;
+  color: var(--paragraph);
+  font-size: 11px;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.integration-field-help {
+  margin: 0;
+  color: var(--paragraph);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.integration-field-problem {
+  margin: 0;
+  color: var(--px-color-danger);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Why a secret field is disabled, stated where the disabled field is. */
+.integration-card-locked {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--framefic-page-bg);
+  color: var(--paragraph);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.integration-card-locked svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  margin-top: 1px;
+  stroke: currentColor;
+}
+
+.integration-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   Fields inside an integration card
+   ---------------------------------------------------------------------------
+   `.framefic-input` carries a transparent border and a tertiary background,
+   which reads as a field against the panel's own background. Inside a card the
+   card background is close enough to the tertiary one that the input stops
+   looking like an input at all: in dark mode it renders as grey placeholder
+   text floating in the card, which is what the review caught.
+
+   So an input inside a card gets a real border. It is the card that changed the
+   context, so it is the card that restates the affordance.
+*/
+
+.integration-card .framefic-input,
+.integration-card .framefic-text-field {
+  border-color: var(--framefic-surface-border);
+  background-color: var(--framefic-page-bg);
+}
+
+.integration-card .framefic-input:focus,
+.integration-card .framefic-text-field:focus {
+  border-color: var(--secondary-default);
+}
+
+.integration-card .framefic-input:disabled,
+.integration-card .framefic-text-field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: var(--framefic-surface-border);
+  box-shadow: none;
+}
+
+/*
+ * A text field with a reveal button beside it.
+ *
+ * The button is the kit's 30px IconButton, so it lines up with the 30px control
+ * height without either being nudged.
+ */
+.integration-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.integration-input .framefic-input,
+.integration-input .framefic-text-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * The enabled row sits between the description and the Install button, with a
+ * rule above it so it reads as a control rather than as more description.
+ */
+.integration-card-row {
+  padding-top: 8px;
+  border-top: 1px solid var(--framefic-surface-border);
+}
+
+/* ==========================================================================
+   PAGE & CONTENT LOCKS PANEL
+   ========================================================================== */
+
+.page-locks-vault {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------------------
+   Global Route Shield Component Card
+   --------------------------------------------------------------------------- */
+.shield-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shield-badge-recommended {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--px-color-text-brand);
+  background: var(--px-brand-subtle);
+}
+
+.shield-code-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--framefic-surface-border);
+  background: var(--framefic-surface);
+  box-sizing: border-box;
+}
+
+.shield-code-desc p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph);
+}
+
+.shield-snippet-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--framefic-page-bg);
+  border: 1px solid var(--framefic-surface-border);
+  overflow: hidden;
+}
+
+.shield-snippet-text {
+  flex: 1 1 auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: all;
+}
+
+.shield-copy-btn {
+  flex-shrink: 0;
+}
+
+.shield-quick-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--framefic-surface-border);
+}
+
+.shield-steps-title {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--paragraph);
+}
+
+.shield-steps-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph);
+}
+
+.shield-steps-list strong {
+  color: var(--title);
+}
+
+.section-header-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.section-subtitle {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph);
+}
+
+.page-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.page-rule-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--framefic-surface-border);
+  background: var(--framefic-surface);
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.page-rule-card.is-open {
+  border-color: var(--px-color-border-brand);
+  background: var(--framefic-surface-2);
+}
+
+.page-rule-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.page-rule-card-header:hover {
+  background-color: var(--bg-card-inner);
+}
+
+.page-rule-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.page-rule-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--framefic-text-muted);
+  flex-shrink: 0;
+}
+
+.page-rule-status-dot[data-enabled="true"] {
+  background: var(--px-color-success, #12b76a);
+  box-shadow: 0 0 6px rgba(18, 183, 106, 0.4);
+}
+
+.page-rule-title {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--title);
+  white-space: nowrap;
+}
+
+.page-rule-path-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--paragraph);
+  background: var(--framefic-surface-border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.page-rule-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.page-rule-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--paragraph-faint);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.page-rule-chevron svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.page-rule-chevron.is-open {
+  transform: rotate(180deg);
+  color: var(--title);
+}
+
+.page-rule-card-body {
+  padding: 12px;
+  border-top: 1px solid var(--framefic-surface-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rule-field-caption {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph-faint);
+  margin-top: -2px;
+  margin-bottom: 4px;
+  padding-left: 2px;
+}
+
+.page-rule-deploy-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--framefic-surface-alt, rgba(255, 255, 255, 0.02));
+  border: 1px dashed var(--framefic-surface-border);
+  border-radius: var(--radius-sm, 6px);
+  margin-top: 6px;
+}
+
+.page-rule-deploy-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.page-rule-deploy-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.page-rule-deploy-text {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--paragraph-faint);
+}
+
+.page-rule-deploy-text code {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--framefic-page-bg);
+  border: 1px solid var(--framefic-surface-border);
+}
+
+.page-locks-btn-row {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.onpage-guide-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--framefic-surface-border);
+  background: var(--framefic-surface);
+  box-sizing: border-box;
+}
+
+.onpage-guide-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.onpage-guide-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--px-color-text-brand);
+  background: var(--px-brand-subtle);
+}
+
+.onpage-guide-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--title);
+}
+
+.onpage-guide-text {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph);
+}
+
+.onpage-guide-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph);
+}
+
+.onpage-guide-steps code {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--framefic-page-bg);
+  border: 1px solid var(--framefic-surface-border);
+}
+
+.onpage-guide-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.page-locks-footer {
+  margin-top: 12px;
+  padding-bottom: 24px;
+}

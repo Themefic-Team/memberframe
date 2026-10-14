@@ -8,13 +8,15 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { Button } from "../ui";
+import { Banner, Button } from "../ui";
 import { BRANDING } from "../../config/branding";
+import { useConnection } from "../../hooks/useConnection";
 
 export interface HomeTabProps {
   onOpenBuilder: () => void;
   onOpenManage: () => void;
   onOpenSettings: () => void;
+  onOpenConnect: () => void;
 }
 
 interface QuickStep {
@@ -30,7 +32,15 @@ interface QuickStep {
  * content is panel chrome rather than member administration, so it is
  * documented in `00-plugin-shell.md` section 9.
  *
- * ## It does not claim to know what the creator has done
+ * ## It now knows one thing, and only one
+ *
+ * Whether the project is connected. That is the single fact the panel can
+ * establish without guessing, and it is the one that matters most: every other
+ * tile leads somewhere that does nothing until it is true. So an unconnected
+ * project gets a banner pointing at the Connect tab, and the three tiles stay
+ * exactly as stateless as they were.
+ *
+ * ## It still does not claim to know the rest
  *
  * The obvious quick start is a checklist with ticks: tier created, gateway
  * connected, frame gated. Every one of those facts lives behind the backend,
@@ -41,8 +51,10 @@ interface QuickStep {
  *
  * A checklist with three permanently unticked boxes reads as a broken product.
  * So these are three routes, not three states: each tile says where to go, and
- * none of them asserts anything about progress. When the backend lands, the
- * tiles can gain real state, and nothing here has to be unpicked first.
+ * none of them asserts anything about progress. Two of the three are now
+ * knowable in principle, since the backend and a creator token both exist, and
+ * making them real is a separate piece of work rather than something to sneak
+ * in here.
  *
  * ## One primary CTA
  *
@@ -53,7 +65,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onOpenBuilder,
   onOpenManage,
   onOpenSettings,
+  onOpenConnect,
 }) => {
+  const { state } = useConnection();
   const steps: ReadonlyArray<QuickStep> = [
     { label: "Gate a frame", icon: <Lock aria-hidden={true} />, onClick: onOpenBuilder },
     { label: "Set up tiers", icon: <Layers aria-hidden={true} />, onClick: onOpenManage },
@@ -62,6 +76,19 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   return (
     <div className="home-tab-container">
+      {/*
+        Only while loading is unknown; "loading" shows nothing rather than
+        flashing a warning at a creator who is in fact connected.
+      */}
+      {state.status === "disconnected" ? (
+        <Banner
+          tone="warning"
+          title="Not connected yet"
+          message="Connect this Framer project to start storing members."
+          action={{ label: "Connect", onClick: onOpenConnect }}
+        />
+      ) : null}
+
       <section className="hero-card">
         <div className="hero-card-content">
           <h1 className="hero-card-title">Membership, Inside Framer</h1>

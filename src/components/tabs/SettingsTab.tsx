@@ -1,25 +1,25 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Save } from "lucide-react";
+import { Banner, Button, Segmented, useToast } from "../ui";
+import { ConfigPanel } from "../settings/ConfigPanel";
+import { IntegrationPanel } from "../settings/IntegrationPanel";
+import { PageLocksPanel } from "../settings/PageLocksPanel";
 import {
-  Banner,
-  Button,
-  Checkbox,
-  FieldRow,
-  FieldRows,
-  Segmented,
-  Select,
-  useToast,
-} from "../ui";
-import { GatewayVault } from "../settings/GatewayVault";
-import type { VaultFieldSpec } from "../settings/gatewayKeys";
-import { checkKey, VAULT_FIELDS } from "../settings/gatewayKeys";
+  readStoredIntegration,
+  type IntegrationId,
+  type IntegrationState,
+} from "../settings/integrationRegistry";
 import type { ThemePreference } from "../../hooks/useFramerTheme";
 import { failureMessage } from "../../services/apiClient";
 import { fetchGatewayStatus, saveGatewayConfig } from "../../services/siteService";
+import { isSafeSitePath, saveSiteSettings } from "../../services/siteSettingsService";
+import { useConnection } from "../../hooks/useConnection";
+import type { AuthSettings, GatedPageRule } from "../../types/connection";
+import { deployBaseUrl } from "../../config/backend";
+import type { DeployContext } from "../../services";
 import {
   EMPTY_GATEWAY_VAULT_DRAFT,
   UNCONFIGURED_GATEWAY_STATUS,
-  type CurrencyCode,
   type GatewayVaultDraft,
   type SiteGatewayStatus,
 } from "../../types/site";
@@ -29,56 +29,154 @@ export interface SettingsTabProps {
   onChangeThemePreference: (preference: ThemePreference) => void;
 }
 
-const THEME_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-] as const satisfies ReadonlyArray<{ value: ThemePreference; label: string }>;
+type SettingsView = "config" | "locks" | "integration";
 
-const CURRENCY_OPTIONS: ReadonlyArray<{ value: CurrencyCode; label: string }> = [
-  { value: "USD", label: "USD, US dollar" },
-  { value: "EUR", label: "EUR, euro" },
-  { value: "GBP", label: "GBP, pound sterling" },
-  { value: "INR", label: "INR, Indian rupee" },
-];
+const VIEWS = [
+  { value: "config", label: "Config" },
+  { value: "locks", label: "Page Locks" },
+  { value: "integration", label: "Integration" },
+] as const satisfies ReadonlyArray<{ value: SettingsView; label: string }>;
 
-/** See `ManageTab.tsx`. One named placeholder for creator sign-in to replace. */
-const PLACEHOLDER_SITE_ID = "unconfigured";
+/**
+ * Whether there is anywhere encrypted to put a secret key.
+ *
+ * `gateway_configs` with AES-256-GCM is backend PRD phase B3 and is not built,
+ * so this is false and every secret field in the Integration tab is disabled
+ * with the reason on screen.
+ *
+ * A named constant rather than a literal `false` scattered through the tree,
+ * because when that table lands this is the one line that changes, and a reader
+ * looking for "why can I not save a Stripe secret key" should find it here.
+ */
+const SECRETS_SUPPORTED = false;
 
 /**
  * The Settings tab. PRD task 2.4, feature F03, layout in section 7.3.
  *
- * Carries the tab's one `.primary-cta`, "Save settings".
+ * Two sub-tabs behind the same `Segmented` control the Manage tab uses, so the
+ * two tabs behave identically and a creator learns the pattern once.
  *
- * ## Which controls need a save, and which do not
+ *   Config        the site's own settings: panel theme, membership paths and
+ *                 policy, currency and routing
+ *   Integration   third-party credentials, as a catalogue of cards
  *
- * PRD section 7.5: a toggle is for instant-apply only, a checkbox is for when a
- * save is required. So the theme switcher stays a segmented control that
- * applies as you pick it, and everything behind "Save settings", including
- * geolocation routing, is a checkbox. Mixing the two would teach the creator
- * that some switches take effect and some do not, with nothing on screen saying
- * which.
+ * ## Why the split, and why the keys moved
+ *
+ * A gateway key is an integration's configuration rather than a site setting,
+ * and the previous single page mixed the two: a creator looking for the login
+ * path scrolled past a Stripe secret key field. They also want different save
+ * models. A setting is edited alongside four others and saved together; an
+ * integration is connected on its own, once, and the card that owns it owns its
+ * save.
+ *
+ * ## Two different saves, deliberately
+ *
+ * Config has one `.primary-cta` that writes the membership document and the
+ * payment routing together. Integration has none at catalogue level: each card
+ * saves itself when it is expanded. Those are mutually exclusive views, so the
+ * one-CTA-per-view rule holds in both.
  *
  * ## No secret is written to this panel's storage
  *
- * The vault draft is state in this component and nothing more. It is not
- * persisted, not restored, and deliberately lost when the panel closes with
- * unsaved edits. See `GatewayVault.tsx` for the full reasoning.
+ * Nothing here persists a credential client side. The integration draft lives
+ * in the card's own state and dies with it, and a stored secret is never
+ * returned to the panel at all: what comes back is a masked suffix.
  */
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   themePreference,
   onChangeThemePreference,
 }) => {
-  const [draft, setDraft] = useState<GatewayVaultDraft>(EMPTY_GATEWAY_VAULT_DRAFT);
-  const [status, setStatus] = useState<SiteGatewayStatus>(UNCONFIGURED_GATEWAY_STATUS);
-  const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const showToast = useToast();
+  const { connection, settings, settingsVersion, applySettings } = useConnection();
+  const siteId = connection?.siteId ?? null;
+
+  const [view, setView] = useState<SettingsView>("config");
+
+  /**
+   * A local copy of the membership settings, edited until Save.
+   *
+   * `null` until the connection loads, and reset from it whenever the stored
+   * document changes. Editing the context copy directly would make every
+   * keystroke a shared state change, and would mean an unsaved edit survived a
+   * tab switch, which contradicts "Save settings" meaning anything.
+   */
+  const [auth, setAuth] = useState<AuthSettings | null>(null);
+
+  const [gatedPages, setGatedPages] = useState<GatedPageRule[]>(
+    () =>
+      settings?.gatedPages ?? [
+        {
+          path: "/dashboard",
+          enabled: true,
+          requiredTier: "signed_in",
+          fallbackAction: "redirect",
+          redirectPath: "/login",
+        },
+        {
+          path: "/private-content",
+          enabled: true,
+          requiredTier: "signed_in",
+          fallbackAction: "redirect",
+          redirectPath: "/login",
+        },
+      ]
+  );
 
   useEffect(() => {
+    setAuth(settings ? { ...settings.auth } : null);
+    if (settings && Array.isArray(settings.gatedPages)) {
+      setGatedPages(settings.gatedPages);
+    }
+  }, [settings]);
+
+  const deployContext = useMemo<DeployContext>(
+    () => ({
+      apiBaseUrl: deployBaseUrl(),
+      siteKey: connection?.siteKey ?? "",
+      afterLoginPath: settings?.auth.afterLoginPath ?? "",
+      loginPath: settings?.auth.loginPath ?? "/login",
+      afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+    }),
+    [connection, settings]
+  );
+
+  const [draft, setDraft] = useState<GatewayVaultDraft>(EMPTY_GATEWAY_VAULT_DRAFT);
+  const [, setStatus] = useState<SiteGatewayStatus>(UNCONFIGURED_GATEWAY_STATUS);
+  const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savingIntegration, setSavingIntegration] = useState<IntegrationId | null>(null);
+  const showToast = useToast();
+
+  /**
+   * The stored integrations, read out of the settings document.
+   *
+   * Defensive on every read because the source is a JSON column that nothing
+   * validates, and the panel must render a card either way. A corrupt entry
+   * reads as not configured, which shows an Install button rather than breaking
+   * the tab.
+   */
+  const integrationState = useMemo<IntegrationState>(() => {
+    const stored = settings?.integrations;
+    if (!stored || typeof stored !== "object") return {};
+
+    const state: IntegrationState = {};
+
+    for (const [id, value] of Object.entries(stored)) {
+      state[id as IntegrationId] = readStoredIntegration(value);
+    }
+
+    return state;
+  }, [settings]);
+
+  useEffect(() => {
+    if (!siteId) {
+      setStatus(UNCONFIGURED_GATEWAY_STATUS);
+      setFailure(null);
+      return;
+    }
+
     let active = true;
 
-    void fetchGatewayStatus(PLACEHOLDER_SITE_ID).then((result) => {
+    void fetchGatewayStatus(siteId).then((result) => {
       if (!active) return;
 
       if (result.kind === "ok") {
@@ -98,40 +196,66 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     return () => {
       active = false;
     };
-  }, []);
+  }, [siteId]);
 
-  const handleFieldChange = useCallback((field: VaultFieldSpec["field"], value: string) => {
-    setDraft((current) => ({ ...current, [field]: value }));
+  const handlePaymentsChange = useCallback((patch: Partial<GatewayVaultDraft>) => {
+    setDraft((current) => ({ ...current, ...patch }));
   }, []);
 
   /**
-   * A field with a shape problem blocks the save.
+   * A bad path is not merely untidy.
    *
-   * Only shape, never validity. Validity is the server's answer, and refusing
-   * to send a key because a client-side rule did not recognise it is how a
-   * creator gets told their working key is invalid.
+   * Every one of the five is baked into a deployed component or an emailed
+   * link, and a value that is not site-relative turns a redirect into an open
+   * redirect.
    */
-  const blockingProblem = VAULT_FIELDS.some(
-    (field) => checkKey(draft[field.field], field.gateway, field.role).problem !== null
-  );
+  const blockingProblem =
+    auth !== null &&
+    (
+      [
+        auth.loginPath,
+        auth.signupPath,
+        auth.resetPath,
+        auth.afterLoginPath,
+        auth.afterLogoutPath,
+      ] as const
+    ).some((path) => !isSafeSitePath(path));
 
   const handleSave = useCallback(async () => {
+    if (!siteId) return;
+
     setSaving(true);
 
-    const result = await saveGatewayConfig(PLACEHOLDER_SITE_ID, draft);
+    /*
+      The membership settings first, the payment routing second.
+
+      Order matters because they can fail independently and the membership
+      paths are the half a creator is most likely to be changing: a save that
+      wrote the routing and then failed on the paths would report failure while
+      having changed something, which is the worst of both.
+    */
+    if (auth) {
+      const settingsResult = await saveSiteSettings(siteId, settingsVersion, { auth });
+
+      if (settingsResult.kind !== "ok") {
+        setSaving(false);
+        setFailure(failureMessage(settingsResult));
+        showToast({ tone: "error", message: "Could not save settings" });
+        return;
+      }
+
+      applySettings(settingsResult.data.settings, settingsResult.data.version);
+    }
+
+    // Currency and routing only. The key fields that used to travel with this
+    // call live in the Integration tab now, and `saveGatewayConfig` strips
+    // empty values, so nothing stored is blanked by sending none.
+    const result = await saveGatewayConfig(siteId, draft);
 
     setSaving(false);
 
     if (result.kind === "ok") {
       setStatus(result.data);
-      // Clear the secrets the moment they are saved. The masked suffix from the
-      // server takes their place in the fields, and nothing in this panel holds
-      // a plaintext key any longer than the request took.
-      setDraft({
-        ...EMPTY_GATEWAY_VAULT_DRAFT,
-        defaultCurrency: result.data.defaultCurrency,
-        autoDetectGeolocation: result.data.autoDetectGeolocation,
-      });
       setFailure(null);
       showToast({ tone: "success", message: "Settings saved" });
       return;
@@ -140,80 +264,168 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     const described = failureMessage(result);
     setFailure(described);
     showToast({ tone: "error", message: "Could not save settings" });
-  }, [draft, showToast]);
+  }, [applySettings, auth, draft, settingsVersion, showToast, siteId]);
+
+  /**
+   * Save one integration's non-secret values.
+   *
+   * A merge into the settings document rather than a replacement, keyed on the
+   * integration id, so connecting Stripe cannot disturb a Google client id
+   * saved last week. `secretsPresent` is deliberately not sent: it is the
+   * server's answer about what it holds, not something the panel may assert.
+   */
+  const handleSaveIntegration = useCallback(
+    async (id: IntegrationId, values: Record<string, string>) => {
+      if (!siteId) return;
+
+      setSavingIntegration(id);
+
+      const result = await saveSiteSettings(siteId, settingsVersion, {
+        integrations: {
+          [id]: { enabled: Object.keys(values).length > 0, values },
+        },
+      });
+
+      setSavingIntegration(null);
+
+      if (result.kind === "ok") {
+        applySettings(result.data.settings, result.data.version);
+        setFailure(null);
+        showToast({ tone: "success", message: "Integration saved" });
+        return;
+      }
+
+      setFailure(failureMessage(result));
+      showToast({ tone: "error", message: "Could not save integration" });
+    },
+    [applySettings, settingsVersion, showToast, siteId]
+  );
+
+  /**
+   * Turn one integration on or off, immediately.
+   *
+   * A toggle commits the moment it moves, per PRD section 7.5, so this writes
+   * rather than staging an edit. The values are carried through unchanged: this
+   * endpoint replaces an integration's whole entry, so sending `enabled` alone
+   * would clear the credentials the creator is trying to switch off rather than
+   * delete.
+   */
+  const handleToggleIntegration = useCallback(
+    async (id: IntegrationId, enabled: boolean) => {
+      if (!siteId) return;
+
+      setSavingIntegration(id);
+
+      const existing = integrationState[id];
+
+      const result = await saveSiteSettings(siteId, settingsVersion, {
+        integrations: { [id]: { enabled, values: existing?.values ?? {} } },
+      });
+
+      setSavingIntegration(null);
+
+      if (result.kind === "ok") {
+        applySettings(result.data.settings, result.data.version);
+        setFailure(null);
+        showToast({ tone: "success", message: enabled ? "Integration on" : "Integration off" });
+        return;
+      }
+
+      setFailure(failureMessage(result));
+      showToast({ tone: "error", message: "Could not change that" });
+    },
+    [applySettings, integrationState, settingsVersion, showToast, siteId]
+  );
+
+  const handleSavePageLocks = useCallback(async () => {
+    if (!siteId) {
+      showToast({
+        tone: "warning",
+        message: "Connect this project in the Connect tab before saving page locks.",
+      });
+      return;
+    }
+
+    setSaving(true);
+    const result = await saveSiteSettings(siteId, settingsVersion, { gatedPages });
+    setSaving(false);
+
+    if (result.kind === "ok") {
+      applySettings(result.data.settings, result.data.version);
+      setFailure(null);
+      showToast({ tone: "success", message: "Page locks saved successfully" });
+      return;
+    }
+
+    setFailure(failureMessage(result));
+    showToast({
+      tone: "error",
+      message: failureMessage(result).message || "Could not save page locks",
+    });
+  }, [applySettings, gatedPages, settingsVersion, showToast, siteId]);
 
   return (
     <div className="tab-panel-body">
-      <section className="section-group">
-        <h2 className="section-title">Panel</h2>
-        <FieldRows>
-          {/* Instant apply, so a segmented control and no save. */}
-          <FieldRow label="Panel theme" fill>
-            <Segmented
-              label="Panel theme"
-              options={THEME_OPTIONS}
-              value={themePreference}
-              onChange={onChangeThemePreference}
-            />
-          </FieldRow>
-        </FieldRows>
-      </section>
+      <Segmented label="Settings view" options={VIEWS} value={view} onChange={setView} />
 
-      <section className="section-group">
-        <h2 className="section-title">Payments</h2>
+      {view === "config" ? (
+        <>
+          <ConfigPanel
+            themePreference={themePreference}
+            onChangeThemePreference={onChangeThemePreference}
+            auth={auth}
+            onChangeAuth={setAuth}
+            currency={draft.defaultCurrency}
+            autoDetectGeolocation={draft.autoDetectGeolocation}
+            onChangePayments={handlePaymentsChange}
+            failure={failure}
+            saving={saving}
+          />
 
-        {failure ? <Banner tone="warning" title={failure.title} message={failure.message} /> : null}
+          {/* The Config view's one and only `.primary-cta`, per PRD section 7.3. */}
+          <div className="settings-cta">
+            <Button
+              variant="primary"
+              size="md"
+              className="fill"
+              disabled={saving || blockingProblem || siteId === null}
+              onClick={() => void handleSave()}
+            >
+              <Save aria-hidden={true} />
+              {saving ? "Saving" : "Save settings"}
+            </Button>
+            {siteId === null ? (
+              <p className="settings-cta-note">Connect this project before saving settings.</p>
+            ) : blockingProblem ? (
+              <p className="settings-cta-note">Fix the highlighted field before saving.</p>
+            ) : null}
+          </div>
+        </>
+      ) : view === "locks" ? (
+        <PageLocksPanel
+          rules={gatedPages}
+          onChangeRules={setGatedPages}
+          saving={saving}
+          onSave={() => void handleSavePageLocks()}
+          deployContext={deployContext}
+          siteConnected={siteId !== null}
+        />
+      ) : (
+        <>
+          {failure ? (
+            <Banner tone="warning" title={failure.title} message={failure.message} />
+          ) : null}
 
-        <GatewayVault draft={draft} status={status} onChange={handleFieldChange} />
-
-        <FieldRows>
-          <FieldRow label="Default currency" htmlFor="settings-currency">
-            <Select
-              id="settings-currency"
-              value={draft.defaultCurrency}
-              options={CURRENCY_OPTIONS}
-              onChange={(value) => setDraft((current) => ({ ...current, defaultCurrency: value }))}
-            />
-          </FieldRow>
-
-          {/*
-            A checkbox, not a toggle. It only takes effect on save, and PRD
-            section 7.5 reserves the toggle for instant-apply controls.
-          */}
-          <FieldRow label="Route by buyer location" htmlFor="settings-geo">
-            <Checkbox
-              id="settings-geo"
-              checked={draft.autoDetectGeolocation}
-              onChange={(checked) =>
-                setDraft((current) => ({ ...current, autoDetectGeolocation: checked }))
-              }
-            />
-          </FieldRow>
-        </FieldRows>
-
-        <p className="settings-help">
-          {draft.autoDetectGeolocation
-            ? "Buyers are routed to the gateway that fits their country. Routing happens on the server."
-            : `Every buyer is charged in ${draft.defaultCurrency} through the gateway that supports it.`}
-        </p>
-      </section>
-
-      {/* The tab's one and only `.primary-cta`, per PRD section 7.3. */}
-      <div className="settings-cta">
-        <Button
-          variant="primary"
-          size="md"
-          className="fill"
-          disabled={saving || blockingProblem}
-          onClick={() => void handleSave()}
-        >
-          <Save aria-hidden={true} />
-          {saving ? "Saving" : "Save settings"}
-        </Button>
-        {blockingProblem ? (
-          <p className="settings-cta-note">Fix the highlighted key before saving.</p>
-        ) : null}
-      </div>
+          <IntegrationPanel
+            state={integrationState}
+            secretsSupported={SECRETS_SUPPORTED}
+            savingId={savingIntegration}
+            onSave={(id, values) => void handleSaveIntegration(id, values)}
+            onToggleEnabled={(id, enabled) => void handleToggleIntegration(id, enabled)}
+            connected={siteId !== null}
+          />
+        </>
+      )}
     </div>
   );
 };

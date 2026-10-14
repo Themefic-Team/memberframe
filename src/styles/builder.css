@@ -372,3 +372,54 @@
   font-weight: 600;
   user-select: none;
 }
+
+/* ---------------------------------------------------------------------------
+   Membership page scaffolding
+   ---------------------------------------------------------------------------
+   The list of pages the button will create, shown before it is clicked. A
+   creator about to have pages added to their project should see which ones,
+   because the paths come from Settings and a wrong path there is far easier to
+   spot as a list than as a form field.
+*/
+
+.builder-help {
+  margin: 0;
+  color: var(--paragraph);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.builder-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.builder-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: 8px;
+  background: var(--framefic-surface);
+  min-width: 0;
+}
+
+.builder-page-path {
+  color: var(--title);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.builder-page-purpose {
+  color: var(--paragraph);
+  font-size: 11px;
+  line-height: 1.4;
+}

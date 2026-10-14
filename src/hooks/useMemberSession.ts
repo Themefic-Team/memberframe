@@ -21,50 +21,6 @@ import {
 /** The five previewable states, PRD section 7.4. Local only, never persisted. */
 export type SimulatedState = "guest" | "free" | "silver" | "vip" | "failed";
 
-export interface SimulatedStateOption {
-  value: SimulatedState;
-  /** Switcher label. Short: five segments share 328px of panel width. */
-  label: string;
-  /**
-   * What this state means, in a sentence. The switcher cannot say
-   * "past_due at 1760000000" at a creator, per PRD section 7.6 rule 4.
-   */
-  caption: string;
-}
-
-/**
- * Labels are the short forms from the PRD section 7.4 mockup,
- * `[Guest][Free][Silver][VIP][Failed]`. "Payment Failed" spelled out does not
- * fit a fifth of the panel.
- */
-export const SIMULATED_STATES: ReadonlyArray<SimulatedStateOption> = [
-  {
-    value: "guest",
-    label: "Guest",
-    caption: "Not signed in. This is what a first-time visitor sees.",
-  },
-  {
-    value: "free",
-    label: "Free",
-    caption: "Signed in on the free plan, with no paid tier.",
-  },
-  {
-    value: "silver",
-    label: "Silver",
-    caption: "Active subscriber on Tier 1: Silver.",
-  },
-  {
-    value: "vip",
-    label: "VIP",
-    caption: "Active VIP member. Passes every lower tier automatically.",
-  },
-  {
-    value: "failed",
-    label: "Failed",
-    caption: "Payment failed and the grace period has closed.",
-  },
-];
-
 export const DEFAULT_SIMULATED_STATE: SimulatedState = "guest";
 
 const DAY_SECONDS = 86_400;
@@ -201,7 +157,3 @@ export function useMemberSession(): MemberSessionValue {
   return value;
 }
 
-/** The caption for a state, for the switcher. Falls back rather than throwing. */
-export function simulatedStateCaption(state: SimulatedState): string {
-  return SIMULATED_STATES.find((option) => option.value === state)?.caption ?? "";
-}

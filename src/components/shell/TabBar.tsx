@@ -13,12 +13,15 @@ export interface TabBarProps {
 }
 
 /**
- * 36px. Four tabs with a 2px gradient pill under the active one, a spacer, then
- * the account button. PRD section 7.2.
+ * 36px, with a 2px gradient pill under the active tab, a spacer, then the
+ * account button. PRD section 7.2.
  *
- * Four tabs, not five. Members and Tiers are folded into Manage behind a
+ * Five tabs since the Connect tab, which is a widening of the shell standard's
+ * two-to-four and is recorded as conflict C26. What has NOT changed is why
+ * there are not six: Members and Tiers stay folded into Manage behind a
  * segmented control because they share a data domain and the same backend
- * calls. That is a resolved decision, PRD section 7.3: do not re-split them.
+ * calls, which is the resolved decision in PRD section 7.3. Do not re-split
+ * them to make room for anything.
  */
 export const TabBar: React.FC<TabBarProps> = ({ activeTab, onSelectTab, onOpenAccount }) => (
   <nav className="framefic-tab-bar">

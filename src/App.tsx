@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { framer } from "framer-plugin";
 import { PluginShell } from "./components/shell";
-import { BuilderTab, HomeTab, ManageTab, SettingsTab } from "./components/tabs";
+import { ConnectionProvider } from "./components/ConnectionProvider";
+import { BuilderTab, ConnectTab, HomeTab, ManageTab, SettingsTab } from "./components/tabs";
 import { ToastProvider } from "./components/ui";
 import { useActiveTab } from "./hooks/useActiveTab";
 import { useFramerTheme } from "./hooks/useFramerTheme";
@@ -40,29 +41,40 @@ export const App: React.FC = () => {
   const openBuilder = useCallback(() => setActiveTab("builder"), [setActiveTab]);
   const openManage = useCallback(() => setActiveTab("manage"), [setActiveTab]);
   const openSettings = useCallback(() => setActiveTab("settings"), [setActiveTab]);
+  const openConnect = useCallback(() => setActiveTab("connect"), [setActiveTab]);
 
   return (
     <ToastProvider>
-      <PluginShell
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapse}
-        onClose={handleClose}
-      >
-        {activeTab === "home" ? (
-          <HomeTab
-            onOpenBuilder={openBuilder}
-            onOpenManage={openManage}
-            onOpenSettings={openSettings}
-          />
-        ) : null}
-        {activeTab === "builder" ? <BuilderTab /> : null}
-        {activeTab === "manage" ? <ManageTab /> : null}
-        {activeTab === "settings" ? (
-          <SettingsTab themePreference={preference} onChangeThemePreference={setPreference} />
-        ) : null}
-      </PluginShell>
+      {/*
+        The connection wraps the shell rather than sitting inside one tab,
+        because three tabs read the same site id. Two copies of "which site is
+        this" is how the Manage tab lists one site's members while the Settings
+        tab writes another's.
+      */}
+      <ConnectionProvider>
+        <PluginShell
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapse}
+          onClose={handleClose}
+        >
+          {activeTab === "home" ? (
+            <HomeTab
+              onOpenBuilder={openBuilder}
+              onOpenManage={openManage}
+              onOpenSettings={openSettings}
+              onOpenConnect={openConnect}
+            />
+          ) : null}
+          {activeTab === "builder" ? <BuilderTab /> : null}
+          {activeTab === "manage" ? <ManageTab /> : null}
+          {activeTab === "settings" ? (
+            <SettingsTab themePreference={preference} onChangeThemePreference={setPreference} />
+          ) : null}
+          {activeTab === "connect" ? <ConnectTab /> : null}
+        </PluginShell>
+      </ConnectionProvider>
     </ToastProvider>
   );
 };

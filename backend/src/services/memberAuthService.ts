@@ -33,10 +33,11 @@ import {
   verifyPassword,
 } from "../lib/password.js";
 import { isAcceptablePassword, normalizeEmail, passwordProblems } from "../lib/credentials.js";
-import { expiryFrom, generateToken, hashToken } from "../lib/tokens.js";
-import { badRequest, unauthorized } from "../middleware/errors.js";
-import { passwordChangedMail, passwordResetMail, sendMail } from "../lib/mailer.js";
+import { expiryFrom, generateOtpCode, generateToken, hashToken, isExpired, tokensMatch } from "../lib/tokens.js";
+import { badRequest, forbidden, unauthorized } from "../middleware/errors.js";
+import { otpMail, passwordChangedMail, passwordResetMail, sendMail } from "../lib/mailer.js";
 import { revokeAllSessionsForMember } from "./sessionService.js";
+import { loadSiteSettings } from "./settingsService.js";
 
 export interface AuthenticatedMember {
   id: string;
@@ -382,3 +383,150 @@ export async function resetPassword(input: {
     sessionsRevoked,
   };
 }
+
+// ============================================================================
+// OTP PASSWORDLESS AUTH (FP-03)
+// ============================================================================
+
+export interface SendMemberOtpInput {
+  siteId: string;
+  siteName: string;
+  email: string;
+}
+
+export interface SendMemberOtpResult {
+  resendAfterSeconds: number;
+  expiresInSeconds: number;
+}
+
+export async function sendMemberOtp(input: SendMemberOtpInput): Promise<SendMemberOtpResult> {
+  const email = normalizeEmail(input.email);
+  const now = new Date();
+
+  const outstanding = await prisma.memberOtp.findFirst({
+    where: {
+      siteId: input.siteId,
+      email,
+      consumedAt: null,
+      expiresAt: { gt: now },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (outstanding && outstanding.resendAvailableAt > now) {
+    const wait = Math.ceil((outstanding.resendAvailableAt.getTime() - now.getTime()) / 1000);
+    throw badRequest("resend_too_soon", { retryAfterSeconds: wait });
+  }
+
+  const code = generateOtpCode();
+
+  // Invalidate previous outstanding codes for this site + email
+  await prisma.memberOtp.updateMany({
+    where: { siteId: input.siteId, email, consumedAt: null },
+    data: { consumedAt: now },
+  });
+
+  await prisma.memberOtp.create({
+    data: {
+      siteId: input.siteId,
+      email,
+      codeHash: hashToken(code),
+      expiresAt: expiryFrom(env.otp.ttlSeconds, now),
+      resendAvailableAt: expiryFrom(env.otp.resendLockSeconds, now),
+    },
+  });
+
+  // Send mail without throwing on delivery errors
+  await sendMail(otpMail(email, code, input.siteName, input.siteId));
+
+  return {
+    resendAfterSeconds: env.otp.resendLockSeconds,
+    expiresInSeconds: env.otp.ttlSeconds,
+  };
+}
+
+export interface VerifyMemberOtpInput {
+  siteId: string;
+  email: string;
+  code: string;
+}
+
+export async function verifyMemberOtp(input: VerifyMemberOtpInput): Promise<AuthenticatedMember> {
+  const email = normalizeEmail(input.email);
+  const now = new Date();
+
+  const otp = await prisma.memberOtp.findFirst({
+    where: { siteId: input.siteId, email, consumedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!otp) {
+    throw unauthorized("invalid_code");
+  }
+
+  if (isExpired(otp.expiresAt, now)) {
+    throw unauthorized("expired_code");
+  }
+
+  if (otp.attempts >= env.otp.maxAttempts) {
+    // Invalidate dead code
+    await prisma.memberOtp.update({ where: { id: otp.id }, data: { consumedAt: now } });
+    throw unauthorized("too_many_attempts");
+  }
+
+  if (!tokensMatch(otp.codeHash, hashToken(input.code.trim()))) {
+    const updated = await prisma.memberOtp.update({
+      where: { id: otp.id },
+      data: { attempts: { increment: 1 } },
+    });
+
+    if (updated.attempts >= env.otp.maxAttempts) {
+      await prisma.memberOtp.update({ where: { id: otp.id }, data: { consumedAt: now } });
+      throw unauthorized("too_many_attempts");
+    }
+
+    throw unauthorized("invalid_code");
+  }
+
+  // Code matches! Mark consumed immediately
+  await prisma.memberOtp.update({ where: { id: otp.id }, data: { consumedAt: now } });
+
+  // Find or create member
+  let member = await prisma.member.findFirst({
+    where: { siteId: input.siteId, email, deletedAt: null },
+    select: SAFE_MEMBER_FIELDS,
+  });
+
+  if (!member) {
+    const settings = await loadSiteSettings(input.siteId);
+    if (!settings.auth.allowRegistration) {
+      throw forbidden("registration_closed");
+    }
+
+    member = await prisma.member.create({
+      data: {
+        siteId: input.siteId,
+        email,
+        emailVerifiedAt: now,
+        activeTier: "free_member",
+        status: "active",
+        lastLoginAt: now,
+      },
+      select: SAFE_MEMBER_FIELDS,
+    });
+  } else {
+    member = await prisma.member.update({
+      where: { id: member.id },
+      data: {
+        lastLoginAt: now,
+        emailVerifiedAt: member.emailVerifiedAt ?? now,
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+      select: SAFE_MEMBER_FIELDS,
+    });
+  }
+
+  return member;
+}
+

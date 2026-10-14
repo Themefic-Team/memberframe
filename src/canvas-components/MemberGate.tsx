@@ -118,6 +118,19 @@ interface GateConfig {
   blurIntensity: number;
   apiBaseUrl: string;
   sessionTtlMs: number;
+  /**
+   * Which MemberFrame site this gate belongs to.
+   *
+   * Public. It identifies the tenant; the request's `Origin` is what
+   * authorizes, checked against that site's allowlist on the server. See the
+   * same field on `<MemberAuth>` for the full reasoning.
+   *
+   * Empty when the gate was deployed before the project was connected, in
+   * which case every session check fails and the gate stays shut. That is the
+   * right direction to fail in: no content leaks.
+   */
+  siteKey: string;
+  loginPath: string;
 }
 
 // @memberframe-config-start
@@ -130,6 +143,8 @@ const CONFIG: GateConfig = {
   blurIntensity: 8,
   apiBaseUrl: "https://api.memberframe.framefic.com",
   sessionTtlMs: 60000,
+  siteKey: "",
+  loginPath: "/login",
 };
 // @memberframe-config-end
 
@@ -195,7 +210,10 @@ async function requestSession(): Promise<SessionResult> {
     // attaches the credential and this component never sees it. Conflict C4.
     const response = await fetch(`${CONFIG.apiBaseUrl}/api/member/session`, {
       credentials: "include",
-      headers: { Accept: "application/json" },
+      headers:
+        CONFIG.siteKey === ""
+          ? { Accept: "application/json" }
+          : { Accept: "application/json", "X-MemberFrame-Site": CONFIG.siteKey },
     });
 
     if (response.status === 401) return { kind: "guest" };
@@ -250,6 +268,8 @@ const cssContent = `
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 260px;
+  min-height: 120px;
   overflow: hidden;
   font-family: var(--framer-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
 }
@@ -340,8 +360,6 @@ const cssContent = `
   color: var(--memberframe-gate-body);
 }
 
-/* Rendered as text, not as a control. Nothing to navigate to until task 2.5
-   authors <MemberAuth>, and a button that does nothing is worse than a label. */
 .memberframe-lock-cta {
   display: inline-flex;
   align-items: center;
@@ -357,6 +375,20 @@ const cssContent = `
     var(--memberframe-gate-brand) 0%,
     var(--memberframe-gate-brand-strong) 100%
   );
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.memberframe-lock-cta:hover {
+  opacity: 0.95;
+  filter: brightness(1.05);
+}
+
+.memberframe-lock-cta:active {
+  transform: scale(0.98);
 }
 
 /* Canvas only. Tells the creator the frame is gated without hiding the frame
@@ -399,6 +431,111 @@ const cssContent = `
   border: 1px dashed var(--memberframe-gate-border);
   border-radius: 10px;
   background: var(--memberframe-gate-surface);
+}
+
+/* Full-screen guard shield: prevents content flashing before page redirect */
+.memberframe-page-shield {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  background: var(--memberframe-gate-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.memberframe-page-shield-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  padding: 24px;
+  text-align: center;
+  border-radius: 14px;
+  background: var(--memberframe-gate-surface);
+  border: 1px solid var(--memberframe-gate-border);
+  box-shadow: var(--memberframe-gate-shadow);
+}
+
+.memberframe-page-shield-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--memberframe-gate-title);
+}
+
+/* Canvas representation of MemberGate when idle or configured as a page guard */
+.memberframe-canvas-guard-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+  max-width: 380px;
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--memberframe-gate-border);
+  background: var(--memberframe-gate-surface);
+  box-shadow: var(--memberframe-gate-shadow);
+}
+
+.memberframe-canvas-guard-card.is-unconnected {
+  border-style: dashed;
+}
+
+.memberframe-canvas-guard-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memberframe-canvas-guard-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--memberframe-gate-brand);
+  background: rgba(82, 113, 255, 0.12);
+}
+
+.memberframe-canvas-guard-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--memberframe-gate-on-brand);
+  background: var(--memberframe-gate-brand);
+}
+
+.memberframe-canvas-guard-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--memberframe-gate-title);
+}
+
+.memberframe-canvas-guard-desc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--memberframe-gate-body);
+}
+
+.memberframe-canvas-guard-desc strong {
+  color: var(--memberframe-gate-title);
 }
 
 /* F19 layer: the Pro-Lock banner, shown when IS_LOCKED is patched to true. */
@@ -564,8 +701,18 @@ export default function MemberGate(props: MemberGateProps) {
       if (active) setResult(value);
     });
 
+    function handleSessionUpdate() {
+      cachedSession = null;
+      void loadSession().then((value) => {
+        if (active) setResult(value);
+      });
+    }
+
+    window.addEventListener("memberframe:session-updated", handleSessionUpdate);
+
     return () => {
       active = false;
+      window.removeEventListener("memberframe:session-updated", handleSessionUpdate);
     };
   }, [onCanvas]);
 
@@ -574,14 +721,16 @@ export default function MemberGate(props: MemberGateProps) {
     result.kind === "member" &&
     isEntitled(result.session, requiredTier, DEFAULT_SITE_TIERS);
 
+  const effectiveRedirect = redirectUrl || CONFIG.redirectUrl || CONFIG.loginPath || "/";
+
   useEffect(() => {
     if (onCanvas) return;
     if (fallbackAction !== "redirect") return;
     if (result === null || entitled) return;
-    if (!redirectUrl) return;
+    if (!effectiveRedirect) return;
 
-    window.location.assign(redirectUrl);
-  }, [onCanvas, fallbackAction, result, entitled, redirectUrl]);
+    window.location.replace(effectiveRedirect);
+  }, [onCanvas, fallbackAction, result, entitled, effectiveRedirect]);
 
   const blur = clampBlur(blurIntensity);
   const scopedBlur = `[data-memberframe-gate="${scope}"] { --memberframe-gate-blur: ${blur}px; }`;
@@ -591,6 +740,15 @@ export default function MemberGate(props: MemberGateProps) {
   const title = showCustomCard ? cardTitle : copy.title;
   const description = showCustomCard ? cardDescription : copy.description;
 
+  const handleLockCtaClick = () => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("memberframe:open-auth"));
+    const target = CONFIG.loginPath || "/login";
+    if (target && window.location.pathname !== target) {
+      window.location.assign(target);
+    }
+  };
+
   /** The locked card, shared by the blur, custom card, and redirect states. */
   const lockCard = (
     <div className="memberframe-lock-card">
@@ -599,7 +757,13 @@ export default function MemberGate(props: MemberGateProps) {
       </span>
       <h3 className="memberframe-lock-title">{title}</h3>
       <p className="memberframe-lock-description">{description}</p>
-      <span className="memberframe-lock-cta">{copy.cta}</span>
+      <button
+        type="button"
+        className="memberframe-lock-cta"
+        onClick={handleLockCtaClick}
+      >
+        {copy.cta}
+      </button>
     </div>
   );
 
@@ -633,20 +797,50 @@ export default function MemberGate(props: MemberGateProps) {
   function body(): React.ReactNode {
     // The creator's own canvas. Show the frame, label it, change nothing.
     if (onCanvas) {
-      return (
-        <React.Fragment>
-          <span className="memberframe-gate-badge">
-            <Lock size={11} stroke="currentColor" aria-hidden={true} />
-            <span>Gated</span>
-          </span>
-          {contentSlot ? (
+      if (contentSlot) {
+        return (
+          <React.Fragment>
+            <span className="memberframe-gate-badge">
+              <Lock size={11} stroke="currentColor" aria-hidden={true} />
+              <span>Gated</span>
+            </span>
             <div className="memberframe-gate-content">{contentSlot}</div>
-          ) : (
-            <p className="memberframe-gate-placeholder">
-              Connect the frame you want to protect to the Protected Frame control.
+          </React.Fragment>
+        );
+      }
+
+      if (fallbackAction === "redirect") {
+        return (
+          <div className="memberframe-canvas-guard-card">
+            <div className="memberframe-canvas-guard-head">
+              <span className="memberframe-canvas-guard-icon">
+                <Lock size={15} stroke="currentColor" aria-hidden={true} />
+              </span>
+              <span className="memberframe-canvas-guard-badge">Page Lock Active</span>
+            </div>
+            <h4 className="memberframe-canvas-guard-title">
+              Route Protected: {requiredTier === "signed_in" ? "Signed in members only" : requiredTier}
+            </h4>
+            <p className="memberframe-canvas-guard-desc">
+              Unauthenticated visitors will be redirected to: <strong>{effectiveRedirect}</strong>
             </p>
-          )}
-        </React.Fragment>
+          </div>
+        );
+      }
+
+      return (
+        <div className="memberframe-canvas-guard-card is-unconnected">
+          <div className="memberframe-canvas-guard-head">
+            <span className="memberframe-canvas-guard-icon">
+              <Lock size={15} stroke="currentColor" aria-hidden={true} />
+            </span>
+            <span className="memberframe-canvas-guard-badge">MemberGate</span>
+          </div>
+          <h4 className="memberframe-canvas-guard-title">Connect Protected Frame</h4>
+          <p className="memberframe-canvas-guard-desc">
+            In Framer&apos;s right sidebar, select any Frame or Stack in the <em>Protected Frame</em> slot.
+          </p>
+        </div>
       );
     }
 
@@ -669,9 +863,19 @@ export default function MemberGate(props: MemberGateProps) {
       );
     }
 
-    // `custom_card` and `redirect` both withhold the content entirely. For
-    // redirect this is the frame a visitor sees for the instant before the
-    // browser leaves, and the frame they keep seeing if `redirectUrl` is empty.
+    if (fallbackAction === "redirect") {
+      return (
+        <div className="memberframe-page-shield">
+          <div className="memberframe-page-shield-card">
+            <span className="memberframe-lock-icon">
+              <Lock size={18} stroke="currentColor" aria-hidden={true} />
+            </span>
+            <h3 className="memberframe-page-shield-title">Verifying access...</h3>
+          </div>
+        </div>
+      );
+    }
+
     return <div className="memberframe-gate-overlay is-plain">{lockCard}</div>;
   }
 
@@ -685,6 +889,11 @@ export default function MemberGate(props: MemberGateProps) {
     </div>
   );
 }
+
+MemberGate.defaultProps = {
+  width: 320,
+  height: 160,
+};
 
 // ============================================================================
 // PROPERTY CONTROLS, PRD SECTION 8 F01
@@ -741,3 +950,144 @@ addPropertyControls(MemberGate, {
     hidden: (props) => props.fallbackAction !== "blur",
   },
 });
+
+// ============================================================================
+// FRAMER CODE OVERRIDES FOR NATIVE FRAMES & SECTIONS
+// ============================================================================
+// Allows any native Framer Frame, Stack, or Grid on canvas to be locked
+// directly with zero component creation or slot dropdowns. Designers simply
+// select their section and pick this override from Framer's "Code overrides".
+
+export function withMemberGate(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return function GatedSection(props: any) {
+    const onCanvas = RenderTarget.current() === RenderTarget.canvas;
+    const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
+
+    useEffect(() => {
+      if (onCanvas) return;
+      let active = true;
+      loadSession().then((res) => {
+        if (active) setSessionResult(res);
+      });
+      return () => {
+        active = false;
+      };
+    }, [onCanvas]);
+
+    const session = sessionResult?.kind === "member" ? sessionResult.session : null;
+    const entitled = isEntitled(session, CONFIG.requiredTier);
+
+    if (onCanvas || entitled) {
+      return (
+        <React.Fragment>
+          <style>{cssContent}</style>
+          <Component {...props} />
+        </React.Fragment>
+      );
+    }
+
+    if (CONFIG.fallbackAction === "hide") {
+      return null;
+    }
+
+    return (
+      <div className="memberframe-gate-root">
+        <style>{cssContent}</style>
+        <div className="memberframe-gate-content is-blurred">
+          <Component {...props} />
+        </div>
+        <div className="memberframe-gate-overlay">
+          <div className="memberframe-gate-card">
+            <span className="memberframe-lock-icon">
+              <Lock size={18} stroke="currentColor" aria-hidden={true} />
+            </span>
+            <h3 className="memberframe-lock-title">{CONFIG.cardTitle}</h3>
+            <p className="memberframe-lock-description">{CONFIG.cardDescription}</p>
+            <a href={CONFIG.loginPath || "/login"} className="memberframe-lock-cta">
+              Sign In to Access
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  };
+}
+
+export function withBlurLock(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return function BlurredSection(props: any) {
+    const onCanvas = RenderTarget.current() === RenderTarget.canvas;
+    const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
+
+    useEffect(() => {
+      if (onCanvas) return;
+      let active = true;
+      loadSession().then((res) => {
+        if (active) setSessionResult(res);
+      });
+      return () => {
+        active = false;
+      };
+    }, [onCanvas]);
+
+    const session = sessionResult?.kind === "member" ? sessionResult.session : null;
+    const entitled = isEntitled(session, CONFIG.requiredTier);
+
+    if (onCanvas || entitled) {
+      return (
+        <React.Fragment>
+          <style>{cssContent}</style>
+          <Component {...props} />
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <div className="memberframe-gate-root">
+        <style>{cssContent}</style>
+        <div className="memberframe-gate-content is-blurred">
+          <Component {...props} />
+        </div>
+        <div className="memberframe-gate-overlay">
+          <div className="memberframe-gate-card">
+            <span className="memberframe-lock-icon">
+              <Lock size={18} stroke="currentColor" aria-hidden={true} />
+            </span>
+            <h3 className="memberframe-lock-title">{CONFIG.cardTitle}</h3>
+            <p className="memberframe-lock-description">{CONFIG.cardDescription}</p>
+            <a href={CONFIG.loginPath || "/login"} className="memberframe-lock-cta">
+              Sign In to Access
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  };
+}
+
+export function withHideLock(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return function HiddenSection(props: any) {
+    const onCanvas = RenderTarget.current() === RenderTarget.canvas;
+    const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
+
+    useEffect(() => {
+      if (onCanvas) return;
+      let active = true;
+      loadSession().then((res) => {
+        if (active) setSessionResult(res);
+      });
+      return () => {
+        active = false;
+      };
+    }, [onCanvas]);
+
+    const session = sessionResult?.kind === "member" ? sessionResult.session : null;
+    const entitled = isEntitled(session, CONFIG.requiredTier);
+
+    if (onCanvas || entitled) {
+      return <Component {...props} />;
+    }
+
+    return null;
+  };
+}
+

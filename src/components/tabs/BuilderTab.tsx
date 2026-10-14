@@ -1,13 +1,24 @@
-import React, { useCallback, useState } from "react";
-import { Plus } from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
+import { FileStack, Plus } from "lucide-react";
 import { framer } from "framer-plugin";
-import { Banner, Button, FieldRow, FieldRows, Select, Slider, TextField, useToast } from "../ui";
+import { Banner, Button, FieldRow, FieldRows, Select, useToast } from "../ui";
 import {
   deployCanvasComponent,
   generateMemberAuthCode,
+  generateMemberDashboardCode,
   generateMemberGateCode,
+  membershipPages,
+  scaffoldMembershipPages,
+  scaffoldSummary,
+  type DeployContext,
 } from "../../services";
-import { DEFAULT_MEMBER_AUTH_CONFIG } from "../../types/canvas";
+import { useConnection } from "../../hooks/useConnection";
+import { deployBaseUrl } from "../../config/backend";
+import {
+  DEFAULT_MEMBER_AUTH_CONFIG,
+  DEFAULT_MEMBER_DASHBOARD_CONFIG,
+  DEFAULT_MEMBER_GATE_CONFIG,
+} from "../../types/canvas";
 import {
   CANVAS_COMPONENTS,
   DEFAULT_COMPONENT_ID,
@@ -17,16 +28,6 @@ import {
   type CanvasComponentId,
 } from "../studio";
 import { MemberSessionProvider } from "../../hooks/useMemberSession";
-import {
-  BLUR_MAX,
-  BLUR_MIN,
-  DEFAULT_MEMBER_GATE_CONFIG,
-  FALLBACK_ACTION_LABELS,
-  visibleGateRows,
-  type GateFallbackAction,
-  type MemberGateConfig,
-} from "../../types/canvas";
-import { REQUIRED_TIER_LABELS, type RequiredTier } from "../../types/member";
 
 const COMPONENT_OPTIONS = CANVAS_COMPONENTS.map((component) => ({
   value: component.id,
@@ -34,40 +35,42 @@ const COMPONENT_OPTIONS = CANVAS_COMPONENTS.map((component) => ({
 }));
 
 /**
- * `anyone` is omitted. A gate set to "Anyone" is entitled by definition, so it
- * gates nothing: the creator would be inserting a component that does no work.
- * The resolver still handles the value, because F09 and F07 need an ungated
- * branch, but it is not something to offer here.
- */
-const REQUIRED_TIER_OPTIONS: ReadonlyArray<{ value: RequiredTier; label: string }> = [
-  "signed_in",
-  "free_member",
-  "tier_1",
-  "tier_2",
-  "vip",
-].map((key) => ({
-  value: key as RequiredTier,
-  label: REQUIRED_TIER_LABELS[key as RequiredTier],
-}));
-
-const FALLBACK_OPTIONS: ReadonlyArray<{ value: GateFallbackAction; label: string }> = (
-  ["blur", "hide", "redirect", "custom_card"] as const
-).map((action) => ({ value: action, label: FALLBACK_ACTION_LABELS[action] }));
-
-/**
  * The Builder tab. PRD tasks 1.3 and 1.5, layout in section 7.4.
  *
- * Picker, then the Live Preview Studio, then the customizer, then exactly one
- * primary CTA. The order is the PRD's and it matters: a creator changes a field
- * and the thing directly above it moves.
+ * Picker, preview, pages, insert. One primary CTA.
  *
- * The customizer edits a draft of F01's property controls, which is why this
- * task spans F01 and F04. The rows mirror F01's `hidden` predicates, so the
- * panel offers exactly what Framer's sidebar will offer after insertion.
+ * ## The customizer was removed, deliberately
+ *
+ * This tab used to carry six configuration rows for `<MemberGate>`: required
+ * tier, locked state, blur amount, redirect target, lock title, lock message.
+ * **Every one of them is also a Framer property control on the component**, so a
+ * creator configured the same value twice in two places and the panel's copy
+ * was only ever the starting value.
+ *
+ * `<MemberAuth>` and `<MemberDashboard>` always worked the other way: inserted
+ * with their defaults and configured in Framer's own sidebar, which is where a
+ * creator is already working. The gate was the odd one out for the historical
+ * reason that it was built first, before its property controls existed.
+ *
+ * So the gate is now deployed with `DEFAULT_MEMBER_GATE_CONFIG` and configured
+ * on the canvas like the other two. Recorded as conflict C30: this reduces PRD
+ * task 1.3's scope and the second half of feature F04.
+ *
+ * ## The preview stayed, and it is a different thing
+ *
+ * The state switcher, Guest through VIP and Failed, is feature F04's first half
+ * and it answers a question Framer's canvas cannot: what a Silver member sees
+ * versus a VIP. There is no other way to check that without publishing and
+ * signing in as five different people.
+ *
+ * What it shows is now "the component you are about to insert" rather than "the
+ * component as you have configured it". That is a real reduction and it is the
+ * cost of the paragraph above.
  */
 export const BuilderTab: React.FC = () => {
+  const { connection, settings } = useConnection();
   const [componentId, setComponentId] = useState<CanvasComponentId>(DEFAULT_COMPONENT_ID);
-  const [gateConfig, setGateConfig] = useState<MemberGateConfig>(DEFAULT_MEMBER_GATE_CONFIG);
+  const [scaffolding, setScaffolding] = useState(false);
   const [deploying, setDeploying] = useState(false);
   /**
    * Title and message only, not the service's `DeployFailure`.
@@ -80,15 +83,77 @@ export const BuilderTab: React.FC = () => {
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
   const showToast = useToast();
 
-  const patch = useCallback(
-    <Key extends keyof MemberGateConfig>(key: Key, value: MemberGateConfig[Key]) =>
-      setGateConfig((current) => ({ ...current, [key]: value })),
-    []
+  /**
+   * What the generator bakes into every deployed component.
+   *
+   * All five fields come from the connection and the settings document rather
+   * than from the customizer, because all five are properties of the SITE. A
+   * creator setting a login path per component is how two components end up
+   * disagreeing about where the sign-in page is, which is a dead end a visitor
+   * finds rather than the creator.
+   *
+   * `apiBaseUrl` goes through `deployBaseUrl`, which refuses to emit a
+   * loopback address: a published site cannot reach the developer's machine,
+   * and baking `127.0.0.1` in produces a membership that works in the panel
+   * and silently fails everywhere else.
+   */
+  const deployContext = useMemo<DeployContext>(
+    () => ({
+      apiBaseUrl: deployBaseUrl(),
+      siteKey: connection?.siteKey ?? "",
+      afterLoginPath: settings?.auth.afterLoginPath ?? "",
+      loginPath: settings?.auth.loginPath ?? "/login",
+      afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+    }),
+    [connection, settings]
   );
 
+  /**
+   * Create the pages a membership needs.
+   *
+   * Derived from the settings document, so the pages that appear are exactly
+   * the ones the components already point at. Additive: a page whose path
+   * already exists is kept, never replaced.
+   */
+  const handleCreatePages = useCallback(async () => {
+    if (!settings) return;
+
+    setScaffolding(true);
+    setFailure(null);
+
+    try {
+      const outcome = await scaffoldMembershipPages(framer, membershipPages(settings.auth));
+
+      if (!outcome.ok) {
+        setFailure(outcome);
+        return;
+      }
+
+      showToast({ tone: outcome.failed > 0 ? "error" : "success", message: scaffoldSummary(outcome) });
+
+      // A page that Framer refused is worth keeping on screen. A toast saying
+      // "1 failed" and nothing saying which would leave the creator to compare
+      // the project against the settings by hand.
+      const failed = outcome.results.filter((result) => result.status === "failed");
+
+      if (failed.length > 0) {
+        setFailure({
+          title: "Some pages were not created",
+          message: failed.map((result) => `${result.path}: ${result.reason}`).join(" "),
+        });
+      }
+    } catch (error) {
+      setFailure({
+        title: "Could not create the pages",
+        message:
+          error instanceof Error ? error.message : "An unexpected error stopped page creation.",
+      });
+    } finally {
+      setScaffolding(false);
+    }
+  }, [settings, showToast]);
+
   const entry = findComponent(componentId);
-  const isGate = entry.id === "member_gate";
-  const rows = visibleGateRows(gateConfig.fallbackAction);
 
   /**
    * Task 1.5. Generate the component, write it, insert it.
@@ -104,15 +169,22 @@ export const BuilderTab: React.FC = () => {
 
     try {
       /*
-        Task 2.5 made this plural. The gate carries the creator's customizer
-        values; Member Auth is inserted with its defaults and configured in
-        Framer's properties panel, because its panel customizer is not built.
-        Both go through the same generator core and the same deploy path.
+        All three are inserted with their authored defaults and configured in
+        Framer's own properties panel. The gate used to be the exception,
+        carrying values from a customizer in this tab; see the header note for
+        why it no longer is. One generator core, one deploy path, no special
+        case.
       */
       const generated =
         entry.id === "member_auth"
-          ? generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG)
-          : generateMemberGateCode(gateConfig);
+          ? generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG, undefined, deployContext)
+          : entry.id === "member_dashboard"
+            ? generateMemberDashboardCode(
+                DEFAULT_MEMBER_DASHBOARD_CONFIG,
+                undefined,
+                deployContext
+              )
+            : generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG, undefined, deployContext);
 
       const outcome = await deployCanvasComponent(framer, generated);
 
@@ -135,7 +207,7 @@ export const BuilderTab: React.FC = () => {
     } finally {
       setDeploying(false);
     }
-  }, [entry, gateConfig, showToast]);
+  }, [deployContext, entry, showToast]);
 
   return (
     <MemberSessionProvider>
@@ -152,77 +224,56 @@ export const BuilderTab: React.FC = () => {
           </FieldRow>
         </FieldRows>
 
-        <PreviewStudio componentId={componentId} gateConfig={gateConfig} />
+        {/*
+          Deploying while disconnected would bake an empty site key into the
+          creator's project, and every request from that component would fail
+          with a 400 that reads like a server problem. Saying so here is the
+          only place a creator would look.
+        */}
+        {connection === null ? (
+          <Banner
+            tone="warning"
+            title="Connect this project first"
+            message="Components added now cannot reach your members until the project is connected."
+          />
+        ) : null}
 
-        {isGate ? (
-          <FieldRows>
-            <FieldRow label="Required tier" htmlFor="gate-required-tier">
-              <Select
-                id="gate-required-tier"
-                value={gateConfig.requiredTier}
-                options={REQUIRED_TIER_OPTIONS}
-                onChange={(value) => patch("requiredTier", value)}
-                fill
-              />
-            </FieldRow>
+        {/*
+          The authored defaults, not a draft. The switcher varies the MEMBER's
+          tier, which is what makes the preview worth having; the gate's own
+          requirement is now set on the canvas.
+        */}
+        <PreviewStudio componentId={componentId} gateConfig={DEFAULT_MEMBER_GATE_CONFIG} />
 
-            <FieldRow label="Locked state" htmlFor="gate-fallback">
-              <Select
-                id="gate-fallback"
-                value={gateConfig.fallbackAction}
-                options={FALLBACK_OPTIONS}
-                onChange={(value) => patch("fallbackAction", value)}
-                fill
-              />
-            </FieldRow>
+        {connection !== null && settings !== null ? (
+          <section className="section-group">
+            <h2 className="section-title">Membership pages</h2>
 
-            {rows.blur ? (
-              <FieldRow label="Blur amount" htmlFor="gate-blur">
-                <Slider
-                  id="gate-blur"
-                  value={gateConfig.blurIntensity}
-                  min={BLUR_MIN}
-                  max={BLUR_MAX}
-                  unit="px"
-                  onChange={(value) => patch("blurIntensity", value)}
-                />
-              </FieldRow>
-            ) : null}
+            <p className="builder-help">
+              Creates the pages your membership needs, using the paths from
+              Settings. Pages that already exist are kept.
+            </p>
 
-            {rows.redirect ? (
-              <FieldRow label="Redirect target" htmlFor="gate-redirect" fill>
-                <TextField
-                  id="gate-redirect"
-                  value={gateConfig.redirectUrl}
-                  placeholder="/sign-in"
-                  onChange={(value) => patch("redirectUrl", value)}
-                  fill
-                />
-              </FieldRow>
-            ) : null}
+            <ul className="builder-page-list">
+              {membershipPages(settings.auth).map((page) => (
+                <li key={page.id} className="builder-page">
+                  <span className="builder-page-path">{page.path}</span>
+                  <span className="builder-page-purpose">{page.purpose}</span>
+                </li>
+              ))}
+            </ul>
 
-            {rows.card ? (
-              <>
-                <FieldRow label="Lock title" htmlFor="gate-card-title" fill>
-                  <TextField
-                    id="gate-card-title"
-                    value={gateConfig.cardTitle}
-                    onChange={(value) => patch("cardTitle", value)}
-                    fill
-                  />
-                </FieldRow>
-
-                <FieldRow label="Lock message" htmlFor="gate-card-description" fill>
-                  <TextField
-                    id="gate-card-description"
-                    value={gateConfig.cardDescription}
-                    onChange={(value) => patch("cardDescription", value)}
-                    fill
-                  />
-                </FieldRow>
-              </>
-            ) : null}
-          </FieldRows>
+            <Button
+              variant="secondary"
+              size="md"
+              className="fill"
+              disabled={scaffolding}
+              onClick={() => void handleCreatePages()}
+            >
+              <FileStack aria-hidden={true} />
+              {scaffolding ? "Creating pages" : "Create membership pages"}
+            </Button>
+          </section>
         ) : null}
 
         {failure ? (
@@ -248,7 +299,7 @@ export const BuilderTab: React.FC = () => {
             <Plus aria-hidden={true} />
             {deploying ? "Adding" : "Add to canvas"}
           </Button>
-          <p className="studio-cta-note">{ctaNote(entry, isGate)}</p>
+          <p className="studio-cta-note">{ctaNote(entry)}</p>
         </div>
       </div>
     </MemberSessionProvider>
@@ -258,17 +309,16 @@ export const BuilderTab: React.FC = () => {
 /**
  * The line under the CTA.
  *
- * Three cases, because after task 2.5 there are three. A deployable component
- * with a customizer says what the button writes; a deployable component without
- * one says where to configure it; an unauthored component names the task that
- * will build it, so an inert button reads as a schedule rather than a defect.
+ * Two cases now, where there were three. The third was for a deployable
+ * component that had a panel customizer, and with the gate's customizer removed
+ * no component has one: all three say the same thing, which is where to
+ * configure what was just inserted.
+ *
+ * An unauthored component still names the task that will build it, so an inert
+ * button reads as a schedule rather than a defect.
  */
-function ctaNote(entry: CanvasComponentEntry, hasCustomizer: boolean): string {
+function ctaNote(entry: CanvasComponentEntry): string {
   if (!entry.deployable) return `${entry.name} arrives with task ${entry.task}.`;
-
-  if (hasCustomizer) {
-    return "Writes MemberGate.tsx into this project and inserts one instance.";
-  }
 
   return `Inserts ${entry.name} with its defaults. Configure it in the Framer properties panel.`;
 }

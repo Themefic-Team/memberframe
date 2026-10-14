@@ -15,6 +15,7 @@
 import { disconnectDatabase, prisma } from "../src/config/db.js";
 import { hashPassword } from "../src/lib/password.js";
 import { generateGrantSalt, generateSiteKey } from "../src/lib/tokens.js";
+import { defaultSettings, toJsonDocument } from "../src/lib/siteSettings.js";
 
 const CREATOR_EMAIL = "creator@memberframe.test";
 const SITE_NAME = "Demo Site";
@@ -94,6 +95,22 @@ async function main(): Promise<void> {
     });
   }
 
+  // Every site needs its settings document. A site without one still reads
+  // (loadSiteSettings falls back to defaults), but a creator saving one
+  // setting would then write a document built from defaults rather than from
+  // whatever the seed intended, which is a confusing first experience.
+  await prisma.siteSettings.upsert({
+    where: { siteId: site.id },
+    create: {
+      siteId: site.id,
+      settings: toJsonDocument({
+        ...defaultSettings(),
+        branding: { displayName: site.siteName, supportEmail: CREATOR_EMAIL },
+      }),
+    },
+    update: {},
+  });
+
   process.stdout.write(
     [
       "",
@@ -116,9 +133,14 @@ async function main(): Promise<void> {
       "  Expect 401 with the tier ladder, which is the correct answer for a",
       "  visitor who is not signed in.",
       "",
+      "  This site was seeded, not connected. The ordinary route is the",
+      "  plugin's Connect tab, which creates the creator, the site, the tier",
+      "  ladder, and the settings document in one step, and which is the only",
+      "  way to get a creator token for the Manage and Settings tabs.",
+      "",
       "  Before a published Framer site can use this, add its origin to",
-      "  allowed_origins on the sites row. Nothing here can guess it, and a",
-      "  wildcard is not accepted.",
+      "  allowed_origins on the sites row, or let the Connect tab do it.",
+      "  Nothing here can guess it, and a wildcard is not accepted.",
       "",
     ].join("\n")
   );

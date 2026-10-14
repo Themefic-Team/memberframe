@@ -14,6 +14,7 @@ import {
   pageCount,
   type MemberFilters,
   type StatusFilter,
+  type TierFilter,
 } from "./memberFilters";
 import { MEMBER_PAGE_SIZE, type MemberPage, type SiteMemberRecord } from "../../types/site";
 
@@ -88,30 +89,18 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         </div>
 
         <Select
+          label="Filter by tier"
+          value={filters.tier}
+          options={TIER_FILTERS}
+          onChange={(tier) => patchFilters({ tier: tier as TierFilter })}
+        />
+
+        <Select
           label="Filter by status"
           value={filters.status}
           options={STATUS_FILTERS}
           onChange={(status) => patchFilters({ status: status as StatusFilter })}
         />
-      </div>
-
-      {/*
-        Tier pills rather than a second select. F02 asks for "tier filter pills",
-        and five tiers at 360px fit on one wrapping row where a select would hide
-        the current filter behind a closed menu.
-      */}
-      <div className="members-pills" role="group" aria-label="Filter by tier">
-        {TIER_FILTERS.map((pill) => (
-          <button
-            key={pill.value}
-            type="button"
-            className={cn("member-pill", filters.tier === pill.value && "is-active")}
-            aria-pressed={filters.tier === pill.value}
-            onClick={() => patchFilters({ tier: pill.value })}
-          >
-            {pill.label}
-          </button>
-        ))}
       </div>
 
       {failure ? (

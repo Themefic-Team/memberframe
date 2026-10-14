@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Segmented, useToast } from "../ui";
+import { Link2 } from "lucide-react";
+import { EmptyState, Segmented, useToast } from "../ui";
 import { MembersTable } from "../manage/MembersTable";
 import { TierEditor } from "../manage/TierEditor";
 import type { MemberAction } from "../manage/MemberFlyout";
@@ -18,6 +19,7 @@ import {
 } from "../../services/siteService";
 import type { MemberPage, SiteMemberRecord, SiteTierRecord } from "../../types/site";
 import { parseMinor } from "../../utils/money";
+import { useConnection } from "../../hooks/useConnection";
 
 type Segment = "members" | "tiers";
 
@@ -25,22 +27,6 @@ const SEGMENTS = [
   { value: "members", label: "Members" },
   { value: "tiers", label: "Tiers" },
 ] as const satisfies ReadonlyArray<{ value: Segment; label: string }>;
-
-/**
- * Fetches are keyed on this placeholder site id.
- *
- * `framer.getProjectInfo()` supplies the real one, and F02 says the creator is
- * "verified via `framer.getCurrentUser()` and `framer.getProjectInfo()`,
- * exchanged for a creator session token". No task in the plan builds that
- * exchange (conflict C10), so there is no token to pair a real site id with and
- * every call resolves `unauthorized` regardless of what is sent.
- *
- * Reading the project info here would therefore add an SDK call whose result
- * cannot be used, and would need a permission to do it. This is honest instead:
- * one named constant, in one place, for the task that builds creator sign-in to
- * replace.
- */
-const PLACEHOLDER_SITE_ID = "unconfigured";
 
 /**
  * The Manage tab. PRD tasks 2.2 and 2.3, feature F02, layout in section 7.3.
@@ -53,8 +39,22 @@ const PLACEHOLDER_SITE_ID = "unconfigured";
  * This component owns the data and the toasts. The two child surfaces are prop
  * driven and own neither, so both are reachable in every state by passing
  * props, and the logic inside them is pure and unit tested.
+ *
+ * ## The site id is real now
+ *
+ * It used to be a named placeholder, because conflict C10 meant no task built
+ * creator sign-in and every call resolved `unauthorized` whatever was sent.
+ * The Connect tab builds it, so this reads the connected site and the member
+ * list it renders is the one visitors have actually registered into.
+ *
+ * An unconnected panel renders an empty state rather than an error. A creator
+ * who has not connected has done nothing wrong, and a failure banner would send
+ * them looking for a problem that is not there.
  */
 export const ManageTab: React.FC = () => {
+  const { connection } = useConnection();
+  const siteId = connection?.siteId ?? null;
+
   const [segment, setSegment] = useState<Segment>("members");
   const [filters, setFilters] = useState<MemberFilters>(NO_MEMBER_FILTERS);
   const [page, setPageNumber] = useState(1);
@@ -80,11 +80,18 @@ export const ManageTab: React.FC = () => {
   const debouncedQuery = useDebouncedValue(filters.query);
 
   useEffect(() => {
+    if (!siteId) {
+      setMemberPage(null);
+      setMemberFailure(null);
+      setMembersLoading(false);
+      return;
+    }
+
     let active = true;
     setMembersLoading(true);
 
     void fetchMembers({
-      siteId: PLACEHOLDER_SITE_ID,
+      siteId,
       page,
       search: debouncedQuery.trim() === "" ? undefined : debouncedQuery.trim(),
       tier: filters.tier === "all" ? undefined : filters.tier,
@@ -106,13 +113,20 @@ export const ManageTab: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [debouncedQuery, filters.tier, filters.status, page, reloadToken]);
+  }, [debouncedQuery, filters.tier, filters.status, page, reloadToken, siteId]);
 
   useEffect(() => {
+    if (!siteId) {
+      setTiers([]);
+      setTierFailure(null);
+      setTiersLoading(false);
+      return;
+    }
+
     let active = true;
     setTiersLoading(true);
 
-    void fetchTiers(PLACEHOLDER_SITE_ID).then((result) => {
+    void fetchTiers(siteId).then((result) => {
       if (!active) return;
 
       if (result.kind === "ok") {
@@ -129,7 +143,7 @@ export const ManageTab: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [reloadToken]);
+  }, [reloadToken, siteId]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
@@ -142,9 +156,11 @@ export const ManageTab: React.FC = () => {
 
   const handleMemberAction = useCallback(
     async (member: SiteMemberRecord, action: MemberAction) => {
+      if (!siteId) return;
+
       setBusyMemberId(member.id);
 
-      const result = await runMemberAction(member, action);
+      const result = await runMemberAction(member, action, siteId);
 
       setBusyMemberId(null);
 
@@ -159,18 +175,20 @@ export const ManageTab: React.FC = () => {
       const { message } = failureMessage(result);
       showToast({ tone: "error", message: shorten(message) });
     },
-    [reload, showToast]
+    [reload, showToast, siteId]
   );
 
   const handleSaveTier = useCallback(
     async (draft: TierFormDraft) => {
       setSavingTier(true);
 
+      if (!siteId) return;
+
       const wire = toTierDraft(draft);
       const result =
         draft.id === null
-          ? await createTier(PLACEHOLDER_SITE_ID, wire)
-          : await updateTier(draft.id, wire);
+          ? await createTier(siteId, wire)
+          : await updateTier(draft.id, { ...wire, siteId });
 
       setSavingTier(false);
 
@@ -186,8 +204,20 @@ export const ManageTab: React.FC = () => {
       const { message } = failureMessage(result);
       showToast({ tone: "error", message: shorten(message) });
     },
-    [reload, showToast]
+    [reload, showToast, siteId]
   );
+
+  if (!siteId) {
+    return (
+      <div className="tab-panel-body">
+        <EmptyState
+          icon={<Link2 aria-hidden={true} />}
+          title="Connect this project first"
+          description="Members and tiers are stored against a connected Framer project. Open the Connect tab to link one."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="tab-panel-body">
@@ -231,16 +261,16 @@ export const ManageTab: React.FC = () => {
  * or revoke" and no separate grant or revoke route, so Grant VIP is a tier
  * change with a fixed argument and Revoke is a status change.
  */
-function runMemberAction(member: SiteMemberRecord, action: MemberAction) {
+function runMemberAction(member: SiteMemberRecord, action: MemberAction, siteId: string) {
   switch (action.kind) {
     case "change_tier":
-      return patchMember(member.id, { tier: action.tier });
+      return patchMember(member.id, { siteId, tier: action.tier });
     case "grant_vip":
-      return patchMember(member.id, { tier: "vip" });
+      return patchMember(member.id, { siteId, tier: "vip" });
     case "revoke":
-      return patchMember(member.id, { status: "canceled" });
+      return patchMember(member.id, { siteId, status: "canceled" });
     case "magic_link":
-      return sendMagicLink(member.id);
+      return sendMagicLink(member.id, siteId);
   }
 }
 

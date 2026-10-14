@@ -11,7 +11,11 @@ import { env } from "./config/env.js";
 import { checkDatabase } from "./config/db.js";
 import { errorHandler, notFoundHandler, ok, route } from "./middleware/errors.js";
 import { preflight, resolveSite } from "./middleware/site.js";
+import { pluginCors } from "./middleware/creator.js";
 import { memberRouter } from "./routes/member.js";
+import { connectRouter } from "./routes/connect.js";
+import { siteRouter } from "./routes/site.js";
+import { handleShieldScript } from "./routes/shield.js";
 
 export function createApp(): Express {
   const app = express();
@@ -28,10 +32,26 @@ export function createApp(): Express {
   // A small body limit. Nothing here accepts more than a few hundred bytes,
   // and the default of 100kb is a free denial-of-service budget.
   app.use(express.json({ limit: "16kb" }));
+  app.use(express.urlencoded({ extended: true, limit: "16kb" }));
   app.use(cookieParser());
 
-  // Preflight before anything that needs a site, because an OPTIONS request
-  // carries neither a cookie nor the custom header.
+  // ------------------------------------------------------------------------
+  // Two doors, two CORS policies
+  // ------------------------------------------------------------------------
+  // The plugin half is mounted first because it answers its own OPTIONS, and
+  // `preflight` below would otherwise reach them first and refuse: that one
+  // resolves a site from the key header, and a connect request has no site yet.
+  //
+  // `pluginCors` sends a wildcard origin and no `Allow-Credentials`, which is
+  // safe here and would not be on the member half. The reasoning is in
+  // `middleware/creator.ts` and the short version is that this half carries no
+  // cookie: authorization is a bearer token the caller must already hold.
+
+  app.use("/api/connect", pluginCors);
+  app.use("/api/site", pluginCors);
+
+  // Preflight for the member half, which needs a site, because an OPTIONS
+  // request carries neither a cookie nor the custom header.
   app.use(preflight);
 
   // ------------------------------------------------------------------------
@@ -63,6 +83,15 @@ export function createApp(): Express {
   );
 
   // ------------------------------------------------------------------------
+  // Global Route Shield script
+  // ------------------------------------------------------------------------
+  // Delivered as a public JavaScript asset to published Framer sites.
+  // Must run before resolveSite because <script> GET tags carry no origin
+  // header and must not be rejected by origin allowlist checks.
+  app.get("/api/member/shield.js", handleShieldScript);
+  app.get("/api/shield.js", handleShieldScript);
+
+  // ------------------------------------------------------------------------
   // Member runtime
   // ------------------------------------------------------------------------
   // `resolveSite` guards the whole subtree, so no handler below can run
@@ -72,22 +101,20 @@ export function createApp(): Express {
   app.use("/api/member", resolveSite, memberRouter);
 
   // ------------------------------------------------------------------------
+  // The plugin panel
+  // ------------------------------------------------------------------------
+  // Deliberately NOT behind `resolveSite`. A connect request has no site yet,
+  // and a creator route is scoped by the site id in the request checked against
+  // the token's owner, never by a public site key: the key is baked into every
+  // published component, so accepting it as creator authorization would hand
+  // the member list to anyone who viewed the page source.
+
+  app.use("/api/connect", connectRouter);
+  app.use("/api/site", siteRouter);
+
+  // ------------------------------------------------------------------------
   // Not built yet, and honest about it
   // ------------------------------------------------------------------------
-  // `<MemberAuth>` ships with the code path enabled by default, so it will
-  // call these. A bare 404 would surface in the component as `unavailable`,
-  // which reads as "the service is broken" rather than "this is not built".
-  // 501 still maps to `unavailable` on the client, and says which it is to
-  // anyone reading the network panel.
-
-  for (const path of ["/api/member/send-otp", "/api/member/verify-otp"]) {
-    app.post(path, (_req, res) => {
-      res.status(501).json({
-        reason: "not_implemented",
-        detail: "The OTP flow is not built yet. Use the password path, or see backend PRD phase B2.",
-      });
-    });
-  }
 
   app.all("/api/checkout/*", (_req, res) => {
     res.status(501).json({

@@ -304,13 +304,14 @@ the user commits it.
 | FP-05 | GitHub Sign In | F05 | `canvas-components/MemberAuth.tsx` | todo | |
 | FP-06 | ReCAPTCHA Bot Defense | F21 | not started | todo | |
 | FP-07 | Soft Paywall, Read More | F07, F08 | not started | todo | |
-| FP-08 | Member Dashboard | F06 | not started | todo | |
-| FP-09 | Custom Profile Fields | F16 | not started | todo | |
+| FP-08 | Member Dashboard | F06 | `canvas-components/MemberDashboard.tsx`, `services/pageScaffoldService.ts` | awaiting review, partial | |
+| FP-09 | Custom Profile Fields | F16 | `backend/src/lib/memberMetadata.ts`, `backend/src/lib/siteSettings.ts`, `backend/src/routes/member.ts` | awaiting review, backend only | |
 | FP-10 | Member Bookmarking | F14 | not started | todo | |
 | FP-11 | LMS Mark As Complete | F11 | not started | todo | |
 | FP-12 | Upgrade To Download | F10 | not started | todo | |
 | FP-13 | Shared Password Access | F22 | not started | todo | |
 | FP-14 | Multi-Language Support | F23 | not started | todo | |
+| FP-00 | Connect, Creator Identity, And Membership Pages | F02, F05, F06 | `components/tabs/ConnectTab.tsx`, `services/connectService.ts`, `services/connectionStore.ts`, `services/pageScaffoldService.ts`, `backend/src/routes/connect.ts`, `backend/src/routes/site.ts` | awaiting review | |
 | FP-15 | Backend Architecture, Node and Prisma | sections 6, 10, 11, 14 | `backend/` in this repo. Specified in [`memberframe-backend-prd.md`](memberframe-backend-prd.md) | awaiting review, partial | |
 
 **FP-02 is `awaiting review` and the work is unstaged.** It adds the password path to
@@ -364,6 +365,61 @@ reversed: there the browser copies are hints and the server copy is the rule.
 PRD section 8.2. Three can wait. The fourth, MemberFrame's own billing for creators, cannot: F19 and
 PRD section 12 require creators to pay, and that flow now has nowhere to live.
 
+**Conflict C10 is closed.** Creator authentication now exists. Every `/api/site/*` route
+needed a creator session token, no task in the 72-task plan built one, and the plugin's Manage and
+Settings tabs had rendered their signed-out state since the project began. The Connect tab proves a
+creator's email address with a six-digit code and issues an opaque bearer token, and both tabs now
+read the connected site rather than a constant named `PLACEHOLDER_SITE_ID`.
+
+**The canvas components could not authenticate at all, and that was silent.** `resolveSite`
+requires an `X-MemberFrame-Site` header and neither `<MemberGate>` nor `<MemberAuth>` sent one,
+so every request from a deployed component was a 400. The plugin looked fine and the backend looked
+fine; only a visitor on the published site would have seen it, as a failure reading like a server
+outage. The generator now bakes the site key in at deploy time and
+[`test/deployContext.test.ts`](../test/deployContext.test.ts) pins the whole chain, proved able to
+fail by perturbation.
+
+**Settings are one JSON document per site**, keyed by `site_id`, on explicit instruction. The
+reasoning and the three things that costs are in
+[`06-connect-and-pages.md`](development-docs/06-connect-and-pages.md) section 3. Custom profile
+field DEFINITIONS live there too; member VALUES live in `Member.metadata`, which is the split FP-09
+needs and the reason neither becomes an `ALTER TABLE` driven by creator input.
+
+**The Builder tab creates the membership pages**, derived from those settings rather than from its
+own list, so a creator who sets `/members/sign-in` gets that page and cannot end up with a
+`/login` page nothing points at. It is additive: an existing page is kept, never replaced.
+
+**`<MemberDashboard>` is built, and billing is not.** FP-08 specifies billing and invoice tabs and
+both need tables that are backend PRD phase B3. The component says so rather than rendering zeroes,
+because a member reading "next billing: never" would conclude their subscription had lapsed.
+
+**The Settings tab is now Config and Integration**, behind the same `Segmented`
+control the Manage tab uses. Config holds the site's own settings; Integration
+holds third-party credentials as a catalogue of cards, and it absorbed the
+gateway key vault, because a gateway key is an integration's configuration
+rather than a site setting.
+
+**The storage rule is the thing to understand about the Integration tab.** Every
+field in `components/settings/integrationRegistry.ts` declares whether it is a
+secret, and the two halves go to different places: non-secret values into the
+settings document, secrets into an encrypted table. A secret must never enter
+the settings document, because that document is returned to the panel whole on
+every connect and every settings read. `gateway_configs` with AES-256-GCM is
+backend PRD phase B3 and **is not built**, so every secret field in the panel is
+disabled today with the reason on screen, and `secretsPresent` is never accepted
+from a client. `test/integrationRegistry.test.ts` checks the no-leak rule
+against the whole catalogue rather than one example, so a field added later
+without `secret: true` fails there rather than in production.
+
+**One card per gateway, not two.** The reference layout has separate Stripe and
+Stripe Sandbox cards. Live against test is already derivable from the key
+itself, which `gatewayKeys.ts` detects, so the mode is a badge. Two cards would
+let a creator fill in both with nothing saying which a real checkout uses.
+
+**The Manage tab is deliberately unchanged.** Its redesign is five design
+decisions listed in [`07-panel-restructure-plan.md`](development-docs/07-panel-restructure-plan.md)
+section 3.1, and guessing at them would be building the wrong thing carefully.
+
 ### Conflicts Found In The Feature-Plan Track
 
 | # | Conflict | Resolved as | Confirm before |
@@ -379,6 +435,11 @@ PRD section 12 require creators to pay, and that flow now has nowhere to live.
 | C23 | FP-02 and the backend PRD both say Argon2id, and `backend/src/lib/password.ts` uses scrypt | Argon2id in Node needs a native addon and node-gyp, which fails often enough on Windows to matter for a surface handling passwords. scrypt is memory-hard, in Node's standard library, OWASP-acceptable as an alternative, and free of bcrypt's 72-byte truncation. Every stored hash carries its algorithm tag, so adding Argon2id later rehashes members as they sign in, with no migration and no forced reset | **Yes, before launch.** It is weaker against a well-funded GPU attacker and the upgrade is one file |
 | C24 | `<MemberAuth>` ships with the email path enabled by default, and the backend answers 501 for OTP send and verify | A visitor who clicks "Email me a code instead" reaches a dead end. 501 rather than 404 so the network panel distinguishes "not built" from "broken" | **Yes.** Either build the OTP pair, backend PRD phase B2 item 11, or reconsider the component default |
 | C25 | `npm audit` on the first backend install reported 15 high-severity nodemailer advisories, several of them delivery to an attacker-controlled domain through IDN, punycode, or RFC 5322 comment mis-parsing | Upgraded to nodemailer 10.1.0 before writing any sending code. Zero vulnerabilities now | Nothing, but **re-run `npm audit` in `backend/` before any release**. This is the dependency that carries password reset tokens |
+| C26 | The shell standard permits two to four tabs and PRD section 7.3 resolved this product at four. Connect is a fifth | Added on explicit instruction. It is a different kind of surface from the other four: a gate a creator passes through once, not a workspace they return to. **The section 7.3 resolution is untouched**: Members and Tiers stay folded into Manage | **Yes.** If 360px feels cramped the fix is to move Connect into Settings. Never re-split Manage |
+| C27 | PRD section 14.1 S2 bars a token from client storage, and the creator token is stored in Framer plugin data | Memory only would mean an emailed code on every panel open, and `localStorage` is what S2 names. Plugin data is project-scoped rather than origin-scoped, read back only by this plugin, with a thirty-day server-side expiry and a revoke endpoint. The resulting model is "whoever can edit this Framer project can administer its membership" | **Yes.** That is defensible, since a project editor can already change what the gates require, but it is weaker than "whoever has the creator's email", which is what the connect code actually proves |
+| C28 | The first address to verify against a Framer project id owns that site, and there is no transfer flow | A second account connecting the same project gets 403 rather than access, which is correct. Inventing an ownership transfer in a service file would be a product decision made in the wrong place | **Yes.** A project connected by mistake, or by a contractor who has left, needs support to reassign |
+| C29 | `ManageTab` calls `sendMagicLink` and no backend route answers it. PRD section 10.3 lists it | Left in place and resolving `unavailable`, with the service function documented as not built. It is a few lines once the OTP flow exists | **Yes**, with C24. They are the same missing piece |
+| C30 | The Builder tab's six-row customizer for `<MemberGate>` was removed. PRD task 1.3 specifies it and feature F04 covers it | Every one of the six is also a Framer property control on the component, so a creator configured the same value twice and the panel's copy was only the starting value. `<MemberAuth>` and `<MemberDashboard>` always worked the other way. The gate now deploys with its authored defaults and is configured on the canvas like the other two | **Confirmed by the user.** Recorded because it reduces specified work that was passing its gates. The preview's state switcher, F04's first half, is kept: it answers what a Silver member sees versus a VIP, which the canvas cannot |
 
 Two need a decision rather than a fix. **C19** is a product scope question: whether the web
 dashboard rebuilds three surfaces the plugin already has. **C18** is unowned: the component handles
@@ -400,6 +461,9 @@ The agent cannot check these. Assign an owner before the phase they fall in.
 | 0.8             | Mock fidelity against a live Framer app. The fixture shapes typecheck against the SDK `.d.ts`, which proves they match what Framer **declares**, not what it **returns**. The done-when, "unit tests run with no Framer desktop app", is fully met and verified: `npm test` passes 16 of 16 in a node environment                                                                                           |
 | FP-02           | **No password has been submitted anywhere**, because none of the four endpoints exists. What that leaves unverified is most of the feature: the five-attempt lockout, whether an unknown address and a wrong password really do take the same time to answer, whether a reset invalidates other sessions, and whether the emailed link resolves at all. Two of those, timing safety and session invalidation, are the ones most likely to be quietly missing in a first backend. On the rendering side: the sign-in and sign-up tabs, the show and hide toggle, the strength meter moving as someone types, inline problems appearing under the field rather than as a banner, the Tab order through email, password, toggle, and submit, and contrast on the meter's weak state in both colour schemes. One creator-facing gap too, conflict C18: the reset page has to exist on the creator's site and nothing tells them so |
 | FP-15           | **No endpoint has run against a database.** The backend typechecks and its pure logic is tested, and `backend/src/routes/member.ts` has never served a request. That leaves unverified everything the frontend could not verify either: the five-failure lockout, whether an unknown address and a wrong password really take the same time to answer, whether a reset invalidates other sessions, and whether a 401 arrives where the contract says it should. Also unverified: the Prisma migration against a real MySQL 8, which is where the hand-written generated column and the `utf8mb4_0900_as_ci` collation either apply or silently do not. `npm run db:check` reports both, and nobody has run it against a server. Above all, **the cross-origin session cookie has not been tested in any browser**, which is the Stage 0 spike in backend PRD section 2.3 and the one result that could invalidate the session design for every canvas component already built |
+| FP-00           | **The connect handshake has never run.** No code has been emailed, no project claimed, no token issued. That leaves unverified: whether `framer.getProjectInfo()` returns an id stable enough to key a tenant on across sessions and machines, whether `setPluginData` actually succeeds with the newly declared permission, and whether a token stored in plugin data survives a Framer project being duplicated, which would hand a copy of the project a live creator session. On the server: whether `Access-Control-Allow-Origin: *` without `Allow-Credentials` really lets the panel's iframe origin through, which is the one assumption the whole plugin half rests on |
+| FP-08           | **`createWebPage` has never been called.** The scaffolder is tested against a mock returning what the SDK types promise, so what is unverified is Framer's real behaviour: whether a path with a nested segment creates one page or a tree, what it does with a path that collides with a CMS detail route, and whether the returned node is ready to accept a component instance immediately or needs the same compile wait `resolveInsertUrl` already works around for code files. `<MemberDashboard>` has also never rendered: contrast, layout at a real width, and both themes need a human |
+| FP-09           | **No custom field has been defined or filled in.** The validator is tested in isolation and the plugin has no editor for the definitions yet, so the only way to create one today is to write the settings document directly. Unverified: whether `Member.metadata` round trips UTF-8 through the MySQL JSON column intact, which FP-09 section 5 asks for explicitly, and whether a definition deleted while a member has the form open produces the intended drop rather than an error |
 | 2.6, 3.1, 3.2   | Live gateway sandbox transactions and webhook delivery                                                                                                                                                                                                                                                                                                                                                      |
 | 3.6             | Google Rich Results Test                                                                                                                                                                                                                                                                                                                                                                                    |
 | 4.2             | Real YouTube, Vimeo, and Mux player `postMessage` traffic                                                                                                                                                                                                                                                                                                                                                   |

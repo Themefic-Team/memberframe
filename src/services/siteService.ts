@@ -67,6 +67,16 @@ export function fetchMembers(
  * for the convenience of a menu.
  */
 export interface MemberPatch {
+  /**
+   * Which site this member belongs to.
+   *
+   * Carried in the body even though the member id alone would find the row.
+   * The server scopes the lookup by both, so a member id guessed or copied from
+   * another creator's site is simply not found rather than found and then
+   * refused. A find followed by an ownership check is the same thing with a
+   * window in between.
+   */
+  siteId: string;
   tier?: TierKey;
   status?: MemberStatus;
 }
@@ -79,11 +89,19 @@ export function patchMember(
   return client.patch(`/api/site/members/${encodeURIComponent(memberId)}`, patch);
 }
 
+/**
+ * NOT BUILT on the server. PRD section 10.3 lists it and no route answers it,
+ * so this resolves `unavailable` today and the Manage tab shows a failure
+ * toast. Left in place rather than removed because the panel's action menu is
+ * written against it and the endpoint is a few lines once the OTP flow exists,
+ * which is backend PRD phase B2 item 11 and conflict C24.
+ */
 export function sendMagicLink(
   memberId: string,
+  siteId: string,
   client: ApiClient = apiClient
 ): Promise<ApiResult<{ ok: true }>> {
-  return client.post(`/api/site/members/${encodeURIComponent(memberId)}/magic-link`);
+  return client.post(`/api/site/members/${encodeURIComponent(memberId)}/magic-link`, { siteId });
 }
 
 /** PRD section 10.3: `GET /api/site/tiers`. */
@@ -123,7 +141,7 @@ export function createTier(
 
 export function updateTier(
   tierId: string,
-  draft: Omit<TierDraft, "key">,
+  draft: Omit<TierDraft, "key"> & { siteId: string },
   client: ApiClient = apiClient
 ): Promise<ApiResult<{ tier: SiteTierRecord }>> {
   return client.patch(`/api/site/tiers/${encodeURIComponent(tierId)}`, draft);
