@@ -19,6 +19,8 @@
  * .log(connection)` or a serialized error cannot carry it.
  */
 
+import type { CustomFieldDefinition } from "../utils/customFields";
+
 /** What the settings document holds. Mirrors `backend/src/lib/siteSettings.ts`. */
 export interface AuthSettings {
   loginPath: string;
@@ -90,6 +92,12 @@ export interface SiteSettingsDocument {
   /** Keyed by integration id. See `components/settings/integrationRegistry.ts`. */
   integrations: Record<string, StoredIntegrationSettings>;
   gatedPages?: GatedPageRule[];
+  /**
+   * FP-09. Ordered, and the order is what members' forms render in. Optional
+   * because a backend older than FP-09 omits it, and read through
+   * `readDefinitions` rather than trusted, blocker B8.
+   */
+  customFields?: CustomFieldDefinition[];
 }
 
 /** A patch. Every section and every field optional, because a write is a merge. */
@@ -98,6 +106,12 @@ export interface SiteSettingsPatch {
   branding?: Partial<BrandingSettings>;
   canvas?: Partial<CanvasSettings>;
   gatedPages?: GatedPageRule[];
+  /**
+   * Replaced wholesale, unlike every other section. The list is the
+   * configuration: deleting a field has to be expressible, and a per-key merge
+   * cannot express it.
+   */
+  customFields?: CustomFieldDefinition[];
   /**
    * Merged per integration id, so saving one cannot disturb another.
    *

@@ -770,13 +770,14 @@
   align-items: center;
   gap: 5px;
   align-self: flex-start;
-  padding: 2px 7px;
-  border-radius: 999px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm, 6px);
   font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 600;
-  color: var(--px-color-text-brand);
-  background: var(--px-brand-subtle);
+  color: var(--paragraph);
+  background: var(--framefic-surface-alt, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--framefic-surface-border);
 }
 
 .onpage-guide-title {
@@ -796,15 +797,54 @@
   color: var(--paragraph);
 }
 
+.onpage-tab-bar {
+  display: flex;
+  background: var(--framefic-page-bg, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 2px;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.onpage-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: calc(var(--radius-sm, 6px) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--paragraph-faint);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onpage-tab-btn:hover {
+  color: var(--title);
+}
+
+.onpage-tab-btn.is-active {
+  background: var(--framefic-surface-hover, rgba(255, 255, 255, 0.08));
+  color: var(--title);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
 .onpage-guide-steps {
   margin: 0;
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-family: var(--font-sans);
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px;
   color: var(--paragraph);
 }
 
@@ -815,6 +855,93 @@
   border-radius: 4px;
   background: var(--framefic-page-bg);
   border: 1px solid var(--framefic-surface-border);
+  color: var(--title);
+}
+
+.onpage-tier-table-wrap {
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-sm, 6px);
+  overflow-x: auto;
+  margin: 4px 0;
+  background: var(--framefic-page-bg, rgba(0, 0, 0, 0.15));
+}
+
+.onpage-tier-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  text-align: left;
+}
+
+.onpage-tier-table th {
+  background: var(--framefic-surface-alt, rgba(255, 255, 255, 0.03));
+  padding: 6px 8px;
+  font-weight: 600;
+  font-size: 9.5px;
+  color: var(--paragraph-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--framefic-surface-border);
+}
+
+.onpage-tier-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--framefic-surface-border);
+  color: var(--paragraph);
+  vertical-align: middle;
+}
+
+.onpage-tier-table tr:last-child td {
+  border-bottom: none;
+}
+
+.onpage-tier-table code {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--framefic-surface);
+  border: 1px solid var(--framefic-surface-border);
+  color: var(--title);
+  white-space: nowrap;
+}
+
+.onpage-example-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 11px;
+  background: var(--framefic-surface-alt, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--framefic-surface-border);
+  border-left: 3px solid var(--px-color-text-brand);
+  border-radius: var(--radius-sm, 6px);
+  margin-top: 2px;
+}
+
+.onpage-example-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.onpage-example-text {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  line-height: 15px;
+  color: var(--paragraph);
+}
+
+.onpage-example-text code {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--framefic-page-bg);
+  border: 1px solid var(--framefic-surface-border);
+  color: var(--title);
 }
 
 .onpage-guide-actions {
@@ -827,4 +954,172 @@
 .page-locks-footer {
   margin-top: 12px;
   padding-bottom: 24px;
+}
+
+/* ---------------------------------------------------------------------------
+   Profile fields, feature plan FP-09
+   ---------------------------------------------------------------------------
+   One card per field, one open at a time. The header is a real button for the
+   expand control plus three icon buttons beside it, rather than one clickable
+   row holding buttons, because a button inside a button is not operable by
+   keyboard or announced sensibly by a screen reader. */
+
+.custom-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.custom-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.custom-field-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--framefic-surface-border);
+  border-radius: 10px;
+  background: var(--framefic-surface);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.custom-field-card.is-open {
+  border-color: var(--px-color-border-brand);
+  background: var(--framefic-surface-2);
+}
+
+.custom-field-card.is-invalid {
+  border-color: var(--px-color-danger);
+}
+
+.custom-field-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 0;
+}
+
+.custom-field-toggle {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.custom-field-toggle:hover {
+  background: var(--bg-card-inner);
+}
+
+.custom-field-toggle:focus-visible {
+  outline: 2px solid var(--px-color-border-brand);
+  outline-offset: -2px;
+}
+
+.custom-field-name {
+  grid-column: 1;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--title);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.custom-field-meta {
+  grid-column: 1;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--paragraph);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.custom-field-chevron {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--paragraph-faint);
+  transition: transform 0.2s ease;
+}
+
+.custom-field-chevron svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.custom-field-chevron.is-open {
+  transform: rotate(180deg);
+  color: var(--title);
+}
+
+.custom-field-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.custom-field-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--framefic-surface-border);
+}
+
+.custom-field-caption {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--framefic-text-muted);
+}
+
+.custom-field-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.custom-field-options-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.custom-field-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.custom-fields-add {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
 }

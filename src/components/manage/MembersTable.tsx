@@ -17,6 +17,7 @@ import {
   type TierFilter,
 } from "./memberFilters";
 import { MEMBER_PAGE_SIZE, type MemberPage, type SiteMemberRecord } from "../../types/site";
+import type { CustomFieldDefinition } from "../../utils/customFields";
 
 export interface MembersTableProps {
   /** Null while loading, so the placeholder and the empty state stay distinct. */
@@ -31,6 +32,8 @@ export interface MembersTableProps {
   onMemberAction: (member: SiteMemberRecord, action: MemberAction) => void;
   /** Switches the Manage tab to Tiers. The empty state's one action. */
   onCreateFirstTier: () => void;
+  /** FP-09. The site's profile field definitions, shown in each flyout. */
+  profileFields?: ReadonlyArray<CustomFieldDefinition>;
 }
 
 /**
@@ -56,6 +59,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
   onFiltersChange,
   onMemberAction,
   onCreateFirstTier,
+  profileFields = [],
 }) => {
   const [filters, setFilters] = useState<MemberFilters>(NO_MEMBER_FILTERS);
   const [openMemberId, setOpenMemberId] = useState<string | null>(null);
@@ -182,6 +186,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                     busy={busyMemberId === member.id}
                     onAction={(action) => onMemberAction(member, action)}
                     onClose={() => setOpenMemberId(null)}
+                    profileFields={profileFields}
                   />
                 ) : null}
               </React.Fragment>

@@ -4,6 +4,12 @@ import { Banner, Button, Segmented, useToast } from "../ui";
 import { ConfigPanel } from "../settings/ConfigPanel";
 import { IntegrationPanel } from "../settings/IntegrationPanel";
 import { PageLocksPanel } from "../settings/PageLocksPanel";
+import { CustomFieldsPanel } from "../settings/CustomFieldsPanel";
+import {
+  normalizeDefinitions,
+  readDefinitions,
+  type CustomFieldDefinition,
+} from "../../utils/customFields";
 import {
   readStoredIntegration,
   type IntegrationId,
@@ -29,11 +35,12 @@ export interface SettingsTabProps {
   onChangeThemePreference: (preference: ThemePreference) => void;
 }
 
-type SettingsView = "config" | "locks" | "integration";
+type SettingsView = "config" | "locks" | "fields" | "integration";
 
 const VIEWS = [
   { value: "config", label: "Config" },
   { value: "locks", label: "Page Locks" },
+  { value: "fields", label: "Fields" },
   { value: "integration", label: "Integration" },
 ] as const satisfies ReadonlyArray<{ value: SettingsView; label: string }>;
 
@@ -119,6 +126,28 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           redirectPath: "/login",
         },
       ]
+  );
+
+  /**
+   * The profile field definitions being edited, FP-09. Same draft-until-save
+   * model as `auth`, reset whenever the stored document changes.
+   */
+  const storedFields = useMemo(() => readDefinitions(settings?.customFields), [settings]);
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(storedFields);
+
+  useEffect(() => {
+    setCustomFields(storedFields);
+  }, [storedFields]);
+
+  const savedFieldKeys = useMemo(() => storedFields.map((field) => field.key), [storedFields]);
+
+  // Compared in saved form, so moving a field and back again, or typing a space
+  // and deleting it, does not count as an unsaved change.
+  const fieldsDirty = useMemo(
+    () =>
+      JSON.stringify(normalizeDefinitions(customFields)) !==
+      JSON.stringify(normalizeDefinitions(storedFields)),
+    [customFields, storedFields]
   );
 
   useEffect(() => {
@@ -340,7 +369,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const handleSavePageLocks = useCallback(async () => {
     if (!siteId) {
       showToast({
-        tone: "warning",
+        tone: "neutral",
         message: "Connect this project in the Connect tab before saving page locks.",
       });
       return;
@@ -363,6 +392,34 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       message: failureMessage(result).message || "Could not save page locks",
     });
   }, [applySettings, gatedPages, settingsVersion, showToast, siteId]);
+
+  /**
+   * Save the field list, FP-09.
+   *
+   * The whole list, because the server replaces it wholesale: that is the only
+   * way deleting a field can be expressed. The version check still applies, so
+   * a second panel open on the same project cannot overwrite this one's edits
+   * without being told.
+   */
+  const handleSaveFields = useCallback(async () => {
+    if (!siteId) return;
+
+    setSaving(true);
+    const result = await saveSiteSettings(siteId, settingsVersion, {
+      customFields: normalizeDefinitions(customFields),
+    });
+    setSaving(false);
+
+    if (result.kind === "ok") {
+      applySettings(result.data.settings, result.data.version);
+      setFailure(null);
+      showToast({ tone: "success", message: "Fields saved" });
+      return;
+    }
+
+    setFailure(failureMessage(result));
+    showToast({ tone: "error", message: "Could not save fields" });
+  }, [applySettings, customFields, settingsVersion, showToast, siteId]);
 
   return (
     <div className="tab-panel-body">
@@ -400,6 +457,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <p className="settings-cta-note">Fix the highlighted field before saving.</p>
             ) : null}
           </div>
+        </>
+      ) : view === "fields" ? (
+        <>
+          {failure ? (
+            <Banner tone="warning" title={failure.title} message={failure.message} />
+          ) : null}
+
+          <CustomFieldsPanel
+            fields={customFields}
+            onChangeFields={setCustomFields}
+            savedKeys={savedFieldKeys}
+            saving={saving}
+            onSave={() => void handleSaveFields()}
+            siteConnected={siteId !== null}
+            dirty={fieldsDirty}
+          />
         </>
       ) : view === "locks" ? (
         <PageLocksPanel

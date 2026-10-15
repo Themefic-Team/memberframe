@@ -186,6 +186,8 @@ export interface MemberDashboardConfig {
   showTier: boolean;
   showBilling: boolean;
   showSignOut: boolean;
+  /** FP-09. The editable profile form: name plus the site's custom fields. */
+  showProfile: boolean;
   signedOutMessage: string;
   accentColor: string;
   borderRadius: number;
@@ -201,7 +203,56 @@ export const DEFAULT_MEMBER_DASHBOARD_CONFIG: MemberDashboardConfig = {
   showTier: true,
   showBilling: true,
   showSignOut: true,
+  showProfile: true,
   signedOutMessage: "Sign in to see your account.",
   accentColor: "#5271ff",
   borderRadius: 12,
 };
+
+/* ==========================================================================
+   ONBOARDING MODAL, feature plan FP-09, PRD feature F16, task 6.3
+   ========================================================================== */
+
+/**
+ * What the generator can emit about `<OnboardingModal>`.
+ *
+ * PRD section 9.2 lists `steps`, `showStepIndicator`, `allowSkip`, and
+ * `completionRedirect`. `steps` is absent, conflict C32: the questions are the
+ * site's profile fields, defined once in Settings and read from the server at
+ * runtime, so a second list here could only disagree with the first.
+ */
+export interface OnboardingModalConfig {
+  welcomeTitle: string;
+  welcomeMessage: string;
+  showStepIndicator: boolean;
+  allowSkip: boolean;
+  /** Site-relative, or empty to stay on the page. */
+  completionRedirect: string;
+  accentColor: string;
+  borderRadius: number;
+}
+
+export const ONBOARDING_RADIUS_MIN = 0;
+export const ONBOARDING_RADIUS_MAX = 32;
+
+/** Copied from the component's own property controls. */
+export const DEFAULT_ONBOARDING_MODAL_CONFIG: OnboardingModalConfig = {
+  welcomeTitle: "Welcome aboard",
+  welcomeMessage: "A few quick questions help us tailor the site to you.",
+  showStepIndicator: true,
+  allowSkip: true,
+  completionRedirect: "",
+  accentColor: "#5271ff",
+  borderRadius: 12,
+};
+
+/* ==========================================================================
+   DEDICATED AUTH SCREENS, all deployed from MemberAuth.tsx
+   ========================================================================== */
+
+/**
+ * Which flows one deployment of `MemberAuth.tsx` offers. Mirrors `AuthScreen`
+ * in the component. `all` is `<MemberAuth>`; the others are `<MemberLogin>`,
+ * `<MemberRegister>`, `<MemberPasswordReset>`, and `<MemberOtpVerify>`.
+ */
+export type AuthScreen = "all" | "login" | "register" | "reset" | "otp";

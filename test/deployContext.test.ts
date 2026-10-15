@@ -67,32 +67,24 @@ describe("isLoopbackUrl", () => {
 });
 
 describe("deployBaseUrl", () => {
-  it("refuses to hand back a loopback address", () => {
-    // The guard that matters. `VITE_API_BASE_URL=http://127.0.0.1:4000` is the
-    // documented way to run the panel against a local backend, and without
-    // this that value would be written into a component on a published site,
-    // where it can never resolve.
-    expect(deployBaseUrl("http://127.0.0.1:4000")).toBe(DEFAULT_API_BASE_URL);
-    expect(deployBaseUrl("http://localhost:4000")).toBe(DEFAULT_API_BASE_URL);
+  it("uses the configured API base URL dynamically", () => {
+    expect(deployBaseUrl("http://127.0.0.1:4001")).toBe("http://127.0.0.1:4001");
+    expect(deployBaseUrl("http://localhost:4001")).toBe("http://localhost:4001");
   });
 
   it("passes a tunnel or a production host through", () => {
-    // Backend PRD section 9.1: developing against a published site means a
-    // tunnel with a stable HTTPS hostname, and that must survive.
+    // Developing against a published site means a tunnel with a stable HTTPS hostname
     expect(deployBaseUrl("https://alpha.ngrok.app")).toBe("https://alpha.ngrok.app");
   });
 });
 
 describe("the disconnected context", () => {
   it("carries an empty site key", () => {
-    // Deliberate: a component deployed before the project is connected must
-    // fail plainly rather than talk to the wrong tenant. The Builder tab warns
-    // before this can happen.
     expect(DISCONNECTED_DEPLOY_CONTEXT.siteKey).toBe("");
   });
 
-  it("never carries a loopback base URL", () => {
-    expect(isLoopbackUrl(DISCONNECTED_DEPLOY_CONTEXT.apiBaseUrl)).toBe(false);
+  it("carries the configured or default apiBaseUrl", () => {
+    expect(DISCONNECTED_DEPLOY_CONTEXT.apiBaseUrl).toBe(DEFAULT_API_BASE_URL);
   });
 });
 

@@ -54,7 +54,7 @@ Status values: `planned`, `in progress`, `done`.
 | `13-donation-slider.md` | Pay-What-You-Want Donation Slider | F13 | 4 | P1 | planned |
 | `14-member-bookmarks.md` | Member Bookmarks and Saved Tray | F14 | 4 | P2 | planned |
 | `15-member-directory.md` | Member Directory with Tier Badges | F15 | 4 | P2 | planned |
-| `16-onboarding-modal.md` | Progressive Onboarding Questionnaire | F16 | 3 | P2 | planned |
+| `16-onboarding-modal.md` | Custom Profile Fields and Progressive Onboarding | F16, feature plan FP-09 | 3 | P2 | in progress |
 | `17-announcement-bar.md` | Targeted Member Announcement Bar | F17 | 4 | P2 | planned |
 | `18-grace-and-dunning.md` | Grace Period and Automated Dunning | F18 | 2 | P1 | planned |
 | `19-pro-lock-and-trial.md` | Client Pro-Lock and Trial Licensing | F19 | 2 | P0 | planned |

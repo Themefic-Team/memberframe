@@ -489,3 +489,78 @@ Two response details the component depends on:
 The last four cannot be closed in this repository at all. Two of them, timing safety and session
 invalidation, are the ones most likely to be quietly missing in a first backend implementation, so
 they are named here rather than assumed.
+
+---
+
+## 10. Dedicated Auth Screens
+
+Added 2026-10-15 on request: a separate canvas component for each flow, so a site's login,
+registration, reset, and code sign-in pages each hold the one form they need. `<MemberAuth>` is
+kept unchanged for creators who want every flow in one box or in a modal.
+
+### 10.1. One Engine, Five Deployments
+
+| Builder entry | File deployed | Component | Screen |
+| :--- | :--- | :--- | :--- |
+| Member Auth | `MemberAuth.tsx` | `MemberAuth` | `all` |
+| Member Login | `MemberLogin.tsx` | `MemberLogin` | `login` |
+| Member Registration | `MemberRegister.tsx` | `MemberRegister` | `register` |
+| Password Reset | `MemberPasswordReset.tsx` | `MemberPasswordReset` | `reset` |
+| OTP Verification | `MemberOtpVerify.tsx` | `MemberOtpVerify` | `otp` |
+
+All five come from the one authored `src/canvas-components/MemberAuth.tsx`. The generator bakes
+`screen` into the config block and, for the four dedicated ones, renames the default export and
+the `addPropertyControls` call. The rename asserts each pattern occurs exactly once and throws
+otherwise, because a rename that missed the controls would deploy a component with an empty
+sidebar and no error anywhere.
+
+Four copies of a 2,300 line component were the alternative and were rejected. The flows share the
+session cookie handling, the site key header, the OAuth origin check, the password policy, and the
+open redirect guard. Four copies is four places for a security fix to be missed, and four more
+parity tests holding them together.
+
+### 10.2. What A Dedicated Screen Changes
+
+- **Starting view** is fixed: login opens on sign in, register on sign up, reset on the email form
+  (or the new password form when the emailed link's `?token=` is present), otp on the code form.
+- **No sign in and sign up tabs.** Each flow lives on its own page, so the tabs become links.
+- **Cross-flow links navigate** instead of switching views: "Forgot password?" to the reset page,
+  "Create an account" to the sign up page, "Back to sign in" and "Use a password instead" to the
+  login page, "Email me a code instead" to the code page. A link is hidden when its path is empty,
+  is not site-relative, or is the page the visitor is already on.
+- **Provider buttons** appear on login and register only. "Continue with Google" on a reset page
+  would sign someone in when they asked to reset.
+- **The headline control governs the screen's main view.** Each ships with its own defaults, for
+  example "Welcome back" on login, instead of the combined component's "Sign in to continue".
+
+### 10.3. Property Controls
+
+The same seventeen as `<MemberAuth>`, with the irrelevant ones hidden per screen:
+
+| Control | Shown on |
+| :--- | :--- |
+| Email Sign In, Password Auth, Default Method | Member Auth only |
+| Google, Apple, GitHub, Discord | Member Auth, Login, Register |
+| Strong Password | Member Auth (when password is on), Register, Reset |
+| Sign In Page | Register, Reset, OTP |
+| Sign Up Page, Reset Page, Code Sign In Page | Login |
+
+Link paths default from Settings at deploy time. Sign Up Page is emitted empty when Settings has
+sign up on the login path, which is the default, so a fresh `<MemberLogin>` does not link to
+itself. **A creator using separate pages should set the sign up path in Settings, or in the
+sidebar.** Code Sign In Page has no Settings field and starts empty, so the login screen's code
+link is hidden until it is set.
+
+### 10.4. Verification
+
+`test/authScreens.test.ts`, 34 tests: each screen deploys to its own file under its own export name
+with its screen baked in, emits exactly the fields the config interface declares, parses, and
+carries the connection; Member Auth is unchanged; the self-link rule; the rename refusing a source
+it cannot apply to. `test/memberAuth.test.ts` updated for the four new controls and the new hiding
+rule.
+
+**Unverified, needs a human:** all five rendered on the canvas and on a published site; each link
+landing on the right page; the reset screen switching to the new password form from a real emailed
+link; the OTP screen against a running backend. The send and verify endpoints are now built in
+`memberframe-backend/src/routes/member.ts`, so conflict C24's 501 no longer describes the code, but
+no code has been emailed and verified end to end from a published page.

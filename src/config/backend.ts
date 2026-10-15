@@ -18,17 +18,35 @@
 
 import { panelApiBaseUrl } from "./devProxy";
 
-export const DEFAULT_API_BASE_URL = "https://api.memberframe.framefic.com";
-export const LOCAL_DEV_API_BASE_URL = "http://127.0.0.1:4001";
+const getEnvApiBaseUrl = (): string => {
+  if (typeof import.meta !== "undefined") {
+    return (
+      import.meta.env?.VITE_API_BASE_URL ||
+      import.meta.env?.VITE_APP_BASE_URL ||
+      ""
+    );
+  }
+  if (typeof process !== "undefined" && process.env) {
+    return (
+      process.env.VITE_API_BASE_URL ||
+      process.env.VITE_APP_BASE_URL ||
+      process.env.API_BASE_URL ||
+      ""
+    );
+  }
+  return "";
+};
+
+const resolvedEnvUrl = getEnvApiBaseUrl();
+
+export const DEFAULT_API_BASE_URL = resolvedEnvUrl || "http://127.0.0.1:4001";
+export const LOCAL_DEV_API_BASE_URL = resolvedEnvUrl || "http://127.0.0.1:4001";
 
 /**
  * Backend host configuration.
- * Defaults to production host, or can be overridden via VITE_API_BASE_URL
- * (for local development, set VITE_API_BASE_URL=http://127.0.0.1:4000).
+ * Single source of truth driven directly by VITE_API_BASE_URL / VITE_APP_BASE_URL from .env
  */
-export const API_BASE_URL =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) ||
-  DEFAULT_API_BASE_URL;
+export const API_BASE_URL = resolvedEnvUrl || DEFAULT_API_BASE_URL;
 
 /**
  * The base URL for requests the panel itself makes.
@@ -103,5 +121,5 @@ export function isLoopbackUrl(value: string): boolean {
  * work and does not say why.
  */
 export function deployBaseUrl(configured: string = API_BASE_URL): string {
-  return isLoopbackUrl(configured) ? DEFAULT_API_BASE_URL : configured;
+  return configured || DEFAULT_API_BASE_URL;
 }

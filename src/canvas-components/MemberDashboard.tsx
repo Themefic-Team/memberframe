@@ -76,6 +76,8 @@ interface DashboardConfig {
   showTier: boolean;
   showBilling: boolean;
   showSignOut: boolean;
+  /** FP-09. The member's editable profile: name plus the site's custom fields. */
+  showProfile: boolean;
   signedOutMessage: string;
   accentColor: string;
   borderRadius: number;
@@ -88,16 +90,22 @@ interface DashboardConfig {
   afterLogoutPath: string;
 }
 
+const ENV_API_BASE_URL =
+  (typeof import.meta !== "undefined" &&
+    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
+  "";
+
 // @memberframe-config-start
 const CONFIG: DashboardConfig = {
   headline: "Your account",
   showTier: true,
   showBilling: true,
   showSignOut: true,
+  showProfile: true,
   signedOutMessage: "Sign in to see your account.",
   accentColor: "#5271ff",
   borderRadius: 12,
-  apiBaseUrl: "https://api.memberframe.framefic.com",
+  apiBaseUrl: ENV_API_BASE_URL,
   siteKey: "",
   loginPath: "/login",
   afterLogoutPath: "/",
@@ -106,6 +114,265 @@ const CONFIG: DashboardConfig = {
 
 const SESSION_PATH = "/api/member/session";
 const LOGOUT_PATH = "/api/member/logout";
+const PROFILE_PATH = "/api/member/profile";
+
+// ============================================================================
+// PROFILE FIELDS, DUPLICATED FROM src/utils/customFields.ts
+// ============================================================================
+// FP-09 section 3.2. Every function in this block is held identical to the
+// plugin's copy by `test/customFieldsParity.test.ts`, and the plugin's copy to
+// the server's by the backend's parity test. Edit all of them or none.
+
+type CustomFieldType = "text" | "textarea" | "url" | "phone" | "select" | "boolean" | "number";
+
+interface FieldCondition {
+  key: string;
+  value: string;
+}
+
+interface CustomFieldDefinition {
+  key: string;
+  label: string;
+  type: CustomFieldType;
+  required: boolean;
+  options: string[];
+  placeholder: string;
+  showWhen?: FieldCondition | null;
+}
+
+type MetadataValue = string | number | boolean | null;
+type MemberMetadata = Record<string, MetadataValue>;
+
+interface ProfileValidation {
+  metadata: MemberMetadata;
+  problems: Record<string, string>;
+}
+
+const MAX_TEXT_LENGTH = 255;
+const MAX_TEXTAREA_LENGTH = 2000;
+const MAX_URL_LENGTH = 2048;
+
+function isSafeUrl(value: string): boolean {
+  if (value.length > MAX_URL_LENGTH) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function isPhoneLike(value: string): boolean {
+  return /^\+?[0-9][0-9\s\-().]{5,24}$/.test(value);
+}
+
+function checkValue(
+  field: CustomFieldDefinition,
+  raw: unknown
+): { value: MetadataValue } | { problem: string } {
+  if (raw === null || raw === undefined) {
+    return field.required ? { problem: `${field.label} is required.` } : { value: null };
+  }
+
+  switch (field.type) {
+    case "boolean": {
+      if (typeof raw !== "boolean") return { problem: `${field.label} must be on or off.` };
+      if (field.required && !raw) return { problem: `${field.label} is required.` };
+      return { value: raw };
+    }
+
+    case "number": {
+      if (typeof raw !== "number" || !Number.isFinite(raw)) {
+        return { problem: `${field.label} must be a number.` };
+      }
+      return { value: raw };
+    }
+
+    case "select": {
+      if (typeof raw !== "string") return { problem: `${field.label} must be one of the options.` };
+      if (raw === "") {
+        return field.required ? { problem: `${field.label} is required.` } : { value: null };
+      }
+      if (!field.options.includes(raw)) {
+        return { problem: `${field.label} must be one of the options.` };
+      }
+      return { value: raw };
+    }
+
+    case "url": {
+      if (typeof raw !== "string") return { problem: `${field.label} must be a web address.` };
+      const trimmed = raw.trim();
+      if (trimmed === "") {
+        return field.required ? { problem: `${field.label} is required.` } : { value: null };
+      }
+      if (!isSafeUrl(trimmed)) {
+        return { problem: `${field.label} must be a web address starting with https://.` };
+      }
+      return { value: trimmed };
+    }
+
+    case "phone": {
+      if (typeof raw !== "string") return { problem: `${field.label} must be a phone number.` };
+      const trimmed = raw.trim();
+      if (trimmed === "") {
+        return field.required ? { problem: `${field.label} is required.` } : { value: null };
+      }
+      if (!isPhoneLike(trimmed)) return { problem: `${field.label} does not look like a number.` };
+      return { value: trimmed };
+    }
+
+    case "textarea":
+    case "text": {
+      if (typeof raw !== "string") return { problem: `${field.label} must be text.` };
+      const trimmed = raw.trim();
+      if (trimmed === "") {
+        return field.required ? { problem: `${field.label} is required.` } : { value: null };
+      }
+      const limit = field.type === "textarea" ? MAX_TEXTAREA_LENGTH : MAX_TEXT_LENGTH;
+      if (trimmed.length > limit) return { problem: `${field.label} is too long.` };
+      return { value: trimmed };
+    }
+
+    default:
+      return { problem: `${field.label} cannot be saved.` };
+  }
+}
+
+function isFieldVisible(
+  field: CustomFieldDefinition,
+  values: Readonly<Record<string, MetadataValue | undefined>>
+): boolean {
+  if (!field.showWhen) return true;
+
+  const parent = values[field.showWhen.key];
+  if (parent === null || parent === undefined) return false;
+
+  return String(parent) === field.showWhen.value;
+}
+
+function toSubmittedValue(
+  field: CustomFieldDefinition,
+  raw: string | boolean | number | null | undefined
+): MetadataValue {
+  if (raw === null || raw === undefined) return null;
+
+  if (field.type === "boolean") return raw === true;
+
+  if (field.type === "number") {
+    if (typeof raw === "number") return raw;
+    const trimmed = String(raw).trim();
+    if (trimmed === "") return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : trimmed;
+  }
+
+  return String(raw);
+}
+
+function validateProfile(
+  fields: ReadonlyArray<CustomFieldDefinition>,
+  values: Readonly<Record<string, MetadataValue | undefined>>,
+  keys?: ReadonlyArray<string>
+): ProfileValidation {
+  const metadata: MemberMetadata = {};
+  const problems: Record<string, string> = {};
+
+  for (const field of fields) {
+    if (keys && !keys.includes(field.key)) continue;
+    if (!isFieldVisible(field, values)) continue;
+
+    const result = checkValue(field, toSubmittedValue(field, values[field.key]));
+
+    if ("problem" in result) {
+      problems[field.key] = result.problem;
+      continue;
+    }
+
+    metadata[field.key] = result.value;
+  }
+
+  return { metadata, problems };
+}
+
+/** The definitions out of a response this component did not write. Malformed entries are dropped. */
+function readFields(value: unknown): CustomFieldDefinition[] {
+  if (!Array.isArray(value)) return [];
+
+  const types = ["text", "textarea", "url", "phone", "select", "boolean", "number"];
+  const fields: CustomFieldDefinition[] = [];
+
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+
+    const key = record["key"];
+    const label = record["label"];
+    const type = record["type"];
+    if (typeof key !== "string" || typeof label !== "string") continue;
+    if (typeof type !== "string" || types.indexOf(type) === -1) continue;
+
+    const rawCondition = record["showWhen"] as Record<string, unknown> | null | undefined;
+    const showWhen =
+      rawCondition &&
+      typeof rawCondition["key"] === "string" &&
+      typeof rawCondition["value"] === "string"
+        ? { key: rawCondition["key"], value: rawCondition["value"] }
+        : null;
+
+    fields.push({
+      key,
+      label,
+      type: type as CustomFieldType,
+      required: record["required"] === true,
+      options: Array.isArray(record["options"])
+        ? (record["options"] as unknown[]).filter((option): option is string => typeof option === "string")
+        : [],
+      placeholder: typeof record["placeholder"] === "string" ? record["placeholder"] : "",
+      showWhen,
+    });
+  }
+
+  return fields;
+}
+
+function readMetadata(value: unknown): MemberMetadata {
+  const out: MemberMetadata = {};
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return out;
+
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      entry === null ||
+      typeof entry === "string" ||
+      typeof entry === "number" ||
+      typeof entry === "boolean"
+    ) {
+      out[key] = entry;
+    }
+  }
+
+  return out;
+}
+
+/** What the canvas shows a creator laying the dashboard out, since there is no member there. */
+const PREVIEW_FIELDS: CustomFieldDefinition[] = [
+  { key: "company", label: "Company", type: "text", required: true, options: [], placeholder: "" },
+  { key: "portfolio_url", label: "Portfolio URL", type: "url", required: false, options: [], placeholder: "https://" },
+  {
+    key: "experience",
+    label: "Experience level",
+    type: "select",
+    required: false,
+    options: ["Junior", "Mid-level", "Senior (5+ years)"],
+    placeholder: "",
+  },
+];
+
+const PREVIEW_VALUES: MemberMetadata = {
+  company: "Acme Design Co",
+  portfolio_url: "https://jordan.design",
+  experience: "Senior (5+ years)",
+};
 
 // ============================================================================
 // SHARED HELPERS, DUPLICATED FROM THE PLUGIN
@@ -146,7 +413,19 @@ function statusLabel(status: MemberStatus): string {
  */
 function tierName(key: string, tiers: ReadonlyArray<TierLadderEntry>): string {
   const match = tiers.find((tier) => tier.key === key);
-  return match ? match.name : key;
+  if (match && match.name) return match.name;
+  switch (key) {
+    case "free_member":
+      return "Free";
+    case "tier_1":
+      return "Tier 1";
+    case "tier_2":
+      return "Tier 2";
+    case "vip":
+      return "VIP";
+    default:
+      return key ? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Free";
+  }
 }
 
 /**
@@ -229,6 +508,126 @@ type DashboardState =
   | { phase: "signed_in"; member: MemberSessionData; tiers: ReadonlyArray<TierLadderEntry> }
   | { phase: "unavailable" }
   | { phase: "misconfigured" };
+
+/**
+ * The profile section's own state, separate from the account's.
+ *
+ * Separate so that a profile request failing leaves the account above it
+ * intact: a member whose email, tier, and status loaded should still see them,
+ * with one line saying the profile could not be loaded, rather than an account
+ * page that has gone blank over a secondary call.
+ */
+type ProfileState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "ready"; fields: CustomFieldDefinition[] }
+  | { phase: "unavailable" };
+
+// ============================================================================
+// ONE PROFILE CONTROL
+// ============================================================================
+
+interface ProfileControlProps {
+  id: string;
+  field: CustomFieldDefinition;
+  value: MetadataValue | undefined;
+  error: string | undefined;
+  disabled: boolean;
+  onChange: (value: MetadataValue) => void;
+}
+
+function ProfileControl({ id, field, value, error, disabled, onChange }: ProfileControlProps): React.ReactElement {
+  const errorId = `${id}-error`;
+  const described = error ? errorId : undefined;
+  const text = value === null || value === undefined ? "" : String(value);
+  const inputClass = `mf-dash-input${error ? " is-invalid" : ""}`;
+
+  const errorLine = error ? (
+    <p className="mf-dash-error" id={errorId}>
+      {error}
+    </p>
+  ) : null;
+
+  if (field.type === "boolean") {
+    return (
+      <div className="mf-dash-field">
+        <label className="mf-dash-check" htmlFor={id}>
+          <input
+            id={id}
+            type="checkbox"
+            checked={value === true}
+            disabled={disabled}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={described}
+            onChange={(event) => onChange(event.currentTarget.checked)}
+          />
+          <span>{field.label}</span>
+        </label>
+        {errorLine}
+      </div>
+    );
+  }
+
+  const common = {
+    id,
+    className: inputClass,
+    disabled,
+    "aria-invalid": error ? true : undefined,
+    "aria-describedby": described,
+    "aria-required": field.required || undefined,
+  };
+
+  let control: React.ReactElement;
+
+  if (field.type === "textarea") {
+    control = (
+      <textarea
+        {...common}
+        value={text}
+        placeholder={field.placeholder}
+        maxLength={MAX_TEXTAREA_LENGTH}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    );
+  } else if (field.type === "select") {
+    control = (
+      <select {...common} value={text} onChange={(event) => onChange(event.currentTarget.value)}>
+        <option value="">Choose one</option>
+        {field.options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    );
+  } else {
+    const inputType =
+      field.type === "url" ? "url" : field.type === "phone" ? "tel" : field.type === "number" ? "number" : "text";
+
+    control = (
+      <input
+        {...common}
+        type={inputType}
+        inputMode={field.type === "number" ? "decimal" : undefined}
+        value={text}
+        placeholder={field.placeholder}
+        maxLength={field.type === "url" ? MAX_URL_LENGTH : field.type === "number" ? undefined : MAX_TEXT_LENGTH}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    );
+  }
+
+  return (
+    <div className="mf-dash-field">
+      <label className="mf-dash-label" htmlFor={id}>
+        {field.label}
+        {field.required ? null : <span className="mf-dash-optional">Optional</span>}
+      </label>
+      {control}
+      {errorLine}
+    </div>
+  );
+}
 
 // ============================================================================
 // STYLES
@@ -344,6 +743,47 @@ function cssContent(accent: string, radius: number): string {
 }
 .mf-dash-state svg { width: 26px; height: 26px; stroke: currentColor; opacity: 0.6; }
 .mf-dash-state p { margin: 0; font-size: 14px; line-height: 1.5; opacity: 0.8; }
+.mf-dash-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(128, 128, 128, 0.18);
+}
+.mf-dash-profile-title { margin: 0; font-size: 15px; font-weight: 600; }
+.mf-dash-field { display: flex; flex-direction: column; gap: 6px; }
+.mf-dash-label { font-size: 13px; font-weight: 500; }
+.mf-dash-optional { margin-left: 6px; font-weight: 400; opacity: 0.65; }
+.mf-dash-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: ${Math.max(0, radius - 4)}px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+textarea.mf-dash-input { min-height: 88px; resize: vertical; }
+.mf-dash-input:focus-visible {
+  outline: none;
+  border-color: ${accent};
+  box-shadow: 0 0 0 3px color-mix(in srgb, ${accent} 25%, transparent);
+}
+.mf-dash-input.is-invalid { border-color: #dc2626; }
+.mf-dash-check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; cursor: pointer; }
+.mf-dash-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: ${accent}; }
+.mf-dash-check input:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
+.mf-dash-error { margin: 0; font-size: 12px; line-height: 1.4; color: #dc2626; }
+.mf-dash-saved { margin: 0; font-size: 13px; opacity: 0.8; }
+.mf-dash-button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
+@media (prefers-color-scheme: dark) {
+  .mf-dash-input.is-invalid { border-color: #f87171; }
+  .mf-dash-error { color: #f87171; }
+}
 `.trim();
 }
 
@@ -362,6 +802,14 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
 
   const [state, setState] = useState<DashboardState>({ phase: "loading" });
   const [busy, setBusy] = useState(false);
+
+  const [profile, setProfile] = useState<ProfileState>({ phase: "idle" });
+  const [profileName, setProfileName] = useState("");
+  const [profileValues, setProfileValues] = useState<MemberMetadata>({});
+  const [profileProblems, setProfileProblems] = useState<Record<string, string>>({});
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileNotice, setProfileNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [profileReload, setProfileReload] = useState(0);
 
   const accent = useMemo(() => safeColor(config.accentColor, "#5271ff"), [config.accentColor]);
   const radius = useMemo(
@@ -403,19 +851,12 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
       return;
     }
 
-    // Deployed before the project was connected. Every request would fail with
-    // `missing_site_key`, which would render as `unavailable` and send the
-    // creator hunting for a network problem. Naming it is worth the branch.
-    if (config.siteKey === "") {
-      setState({ phase: "misconfigured" });
-      return;
-    }
-
     let active = true;
+    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
 
     void (async () => {
       try {
-        const response = await fetch(`${config.apiBaseUrl}${SESSION_PATH}`, {
+        const response = await fetch(`${base}${SESSION_PATH}`, {
           // The session is an HTTP-only cookie, per PRD section 14.1 S2. This
           // component never sees it, which is the point.
           credentials: "include",
@@ -461,6 +902,156 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
   }, [config.apiBaseUrl, config.siteKey, onCanvas]);
 
   // ------------------------------------------------------------------------
+  // Load the profile, FP-09 section 3.2
+  // ------------------------------------------------------------------------
+
+  const signedInMemberId = state.phase === "signed_in" ? state.member.memberId : null;
+  const signedInName = state.phase === "signed_in" ? state.member.name : null;
+
+  useEffect(() => {
+    if (!config.showProfile || signedInMemberId === null) {
+      setProfile({ phase: "idle" });
+      return;
+    }
+
+    if (onCanvas) {
+      setProfileName(signedInName ?? "");
+      setProfileValues(PREVIEW_VALUES);
+      setProfile({ phase: "ready", fields: PREVIEW_FIELDS });
+      return;
+    }
+
+    let active = true;
+    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+
+    setProfile({ phase: "loading" });
+
+    void (async () => {
+      try {
+        const response = await fetch(`${base}${PROFILE_PATH}`, {
+          credentials: "include",
+          headers: apiHeaders(false),
+        });
+
+        if (!active) return;
+        if (!response.ok) {
+          setProfile({ phase: "unavailable" });
+          return;
+        }
+
+        const body = (await response.json()) as {
+          member?: { name?: string | null };
+          fields?: unknown;
+          metadata?: unknown;
+        };
+        if (!active) return;
+
+        setProfileName(body.member?.name ?? signedInName ?? "");
+        setProfileValues(readMetadata(body.metadata));
+        setProfileProblems({});
+        setProfile({ phase: "ready", fields: readFields(body.fields) });
+      } catch {
+        if (active) setProfile({ phase: "unavailable" });
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [config.apiBaseUrl, config.showProfile, onCanvas, profileReload, signedInMemberId, signedInName]);
+
+  // `<OnboardingModal>` on the same page announces a save. Reloading here keeps
+  // the two from showing a member different answers side by side.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reload = () => setProfileReload((count) => count + 1);
+    window.addEventListener("memberframe:profile-updated", reload);
+    return () => window.removeEventListener("memberframe:profile-updated", reload);
+  }, []);
+
+  const setProfileValue = useCallback((key: string, value: MetadataValue) => {
+    setProfileValues((current) => ({ ...current, [key]: value }));
+    setProfileNotice(null);
+    setProfileProblems((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const handleSaveProfile = useCallback(async () => {
+    if (profile.phase !== "ready" || onCanvas) return;
+
+    const checked = validateProfile(profile.fields, profileValues);
+
+    if (Object.keys(checked.problems).length > 0) {
+      setProfileProblems(checked.problems);
+      setProfileNotice({ ok: false, text: "Check the highlighted fields." });
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileNotice(null);
+
+    try {
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+      const response = await fetch(`${base}${PROFILE_PATH}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: apiHeaders(true),
+        // An empty name is sent as empty, which the server stores as no name.
+        // That is how a member removes one, so it must not be dropped here.
+        body: JSON.stringify({ name: profileName.trim(), metadata: checked.metadata }),
+      });
+
+      if (response.status === 400) {
+        const body = (await response.json().catch(() => ({}))) as {
+          problems?: Array<{ key?: string; message?: string }>;
+        };
+        const mapped: Record<string, string> = {};
+        for (const problem of body.problems ?? []) {
+          if (problem.key && problem.message) mapped[problem.key] = problem.message;
+        }
+        setProfileProblems(mapped);
+        setProfileNotice({ ok: false, text: "Some answers could not be saved. Check them and try again." });
+        return;
+      }
+
+      if (response.status === 401) {
+        setState({ phase: "signed_out" });
+        return;
+      }
+
+      if (!response.ok) {
+        setProfileNotice({ ok: false, text: "Your profile could not be saved. Try again in a moment." });
+        return;
+      }
+
+      const body = (await response.json().catch(() => ({}))) as {
+        member?: { name?: string | null };
+        metadata?: unknown;
+      };
+
+      setProfileValues(readMetadata(body.metadata));
+      setProfileName(body.member?.name ?? profileName.trim());
+      setProfileProblems({});
+      setProfileNotice({ ok: true, text: "Profile saved." });
+
+      // The header shows the name too, so it follows the save.
+      setState((current) =>
+        current.phase === "signed_in"
+          ? { ...current, member: { ...current.member, name: body.member?.name ?? null } }
+          : current
+      );
+    } catch {
+      setProfileNotice({ ok: false, text: "Your profile could not be saved. Check your connection and try again." });
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [config.apiBaseUrl, onCanvas, profile, profileName, profileValues]);
+
+  // ------------------------------------------------------------------------
   // Sign out
   // ------------------------------------------------------------------------
 
@@ -470,7 +1061,8 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     setBusy(true);
 
     try {
-      await fetch(`${config.apiBaseUrl}${LOGOUT_PATH}`, {
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+      await fetch(`${base}${LOGOUT_PATH}`, {
         method: "POST",
         credentials: "include",
         headers: apiHeaders(false),
@@ -604,6 +1196,77 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
         <span className="mf-dash-row-value">{statusLabel(member.status)}</span>
       </div>
 
+      {config.showProfile && profile.phase !== "idle" ? (
+        <form
+          className="mf-dash-profile"
+          noValidate
+          aria-labelledby={`mf-dash-profile-${member.memberId}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSaveProfile();
+          }}
+        >
+          <p className="mf-dash-profile-title" id={`mf-dash-profile-${member.memberId}`}>
+            Profile
+          </p>
+
+          {profile.phase === "loading" ? (
+            <p className="mf-dash-saved">Loading your profile.</p>
+          ) : profile.phase === "unavailable" ? (
+            <p className="mf-dash-saved">Your profile could not be loaded. Refresh the page to try again.</p>
+          ) : (
+            <>
+              <div className="mf-dash-field">
+                <label className="mf-dash-label" htmlFor={`mf-dash-name-${member.memberId}`}>
+                  Name
+                </label>
+                <input
+                  id={`mf-dash-name-${member.memberId}`}
+                  className="mf-dash-input"
+                  type="text"
+                  autoComplete="name"
+                  maxLength={255}
+                  value={profileName}
+                  disabled={profileSaving}
+                  onChange={(event) => {
+                    setProfileName(event.currentTarget.value);
+                    setProfileNotice(null);
+                  }}
+                />
+              </div>
+
+              {profile.fields
+                .filter((field) => isFieldVisible(field, profileValues))
+                .map((field) => (
+                  <ProfileControl
+                    key={field.key}
+                    id={`mf-dash-${member.memberId}-${field.key}`}
+                    field={field}
+                    value={profileValues[field.key]}
+                    error={profileProblems[field.key]}
+                    disabled={profileSaving}
+                    onChange={(value) => setProfileValue(field.key, value)}
+                  />
+                ))}
+
+              {profileNotice ? (
+                <p className={profileNotice.ok ? "mf-dash-saved" : "mf-dash-error"} role="status">
+                  {profileNotice.text}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                className="mf-dash-button mf-dash-button-primary"
+                disabled={profileSaving || onCanvas}
+              >
+                {profileSaving ? "Saving" : "Save profile"}
+              </button>
+            </>
+          )}
+        </form>
+      ) : null}
+
       {config.showBilling ? (
         /*
          * Honest rather than empty. FP-08 specifies plan, renewal date, payment
@@ -661,6 +1324,11 @@ addPropertyControls(MemberDashboard, {
   showSignOut: {
     type: ControlType.Boolean,
     title: "Sign out",
+    defaultValue: true,
+  },
+  showProfile: {
+    type: ControlType.Boolean,
+    title: "Profile form",
     defaultValue: true,
   },
   signedOutMessage: {

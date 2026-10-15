@@ -8,7 +8,14 @@ export {
   MEMBER_DASHBOARD_FILE_NAME,
   generateMemberDashboardCode,
   normalizeDashboardConfig,
+  ONBOARDING_MODAL_DESCRIPTOR,
+  ONBOARDING_MODAL_FILE_NAME,
+  generateOnboardingModalCode,
+  normalizeOnboardingConfig,
   MEMBER_AUTH_DESCRIPTOR,
+  AUTH_SCREEN_DEFAULTS,
+  AUTH_SCREEN_DESCRIPTORS,
+  generateAuthScreenCode,
   MEMBER_AUTH_FILE_NAME,
   MEMBER_GATE_DESCRIPTOR,
   MEMBER_GATE_FILE_NAME,
@@ -21,6 +28,7 @@ export {
   normalizeGateConfig,
 } from "./canvasComponentCodeGenerator";
 export type {
+  AuthScreenComponentId,
   CanvasComponentDescriptor,
   DeployContext,
   GeneratedCanvasFile,

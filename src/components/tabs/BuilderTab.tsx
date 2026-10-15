@@ -3,14 +3,18 @@ import { FileStack, Plus } from "lucide-react";
 import { framer } from "framer-plugin";
 import { Banner, Button, FieldRow, FieldRows, Select, useToast } from "../ui";
 import {
+  AUTH_SCREEN_DEFAULTS,
   deployCanvasComponent,
+  generateAuthScreenCode,
   generateMemberAuthCode,
   generateMemberDashboardCode,
   generateMemberGateCode,
+  generateOnboardingModalCode,
   membershipPages,
   scaffoldMembershipPages,
   scaffoldSummary,
   type DeployContext,
+  type GeneratedCanvasFile,
 } from "../../services";
 import { useConnection } from "../../hooks/useConnection";
 import { deployBaseUrl } from "../../config/backend";
@@ -18,6 +22,7 @@ import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
   DEFAULT_MEMBER_GATE_CONFIG,
+  DEFAULT_ONBOARDING_MODAL_CONFIG,
 } from "../../types/canvas";
 import {
   CANVAS_COMPONENTS,
@@ -104,6 +109,8 @@ export const BuilderTab: React.FC = () => {
       afterLoginPath: settings?.auth.afterLoginPath ?? "",
       loginPath: settings?.auth.loginPath ?? "/login",
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+      signupPath: settings?.auth.signupPath ?? "",
+      resetPath: settings?.auth.resetPath ?? "/reset-password",
     }),
     [connection, settings]
   );
@@ -175,16 +182,7 @@ export const BuilderTab: React.FC = () => {
         why it no longer is. One generator core, one deploy path, no special
         case.
       */
-      const generated =
-        entry.id === "member_auth"
-          ? generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG, undefined, deployContext)
-          : entry.id === "member_dashboard"
-            ? generateMemberDashboardCode(
-                DEFAULT_MEMBER_DASHBOARD_CONFIG,
-                undefined,
-                deployContext
-              )
-            : generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG, undefined, deployContext);
+      const generated = generateForComponent(entry.id, deployContext);
 
       const outcome = await deployCanvasComponent(framer, generated);
 
@@ -245,7 +243,7 @@ export const BuilderTab: React.FC = () => {
         */}
         <PreviewStudio componentId={componentId} gateConfig={DEFAULT_MEMBER_GATE_CONFIG} />
 
-        {connection !== null && settings !== null ? (
+        {/* {connection !== null && settings !== null ? (
           <section className="section-group">
             <h2 className="section-title">Membership pages</h2>
 
@@ -274,7 +272,7 @@ export const BuilderTab: React.FC = () => {
               {scaffolding ? "Creating pages" : "Create membership pages"}
             </Button>
           </section>
-        ) : null}
+        ) : null} */}
 
         {failure ? (
           <Banner tone="danger" title={failure.title} message={failure.message} />
@@ -321,4 +319,29 @@ function ctaNote(entry: CanvasComponentEntry): string {
   if (!entry.deployable) return `${entry.name} arrives with task ${entry.task}.`;
 
   return `Inserts ${entry.name} with its defaults. Configure it in the Framer properties panel.`;
+}
+
+/**
+ * The file to deploy for a picker entry, with its authored defaults.
+ *
+ * Every component is configured afterwards in Framer's properties panel, so
+ * nothing here varies but the connection. The gate is the fallthrough because
+ * it was the first and only component before this switch existed.
+ */
+function generateForComponent(id: CanvasComponentId, context: DeployContext): GeneratedCanvasFile {
+  switch (id) {
+    case "member_auth":
+      return generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG, undefined, context);
+    case "member_login":
+    case "member_register":
+    case "member_password_reset":
+    case "member_otp_verify":
+      return generateAuthScreenCode(id, AUTH_SCREEN_DEFAULTS[id], undefined, context);
+    case "member_dashboard":
+      return generateMemberDashboardCode(DEFAULT_MEMBER_DASHBOARD_CONFIG, undefined, context);
+    case "onboarding_modal":
+      return generateOnboardingModalCode(DEFAULT_ONBOARDING_MODAL_CONFIG, undefined, context);
+    default:
+      return generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG, undefined, context);
+  }
 }

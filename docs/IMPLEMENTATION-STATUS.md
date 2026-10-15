@@ -4,7 +4,7 @@ The task ledger. One row per numbered task in [`memberframe-complete-prd.md`](me
 
 **Read this first in every session.** It is the single source of truth for what is done. The PRD says what to build; this says where we are.
 
-Last updated: 2026-10-12
+Last updated: 2026-10-15
 
 ---
 
@@ -237,7 +237,7 @@ PRD section 15.6.
 | :-- | :-------------------------------------------------------- | :------ | :-------------------------------------- | :----- | :----- |
 | 6.1 | Author `<TeamManagement>` embedded in the dashboard       | F12     | `canvas-components/TeamManagement.tsx`  | todo   |        |
 | 6.2 | Implement seat allocation, invites, and revocation limits | F12     | `services/orgService.ts`                | todo   |        |
-| 6.3 | Author `<OnboardingModal>` with conditional steps         | F16     | `canvas-components/OnboardingModal.tsx` | todo   |        |
+| 6.3 | Author `<OnboardingModal>` with conditional steps         | F16     | `canvas-components/OnboardingModal.tsx` | awaiting review |        |
 | 6.4 | Implement shared password gating mode                     | F22     | `MemberGate.tsx`, Settings              | todo   |        |
 | 6.5 | Write development docs for F06, F09, F10, F12, F16, F22   | Rule    | `docs/development-docs/*`               | todo   |        |
 
@@ -305,7 +305,7 @@ the user commits it.
 | FP-06 | ReCAPTCHA Bot Defense | F21 | not started | todo | |
 | FP-07 | Soft Paywall, Read More | F07, F08 | not started | todo | |
 | FP-08 | Member Dashboard | F06 | `canvas-components/MemberDashboard.tsx`, `services/pageScaffoldService.ts` | awaiting review, partial | |
-| FP-09 | Custom Profile Fields | F16 | `backend/src/lib/memberMetadata.ts`, `backend/src/lib/siteSettings.ts`, `backend/src/routes/member.ts` | awaiting review, backend only | |
+| FP-09 | Custom Profile Fields | F16 | `utils/customFields.ts`, `components/settings/CustomFieldsPanel.tsx`, `components/manage/MemberFlyout.tsx`, `canvas-components/OnboardingModal.tsx`, `canvas-components/MemberDashboard.tsx`; backend `lib/memberMetadata.ts`, `lib/siteSettings.ts`, `routes/site.ts` | awaiting review | |
 | FP-10 | Member Bookmarking | F14 | not started | todo | |
 | FP-11 | LMS Mark As Complete | F11 | not started | todo | |
 | FP-12 | Upgrade To Download | F10 | not started | todo | |
@@ -313,6 +313,22 @@ the user commits it.
 | FP-14 | Multi-Language Support | F23 | not started | todo | |
 | FP-00 | Connect, Creator Identity, And Membership Pages | F02, F05, F06 | `components/tabs/ConnectTab.tsx`, `services/connectService.ts`, `services/connectionStore.ts`, `services/pageScaffoldService.ts`, `backend/src/routes/connect.ts`, `backend/src/routes/site.ts` | awaiting review | |
 | FP-15 | Backend Architecture, Node and Prisma | sections 6, 10, 11, 14 | `backend/` in this repo. Specified in [`memberframe-backend-prd.md`](memberframe-backend-prd.md) | awaiting review, partial | |
+
+**Dedicated auth screens, added 2026-10-15 on request, awaiting review and unstaged.** The Builder
+now offers Member Login, Member Registration, Password Reset, and OTP Verification beside Member
+Auth, which is unchanged. All five deploy from the one `MemberAuth.tsx`: the generator bakes a
+`screen` in and renames the export, so each lands as its own file and component. Recorded in
+[`05-member-auth.md`](development-docs/05-member-auth.md) section 10. 34 tests; none rendered.
+
+**FP-09 is `awaiting review` and the work is unstaged, in both repositories.** Recorded in
+[`16-onboarding-modal.md`](development-docs/16-onboarding-modal.md), which also closes task 6.3.
+Creators define fields in a new Settings, Fields view; members answer them in `<OnboardingModal>`,
+which opens only while a required answer is missing, and edit them in a new profile form on
+`<MemberDashboard>`; the Manage flyout shows the answers. The value rules exist four times and two
+parity tests chain them together, both proved able to fail. Gates: frontend lint, tsc, 621 tests,
+build; backend tsc and 179 tests. **Nothing has run against a server or been seen rendered.** The
+backend half lives in the sibling `memberframe-backend` folder, which has no commits yet. The
+build now warns that the bundle passed 500 kB, at 539.74 kB.
 
 **FP-02 is `awaiting review` and the work is unstaged.** It adds the password path to
 `<MemberAuth>`: sign-in, sign-up, forgot-password, and the reset form, three more property controls
@@ -440,6 +456,8 @@ section 3.1, and guessing at them would be building the wrong thing carefully.
 | C28 | The first address to verify against a Framer project id owns that site, and there is no transfer flow | A second account connecting the same project gets 403 rather than access, which is correct. Inventing an ownership transfer in a service file would be a product decision made in the wrong place | **Yes.** A project connected by mistake, or by a contractor who has left, needs support to reassign |
 | C29 | `ManageTab` calls `sendMagicLink` and no backend route answers it. PRD section 10.3 lists it | Left in place and resolving `unavailable`, with the service function documented as not built. It is a few lines once the OTP flow exists | **Yes**, with C24. They are the same missing piece |
 | C30 | The Builder tab's six-row customizer for `<MemberGate>` was removed. PRD task 1.3 specifies it and feature F04 covers it | Every one of the six is also a Framer property control on the component, so a creator configured the same value twice and the panel's copy was only the starting value. `<MemberAuth>` and `<MemberDashboard>` always worked the other way. The gate now deploys with its authored defaults and is configured on the canvas like the other two | **Confirmed by the user.** Recorded because it reduces specified work that was passing its gates. The preview's state switcher, F04's first half, is kept: it answers what a Silver member sees versus a VIP, which the canvas cannot |
+| C31 | FP-09's flow chart branches ("Agency selected, show Team Size") and its section 5 tests conditional fields, but its section 4.1 schema has nothing that can express a condition | `showWhen: { key, value } \| null` added to the definition on both sides, one level deep, parent an earlier dropdown or checkbox. Optional, so stored documents read back unchanged. The server validates it on write, salvages it on read, and drops a hidden field's value | Nothing, but it is a schema addition the plan did not specify |
+| C32 | PRD section 9.2 lists a `steps` property control on `<OnboardingModal>`, and the questions are the profile fields defined in Settings | No `steps` control. Steps are derived from the fields: welcome, required, optional. A second list in Framer's sidebar could only disagree with the first, the same reasoning as C30 | Nothing |
 
 Two need a decision rather than a fix. **C19** is a product scope question: whether the web
 dashboard rebuilds three surfaces the plugin already has. **C18** is unowned: the component handles
@@ -463,7 +481,7 @@ The agent cannot check these. Assign an owner before the phase they fall in.
 | FP-15           | **No endpoint has run against a database.** The backend typechecks and its pure logic is tested, and `backend/src/routes/member.ts` has never served a request. That leaves unverified everything the frontend could not verify either: the five-failure lockout, whether an unknown address and a wrong password really take the same time to answer, whether a reset invalidates other sessions, and whether a 401 arrives where the contract says it should. Also unverified: the Prisma migration against a real MySQL 8, which is where the hand-written generated column and the `utf8mb4_0900_as_ci` collation either apply or silently do not. `npm run db:check` reports both, and nobody has run it against a server. Above all, **the cross-origin session cookie has not been tested in any browser**, which is the Stage 0 spike in backend PRD section 2.3 and the one result that could invalidate the session design for every canvas component already built |
 | FP-00           | **The connect handshake has never run.** No code has been emailed, no project claimed, no token issued. That leaves unverified: whether `framer.getProjectInfo()` returns an id stable enough to key a tenant on across sessions and machines, whether `setPluginData` actually succeeds with the newly declared permission, and whether a token stored in plugin data survives a Framer project being duplicated, which would hand a copy of the project a live creator session. On the server: whether `Access-Control-Allow-Origin: *` without `Allow-Credentials` really lets the panel's iframe origin through, which is the one assumption the whole plugin half rests on |
 | FP-08           | **`createWebPage` has never been called.** The scaffolder is tested against a mock returning what the SDK types promise, so what is unverified is Framer's real behaviour: whether a path with a nested segment creates one page or a tree, what it does with a path that collides with a CMS detail route, and whether the returned node is ready to accept a component instance immediately or needs the same compile wait `resolveInsertUrl` already works around for code files. `<MemberDashboard>` has also never rendered: contrast, layout at a real width, and both themes need a human |
-| FP-09           | **No custom field has been defined or filled in.** The validator is tested in isolation and the plugin has no editor for the definitions yet, so the only way to create one today is to write the settings document directly. Unverified: whether `Member.metadata` round trips UTF-8 through the MySQL JSON column intact, which FP-09 section 5 asks for explicitly, and whether a definition deleted while a member has the form open produces the intended drop rather than an error |
+| FP-09           | **No field has been saved to a real server or answered in a browser.** The editor, the modal, the dashboard form, and the flyout are all unrendered. Unverified: the Fields view at 360px in both themes; the modal opening only with a required answer missing and never for a signed-out visitor; a reload resuming the same step; the focus trap and "Step 2 of 3" being announced; a server problem landing under its field; whether `Member.metadata` round trips UTF-8 through the MySQL JSON column, which FP-09 section 5 asks for explicitly. Full list in [`16-onboarding-modal.md`](development-docs/16-onboarding-modal.md) section 7 |
 | 2.6, 3.1, 3.2   | Live gateway sandbox transactions and webhook delivery                                                                                                                                                                                                                                                                                                                                                      |
 | 3.6             | Google Rich Results Test                                                                                                                                                                                                                                                                                                                                                                                    |
 | 4.2             | Real YouTube, Vimeo, and Mux player `postMessage` traffic                                                                                                                                                                                                                                                                                                                                                   |

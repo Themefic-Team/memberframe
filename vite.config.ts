@@ -9,7 +9,10 @@ export default defineConfig(({ command, mode }) => {
 
   // Only the dev server forwards. A build must never ship a panel that calls
   // its own origin, because nothing is listening for `/api` there.
-  const apiProxyTarget = command === "serve" ? devProxyTarget(env.VITE_API_BASE_URL) : null;
+  const apiProxyTarget =
+    command === "serve"
+      ? devProxyTarget(env.VITE_API_BASE_URL || env.VITE_APP_BASE_URL)
+      : null;
 
   return {
     plugins: [react(), framer(), basicSsl()],

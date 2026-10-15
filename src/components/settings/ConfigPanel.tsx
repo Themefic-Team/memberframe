@@ -65,20 +65,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   saving,
 }) => (
   <>
-    <section className="section-group">
-      <h2 className="section-title">Panel</h2>
-      <FieldRows>
-        {/* Instant apply, so a segmented control and no save. */}
-        <FieldRow label="Panel theme" fill>
-          <Segmented
-            label="Panel theme"
-            options={THEME_OPTIONS}
-            value={themePreference}
-            onChange={onChangeThemePreference}
-          />
-        </FieldRow>
-      </FieldRows>
-    </section>
+    
 
     {auth ? (
       <section className="section-group">

@@ -133,6 +133,11 @@ interface GateConfig {
   loginPath: string;
 }
 
+const ENV_API_BASE_URL =
+  (typeof import.meta !== "undefined" &&
+    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
+  "";
+
 // @memberframe-config-start
 const CONFIG: GateConfig = {
   requiredTier: "signed_in",
@@ -141,7 +146,7 @@ const CONFIG: GateConfig = {
   cardTitle: "Members Only Content",
   cardDescription: "Join or sign in to read this full guide.",
   blurIntensity: 8,
-  apiBaseUrl: "https://api.memberframe.framefic.com",
+  apiBaseUrl: ENV_API_BASE_URL,
   sessionTtlMs: 60000,
   siteKey: "",
   loginPath: "/login",
@@ -952,13 +957,18 @@ addPropertyControls(MemberGate, {
 });
 
 // ============================================================================
+// ============================================================================
 // FRAMER CODE OVERRIDES FOR NATIVE FRAMES & SECTIONS
 // ============================================================================
 // Allows any native Framer Frame, Stack, or Grid on canvas to be locked
 // directly with zero component creation or slot dropdowns. Designers simply
-// select their section and pick this override from Framer's "Code overrides".
+// select their section and pick the desired override from Framer's "Code overrides".
 
-export function withMemberGate(Component: React.ComponentType<any>): React.ComponentType<any> {
+function createGatedSection(
+  Component: React.ComponentType<any>,
+  tier: RequiredTier,
+  fallback: "blur" | "hide"
+): React.ComponentType<any> {
   return function GatedSection(props: any) {
     const onCanvas = RenderTarget.current() === RenderTarget.canvas;
     const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
@@ -975,7 +985,7 @@ export function withMemberGate(Component: React.ComponentType<any>): React.Compo
     }, [onCanvas]);
 
     const session = sessionResult?.kind === "member" ? sessionResult.session : null;
-    const entitled = isEntitled(session, CONFIG.requiredTier);
+    const entitled = isEntitled(session, tier);
 
     if (onCanvas || entitled) {
       return (
@@ -986,10 +996,27 @@ export function withMemberGate(Component: React.ComponentType<any>): React.Compo
       );
     }
 
-    if (CONFIG.fallbackAction === "hide") {
+    if (fallback === "hide") {
       return null;
     }
 
+    const tierName =
+      tier === "vip"
+        ? "VIP"
+        : tier === "tier_2"
+        ? "Gold"
+        : tier === "tier_1"
+        ? "Silver"
+        : tier === "free_member"
+        ? "Member"
+        : "";
+
+    const title = CONFIG.cardTitle || (tierName ? `${tierName} Content` : "Members Only Content");
+    const description =
+      tierName && tier !== "signed_in" && tier !== "anyone"
+        ? `Requires ${tierName} plan or higher to unlock this section.`
+        : CONFIG.cardDescription || "Join or sign in to read this full guide.";
+
     return (
       <div className="memberframe-gate-root">
         <style>{cssContent}</style>
@@ -1001,8 +1028,8 @@ export function withMemberGate(Component: React.ComponentType<any>): React.Compo
             <span className="memberframe-lock-icon">
               <Lock size={18} stroke="currentColor" aria-hidden={true} />
             </span>
-            <h3 className="memberframe-lock-title">{CONFIG.cardTitle}</h3>
-            <p className="memberframe-lock-description">{CONFIG.cardDescription}</p>
+            <h3 className="memberframe-lock-title">{title}</h3>
+            <p className="memberframe-lock-description">{description}</p>
             <a href={CONFIG.loginPath || "/login"} className="memberframe-lock-cta">
               Sign In to Access
             </a>
@@ -1011,83 +1038,65 @@ export function withMemberGate(Component: React.ComponentType<any>): React.Compo
       </div>
     );
   };
+}
+
+// Default overrides using CONFIG settings
+export function withMemberGate(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, CONFIG.requiredTier, CONFIG.fallbackAction === "hide" ? "hide" : "blur");
 }
 
 export function withBlurLock(Component: React.ComponentType<any>): React.ComponentType<any> {
-  return function BlurredSection(props: any) {
-    const onCanvas = RenderTarget.current() === RenderTarget.canvas;
-    const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
-
-    useEffect(() => {
-      if (onCanvas) return;
-      let active = true;
-      loadSession().then((res) => {
-        if (active) setSessionResult(res);
-      });
-      return () => {
-        active = false;
-      };
-    }, [onCanvas]);
-
-    const session = sessionResult?.kind === "member" ? sessionResult.session : null;
-    const entitled = isEntitled(session, CONFIG.requiredTier);
-
-    if (onCanvas || entitled) {
-      return (
-        <React.Fragment>
-          <style>{cssContent}</style>
-          <Component {...props} />
-        </React.Fragment>
-      );
-    }
-
-    return (
-      <div className="memberframe-gate-root">
-        <style>{cssContent}</style>
-        <div className="memberframe-gate-content is-blurred">
-          <Component {...props} />
-        </div>
-        <div className="memberframe-gate-overlay">
-          <div className="memberframe-gate-card">
-            <span className="memberframe-lock-icon">
-              <Lock size={18} stroke="currentColor" aria-hidden={true} />
-            </span>
-            <h3 className="memberframe-lock-title">{CONFIG.cardTitle}</h3>
-            <p className="memberframe-lock-description">{CONFIG.cardDescription}</p>
-            <a href={CONFIG.loginPath || "/login"} className="memberframe-lock-cta">
-              Sign In to Access
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  return createGatedSection(Component, CONFIG.requiredTier, "blur");
 }
 
 export function withHideLock(Component: React.ComponentType<any>): React.ComponentType<any> {
-  return function HiddenSection(props: any) {
-    const onCanvas = RenderTarget.current() === RenderTarget.canvas;
-    const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
-
-    useEffect(() => {
-      if (onCanvas) return;
-      let active = true;
-      loadSession().then((res) => {
-        if (active) setSessionResult(res);
-      });
-      return () => {
-        active = false;
-      };
-    }, [onCanvas]);
-
-    const session = sessionResult?.kind === "member" ? sessionResult.session : null;
-    const entitled = isEntitled(session, CONFIG.requiredTier);
-
-    if (onCanvas || entitled) {
-      return <Component {...props} />;
-    }
-
-    return null;
-  };
+  return createGatedSection(Component, CONFIG.requiredTier, "hide");
 }
+
+// ---------------------------------------------------------------------------
+// TIER-SPECIFIC OVERRIDES: Frosted Blur Teaser + Lock Card
+// ---------------------------------------------------------------------------
+export function withSignedInOnly(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "signed_in", "blur");
+}
+
+export function withFreeTier(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "free_member", "blur");
+}
+
+export function withSilverTier(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "tier_1", "blur");
+}
+
+export function withGoldTier(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "tier_2", "blur");
+}
+
+export function withVipTier(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "vip", "blur");
+}
+
+// ---------------------------------------------------------------------------
+// TIER-SPECIFIC OVERRIDES: Completely Hidden if not authorized
+// ---------------------------------------------------------------------------
+export function withSignedInHide(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "signed_in", "hide");
+}
+
+export function withFreeTierHide(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "free_member", "hide");
+}
+
+export function withSilverTierHide(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "tier_1", "hide");
+}
+
+export function withGoldTierHide(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "tier_2", "hide");
+}
+
+export function withVipTierHide(Component: React.ComponentType<any>): React.ComponentType<any> {
+  return createGatedSection(Component, "vip", "hide");
+}
+
 

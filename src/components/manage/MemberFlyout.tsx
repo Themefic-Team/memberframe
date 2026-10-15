@@ -5,6 +5,14 @@ import type { SiteMemberRecord } from "../../types/site";
 import { SELECTABLE_TIER_KEYS } from "./tierValidation";
 import { REQUIRED_TIER_LABELS, type TierKey } from "../../types/member";
 import { statusLabel, tierLabel } from "./memberFilters";
+import {
+  displayValue,
+  isFieldVisible,
+  isSafeUrl,
+  type CustomFieldDefinition,
+  type MemberMetadata,
+} from "../../utils/customFields";
+import { cn } from "../../utils/cn";
 
 export type MemberAction =
   | { kind: "change_tier"; tier: TierKey }
@@ -17,7 +25,64 @@ export interface MemberFlyoutProps {
   busy: boolean;
   onAction: (action: MemberAction) => void;
   onClose: () => void;
+  /** FP-09. Empty hides the profile section entirely. */
+  profileFields?: ReadonlyArray<CustomFieldDefinition>;
 }
+
+/**
+ * The member's answers to the site's profile fields. FP-09 section 3.3, PRD
+ * F16's "collected metadata appears on the member record in the Manage tab".
+ *
+ * Read only. A creator editing a member's answers is a different feature with
+ * its own endpoint and its own audit question, and nothing has asked for it.
+ *
+ * A web address is a link only when it passes `isSafeUrl`. The server refuses
+ * anything else on the way in, so this is a second check rather than the only
+ * one, and it is the one that matters if a value predates the rule: an href of
+ * `javascript:` inside the Framer editor would run in the plugin's frame.
+ */
+const MemberProfileValues: React.FC<{
+  fields: ReadonlyArray<CustomFieldDefinition>;
+  metadata: MemberMetadata | undefined;
+}> = ({ fields, metadata }) => {
+  if (!metadata) {
+    // A server older than FP-09 sends no metadata at all. Saying "Not answered"
+    // eight times would accuse the member of something the server did not say.
+    return (
+      <p className="member-flyout-note">Profile answers are not available from the server yet.</p>
+    );
+  }
+
+  const visible = fields.filter((field) => isFieldVisible(field, metadata));
+
+  return (
+    <div className="member-profile" role="group" aria-label="Profile">
+      <span className="member-profile-title">Profile</span>
+      <dl className="member-profile-list">
+        {visible.map((field) => {
+          const value = metadata[field.key];
+          const text = displayValue(field, value);
+          const answered = text !== "Not answered";
+
+          return (
+            <div className="member-profile-row" key={field.key}>
+              <dt className="member-profile-label">{field.label}</dt>
+              <dd className={cn("member-profile-value", !answered && "is-empty")}>
+                {field.type === "url" && typeof value === "string" && isSafeUrl(value) ? (
+                  <a href={value} target="_blank" rel="noopener noreferrer">
+                    {value}
+                  </a>
+                ) : (
+                  text
+                )}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+};
 
 const TIER_OPTIONS: ReadonlyArray<{ value: TierKey; label: string }> = SELECTABLE_TIER_KEYS.map(
   (key) => ({ value: key, label: REQUIRED_TIER_LABELS[key] })
@@ -44,6 +109,7 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
   busy,
   onAction,
   onClose,
+  profileFields = [],
 }) => {
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
 
@@ -147,6 +213,10 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
           </Button>
         )}
       </div>
+
+      {profileFields.length > 0 ? (
+        <MemberProfileValues fields={profileFields} metadata={member.metadata} />
+      ) : null}
 
       <p className="member-flyout-note">
         {`Changes apply on this member's next session check. Currently ${tierLabel(member.tier)}.`}

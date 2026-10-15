@@ -32,6 +32,8 @@
 import memberGateSource from "../canvas-components/MemberGate.tsx?raw";
 import memberAuthSource from "../canvas-components/MemberAuth.tsx?raw";
 import memberDashboardSource from "../canvas-components/MemberDashboard.tsx?raw";
+import onboardingModalSource from "../canvas-components/OnboardingModal.tsx?raw";
+import { isSafeSitePath } from "./siteSettingsService";
 import { SESSION_CACHE_TTL_MS, deployBaseUrl } from "../config/backend";
 import {
   AUTH_RADIUS_MAX,
@@ -43,6 +45,11 @@ import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
   DEFAULT_MEMBER_GATE_CONFIG,
+  DEFAULT_ONBOARDING_MODAL_CONFIG,
+  ONBOARDING_RADIUS_MAX,
+  ONBOARDING_RADIUS_MIN,
+  type OnboardingModalConfig,
+  type AuthScreen,
   type GateFallbackAction,
   type MemberAuthConfig,
   type MemberDashboardConfig,
@@ -235,6 +242,14 @@ export interface DeployContext {
   loginPath: string;
   /** Site-relative. Where signing out lands. */
   afterLogoutPath: string;
+  /**
+   * Site-relative. The sign up and reset pages a dedicated `<MemberLogin>`
+   * links to. Optional so the existing call sites and tests that predate the
+   * dedicated screens still describe a complete context; absent means the
+   * settings defaults.
+   */
+  signupPath?: string;
+  resetPath?: string;
 }
 
 /**
@@ -289,6 +304,13 @@ export interface CanvasComponentDescriptor<Config> {
   normalize: (config: Config) => Config;
   /** The object body, one `  key: value,` line each, markers excluded. */
   serializeFields: (config: Config, context: DeployContext) => ReadonlyArray<string>;
+  /**
+   * A rewrite applied after the config block is swapped, for a deployment that
+   * needs more than different values. The dedicated auth screens use it to
+   * rename the export, so Framer lists `MemberLogin` rather than a second
+   * `MemberAuth`. Must throw `CodeGenerationError` when it cannot apply.
+   */
+  transform?: (code: string) => string;
 }
 
 /**
@@ -333,7 +355,8 @@ export function generateComponentCode<Config>(
 ): GeneratedCanvasFile<Config> {
   const source = sourceOverride ?? descriptor.source;
   const normalized = descriptor.normalize(config);
-  const code = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized, context));
+  const replaced = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized, context));
+  const code = descriptor.transform ? descriptor.transform(replaced) : replaced;
 
   return { fileName: descriptor.fileName, code, config: normalized };
 }
@@ -477,13 +500,68 @@ export function isSafeCssColor(value: string): boolean {
   return false;
 }
 
-export const MEMBER_AUTH_DESCRIPTOR: CanvasComponentDescriptor<MemberAuthConfig> = {
-  id: "member_auth",
-  fileName: MEMBER_AUTH_FILE_NAME,
-  source: memberAuthSource,
-  configTypeName: "AuthConfig",
-  normalize: normalizeAuthConfig,
-  serializeFields: (config, context) => [
+/**
+ * One descriptor per auth deployment, all from `MemberAuth.tsx`.
+ *
+ * `all` is `<MemberAuth>` unchanged. The other four bake a screen in and rename
+ * the export. Every one emits the same config fields, because the authored
+ * interface declares them all and a missing one is a type error in Framer.
+ */
+function authDescriptor(
+  screen: AuthScreen,
+  id: string,
+  fileName: string,
+  componentName: string
+): CanvasComponentDescriptor<MemberAuthConfig> {
+  return {
+    id,
+    fileName,
+    source: memberAuthSource,
+    configTypeName: "AuthConfig",
+    normalize: normalizeAuthConfig,
+    serializeFields: (config, context) => [
+      ...authFields(config, context),
+      `  screen: ${encodeLiteral(screen)},`,
+      `  loginPath: ${encodeLiteral(context.loginPath || "/login")},`,
+      // The login page links to sign up only when the creator has given it its
+      // own page. Settings defaults sign up to the login path, and a link from
+      // the login page to itself is a reload, so it is emitted empty instead.
+      `  signupPath: ${encodeLiteral(
+        context.signupPath && context.signupPath !== context.loginPath ? context.signupPath : ""
+      )},`,
+      `  resetPath: ${encodeLiteral(context.resetPath ?? "/reset-password")},`,
+      `  otpPath: ${encodeLiteral("")},`,
+    ],
+    transform:
+      componentName === "MemberAuth" ? undefined : (code) => renameComponent(code, componentName),
+  };
+}
+
+/**
+ * Rename the default export and its property controls.
+ *
+ * Both occurrences are asserted exactly once. A rename that missed the
+ * `addPropertyControls` call would deploy a component with no sidebar controls
+ * and no error anywhere, so a source edit that breaks either pattern stops
+ * generation instead.
+ */
+function renameComponent(code: string, name: string): string {
+  const declaration = "export default function MemberAuth(";
+  const controls = "addPropertyControls(MemberAuth,";
+
+  if (occurrences(code, declaration) !== 1 || occurrences(code, controls) !== 1) {
+    throw new CodeGenerationError(
+      `Cannot rename MemberAuth to ${name}: expected exactly one default export and one addPropertyControls call.`
+    );
+  }
+
+  return code
+    .replace(declaration, `export default function ${name}(`)
+    .replace(controls, `addPropertyControls(${name},`);
+}
+
+function authFields(config: MemberAuthConfig, context: DeployContext): string[] {
+  return [
     `  authMode: ${encodeLiteral(config.authMode)},`,
     `  headline: ${encodeLiteral(config.headline)},`,
     `  welcomeMessage: ${encodeLiteral(config.welcomeMessage)},`,
@@ -500,8 +578,78 @@ export const MEMBER_AUTH_DESCRIPTOR: CanvasComponentDescriptor<MemberAuthConfig>
     `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
     `  siteKey: ${encodeLiteral(context.siteKey)},`,
     `  afterLoginPath: ${encodeLiteral(context.afterLoginPath)},`,
-  ],
+  ];
+}
+
+export const MEMBER_AUTH_DESCRIPTOR = authDescriptor(
+  "all",
+  "member_auth",
+  MEMBER_AUTH_FILE_NAME,
+  "MemberAuth"
+);
+
+/* ---- The four dedicated screens ---- */
+
+export const AUTH_SCREEN_DESCRIPTORS = {
+  member_login: authDescriptor("login", "member_login", "MemberLogin.tsx", "MemberLogin"),
+  member_register: authDescriptor(
+    "register",
+    "member_register",
+    "MemberRegister.tsx",
+    "MemberRegister"
+  ),
+  member_password_reset: authDescriptor(
+    "reset",
+    "member_password_reset",
+    "MemberPasswordReset.tsx",
+    "MemberPasswordReset"
+  ),
+  member_otp_verify: authDescriptor(
+    "otp",
+    "member_otp_verify",
+    "MemberOtpVerify.tsx",
+    "MemberOtpVerify"
+  ),
+} as const;
+
+export type AuthScreenComponentId = keyof typeof AUTH_SCREEN_DESCRIPTORS;
+
+/**
+ * What each dedicated screen says before the creator edits it. The combined
+ * component's "Sign in to continue" would be wrong on three of the four.
+ */
+export const AUTH_SCREEN_DEFAULTS: Record<AuthScreenComponentId, MemberAuthConfig> = {
+  member_login: {
+    ...DEFAULT_MEMBER_AUTH_CONFIG,
+    headline: "Welcome back",
+    welcomeMessage: "Sign in to your account.",
+  },
+  member_register: {
+    ...DEFAULT_MEMBER_AUTH_CONFIG,
+    headline: "Create your account",
+    welcomeMessage: "Join to unlock members-only content.",
+  },
+  member_password_reset: {
+    ...DEFAULT_MEMBER_AUTH_CONFIG,
+    headline: "Reset your password",
+    welcomeMessage: "Enter your email and we will send you a reset link.",
+  },
+  member_otp_verify: {
+    ...DEFAULT_MEMBER_AUTH_CONFIG,
+    headline: "Sign in with a code",
+    welcomeMessage: "We will email you a six digit code. No password needed.",
+    defaultAuthMethod: "otp",
+  },
 };
+
+export function generateAuthScreenCode(
+  id: AuthScreenComponentId,
+  config: MemberAuthConfig = AUTH_SCREEN_DEFAULTS[id],
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<MemberAuthConfig> {
+  return generateComponentCode(AUTH_SCREEN_DESCRIPTORS[id], config, source, context);
+}
 
 export function generateMemberAuthCode(
   config: MemberAuthConfig,
@@ -530,6 +678,7 @@ export function normalizeDashboardConfig(config: MemberDashboardConfig): MemberD
     showTier: config.showTier !== false,
     showBilling: config.showBilling !== false,
     showSignOut: config.showSignOut !== false,
+    showProfile: config.showProfile !== false,
     signedOutMessage: String(config.signedOutMessage ?? "").slice(0, 240),
     // The same sanitizer the component applies at runtime. Applying it here as
     // well means an unsafe value never reaches the creator's project file, not
@@ -555,6 +704,7 @@ export const MEMBER_DASHBOARD_DESCRIPTOR: CanvasComponentDescriptor<MemberDashbo
     `  showTier: ${config.showTier},`,
     `  showBilling: ${config.showBilling},`,
     `  showSignOut: ${config.showSignOut},`,
+    `  showProfile: ${config.showProfile},`,
     `  signedOutMessage: ${encodeLiteral(config.signedOutMessage)},`,
     `  accentColor: ${encodeLiteral(config.accentColor)},`,
     `  borderRadius: ${config.borderRadius},`,
@@ -571,4 +721,63 @@ export function generateMemberDashboardCode(
   context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): GeneratedCanvasFile<MemberDashboardConfig> {
   return generateComponentCode(MEMBER_DASHBOARD_DESCRIPTOR, config, source, context);
+}
+
+/* ==========================================================================
+   ONBOARDING MODAL, feature plan FP-09, PRD feature F16, task 6.3
+   ========================================================================== */
+
+export const ONBOARDING_MODAL_FILE_NAME = "OnboardingModal.tsx";
+
+/**
+ * Clamp and whitelist before emission, same contract as the other three.
+ *
+ * `completionRedirect` is dropped to empty unless it is a site-relative path.
+ * The component checks again at runtime, and checking here as well means an
+ * off-site address never reaches the creator's project file at all.
+ */
+export function normalizeOnboardingConfig(config: OnboardingModalConfig): OnboardingModalConfig {
+  const redirect = String(config.completionRedirect ?? "").trim();
+
+  return {
+    welcomeTitle: sanitizeText(String(config.welcomeTitle ?? ""), MAX_CARD_TITLE),
+    welcomeMessage: sanitizeText(String(config.welcomeMessage ?? ""), MAX_CARD_DESCRIPTION),
+    showStepIndicator: config.showStepIndicator !== false,
+    allowSkip: config.allowSkip !== false,
+    completionRedirect: redirect !== "" && isSafeSitePath(redirect) ? redirect : "",
+    accentColor: isSafeCssColor(config.accentColor)
+      ? config.accentColor
+      : DEFAULT_ONBOARDING_MODAL_CONFIG.accentColor,
+    borderRadius: Math.max(
+      ONBOARDING_RADIUS_MIN,
+      Math.min(ONBOARDING_RADIUS_MAX, Math.round(Number(config.borderRadius) || 0))
+    ),
+  };
+}
+
+export const ONBOARDING_MODAL_DESCRIPTOR: CanvasComponentDescriptor<OnboardingModalConfig> = {
+  id: "onboarding_modal",
+  fileName: ONBOARDING_MODAL_FILE_NAME,
+  source: onboardingModalSource,
+  configTypeName: "OnboardingConfig",
+  normalize: normalizeOnboardingConfig,
+  serializeFields: (config, context) => [
+    `  welcomeTitle: ${encodeLiteral(config.welcomeTitle)},`,
+    `  welcomeMessage: ${encodeLiteral(config.welcomeMessage)},`,
+    `  showStepIndicator: ${config.showStepIndicator},`,
+    `  allowSkip: ${config.allowSkip},`,
+    `  completionRedirect: ${encodeLiteral(config.completionRedirect)},`,
+    `  accentColor: ${encodeLiteral(config.accentColor)},`,
+    `  borderRadius: ${config.borderRadius},`,
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+  ],
+};
+
+export function generateOnboardingModalCode(
+  config: OnboardingModalConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<OnboardingModalConfig> {
+  return generateComponentCode(ONBOARDING_MODAL_DESCRIPTOR, config, source, context);
 }

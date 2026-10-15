@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
+  Code2,
   Copy,
   ExternalLink,
   Layers,
   Plus,
   Save,
   ShieldCheck,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { Banner, Button, FieldRow, FieldRows, IconButton, Select, TextField, Toggle } from "../ui";
@@ -66,6 +66,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
   const [customPathActive, setCustomPathActive] = useState<Record<number, boolean>>({});
   const [customRedirectActive, setCustomRedirectActive] = useState<Record<number, boolean>>({});
   const [expandedRules, setExpandedRules] = useState<Record<number, boolean>>({ 0: true });
+  const [gatingMethod, setGatingMethod] = useState<"overrides" | "component">("overrides");
 
   const shieldSnippet = `<script src="${deployContext.apiBaseUrl}/api/member/shield.js?site=${deployContext.siteKey || "YOUR_SITE_KEY"}"></script>`;
 
@@ -273,18 +274,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
       {/* GLOBAL ROUTE SHIELD (RECOMMENDED ZERO-FOUC ENGINE)                 */}
       {/* ------------------------------------------------------------------ */}
       <section className="section-group">
-        <div className="section-header-row">
-          <div className="shield-section-title-wrap">
-            <h2 className="section-title">Global Route Shield</h2>
-            <span className="shield-badge-recommended">
-              <ShieldCheck size={12} stroke="currentColor" aria-hidden={true} />
-              <span>Recommended • Zero Flash</span>
-            </span>
-          </div>
-          <span className="section-subtitle">
-            Lock entire pages across your site with 0ms content flash and zero canvas setup.
-          </span>
-        </div>
+         
 
         <div className="shield-code-card">
           <div className="shield-code-desc">
@@ -518,7 +508,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                         disabled={deployingGate || saving || !rule.enabled}
                         onClick={() => void handleDeployGateForRule(rule)}
                       >
-                        <Sparkles size={13} stroke="currentColor" aria-hidden={true} />
+                        <Code2 size={13} stroke="currentColor" aria-hidden={true} />
                         <span>Deploy Gate</span>
                       </Button>
                     </div>
@@ -538,33 +528,149 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
       </section>
 
       <section className="section-group">
-        <h2 className="section-title">On-Page Section Gating</h2>
-        <div className="onpage-guide-card">
-          <div className="onpage-guide-head">
-            <span className="onpage-guide-badge">
-              <Layers size={13} stroke="currentColor" aria-hidden={true} />
-              <span>Zero-Setup • Native Frames</span>
-            </span>
-            <h3 className="onpage-guide-title">Lock Any Section, Stack or Grid</h3>
-          </div>
-          <p className="onpage-guide-text">
-            Lock any native Framer Frame directly without creating components or dealing with empty slot dropdowns:
-          </p>
+        <div className="section-header-row">
+          <h2 className="section-title">On-Page Section Gating</h2>
+          <span className="section-subtitle">
+            Gate individual sections, stacks, or components inside any page for different member tiers.
+          </span>
+        </div>
 
-          <ol className="onpage-guide-steps">
-            <li>
-              <strong>1. Normal Section:</strong> Design your Section, Stack, or Grid normally on canvas and drag &amp; drop any child layers inside.
-            </li>
-            <li>
-              <strong>2. Attach Override:</strong> Select that Frame, scroll to the bottom of Framer&apos;s right sidebar to <strong>Code overrides</strong>.
-            </li>
-            <li>
-              <strong>3. Select Gate:</strong> Choose File: <code>MemberGate</code> &rarr; Override: <code>withMemberGate</code> (or <code>withBlurLock</code> / <code>withHideLock</code>).
-            </li>
-            <li>
-              <strong>4. Done!</strong> Anything inside that native Section automatically locks and unlocks for authenticated members.
-            </li>
-          </ol>
+        <div className="onpage-guide-card">
+          <div className="onpage-tab-bar" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={gatingMethod === "overrides"}
+              className={cn("onpage-tab-btn", gatingMethod === "overrides" && "is-active")}
+              onClick={() => setGatingMethod("overrides")}
+            >
+              <Code2 size={13} stroke="currentColor" aria-hidden={true} />
+              <span>Method 1: Code Overrides (Per-Frame)</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={gatingMethod === "component"}
+              className={cn("onpage-tab-btn", gatingMethod === "component" && "is-active")}
+              onClick={() => setGatingMethod("component")}
+            >
+              <Layers size={13} stroke="currentColor" aria-hidden={true} />
+              <span>Method 2: Canvas Component</span>
+            </button>
+          </div>
+
+          {gatingMethod === "overrides" ? (
+            <>
+              <div className="onpage-guide-head">
+                <span className="onpage-guide-badge">
+                  <Code2 size={12} stroke="currentColor" aria-hidden={true} />
+                  <span>Framer Code Overrides</span>
+                </span>
+                <h3 className="onpage-guide-title">Multi-Tier Section Locking via Overrides</h3>
+              </div>
+              <p className="onpage-guide-text">
+                Select any native Frame, Stack, or Grid on the canvas and attach an override. You can attach different overrides to different frames on the same page:
+              </p>
+
+              <ol className="onpage-guide-steps">
+                <li>
+                  <strong>Select Frame:</strong> Click the Frame, Stack, or Grid on canvas you want to restrict.
+                </li>
+                <li>
+                  <strong>Open Code Overrides:</strong> In Framer&apos;s right sidebar, scroll to the bottom to <strong>Code overrides</strong>.
+                </li>
+                <li>
+                  <strong>Choose File:</strong> Select File: <code>MemberGate</code>.
+                </li>
+                <li>
+                  <strong>Pick Override for Tier:</strong> Select the override matching that section&apos;s target tier:
+                </li>
+              </ol>
+
+              <div className="onpage-tier-table-wrap">
+                <table className="onpage-tier-table">
+                  <thead>
+                    <tr>
+                      <th>Required Tier</th>
+                      <th>Frosted Lock Card</th>
+                      <th>Completely Hide</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Any Signed In</td>
+                      <td><code>withSignedInOnly</code></td>
+                      <td><code>withSignedInHide</code></td>
+                    </tr>
+                    <tr>
+                      <td>Free Member</td>
+                      <td><code>withFreeTier</code></td>
+                      <td><code>withFreeTierHide</code></td>
+                    </tr>
+                    <tr>
+                      <td>Tier 1: Silver</td>
+                      <td><code>withSilverTier</code></td>
+                      <td><code>withSilverTierHide</code></td>
+                    </tr>
+                    <tr>
+                      <td>Tier 2: Gold</td>
+                      <td><code>withGoldTier</code></td>
+                      <td><code>withGoldTierHide</code></td>
+                    </tr>
+                    <tr>
+                      <td>VIP Member</td>
+                      <td><code>withVipTier</code></td>
+                      <td><code>withVipTierHide</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="onpage-example-box">
+                <span className="onpage-example-title">Multi-Tier Example on a Single Page:</span>
+                <p className="onpage-example-text">
+                  To serve different content to different tiers on the same page, design separate frames side-by-side or stacked on your canvas:
+                </p>
+                <p className="onpage-example-text">
+                  • <strong>Frame A (Free):</strong> Code overrides &rarr; <code>withFreeTier</code><br />
+                  • <strong>Frame B (Silver):</strong> Code overrides &rarr; <code>withSilverTier</code><br />
+                  • <strong>Frame C (Gold):</strong> Code overrides &rarr; <code>withGoldTier</code><br />
+                  • <strong>Frame D (VIP):</strong> Code overrides &rarr; <code>withVipTier</code>
+                </p>
+                <p className="onpage-example-text">
+                  Framer automatically checks the visitor&apos;s session rank and renders only the authorized sections for each member tier.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="onpage-guide-head">
+                <span className="onpage-guide-badge">
+                  <Layers size={12} stroke="currentColor" aria-hidden={true} />
+                  <span>Visual Canvas Component</span>
+                </span>
+                <h3 className="onpage-guide-title">Visual MemberGate Component</h3>
+              </div>
+              <p className="onpage-guide-text">
+                Use the visual <code>&lt;MemberGate&gt;</code> component from Framer&apos;s component library to wrap and protect frames:
+              </p>
+
+              <ol className="onpage-guide-steps">
+                <li>
+                  <strong>Add to Canvas:</strong> Open Framer&apos;s Assets or Components panel and drag <code>MemberGate</code> onto your page.
+                </li>
+                <li>
+                  <strong>Connect Frame:</strong> In Framer&apos;s right sidebar, link your section to the <strong>Protected Frame</strong> slot.
+                </li>
+                <li>
+                  <strong>Configure Tier &amp; Action:</strong> Use Framer&apos;s property controls to choose the <strong>Access Tier</strong> (Signed In, Free, Silver, Gold, VIP) and <strong>Locked State</strong> (Frosted Blur, Completely Hide, or Redirect).
+                </li>
+                <li>
+                  <strong>Multi-Tier Setup:</strong> You can add multiple <code>MemberGate</code> components onto the same page, each with its own Access Tier property control setting.
+                </li>
+              </ol>
+            </>
+          )}
 
           <div className="onpage-guide-actions">
             <Button
@@ -572,7 +678,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
               onClick={handleDeployGate}
               disabled={deployingGate || saving}
             >
-              <Sparkles size={14} stroke="currentColor" aria-hidden={true} />
+              <Code2 size={14} stroke="currentColor" aria-hidden={true} />
               <span>{deployingGate ? "Updating..." : "Deploy / Update MemberGate Code"}</span>
             </Button>
             {onNavigateToBuilder ? (

@@ -11,6 +11,7 @@
  */
 
 import type { MemberStatus, TierKey, TierLadderEntry } from "./member";
+import type { MemberMetadata } from "../utils/customFields";
 
 /**
  * The currencies PRD section 8 F03 names on `SiteGatewayConfig.defaultCurrency`.
@@ -66,6 +67,13 @@ export interface SiteMemberRecord {
   lifetimeSpend: number;
   currency: CurrencyCode;
   gateway: GatewayId;
+  /**
+   * FP-09. The member's custom field values, keyed by field key, already
+   * filtered by the server to fields that exist and apply. Optional because a
+   * backend older than FP-09 does not send it, and the flyout must render
+   * either way.
+   */
+  metadata?: MemberMetadata;
 }
 
 /**

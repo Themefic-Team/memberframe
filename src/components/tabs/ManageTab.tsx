@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link2 } from "lucide-react";
 import { EmptyState, Segmented, useToast } from "../ui";
 import { MembersTable } from "../manage/MembersTable";
@@ -20,6 +20,7 @@ import {
 import type { MemberPage, SiteMemberRecord, SiteTierRecord } from "../../types/site";
 import { parseMinor } from "../../utils/money";
 import { useConnection } from "../../hooks/useConnection";
+import { readDefinitions } from "../../utils/customFields";
 
 type Segment = "members" | "tiers";
 
@@ -52,7 +53,11 @@ const SEGMENTS = [
  * them looking for a problem that is not there.
  */
 export const ManageTab: React.FC = () => {
-  const { connection } = useConnection();
+  const { connection, settings } = useConnection();
+
+  // FP-09. The definitions say which values a member's flyout shows and how
+  // each is labelled; the values themselves arrive on each member record.
+  const profileFields = useMemo(() => readDefinitions(settings?.customFields), [settings]);
   const siteId = connection?.siteId ?? null;
 
   const [segment, setSegment] = useState<Segment>("members");
@@ -239,6 +244,7 @@ export const ManageTab: React.FC = () => {
           onFiltersChange={handleFiltersChange}
           onMemberAction={(member, action) => void handleMemberAction(member, action)}
           onCreateFirstTier={() => setSegment("tiers")}
+          profileFields={profileFields}
         />
       ) : (
         <TierEditor

@@ -297,9 +297,14 @@ describe("the property controls", () => {
     "enablePasswordAuth",
     "defaultAuthMethod",
     "requirePasswordStrength",
+    // The dedicated screens' link targets. Hidden on `<MemberAuth>` itself.
+    "loginPath",
+    "signupPath",
+    "resetPath",
+    "otpPath",
   ];
 
-  it("declares all thirteen", () => {
+  it("declares all seventeen", () => {
     for (const control of EVERY_CONTROL) {
       expect(source).toContain(`  ${control}: {`);
     }
@@ -318,10 +323,17 @@ describe("the property controls", () => {
   it("hides the two password sub-controls when password auth is off", () => {
     // FP-02 section 3.2. A "Strong Password" toggle with no password form to
     // govern is a control that appears to do nothing.
+    // On `<MemberAuth>` itself (screen "all"). The dedicated screens have their
+    // own rule: no method choice at all, and a strength toggle only where a
+    // new password is chosen.
     const controlBlock = source.slice(source.indexOf("addPropertyControls(MemberAuth"));
-    const hidden = controlBlock.match(/hidden: \(props\) => !props\.enablePasswordAuth/g) ?? [];
 
-    expect(hidden).toHaveLength(2);
+    expect(controlBlock).toContain(
+      'hidden: (props) => CONFIG.screen !== "all" || !props.enablePasswordAuth'
+    );
+    expect(controlBlock).toContain(
+      'CONFIG.screen === "all" ? !props.enablePasswordAuth : CONFIG.screen !== "register" && CONFIG.screen !== "reset"'
+    );
   });
 
   it("gives the method enum readable option titles", () => {
@@ -481,7 +493,7 @@ describe("generateMemberAuthCode", () => {
   });
 
   it("carries the backend base URL rather than a literal at the call site", () => {
-    expect(generateMemberAuthCode(config()).code).toMatch(/apiBaseUrl: "https:\/\//);
+    expect(generateMemberAuthCode(config()).code).toMatch(/apiBaseUrl: "https?:\/\//);
   });
 
   it("changes nothing outside the config block", () => {

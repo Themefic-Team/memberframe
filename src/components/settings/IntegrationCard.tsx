@@ -145,13 +145,15 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
       }
     }
 
+    // One write, not two. `onSave` already stores `enabled: true` whenever
+    // there are values. A separate enable call here fired a second request
+    // with the same settings version: one of the two was refused as out of
+    // date, and when the enable won it wrote the OLD empty values, so a
+    // creator's Save was lost behind a success toast.
     onSave(valuesToSave);
     setRevealed([]);
-    if (!stored.enabled) {
-      onToggleEnabled(true);
-    }
     setOpen(false);
-  }, [defaultRedirectUrl, definition, draft, onSave, onToggleEnabled, secretsSupported, stored]);
+  }, [defaultRedirectUrl, definition, draft, onSave, secretsSupported, stored]);
 
   const toggleReveal = useCallback((key: string) => {
     setRevealed((current) =>

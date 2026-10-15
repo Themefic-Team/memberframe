@@ -70,6 +70,22 @@ type AuthDisplayMode = "inline" | "modal";
 type OAuthProvider = "google" | "apple" | "github" | "discord";
 type AuthMethod = "password" | "otp";
 
+/**
+ * Which flows this deployment offers.
+ *
+ * `all` is `<MemberAuth>` itself: every flow in one box, switched by tabs and
+ * links. The other four are the dedicated components the plugin deploys from
+ * this same file, `<MemberLogin>`, `<MemberRegister>`, `<MemberPasswordReset>`,
+ * and `<MemberOtpVerify>`, one flow each and one page each.
+ *
+ * One authored file rather than five. The flows share the session cookie, the
+ * site key header, the OAuth origin check, the password policy, and the open
+ * redirect guard, and five copies of those are five places for a security fix
+ * to be missed. The generator bakes the screen in and renames the export, so a
+ * creator sees five separate components and the repository holds one.
+ */
+type AuthScreen = "all" | "login" | "register" | "reset" | "otp";
+
 interface AuthConfig {
   authMode: AuthDisplayMode;
   headline: string;
@@ -108,7 +124,23 @@ interface AuthConfig {
    * the shape a phishing hop wants.
    */
   afterLoginPath: string;
+  /** See `AuthScreen`. Baked in by the generator, never a property control. */
+  screen: AuthScreen;
+  /**
+   * The pages a dedicated screen links to, site-relative. Unused by `all`,
+   * which switches views in place. An empty or unsafe value hides its link
+   * rather than sending a visitor somewhere that may not exist.
+   */
+  loginPath: string;
+  signupPath: string;
+  resetPath: string;
+  otpPath: string;
 }
+
+const ENV_API_BASE_URL =
+  (typeof import.meta !== "undefined" &&
+    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
+  "";
 
 // @memberframe-config-start
 const CONFIG: AuthConfig = {
@@ -125,9 +157,14 @@ const CONFIG: AuthConfig = {
   enablePasswordAuth: true,
   defaultAuthMethod: "password",
   requirePasswordStrength: true,
-  apiBaseUrl: "https://api.memberframe.framefic.com",
+  apiBaseUrl: ENV_API_BASE_URL,
   siteKey: "",
   afterLoginPath: "",
+  screen: "all",
+  loginPath: "/login",
+  signupPath: "",
+  resetPath: "/reset-password",
+  otpPath: "",
 };
 // @memberframe-config-end
 
@@ -214,6 +251,27 @@ function redirectAfterAuth(): void {
   if (typeof window === "undefined") return;
   if (window.location.pathname === path) return;
 
+  window.location.assign(path);
+}
+
+/**
+ * Can a dedicated screen link to this page?
+ *
+ * The same four rules as `redirectAfterAuth`, for the same reason: the value
+ * comes from a property control and ends up in the address bar. On the
+ * published site a link to the page the visitor is already on is hidden too,
+ * which is the common case of a creator who kept sign in and sign up on one
+ * path: "Create an account" would only reload the sign in form.
+ */
+function linkablePath(path: string, onCanvas: boolean): boolean {
+  if (path === "" || !path.startsWith("/")) return false;
+  if (path.startsWith("//") || path.includes("\\")) return false;
+  if (onCanvas || typeof window === "undefined") return true;
+  return window.location.pathname !== path;
+}
+
+function goTo(path: string): void {
+  if (!linkablePath(path, false)) return;
   window.location.assign(path);
 }
 
@@ -1129,6 +1187,11 @@ export interface MemberAuthProps {
   enablePasswordAuth?: boolean;
   defaultAuthMethod?: AuthMethod;
   requirePasswordStrength?: boolean;
+  /** Dedicated screens only. See `AuthConfig`. */
+  loginPath?: string;
+  signupPath?: string;
+  resetPath?: string;
+  otpPath?: string;
   /** Modal mode only. Framer wires this to an interaction. */
   onClose?: () => void;
 }
@@ -1138,18 +1201,40 @@ export default function MemberAuth(props: MemberAuthProps) {
     authMode = CONFIG.authMode,
     headline = CONFIG.headline,
     welcomeMessage = CONFIG.welcomeMessage,
-    emailEnabled = CONFIG.emailEnabled,
-    googleEnabled = CONFIG.googleEnabled,
-    appleEnabled = CONFIG.appleEnabled,
-    githubEnabled = CONFIG.githubEnabled,
-    discordEnabled = CONFIG.discordEnabled,
+    emailEnabled: emailControl = CONFIG.emailEnabled,
+    googleEnabled: googleControl = CONFIG.googleEnabled,
+    appleEnabled: appleControl = CONFIG.appleEnabled,
+    githubEnabled: githubControl = CONFIG.githubEnabled,
+    discordEnabled: discordControl = CONFIG.discordEnabled,
     accentColor = CONFIG.accentColor,
     borderRadius = CONFIG.borderRadius,
-    enablePasswordAuth = CONFIG.enablePasswordAuth,
+    enablePasswordAuth: passwordControl = CONFIG.enablePasswordAuth,
     defaultAuthMethod = CONFIG.defaultAuthMethod,
     requirePasswordStrength = CONFIG.requirePasswordStrength,
+    loginPath = CONFIG.loginPath,
+    signupPath = CONFIG.signupPath,
+    resetPath = CONFIG.resetPath,
+    otpPath = CONFIG.otpPath,
     onClose,
   } = props;
+
+  /*
+    A dedicated screen fixes what the general controls would otherwise decide.
+    Every one of the four is an email form, so email is on; the three password
+    screens have password on; and the reset and code screens offer no provider
+    buttons, because "Continue with Google" on a reset page signs someone in
+    when they asked to reset. The controls these override are hidden in the
+    sidebar for the dedicated components, so nothing appears to do nothing.
+  */
+  const screen = CONFIG.screen;
+  const dedicated = screen !== "all";
+  const emailEnabled = dedicated ? true : emailControl;
+  const enablePasswordAuth = dedicated ? screen !== "otp" : passwordControl;
+  const providersAllowed = screen === "all" || screen === "login" || screen === "register";
+  const googleEnabled = providersAllowed && googleControl;
+  const appleEnabled = providersAllowed && appleControl;
+  const githubEnabled = providersAllowed && githubControl;
+  const discordEnabled = providersAllowed && discordControl;
 
   /**
    * A CSS-safe scope for this instance, so two sign-in boxes on one page with
@@ -1184,6 +1269,10 @@ export default function MemberAuth(props: MemberAuthProps) {
   const [resetToken, setResetToken] = useState<string | null>(() => readResetToken());
 
   const [view, setView] = useState<AuthView>(() => {
+    if (screen === "login") return "password_signin";
+    if (screen === "register") return "password_signup";
+    if (screen === "otp") return "otp";
+    if (screen === "reset") return readResetToken() !== null ? "reset" : "forgot";
     if (readResetToken() !== null) return "reset";
     if (!enablePasswordAuth) return "otp";
     return defaultAuthMethod === "password" ? "password_signin" : "otp";
@@ -1704,8 +1793,24 @@ export default function MemberAuth(props: MemberAuthProps) {
    * visitor reached from an email. Those three views supply their own and leave
    * the creator's control governing the view it was written for.
    */
-  const viewHeadline =
-    view === "password_signup"
+  // On a dedicated screen the headline control was written for that screen's
+  // main view, so it governs there. Only the reset screen has a second view,
+  // the new-password form an emailed link opens, and that keeps its own words.
+  const primaryView: AuthView | null =
+    screen === "login"
+      ? "password_signin"
+      : screen === "register"
+        ? "password_signup"
+        : screen === "reset"
+          ? "forgot"
+          : screen === "otp"
+            ? "otp"
+            : null;
+  const creatorWords = view === primaryView;
+
+  const viewHeadline = creatorWords
+    ? headline
+    : view === "password_signup"
       ? "Create your account"
       : view === "forgot"
         ? "Reset your password"
@@ -1713,12 +1818,39 @@ export default function MemberAuth(props: MemberAuthProps) {
           ? "Choose a new password"
           : headline;
 
-  const viewWelcome =
-    view === "forgot"
+  const viewWelcome = creatorWords
+    ? welcomeMessage
+    : view === "forgot"
       ? "Enter your email and we will send you a reset link."
       : view === "reset"
         ? "Pick something you have not used on another site."
         : welcomeMessage;
+
+  /**
+   * A link to another flow. In `<MemberAuth>` it switches the view in place;
+   * on a dedicated screen it goes to that flow's page, or is not shown at all
+   * when no usable page is configured.
+   */
+  const flowLink = (label: string, toView: AuthView, toPath: string, onClick?: () => void) => {
+    if (dedicated && !linkablePath(toPath, onCanvas)) return null;
+
+    return (
+      <button
+        type="button"
+        className="memberframe-auth-link"
+        onClick={() => {
+          onClick?.();
+          if (dedicated) {
+            if (!onCanvas) goTo(toPath);
+          } else {
+            setView(toView);
+          }
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
 
   /* ------------------------------------------------------------------------
      FP-02 form pieces
@@ -1864,7 +1996,7 @@ export default function MemberAuth(props: MemberAuthProps) {
    * halfway through, so those views get a back link instead.
    */
   const authTabs =
-    view === "password_signin" || view === "password_signup" ? (
+    !dedicated && (view === "password_signin" || view === "password_signup") ? (
       <div className="memberframe-auth-tabs" role="tablist" aria-label="Sign in or sign up">
         <button
           type="button"
@@ -1886,6 +2018,20 @@ export default function MemberAuth(props: MemberAuthProps) {
         </button>
       </div>
     ) : null;
+
+  /** A row of flow links, or nothing when every link in it was hidden. */
+  const linkRow = (...links: Array<React.ReactElement | null>) => {
+    const shown = links.filter((link): link is React.ReactElement => link !== null);
+    if (shown.length === 0) return null;
+
+    return (
+      <div className="memberframe-auth-links">
+        {shown.map((link, index) => (
+          <React.Fragment key={index}>{link}</React.Fragment>
+        ))}
+      </div>
+    );
+  };
 
   const emailBody = (() => {
     if (awaitingCode) {
@@ -1948,15 +2094,7 @@ export default function MemberAuth(props: MemberAuthProps) {
             <Mail stroke="currentColor" aria-hidden={true} />,
             requestPasswordReset
           )}
-          <div className="memberframe-auth-links">
-            <button
-              type="button"
-              className="memberframe-auth-link"
-              onClick={() => setView("password_signin")}
-            >
-              Back to sign in
-            </button>
-          </div>
+          {linkRow(flowLink("Back to sign in", "password_signin", loginPath))}
         </>
       );
     }
@@ -1984,6 +2122,10 @@ export default function MemberAuth(props: MemberAuthProps) {
             <UserPlus stroke="currentColor" aria-hidden={true} />,
             register
           )}
+          {/* The combined component has tabs for this; a dedicated page needs a way back. */}
+          {dedicated
+            ? linkRow(flowLink("Already have an account? Sign in", "password_signin", loginPath))
+            : null}
         </>
       );
     }
@@ -2008,22 +2150,11 @@ export default function MemberAuth(props: MemberAuthProps) {
             <ArrowRight stroke="currentColor" aria-hidden={true} />,
             signInWithPassword
           )}
-          <div className="memberframe-auth-links">
-            <button
-              type="button"
-              className="memberframe-auth-link"
-              onClick={() => setView("forgot")}
-            >
-              Forgot password?
-            </button>
-            <button
-              type="button"
-              className="memberframe-auth-link"
-              onClick={() => setView("otp")}
-            >
-              Email me a code instead
-            </button>
-          </div>
+          {linkRow(
+            flowLink("Forgot password?", "forgot", resetPath),
+            flowLink("Email me a code instead", "otp", otpPath),
+            dedicated ? flowLink("Create an account", "password_signup", signupPath) : null
+          )}
         </>
       );
     }
@@ -2039,17 +2170,9 @@ export default function MemberAuth(props: MemberAuthProps) {
           () => void sendCode(),
           email.trim() === ""
         )}
-        {passwordPath ? (
-          <div className="memberframe-auth-links">
-            <button
-              type="button"
-              className="memberframe-auth-link"
-              onClick={() => setView("password_signin")}
-            >
-              Use a password instead
-            </button>
-          </div>
-        ) : null}
+        {passwordPath || dedicated
+          ? linkRow(flowLink("Use a password instead", "password_signin", loginPath))
+          : null}
       </>
     );
   })();
@@ -2077,17 +2200,23 @@ export default function MemberAuth(props: MemberAuthProps) {
           <p className="memberframe-auth-welcome">
             {`If ${state.email} has an account, a reset link is on its way. The link works for 15 minutes.`}
           </p>
-          <button
-            type="button"
-            className="memberframe-auth-link"
-            onClick={() => {
-              setState({ phase: "idle" });
-              setView("password_signin");
-            }}
-          >
-            <ArrowLeft stroke="currentColor" aria-hidden={true} />
-            <span>Back to sign in</span>
-          </button>
+          {!dedicated || linkablePath(loginPath, onCanvas) ? (
+            <button
+              type="button"
+              className="memberframe-auth-link"
+              onClick={() => {
+                if (dedicated) {
+                  if (!onCanvas) goTo(loginPath);
+                  return;
+                }
+                setState({ phase: "idle" });
+                setView("password_signin");
+              }}
+            >
+              <ArrowLeft stroke="currentColor" aria-hidden={true} />
+              <span>Back to sign in</span>
+            </button>
+          ) : null}
         </div>
       ) : (
         <>
@@ -2203,6 +2332,10 @@ export default function MemberAuth(props: MemberAuthProps) {
 // type: an Enum picks one. Four booleans is the shape F05's own configuration
 // flow describes, which is "enables or disables providers with checkboxes".
 
+/** The reset and code screens show no provider buttons, so their toggles are hidden. */
+const PROVIDERS_ALLOWED =
+  CONFIG.screen === "all" || CONFIG.screen === "login" || CONFIG.screen === "register";
+
 addPropertyControls(MemberAuth, {
   authMode: {
     type: ControlType.Enum,
@@ -2224,26 +2357,31 @@ addPropertyControls(MemberAuth, {
   emailEnabled: {
     type: ControlType.Boolean,
     title: "Email Sign In",
+    hidden: () => CONFIG.screen !== "all",
     defaultValue: CONFIG.emailEnabled,
   },
   googleEnabled: {
     type: ControlType.Boolean,
     title: "Google",
+    hidden: () => !PROVIDERS_ALLOWED,
     defaultValue: CONFIG.googleEnabled,
   },
   appleEnabled: {
     type: ControlType.Boolean,
     title: "Apple",
+    hidden: () => !PROVIDERS_ALLOWED,
     defaultValue: CONFIG.appleEnabled,
   },
   githubEnabled: {
     type: ControlType.Boolean,
     title: "GitHub",
+    hidden: () => !PROVIDERS_ALLOWED,
     defaultValue: CONFIG.githubEnabled,
   },
   discordEnabled: {
     type: ControlType.Boolean,
     title: "Discord",
+    hidden: () => !PROVIDERS_ALLOWED,
     defaultValue: CONFIG.discordEnabled,
   },
   accentColor: {
@@ -2266,6 +2404,7 @@ addPropertyControls(MemberAuth, {
   enablePasswordAuth: {
     type: ControlType.Boolean,
     title: "Password Auth",
+    hidden: () => CONFIG.screen !== "all",
     defaultValue: CONFIG.enablePasswordAuth,
   },
   defaultAuthMethod: {
@@ -2276,12 +2415,40 @@ addPropertyControls(MemberAuth, {
     // sidebar means nothing to a designer.
     optionTitles: ["Email & Password", "Passwordless Code"],
     defaultValue: CONFIG.defaultAuthMethod,
-    hidden: (props) => !props.enablePasswordAuth,
+    hidden: (props) => CONFIG.screen !== "all" || !props.enablePasswordAuth,
   },
   requirePasswordStrength: {
     type: ControlType.Boolean,
     title: "Strong Password",
     defaultValue: CONFIG.requirePasswordStrength,
-    hidden: (props) => !props.enablePasswordAuth,
+    hidden: (props) =>
+      CONFIG.screen === "all" ? !props.enablePasswordAuth : CONFIG.screen !== "register" && CONFIG.screen !== "reset",
+  },
+
+  /* ---- Dedicated screens only: the pages their links go to ---- */
+
+  loginPath: {
+    type: ControlType.String,
+    title: "Sign In Page",
+    defaultValue: CONFIG.loginPath,
+    hidden: () => CONFIG.screen === "all" || CONFIG.screen === "login",
+  },
+  signupPath: {
+    type: ControlType.String,
+    title: "Sign Up Page",
+    defaultValue: CONFIG.signupPath,
+    hidden: () => CONFIG.screen !== "login",
+  },
+  resetPath: {
+    type: ControlType.String,
+    title: "Reset Page",
+    defaultValue: CONFIG.resetPath,
+    hidden: () => CONFIG.screen !== "login",
+  },
+  otpPath: {
+    type: ControlType.String,
+    title: "Code Sign In Page",
+    defaultValue: CONFIG.otpPath,
+    hidden: () => CONFIG.screen !== "login",
   },
 });
