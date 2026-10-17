@@ -7,6 +7,8 @@ Technical development specification, user flow, architectural wiring, and testin
 **Status**: in progress
 **Tasks**: 6.3, and FP-09 in the feature plan track (see [`../IMPLEMENTATION-STATUS.md`](../IMPLEMENTATION-STATUS.md))
 
+> **Appearance and sizing (2026-10-15):** Theme (Light by default), Colors, Typography, Layout, and Labels controls, fixed default size, and the shared colour sanitizer are documented once in [`00-canvas-appearance.md`](00-canvas-appearance.md). Redeploy from the Builder to update an existing file.
+
 ---
 
 ## 1. Overview and Problem Solved

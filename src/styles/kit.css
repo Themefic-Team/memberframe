@@ -1,0 +1,326 @@
+/* ==========================================================================
+   UI KIT EXTENSIONS
+
+   Kit-level CSS the reference design system does not cover, for the
+   components in src/components/ui/. Feature files (builder, manage, settings,
+   connect) must not restyle these classes; if a kit component looks wrong,
+   fix it here once, for every tab.
+
+   Cannot live in components.css, which is a verbatim slice of the reference
+   guarded by a provenance diff. Rules: .agents/rules/design-system.md.
+
+   Every value is a token. No hex, no rgba, no off-scale size.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Hero card: title block with an optional illustration on the right.
+   -------------------------------------------------------------------------- */
+.hero-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+  position: relative;
+  z-index: 1;
+}
+
+.hero-card-content {
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.hero-card-title {
+  letter-spacing: var(--text-title-lg-tracking);
+}
+
+.hero-card-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: var(--radius-14);
+  background: var(--px-color-info-subtle);
+  color: var(--px-color-text-brand);
+}
+
+.hero-card-illustration svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   Badge: icons inside a badge are 10px.
+   -------------------------------------------------------------------------- */
+.badge svg {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   Plugin card: the open affordance is always visible, as in the Figma card,
+   on a bg/tertiary square. Hover darkens it rather than revealing it.
+   -------------------------------------------------------------------------- */
+.framefic-card-open {
+  background: var(--framer-color-bg-tertiary);
+  border: 1px solid var(--framer-color-divider);
+  color: var(--title);
+}
+
+.framefic-card:hover .framefic-card-open {
+  background: var(--px-color-pressed);
+}
+
+/* Focus on the link-shaped kit surfaces: 1px focus/ring + Focus/Halo. */
+.framefic-card:focus-visible,
+.help-tile:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring);
+  box-shadow: var(--px-focus-halo);
+}
+
+/* --------------------------------------------------------------------------
+   Section header: Title/Medium heading with an optional Body/Small subtitle.
+   Use this for every titled group inside a tab.
+   -------------------------------------------------------------------------- */
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.section-subtitle {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--paragraph);
+}
+
+/* --------------------------------------------------------------------------
+   Inline code chip: Mono on bg/tertiary. For identifiers inside prose.
+   -------------------------------------------------------------------------- */
+.code-chip {
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-4);
+  background: var(--framer-color-bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--title);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Step row: a route into a tab, for the Home tab Quick Start.
+   The row model every list row uses (bg/raised, hairline, Shadow/Card,
+   radius 12), with the Help tile's brand-subtle icon circle.
+   -------------------------------------------------------------------------- */
+.step-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: 100%;
+}
+
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  width: 100%;
+  height: auto;
+  min-height: 52px;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-card);
+  color: var(--title);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.step-row:hover {
+  border-color: var(--px-color-border-brand);
+  box-shadow: var(--px-shadow-card-hover);
+}
+
+.step-row:focus-visible {
+  outline: none;
+  border-color: var(--px-color-focus-ring);
+  box-shadow: var(--px-focus-halo);
+}
+
+.step-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--px-brand-subtle);
+  color: var(--px-color-text-brand);
+}
+
+.step-row-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.step-row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.step-row-title {
+  font: var(--text-body-strong);
+  color: var(--title);
+}
+
+.step-row-desc {
+  overflow: hidden;
+  font: var(--text-body-sm);
+  color: var(--paragraph);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-row-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
+  color: var(--paragraph-faint);
+}
+
+/* --------------------------------------------------------------------------
+   Tab bar: Account icon and tab focus.
+   The Account icon opens the account view (Connect). While that view is open
+   no tab is selected, so the icon shows the ghost icon button's pressed fill
+   to say where the creator is.
+   -------------------------------------------------------------------------- */
+.framefic-account-button.is-active {
+  background-color: var(--framer-color-bg-tertiary);
+  color: var(--framer-color-text);
+}
+
+/* Square, like the tab itself (components.css sets tab radius 0). */
+.framefic-tab:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--px-color-focus-ring), var(--px-focus-halo);
+}
+
+/* --------------------------------------------------------------------------
+   Info tip: a field hint behind an info icon beside the label.
+   Hints never sit as paragraphs under fields; errors still do (they must be
+   seen without an action). The bubble is the Popover rung: bg/raised,
+   hairline, Shadow/Popover, radius 8, Body/Small.
+   -------------------------------------------------------------------------- */
+.field-row-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.info-tip {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* 18px hit area around a 14px glyph, so it does not grow the 30px row. */
+.info-tip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--framer-color-text-tertiary);
+  cursor: help;
+  transition: color 0.15s ease;
+}
+
+.info-tip-trigger:hover,
+.info-tip-trigger.is-open {
+  background: transparent;
+  color: var(--framer-color-text);
+}
+
+.info-tip-trigger:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--px-color-focus-ring), var(--px-focus-halo);
+}
+
+.info-tip-trigger svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.info-tip-bubble {
+  /* Overwritten by InfoTip from the trigger rect each time it opens. */
+  --info-tip-x: 0px;
+  --info-tip-y: 0px;
+
+  position: fixed;
+  left: var(--info-tip-x);
+  top: var(--info-tip-y);
+  z-index: 1000;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 240px;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-8);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-popover);
+  font: var(--text-body-sm);
+  color: var(--framer-color-text);
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.info-tip-bubble.is-open {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Fill rows: a fixed label column, so every full-width control in a card
+   starts at the same x and a long label wraps instead of pushing its control
+   past the card edge. The control takes the rest and may shrink.
+   -------------------------------------------------------------------------- */
+.field-row.is-fill > .field-row-label,
+.field-row.is-fill > .field-row-label-group {
+  flex: 0 0 112px;
+  min-width: 0;
+}
+
+.field-row.is-fill .field-row-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.field-row-label-group .field-row-label {
+  flex-shrink: 1;
+}
+
+.field-row-control.fill {
+  min-width: 0;
+}

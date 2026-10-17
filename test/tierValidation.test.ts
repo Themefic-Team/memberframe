@@ -146,10 +146,11 @@ describe("tier name", () => {
 });
 
 describe("tier key", () => {
-  it("rejects a key outside the selectable set", () => {
-    // Conflict C9: F02 allows custom keys and F01's property control is a fixed
-    // Enum, so Phase 1 holds the four known keys.
-    expect(validateTierDraft(draft({ key: "platinum" as TierKey }), []).errors.key).toBeTruthy();
+  it("accepts a custom key and rejects a malformed one", () => {
+    // Conflict C9, resolved: a custom key is allowed when it is shaped like
+    // one, because the generator writes the site's tiers into the gate.
+    expect(validateTierDraft(draft({ key: "platinum" as TierKey }), []).errors.key).toBeUndefined();
+    expect(validateTierDraft(draft({ key: "Platinum Plus!" as TierKey }), []).errors.key).toBeTruthy();
   });
 
   it("rejects a key another tier already uses", () => {
@@ -223,7 +224,7 @@ describe("every message is written for a creator", () => {
     // PRD section 7.6 rules 4 and 6.
     const broken = draft({
       name: "",
-      key: "nope" as TierKey,
+      key: "Not A Key!" as TierKey,
       rank: "x",
       monthlyPrice: "abc",
     });

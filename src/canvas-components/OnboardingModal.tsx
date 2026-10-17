@@ -57,9 +57,366 @@ const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
 
+// @memberframe-appearance-start
+// ============================================================================
+// APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
+// ============================================================================
+// Byte-identical in every canvas component: MemberAuth, MemberDashboard,
+// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
+// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// `test/canvasAppearanceParity.test.ts`, which also compiles this block and
+// runs it. A canvas component is compiled by Framer alone and cannot import
+// from this repository, so the copy is the architecture. Edit all or none.
+//
+// One vocabulary for every component. The Theme control picks a palette, the
+// creator's Colors, Typography, and Layout groups override it, and every rule
+// in a component's stylesheet reads the resolved `--mf-c-*` values.
+//
+// ## Theme is a control, not the visitor's operating system
+//
+// These components used to switch palette on `prefers-color-scheme` alone.
+// The Framer canvas renders light, but that media query follows the visitor's
+// OS, so a published page turned dark for every visitor with a dark OS while
+// the editor showed light. Theme now defaults to Light, matching the editor,
+// and "Match visitor" is still offered as an explicit choice.
+//
+// ## Every creator value is sanitized before it reaches a style block
+//
+// Colors, the font family, and the numbers below end up inside a `<style>`
+// element. A Framer variable can set a prop the code generator never saw, so
+// each value is checked here, at runtime, and anything that could close a
+// declaration is dropped in favour of the theme default.
+
+type MfThemeMode = "light" | "dark" | "auto";
+
+type MfColorKey = "onAccent" | "surface" | "text" | "muted" | "border" | "field";
+
+interface MfAppearanceProps {
+  theme?: MfThemeMode;
+  colors?: Partial<Record<MfColorKey, string>> | null;
+  typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
+  layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  labels?: Record<string, unknown> | null;
+}
+
+interface MfAppearanceInput extends MfAppearanceProps {
+  accent: unknown;
+  radius: unknown;
+  radiusMax: number;
+  /** The component's look before Layout existed: a card has a shadow, a page section does not. */
+  shadowByDefault: boolean;
+}
+
+const MF_DEFAULT_ACCENT = "#5271ff";
+
+const MF_COLOR_VARS: Record<MfColorKey, string> = {
+  onAccent: "--mf-on-accent",
+  surface: "--mf-surface",
+  text: "--mf-text",
+  muted: "--mf-muted",
+  border: "--mf-border",
+  field: "--mf-field",
+};
+
+const MF_PLAIN_COLOR =
+  /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.%\s,/]+\)|hsla?\(\s*[\d.%\s,/a-z]+\)|transparent)$/;
+
+/**
+ * A colour, and nothing but a colour, or the fallback.
+ *
+ * Accepts hex, rgb(a), hsl(a), and a Framer colour style, which arrives as
+ * `var(--token-id, rgb(...))`, sometimes followed by a name comment that is
+ * stripped first. A brace, a semicolon, an angle bracket, a backslash, or a
+ * comment anywhere else rejects the value outright.
+ */
+function mfSafeColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+
+  const colour = value.replace(/\s*\/\*[^*]*\*\/\s*$/, "").trim();
+  if (colour === "" || colour.length > 160) return fallback;
+  if (/[;{}<>\\]/.test(colour) || colour.indexOf("/*") !== -1) return fallback;
+  if (MF_PLAIN_COLOR.test(colour)) return colour;
+
+  const token = /^var\(\s*--[a-zA-Z0-9_-]+\s*(?:,\s*(.+))?\)$/.exec(colour);
+  if (token && (token[1] === undefined || MF_PLAIN_COLOR.test(token[1].trim()))) return colour;
+
+  return fallback;
+}
+
+/** A finite number inside the range, or the fallback. */
+function mfNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const number = typeof value === "number" ? value : Number(value);
+  if (typeof value === "string" && value.trim() === "") return fallback;
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+/**
+ * The family out of a Font control value, or null.
+ *
+ * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
+ * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ */
+function mfFontFamily(font: unknown): string | null {
+  let family = "";
+  if (typeof font === "string") family = font;
+  else if (font && typeof font === "object") {
+    const candidate = (font as { fontFamily?: unknown }).fontFamily;
+    if (typeof candidate === "string") family = candidate;
+  }
+
+  family = family.trim();
+  if (family === "" || family.length > 300) return null;
+  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  return family;
+}
+
+/** The root class for a theme. Anything unknown is Light, the editor's look. */
+function mfThemeClass(theme: unknown): string {
+  if (theme === "dark") return "is-dark";
+  if (theme === "auto") return "is-auto";
+  return "is-light";
+}
+
+/** `{name}` placeholders in a creator's label, filled with plain text. */
+function mfFill(template: string, values: Record<string, string | number>): string {
+  let out = template;
+  for (const key of Object.keys(values)) out = out.split(`{${key}}`).join(String(values[key]));
+  return out;
+}
+
+/**
+ * One label: the creator's text when they typed some, the default otherwise.
+ * Labels render as React text, never as markup, so they need no escaping.
+ */
+function mfLabel(
+  labels: Record<string, unknown> | null | undefined,
+  defaults: Record<string, readonly [string, string]>,
+  key: string
+): string {
+  const value = labels ? labels[key] : undefined;
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return defaults[key] ? defaults[key][1] : "";
+}
+
+/**
+ * The scoped custom properties for one instance.
+ *
+ * Every `--mf-*` is declared, set or `initial`. `initial` makes `var()` fall
+ * back to the theme default, and declaring it stops a component nested inside
+ * another from inheriting the outer one's overrides.
+ */
+function mfAppearanceVars(input: MfAppearanceInput): string {
+  const lines: string[] = [];
+  const set = (name: string, value: string | null) => {
+    lines.push(`${name}: ${value === null ? "initial" : value};`);
+  };
+
+  set("--mf-accent", mfSafeColor(input.accent, MF_DEFAULT_ACCENT));
+  set("--mf-radius", `${Math.round(mfNumber(input.radius, 0, input.radiusMax, 10))}px`);
+
+  const colors = input.colors || {};
+  for (const key of Object.keys(MF_COLOR_VARS) as MfColorKey[]) {
+    const colour = mfSafeColor(colors[key], "");
+    set(MF_COLOR_VARS[key], colour === "" ? null : colour);
+  }
+
+  const typography = input.typography || {};
+  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
+
+  const layout = input.layout || {};
+  const px = (value: unknown, max: number) =>
+    value === undefined || value === null ? null : `${Math.round(mfNumber(value, 0, max, 0))}px`;
+  set("--mf-pad", px(layout.padding, 64));
+  set("--mf-gap", px(layout.gap, 48));
+  set("--mf-border-width", px(layout.borderWidth, 4));
+  const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
+  set("--mf-card-shadow", shadow ? null : "none");
+
+  return lines.join(" ");
+}
+
+const MF_LIGHT = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #ffffff);
+  --mf-c-text: var(--mf-text, #18202b);
+  --mf-c-muted: var(--mf-muted, #5b6472);
+  --mf-c-border: var(--mf-border, rgba(16, 24, 40, 0.12));
+  --mf-c-field: var(--mf-field, #f4f5f7);
+  --mf-c-danger: #dc2626;
+  --mf-c-veil: rgba(255, 255, 255, 0.55);
+  --mf-c-backdrop: rgba(15, 17, 23, 0.55);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(16, 24, 40, 0.14));
+  color-scheme: light;`;
+
+const MF_DARK = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #18191b);
+  --mf-c-text: var(--mf-text, #ffffff);
+  --mf-c-muted: var(--mf-muted, #cbcbcb);
+  --mf-c-border: var(--mf-border, rgba(255, 255, 255, 0.1));
+  --mf-c-field: var(--mf-field, #202020);
+  --mf-c-danger: #f87171;
+  --mf-c-veil: rgba(12, 14, 18, 0.55);
+  --mf-c-backdrop: rgba(0, 0, 0, 0.62);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(0, 0, 0, 0.45));
+  color-scheme: dark;`;
+
+/** The palette for a component root, per theme. Emitted before the component's own CSS. */
+function mfThemeCss(root: string): string {
+  return `
+${root} {${MF_LIGHT}
+  --mf-c-radius: var(--mf-radius, 10px);
+  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  font-family: var(--mf-c-font);
+}
+${root}.is-dark {${MF_DARK}
+}
+@media (prefers-color-scheme: dark) {
+  ${root}.is-auto {${MF_DARK}
+  }
+}
+`;
+}
+
+/**
+ * The shared property controls: Theme, Colors, Typography, Layout.
+ *
+ * Return types are inferred on purpose. Framer's real `framer` module and this
+ * repo's shim name their control types differently, and this file compiles
+ * against both.
+ *
+ * Colours are optional, so an untouched one stays undefined and the theme
+ * default shows through. Layout defaults are the component's own, passed in,
+ * so a fresh instance looks exactly as it did before the group existed.
+ */
+function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
+  return {
+    theme: {
+      type: ControlType.Enum,
+      title: "Theme",
+      options: ["light", "dark", "auto"],
+      optionTitles: ["Light", "Dark", "Match visitor"],
+      defaultValue: "light",
+    },
+    colors: {
+      type: ControlType.Object,
+      title: "Colors",
+      buttonTitle: "Colors",
+      controls: {
+        surface: { type: ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+      },
+    },
+    typography: {
+      type: ControlType.Object,
+      title: "Typography",
+      buttonTitle: "Typography",
+      controls: {
+        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
+        font: {
+          type: ControlType.Font,
+          title: "Font",
+          controls: "basic" as const,
+          defaultFontType: "sans-serif" as const,
+        },
+        textScale: {
+          type: ControlType.Number,
+          title: "Text size",
+          min: 70,
+          max: 160,
+          step: 5,
+          unit: "%",
+          defaultValue: 100,
+        },
+      },
+    },
+    layout: {
+      type: ControlType.Object,
+      title: "Layout",
+      buttonTitle: "Layout",
+      controls: {
+        padding: {
+          type: ControlType.Number,
+          title: "Padding",
+          min: 0,
+          max: 64,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.padding,
+        },
+        gap: {
+          type: ControlType.Number,
+          title: "Spacing",
+          min: 0,
+          max: 48,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.gap,
+        },
+        borderWidth: {
+          type: ControlType.Number,
+          title: "Border",
+          min: 0,
+          max: 4,
+          step: 1,
+          unit: "px",
+          defaultValue: 1,
+        },
+        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+      },
+    },
+  };
+}
+
+/** The Labels group, one String control per entry: key -> [title, default text]. */
+function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
+  const controls: Record<
+    string,
+    { type: typeof ControlType.String; title: string; defaultValue: string }
+  > = {};
+  for (const key of Object.keys(defaults)) {
+    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+  }
+  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+// @memberframe-appearance-end
+
 // ============================================================================
 // CONTRACTS
 // ============================================================================
+
+/**
+ * Every visible string, as [sidebar title, default]. The Labels group edits
+ * them; an empty field falls back. `{current}` and `{total}` fill the step
+ * counter. Save errors stay fixed: they are feedback, not design copy. The
+ * questions themselves come from the plugin's Settings, Fields view.
+ */
+const ONBOARDING_LABELS: Record<string, readonly [string, string]> = {
+  stepCounter: ["Step counter", "Step {current} of {total}"],
+  requiredTitle: ["Required step title", "About you"],
+  requiredText: ["Required step text", "These answers are needed to finish setting up your account."],
+  optionalTitle: ["Optional step title", "A little more"],
+  optionalText: [
+    "Optional step text",
+    "Optional. Skip any of these and answer them later from your account page.",
+  ],
+  nameLabel: ["Name label", "Your name"],
+  optional: ["Optional marker", "Optional"],
+  chooseOne: ["Select placeholder", "Choose one"],
+  back: ["Back button", "Back"],
+  skip: ["Skip button", "Skip for now"],
+  continue: ["Continue button", "Continue"],
+  finish: ["Finish button", "Finish"],
+  saving: ["Saving", "Saving"],
+};
 
 interface OnboardingConfig {
   welcomeTitle: string;
@@ -326,17 +683,6 @@ function safePath(value: string): boolean {
   return true;
 }
 
-/** Same sanitizer as `<MemberDashboard>`: a creator's colour reaches a `<style>` block. */
-function safeColor(value: string, fallback: string): string {
-  const trimmed = String(value ?? "").trim();
-
-  if (/^#[0-9a-fA-F]{3,8}$/.test(trimmed)) return trimmed;
-  if (/^rgba?\(\s*[\d.\s,%/]+\)$/.test(trimmed)) return trimmed;
-  if (/^hsla?\(\s*[\d.\s,%/degrad]+\)$/.test(trimmed)) return trimmed;
-
-  return fallback;
-}
-
 function apiHeaders(withBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
 
@@ -494,33 +840,25 @@ type ModalState =
 // `style={{ }}` even though two values are dynamic.
 
 const cssContent = `
+/*
+  The palette comes from the shared appearance block (mfThemeCss): Theme plus
+  the creator's Colors resolve into --mf-c-*. These names are kept so every
+  rule below reads as it always did.
+*/
 .memberframe-onboarding-root {
-  --memberframe-onboarding-accent: #5271ff;
-  --memberframe-onboarding-radius: 12px;
-  --memberframe-onboarding-surface: #ffffff;
-  --memberframe-onboarding-border: rgba(16, 24, 40, 0.12);
-  --memberframe-onboarding-title: #18202b;
-  --memberframe-onboarding-body: #5b6472;
-  --memberframe-onboarding-field: #f4f5f7;
-  --memberframe-onboarding-on-accent: #ffffff;
-  --memberframe-onboarding-danger: #dc2626;
-  --memberframe-onboarding-scrim: rgba(15, 17, 23, 0.55);
-  --memberframe-onboarding-shadow: 0 16px 40px rgba(16, 24, 40, 0.18);
+  --memberframe-onboarding-accent: var(--mf-c-accent);
+  --memberframe-onboarding-radius: var(--mf-c-radius);
+  --memberframe-onboarding-surface: var(--mf-c-surface);
+  --memberframe-onboarding-border: var(--mf-c-border);
+  --memberframe-onboarding-title: var(--mf-c-text);
+  --memberframe-onboarding-body: var(--mf-c-muted);
+  --memberframe-onboarding-field: var(--mf-c-field);
+  --memberframe-onboarding-on-accent: var(--mf-c-on-accent);
+  --memberframe-onboarding-danger: var(--mf-c-danger);
+  --memberframe-onboarding-scrim: var(--mf-c-backdrop);
+  --memberframe-onboarding-shadow: var(--mf-c-shadow);
 
   box-sizing: border-box;
-  font-family: var(--framer-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-}
-
-@media (prefers-color-scheme: dark) {
-  .memberframe-onboarding-root {
-    --memberframe-onboarding-surface: #1b1f27;
-    --memberframe-onboarding-border: rgba(255, 255, 255, 0.14);
-    --memberframe-onboarding-title: #edf0f7;
-    --memberframe-onboarding-body: #b7bfcd;
-    --memberframe-onboarding-field: #23272f;
-    --memberframe-onboarding-scrim: rgba(0, 0, 0, 0.62);
-    --memberframe-onboarding-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-  }
 }
 
 html.memberframe-onboarding-open { overflow: hidden; }
@@ -534,12 +872,22 @@ html.memberframe-onboarding-open { overflow: hidden; }
   justify-content: center;
   padding: 24px;
   background: var(--memberframe-onboarding-scrim);
+  -webkit-backdrop-filter: blur(var(--memberframe-onboarding-blur, 0px));
+  backdrop-filter: blur(var(--memberframe-onboarding-blur, 0px));
   overflow-y: auto;
 }
 
+/* Inline is the canvas view: it fills the frame the creator sized. */
 .memberframe-onboarding-root.is-inline {
   position: relative;
   width: 100%;
+  height: 100%;
+}
+
+.memberframe-onboarding-root.is-inline .memberframe-onboarding-card {
+  max-width: none;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .memberframe-onboarding-card {
@@ -547,12 +895,12 @@ html.memberframe-onboarding-open { overflow: hidden; }
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--mf-gap, 16px);
   width: 100%;
   max-width: 440px;
   margin: auto;
-  padding: 24px;
-  border: 1px solid var(--memberframe-onboarding-border);
+  padding: var(--mf-pad, 24px);
+  border: var(--mf-border-width, 1px) solid var(--memberframe-onboarding-border);
   border-radius: var(--memberframe-onboarding-radius);
   background: var(--memberframe-onboarding-surface);
   box-shadow: var(--memberframe-onboarding-shadow);
@@ -567,7 +915,7 @@ html.memberframe-onboarding-open { overflow: hidden; }
 
 .memberframe-onboarding-step-label {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   font-weight: 600;
   color: var(--memberframe-onboarding-body);
 }
@@ -591,7 +939,7 @@ html.memberframe-onboarding-open { overflow: hidden; }
 
 .memberframe-onboarding-title {
   margin: 0;
-  font-size: 20px;
+  font-size: calc(20px * var(--mf-text-scale, 1));
   font-weight: 650;
   line-height: 1.3;
   color: var(--memberframe-onboarding-title);
@@ -601,7 +949,7 @@ html.memberframe-onboarding-open { overflow: hidden; }
 
 .memberframe-onboarding-text {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
   line-height: 1.5;
   color: var(--memberframe-onboarding-body);
 }
@@ -619,7 +967,7 @@ html.memberframe-onboarding-open { overflow: hidden; }
 }
 
 .memberframe-onboarding-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--mf-text-scale, 1));
   font-weight: 600;
   color: var(--memberframe-onboarding-title);
 }
@@ -640,7 +988,7 @@ html.memberframe-onboarding-open { overflow: hidden; }
   background: var(--memberframe-onboarding-field);
   color: var(--memberframe-onboarding-title);
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
 }
 
 textarea.memberframe-onboarding-input {
@@ -662,7 +1010,7 @@ textarea.memberframe-onboarding-input {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
   line-height: 1.4;
   color: var(--memberframe-onboarding-title);
   cursor: pointer;
@@ -682,7 +1030,7 @@ textarea.memberframe-onboarding-input {
 
 .memberframe-onboarding-error {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   line-height: 1.4;
   color: var(--memberframe-onboarding-danger);
 }
@@ -707,7 +1055,7 @@ textarea.memberframe-onboarding-input {
   background: transparent;
   color: var(--memberframe-onboarding-title);
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
   font-weight: 500;
   cursor: pointer;
 }
@@ -737,7 +1085,7 @@ textarea.memberframe-onboarding-input {
 
 .memberframe-onboarding-note {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   color: var(--memberframe-onboarding-body);
 }
 
@@ -750,7 +1098,7 @@ textarea.memberframe-onboarding-input {
   gap: 5px;
   padding: 3px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: calc(10px * var(--mf-text-scale, 1));
   font-weight: 600;
   text-decoration: none;
   color: var(--memberframe-onboarding-on-accent);
@@ -809,9 +1157,21 @@ interface FieldControlProps {
   error: string | undefined;
   disabled: boolean;
   onChange: (value: MetadataValue) => void;
+  /** From the Labels group. */
+  optionalLabel: string;
+  chooseLabel: string;
 }
 
-function FieldControl({ id, field, value, error, disabled, onChange }: FieldControlProps): React.ReactElement {
+function FieldControl({
+  id,
+  field,
+  value,
+  error,
+  disabled,
+  onChange,
+  optionalLabel,
+  chooseLabel,
+}: FieldControlProps): React.ReactElement {
   const errorId = `${id}-error`;
   const described = error ? errorId : undefined;
   const text = value === null || value === undefined ? "" : String(value);
@@ -865,7 +1225,7 @@ function FieldControl({ id, field, value, error, disabled, onChange }: FieldCont
   } else if (field.type === "select") {
     control = (
       <select {...common} value={text} onChange={(event) => onChange(event.currentTarget.value)}>
-        <option value="">Choose one</option>
+        <option value="">{chooseLabel}</option>
         {field.options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -895,7 +1255,7 @@ function FieldControl({ id, field, value, error, disabled, onChange }: FieldCont
     <div className="memberframe-onboarding-field">
       <label className="memberframe-onboarding-label" htmlFor={id}>
         {field.label}
-        {field.required ? null : <span className="memberframe-onboarding-optional">Optional</span>}
+        {field.required ? null : <span className="memberframe-onboarding-optional">{optionalLabel}</span>}
       </label>
       {control}
       {error ? (
@@ -912,13 +1272,26 @@ function FieldControl({ id, field, value, error, disabled, onChange }: FieldCont
 // ============================================================================
 
 /**
+ * Fixed size by default on the canvas, where it renders inline and fills the
+ * frame. On the published site it is an overlay, so the frame size only
+ * governs the canvas preview.
+ *
  * @framerIntrinsicWidth 440
- * @framerIntrinsicHeight 480
+ * @framerIntrinsicHeight 560
  * @framerSupportedLayoutWidth any-prefer-fixed
- * @framerSupportedLayoutHeight auto
+ * @framerSupportedLayoutHeight any-prefer-fixed
  */
-export default function OnboardingModal(props: Partial<OnboardingConfig>): React.ReactElement | null {
+export default function OnboardingModal(
+  props: Partial<OnboardingConfig> & MfAppearanceProps & { backdropBlur?: number }
+): React.ReactElement | null {
   const config: OnboardingConfig = { ...CONFIG, ...props };
+  const { theme = "light", colors, typography, layout, labels } = props;
+  /** Blurs the page behind the modal. Not in CONFIG: no plugin field sets it. */
+  const backdropBlur = Math.round(mfNumber(props.backdropBlur, 0, 20, 0));
+  const t = (key: string, values?: Record<string, string | number>): string => {
+    const text = mfLabel(labels, ONBOARDING_LABELS, key);
+    return values ? mfFill(text, values) : text;
+  };
   const onCanvas = RenderTarget.current() === RenderTarget.canvas;
 
   const rawId = useId();
@@ -1198,11 +1571,22 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
   // Render
   // --------------------------------------------------------------------------
 
-  const accent = safeColor(config.accentColor, CONFIG.accentColor);
-  const radius = Math.max(0, Math.min(32, Math.round(Number(config.borderRadius) || 0)));
+  // Accent, radius, Colors, Typography, and Layout, sanitized by the shared
+  // appearance block and scoped to this instance.
   const scopedVars =
-    `[data-memberframe-onboarding="${scope}"] ` +
-    `{ --memberframe-onboarding-accent: ${accent}; --memberframe-onboarding-radius: ${radius}px; }`;
+    `[data-memberframe-onboarding="${scope}"] { ` +
+    mfAppearanceVars({
+      accent: config.accentColor,
+      radius: config.borderRadius,
+      radiusMax: 32,
+      shadowByDefault: true,
+      colors,
+      typography,
+      layout,
+    }) +
+    ` --memberframe-onboarding-blur: ${backdropBlur}px; }`;
+  const themeClass = mfThemeClass(theme);
+  const themeStyle = <style>{mfThemeCss(".memberframe-onboarding-root")}</style>;
 
   const watermark =
     IS_TRIAL && !IS_LOCKED ? (
@@ -1216,7 +1600,8 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
     // Only on the canvas: a member is never shown a licensing message.
     if (!onCanvas) return null;
     return (
-      <div className="memberframe-onboarding-root is-inline" data-memberframe-onboarding={scope}>
+      <div className={`memberframe-onboarding-root is-inline ${themeClass}`} data-memberframe-onboarding={scope}>
+        {themeStyle}
         <style>{cssContent}</style>
         <style>{scopedVars}</style>
         <div className="memberframe-onboarding-card">
@@ -1244,22 +1629,23 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
     step === "welcome"
       ? config.welcomeTitle
       : step === "required"
-        ? "About you"
-        : "A little more";
+        ? t("requiredTitle")
+        : t("optionalTitle");
 
   const intro =
     step === "welcome"
       ? config.welcomeMessage
       : step === "required"
-        ? "These answers are needed to finish setting up your account."
-        : "Optional. Skip any of these and answer them later from your account page.";
+        ? t("requiredText")
+        : t("optionalText");
 
   return (
     <div
-      className={`memberframe-onboarding-root ${overlay ? "is-overlay" : "is-inline"}`}
+      className={`memberframe-onboarding-root ${overlay ? "is-overlay" : "is-inline"} ${themeClass}`}
       data-memberframe-onboarding={scope}
       onKeyDown={handleKeyDown}
     >
+      {themeStyle}
       <style>{cssContent}</style>
       <style>{scopedVars}</style>
 
@@ -1273,7 +1659,7 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
         {config.showStepIndicator && steps.length > 1 ? (
           <div className="memberframe-onboarding-progress">
             <p className="memberframe-onboarding-step-label" aria-live="polite">
-              {`Step ${stepIndex + 1} of ${steps.length}`}
+              {t("stepCounter", { current: stepIndex + 1, total: steps.length })}
             </p>
             <div className="memberframe-onboarding-dots" aria-hidden={true}>
               {steps.map((id, position) => (
@@ -1306,8 +1692,8 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
           {step === "welcome" ? (
             <div className="memberframe-onboarding-field">
               <label className="memberframe-onboarding-label" htmlFor={`${scope}-name`}>
-                Your name
-                <span className="memberframe-onboarding-optional">Optional</span>
+                {t("nameLabel")}
+                <span className="memberframe-onboarding-optional">{t("optional")}</span>
               </label>
               <input
                 id={`${scope}-name`}
@@ -1333,6 +1719,8 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
                   error={problems[key]}
                   disabled={submitting}
                   onChange={(value) => setValue(key, value)}
+                  optionalLabel={t("optional")}
+                  chooseLabel={t("chooseOne")}
                 />
               );
             })
@@ -1356,7 +1744,7 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
                 }}
               >
                 <ArrowLeft aria-hidden={true} />
-                Back
+                {t("back")}
               </button>
             ) : null}
 
@@ -1369,12 +1757,12 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
                 disabled={submitting}
                 onClick={handleSkip}
               >
-                Skip for now
+                {t("skip")}
               </button>
             ) : null}
 
             <button type="submit" className="memberframe-onboarding-button is-primary" disabled={submitting}>
-              {submitting ? "Saving" : isLast ? "Finish" : "Continue"}
+              {submitting ? t("saving") : isLast ? t("finish") : t("continue")}
             </button>
           </div>
 
@@ -1403,40 +1791,54 @@ export default function OnboardingModal(props: Partial<OnboardingConfig>): React
 addPropertyControls(OnboardingModal, {
   welcomeTitle: {
     type: ControlType.String,
-    title: "Welcome title",
-    defaultValue: "Welcome aboard",
+    title: "Welcome Title",
+    defaultValue: CONFIG.welcomeTitle,
   },
   welcomeMessage: {
     type: ControlType.String,
-    title: "Welcome text",
-    defaultValue: "A few quick questions help us tailor the site to you.",
+    title: "Welcome Text",
+    defaultValue: CONFIG.welcomeMessage,
   },
   showStepIndicator: {
     type: ControlType.Boolean,
-    title: "Step indicator",
-    defaultValue: true,
+    title: "Step Indicator",
+    defaultValue: CONFIG.showStepIndicator,
   },
   allowSkip: {
     type: ControlType.Boolean,
-    title: "Allow skip",
-    defaultValue: true,
+    title: "Allow Skip",
+    defaultValue: CONFIG.allowSkip,
   },
   completionRedirect: {
     type: ControlType.String,
-    title: "After finish",
-    defaultValue: "",
+    title: "After Finish Page",
+    defaultValue: CONFIG.completionRedirect,
+  },
+  backdropBlur: {
+    type: ControlType.Number,
+    title: "Backdrop Blur",
+    min: 0,
+    max: 20,
+    step: 1,
+    unit: "px",
+    defaultValue: 0,
   },
   accentColor: {
     type: ControlType.Color,
-    title: "Accent",
-    defaultValue: "#5271ff",
+    title: "Accent Color",
+    defaultValue: CONFIG.accentColor,
   },
   borderRadius: {
     type: ControlType.Number,
-    title: "Corner radius",
-    defaultValue: 12,
+    title: "Corner Radius",
+    defaultValue: CONFIG.borderRadius,
     min: 0,
     max: 32,
     unit: "px",
   },
+
+  /* ---- Shared appearance: Theme, Colors, Typography, Layout, then Labels ---- */
+
+  ...mfAppearanceControls({ padding: 24, gap: 16, shadow: true }),
+  labels: mfLabelControls(ONBOARDING_LABELS),
 });

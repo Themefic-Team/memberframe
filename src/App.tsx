@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { framer } from "framer-plugin";
 import { PluginShell } from "./components/shell";
 import { ConnectionProvider } from "./components/ConnectionProvider";
-import { BuilderTab, ConnectTab, HomeTab, ManageTab, SettingsTab } from "./components/tabs";
+import { ACCOUNT_VIEW, BuilderTab, ConnectTab, HomeTab, ManageTab, SettingsTab } from "./components/tabs";
 import { ToastProvider } from "./components/ui";
 import { useActiveTab } from "./hooks/useActiveTab";
 import { useFramerTheme } from "./hooks/useFramerTheme";
@@ -10,7 +10,8 @@ import { useFramerTheme } from "./hooks/useFramerTheme";
 /** PRD section 7.1. Geometry is fixed by the shell standard. */
 const PANEL_WIDTH = 360;
 const PANEL_HEIGHT = 640;
-const COLLAPSED_HEIGHT = 48;
+/** The tab bar, which is the panel's top row since the plugin header went. */
+const COLLAPSED_HEIGHT = 36;
 
 export const App: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -29,19 +30,35 @@ export const App: React.FC = () => {
     }
   }, [collapsed]);
 
-  const handleClose = useCallback(() => {
-    try {
-      framer.closePlugin();
-    } catch {
-      // Same as above: nothing to close outside Framer.
-    }
-  }, []);
+  // No close handler: Framer's own window bar closes the plugin, and the shell
+  // no longer draws a second one. See PluginShell.
 
   const toggleCollapse = useCallback(() => setCollapsed((current) => !current), []);
+
+  // Collapse lives in Framer's own window bar, beside its close button: the
+  // plugin menu (`framer.setMenu`) is the only thing a plugin can put there.
+  // Framer draws the menu button itself, and items are text only, so this is
+  // a labelled menu item rather than our chevron icon. No permission needed.
+  useEffect(() => {
+    try {
+      void framer
+        .setMenu([
+          {
+            label: collapsed ? "Expand panel" : "Collapse panel",
+            onAction: toggleCollapse,
+          },
+        ])
+        .catch(() => {
+          // Outside Framer there is no window bar to put a menu in.
+        });
+    } catch {
+      // Same: a standalone browser dev preview has no Framer host.
+    }
+  }, [collapsed, toggleCollapse]);
   const openBuilder = useCallback(() => setActiveTab("builder"), [setActiveTab]);
   const openManage = useCallback(() => setActiveTab("manage"), [setActiveTab]);
   const openSettings = useCallback(() => setActiveTab("settings"), [setActiveTab]);
-  const openConnect = useCallback(() => setActiveTab("connect"), [setActiveTab]);
+  const openConnect = useCallback(() => setActiveTab(ACCOUNT_VIEW), [setActiveTab]);
 
   return (
     <ToastProvider>
@@ -57,7 +74,7 @@ export const App: React.FC = () => {
           onSelectTab={setActiveTab}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapse}
-          onClose={handleClose}
+          onOpenAccount={openConnect}
         >
           {activeTab === "home" ? (
             <HomeTab
@@ -72,7 +89,7 @@ export const App: React.FC = () => {
           {activeTab === "settings" ? (
             <SettingsTab themePreference={preference} onChangeThemePreference={setPreference} />
           ) : null}
-          {activeTab === "connect" ? <ConnectTab /> : null}
+          {activeTab === ACCOUNT_VIEW ? <ConnectTab /> : null}
         </PluginShell>
       </ConnectionProvider>
     </ToastProvider>

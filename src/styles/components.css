@@ -5,17 +5,17 @@
      .agents/skills/framer-plugin-suite/references/design-tokens.css
 
    Two slices, concatenated in order:
-     reference lines  258 to  553   sections 3 and 4, buttons
-     reference lines  580 to 2642   sections 6 to 20, every other component
+     reference lines  312 to  607   sections 3 and 4, buttons
+     reference lines  634 to 2709   sections 6 to 20, every other component
 
-   The gap is deliberate. Reference section 5 (lines 554 to 578) is the base
+   The gap is deliberate. Reference section 5 (lines 608 to 633) is the base
    reset and app container, which PRD section 6.3 assigns to src/App.css.
-   The variable layers (reference lines 1 to 256) live in design-tokens.css.
+   The variable layers (reference lines 1 to 311) live in design-tokens.css.
 
-   Copied 2026-10-11 for PRD tasks 0.4 and 0.5.
+   Recopied 2026-10-15 for Foundations v0.4.0.
    Check for drift:
      diff <(tail -n +21 src/styles/components.css) \
-          <(sed -n '258,553p;580,2642p' \
+          <(sed -n '312,607p;634,2709p' \
             .agents/skills/framer-plugin-suite/references/design-tokens.css)
    ========================================================================== */
 /* --------------------------------------------------------------------------
@@ -36,14 +36,9 @@
   padding: 0 16px;
 
   /* Figma Brand Gradient (180deg #5271FF -> #3B51B8) */
-  /* background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%)) !important; */
+  background: var(--px-brand-gradient, linear-gradient(180deg, #5271ff 0%, #3b51b8 100%)) !important;
   color: #ffffff !important;
-  background:
-    linear-gradient(#5271FF, #3b51b8) padding-box,
-    linear-gradient(180deg, #5271ff 0%, #3b51b8 100%) border-box !important;
-    cursor: pointer;
-  border: 2px solid transparent !important;
-  /* border: 1px solid rgba(255, 255, 255, 0.12) !important; */
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 10px; /* Figma radius/10 for Medium 36px CTA */
 
   /* Dual-Layer Elevation: Whisper Indigo Glow + Lit Top Highlight Edge */
@@ -72,7 +67,7 @@
 /* Hover State */
 .primary-cta:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #4761db 0%, #3448a6 100%) !important;
+  background: var(--px-brand-primary-hover, #4761db) !important; /* Foundations: hover is flat */
   box-shadow: 0 4px 14px rgba(82, 113, 255, 0.32),
               inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
@@ -176,7 +171,7 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #4761db 0%, #3448a6 100%) !important;
+  background: var(--px-brand-primary-hover, #4761db) !important; /* Foundations: hover is flat */
   box-shadow: 0 4px 14px rgba(82, 113, 255, 0.32),
               inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
@@ -191,7 +186,7 @@
 
 .btn-primary:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -230,7 +225,7 @@
 .btn-secondary:focus-visible,
 .secondary-cta:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff) !important;
+  border-color: var(--px-color-focus-ring, #5271ff) !important;
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -264,7 +259,7 @@
 
 .btn-ghost:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff) !important;
+  border-color: var(--px-color-focus-ring, #5271ff) !important;
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -742,19 +737,8 @@ select option {
               inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
 }
 
-/* Soft aurora glow backdrop effect */
-.hero-card::before {
-  content: "";
-  position: absolute;
-  top: -30px;
-  right: -30px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(82, 113, 255, 0.12) 0%, rgba(139, 92, 246, 0.08) 50%, transparent 70%);
-  filter: blur(20px);
-  pointer-events: none;
-}
+/* No aurora glow: the Figma hero is a plain raised card (bg/raised, hairline,
+   Shadow/Card). Removed in Foundations v0.4.0. */
 
 .hero-card-content {
   display: flex;
@@ -1002,11 +986,13 @@ select option {
   box-sizing: border-box;
 }
 
+/* Title/Medium 15/22, -1%: section headings such as "Help" and "More from Pixelfic". */
 .section-title {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 22px;
+  letter-spacing: -0.01em;
   color: var(--title);
   margin: 0;
 }
@@ -1110,7 +1096,7 @@ select option {
 /* Keyboard Focus Ring (Figma: 1px tint focus ring + 3px halo) */
 .icon-button:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -1220,7 +1206,8 @@ select option {
   justify-content: space-between;
   padding: 0 8px 0 16px;
   background-color: var(--framer-color-bg, #ffffff);
-  border-bottom: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  /* No divider: header and tab bar read as one surface in Figma. The only
+     hairline in the chrome is under the tab bar. */
   box-sizing: border-box;
   z-index: 10;
 }
@@ -1271,17 +1258,29 @@ select option {
 }
 
 /* 2. Tab Bar (Height 36px) */
+/* The panel's top row: Framer draws its own window bar above it, so the
+   plugin adds no header of its own. Tabs left, Collapse and Account right.
+   No bar gap: the spacer provides it, and four tabs plus two 30px icon
+   buttons only fit 360px without a second 20px. */
 .framefic-tab-bar {
   height: 36px;
   min-height: 36px;
   display: flex;
   align-items: center;
-  padding: 0 12px 0 16px;
+  padding: 0 8px 0 16px;
   background-color: var(--framer-color-bg, #ffffff);
   border-bottom: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
   box-sizing: border-box;
-  gap: 20px;
+  gap: 0;
   z-index: 9;
+}
+
+/* Collapse and Account, pinned right, 2px apart like icon button groups. */
+.framefic-tab-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .framefic-tabs-list {
@@ -1300,7 +1299,7 @@ select option {
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-secondary, #5c6670);
   background: transparent;
   border: none;
   padding: 0 2px;
@@ -1309,6 +1308,12 @@ select option {
   transition: color 0.15s ease;
   user-select: none;
   text-decoration: none;
+}
+
+/* Tabs are square. framer.css gives every <button> an 8px radius, which
+   rounded the tab and its active indicator. */
+.framefic-tabs-list button {
+	border-radius: 0 !important;
 }
 
 .framefic-tab:hover {
@@ -1505,7 +1510,7 @@ select option {
 .framefic-text-field:focus,
 .framefic-text-field.is-focus {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
   background-color: var(--framer-color-bg-tertiary, #ededed);
 }
@@ -1615,7 +1620,7 @@ body[data-framer-theme="light"] .framefic-select {
 .framefic-select:focus,
 .framefic-select.is-focus {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
   background-color: var(--framer-color-bg-tertiary, #ededed);
 }
@@ -1674,8 +1679,8 @@ body[data-framer-theme="light"] .framefic-select {
 .framefic-checkbox input:checked + .framefic-checkbox-box,
 .framefic-checkbox.is-checked .framefic-checkbox-box,
 .framefic-checkbox.is-indeterminate .framefic-checkbox-box {
-  background-color: var(--px-brand-primary, #5271ff);
-  border-color: var(--px-brand-primary, #5271ff);
+  background-color: var(--px-brand-action, #4761db);
+  border-color: var(--px-brand-action, #4761db);
 }
 
 .framefic-checkbox-icon {
@@ -1713,7 +1718,7 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-checkbox input:focus-visible + .framefic-checkbox-box,
 .framefic-checkbox.is-focus .framefic-checkbox-box {
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -1768,8 +1773,8 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-toggle input:checked + .framefic-toggle-track,
 .framefic-toggle.is-checked .framefic-toggle-track {
-  background-color: var(--px-brand-primary, #5271ff);
-  border-color: var(--px-brand-primary, #5271ff);
+  background-color: var(--px-brand-action, #4761db);
+  border-color: var(--px-brand-action, #4761db);
 }
 
 .framefic-toggle input:checked + .framefic-toggle-track .framefic-toggle-knob,
@@ -1780,7 +1785,7 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-toggle input:focus-visible + .framefic-toggle-track,
 .framefic-toggle.is-focus .framefic-toggle-track {
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -1833,8 +1838,8 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-radio input:checked + .framefic-radio-circle,
 .framefic-radio.is-checked .framefic-radio-circle {
-  background-color: var(--px-brand-primary, #5271ff);
-  border-color: var(--px-brand-primary, #5271ff);
+  background-color: var(--px-brand-action, #4761db);
+  border-color: var(--px-brand-action, #4761db);
 }
 
 .framefic-radio-dot {
@@ -1853,7 +1858,7 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-radio input:focus-visible + .framefic-radio-circle,
 .framefic-radio.is-focus .framefic-radio-circle {
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -1905,18 +1910,21 @@ body[data-framer-theme="light"] .framefic-select {
   color: var(--framer-color-text, #1b1f22);
 }
 
+/* v0.4.0: bg/selected, not bg/raised. In dark, bg/raised (#18191B) is darker
+   than the bg/tertiary track (#202020) and the selected segment disappeared.
+   bg/selected is always lighter than its track, with a 1px border/selected edge. */
 .framefic-segment.is-active,
 .framefic-segment[aria-selected="true"] {
-  background-color: var(--px-color-bg-raised, #ffffff);
+  background-color: var(--px-color-bg-selected, #ffffff);
   color: var(--framer-color-text, #1b1f22);
   font-weight: 600;
-  box-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
-              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
-              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0 0 1px var(--px-color-border-selected, rgba(0, 0, 0, 0.05)),
+              0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
+              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04));
 }
 
 .framefic-segment:focus-visible {
-  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #5271ff);
 }
 
 .framefic-segment:disabled,
@@ -2135,7 +2143,7 @@ html[data-user-theme="light"] body .framefic-banner.banner-danger .banner-icon s
 }
 
 .banner-action-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #5271ff);
 }
 
 /* --------------------------------------------------------------------------
@@ -2375,7 +2383,7 @@ html[data-user-theme="light"] body .toast-action {
 }
 
 .toast-action:focus-visible {
-  outline: 2px solid var(--px-color-focus-ring, #0099ff);
+  outline: 2px solid var(--px-color-focus-ring, #5271ff);
   border-radius: 2px;
 }
 

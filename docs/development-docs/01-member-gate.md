@@ -6,6 +6,8 @@ Technical development specification, user flow, architectural wiring, and testin
 **Status**: Completed  
 **Feature Plan**: `docs/features-plan/1. Lock Pages & On-Page Content.md`  
 
+> **Appearance and sizing (2026-10-15):** Theme (Light by default), Colors, Typography, Layout, and Labels controls, fixed default size, and the shared colour sanitizer are documented once in [`00-canvas-appearance.md`](00-canvas-appearance.md). Redeploy from the Builder to update an existing file.
+
 ---
 
 ## 1. Overview and Problem Solved

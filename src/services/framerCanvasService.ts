@@ -66,7 +66,7 @@ export interface CanvasDeps {
   isAllowedTo(...methods: [ProtectedMethod, ...ProtectedMethod[]]): boolean;
   getCodeFiles(): Promise<ReadonlyArray<CanvasCodeFile>>;
   createCodeFile(name: string, code: string): Promise<CanvasCodeFile>;
-  addComponentInstance(options: { url: string }): Promise<CanvasNode>;
+  addComponentInstance(options: Parameters<typeof framer.addComponentInstance>[0]): Promise<CanvasNode>;
   setParent(nodeId: string, parentId: string, index?: number): Promise<void>;
 }
 
@@ -128,6 +128,29 @@ export interface DeployOptions {
    */
   parentId?: string;
   index?: number;
+  /**
+   * How long to wait between re-reads while Framer compiles a new file, in
+   * milliseconds. Defaults to `EXPORT_RETRY_DELAYS_MS`; the tests pass zeros.
+   */
+  exportRetryDelaysMs?: ReadonlyArray<number>;
+  /** Optional attributes and control values for the inserted component instance. */
+  attributes?: Record<string, unknown>;
+}
+
+/**
+ * Re-read schedule while a new code file compiles, about 15 seconds in all.
+ *
+ * Framer compiles in the background, and `createCodeFile` resolves before it
+ * finishes, so a large first deploy (Member Pricing, Member Auth) regularly
+ * has no exports on the first two reads. Short waits first, so a quick
+ * compile still inserts at once.
+ */
+export const EXPORT_RETRY_DELAYS_MS: ReadonlyArray<number> = [
+  150, 250, 400, 600, 800, 1000, 1250, 1500, 2000, 2000, 2500, 2500,
+];
+
+function wait(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
 /**
@@ -149,22 +172,32 @@ function isWritableMode(mode: Mode): boolean {
  *
  * Framer compiles a code file before it can report what the file exports, so
  * `exports` can be empty on the object returned straight from
- * `createCodeFile`. The second attempt re-reads the file list, which is the
- * only other source of the same data. If both come back empty the deploy stops
- * with a reason the creator can act on, rather than inserting nothing and
- * reporting success.
+ * `createCodeFile`. The file list is the only other source of the same data,
+ * so it is re-read on a schedule until the export shows up. If it never does,
+ * the deploy stops with a reason the creator can act on, rather than inserting
+ * nothing and reporting success.
  */
 async function resolveInsertUrl(
   deps: CanvasDeps,
-  file: CanvasCodeFile
+  file: CanvasCodeFile,
+  delays: ReadonlyArray<number>
 ): Promise<string | null> {
   const fromFile = pickComponentExport(file);
   if (fromFile) return fromFile;
 
-  const files = await deps.getCodeFiles();
-  const refreshed = files.find((candidate) => candidate.id === file.id);
+  for (const delay of [0, ...delays]) {
+    await wait(delay);
+    try {
+      const files = await deps.getCodeFiles();
+      const refreshed = files.find((candidate) => candidate.id === file.id || candidate.name === file.name);
+      const url = refreshed ? pickComponentExport(refreshed) : null;
+      if (url) return url;
+    } catch {
+      // A failed read is one missed attempt, not the end of the wait.
+    }
+  }
 
-  return refreshed ? pickComponentExport(refreshed) : null;
+  return null;
 }
 
 function pickComponentExport(file: CanvasCodeFile): string | null {
@@ -247,7 +280,7 @@ export async function deployCanvasComponent(
   let insertUrl: string | null;
 
   try {
-    insertUrl = await resolveInsertUrl(deps, file);
+    insertUrl = await resolveInsertUrl(deps, file, options.exportRetryDelaysMs ?? EXPORT_RETRY_DELAYS_MS);
   } catch {
     insertUrl = null;
   }
@@ -260,14 +293,25 @@ export async function deployCanvasComponent(
       reason: "no_component_export",
       title: "Component saved, not inserted",
       message:
-        `${generated.fileName} is in the project. Framer has not finished reading it, so drag it in from the components panel.`,
+        `${generated.fileName} is in the project, but Framer is still compiling it. Click Add to canvas again in a moment, or drag it in from the components panel.`,
     };
   }
 
   let node: CanvasNode;
 
   try {
-    node = await deps.addComponentInstance({ url: insertUrl });
+    const addOptions: Parameters<typeof deps.addComponentInstance>[0] = {
+      url: insertUrl,
+      ...(options.attributes ? { attributes: options.attributes as any } : {}),
+    };
+    node = await deps.addComponentInstance(addOptions);
+    if (options.attributes && typeof (node as any)?.setAttributes === "function") {
+      try {
+        await (node as any).setAttributes(options.attributes);
+      } catch {
+        // Ignored if Framer does not support setAttributes on this instance
+      }
+    }
   } catch {
     return {
       ok: false,

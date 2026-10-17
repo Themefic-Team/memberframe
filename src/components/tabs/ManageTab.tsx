@@ -3,6 +3,8 @@ import { Link2 } from "lucide-react";
 import { EmptyState, Segmented, useToast } from "../ui";
 import { MembersTable } from "../manage/MembersTable";
 import { TierEditor } from "../manage/TierEditor";
+import { PaymentsPanel } from "../manage/PaymentsPanel";
+import { FilesPanel } from "../manage/FilesPanel";
 import type { MemberAction } from "../manage/MemberFlyout";
 import { NO_MEMBER_FILTERS, type MemberFilters } from "../manage/memberFilters";
 import type { TierFormDraft } from "../manage/tierValidation";
@@ -21,12 +23,22 @@ import type { MemberPage, SiteMemberRecord, SiteTierRecord } from "../../types/s
 import { parseMinor } from "../../utils/money";
 import { useConnection } from "../../hooks/useConnection";
 import { readDefinitions } from "../../utils/customFields";
+import { rememberSiteTiers } from "../../types/member";
+import { resolvedTierKey } from "../manage/tierValidation";
 
-type Segment = "members" | "tiers";
+type Segment = "members" | "tiers" | "payments" | "files";
 
+/**
+ * Payments sits beside Tiers, FP-16 section 9.4: a tier's prices only sell
+ * once a gateway is connected, so the two are one job and one tab. Files,
+ * FP-12, is the vault behind Protected Download: each file names the tier it
+ * needs, which is the same tier list.
+ */
 const SEGMENTS = [
   { value: "members", label: "Members" },
   { value: "tiers", label: "Tiers" },
+  { value: "payments", label: "Payments" },
+  { value: "files", label: "Files" },
 ] as const satisfies ReadonlyArray<{ value: Segment; label: string }>;
 
 /**
@@ -45,7 +57,7 @@ const SEGMENTS = [
  *
  * It used to be a named placeholder, because conflict C10 meant no task built
  * creator sign-in and every call resolved `unauthorized` whatever was sent.
- * The Connect tab builds it, so this reads the connected site and the member
+ * The Connect view (Account icon) builds it, so this reads the connected site and the member
  * list it renders is the one visitors have actually registered into.
  *
  * An unconnected panel renders an empty state rather than an error. A creator
@@ -136,6 +148,8 @@ export const ManageTab: React.FC = () => {
 
       if (result.kind === "ok") {
         setTiers(result.data.tiers);
+        // Every picker and label in the panel names the site's real tiers.
+        rememberSiteTiers(result.data.tiers);
         setTierFailure(null);
       } else {
         setTiers([]);
@@ -189,7 +203,7 @@ export const ManageTab: React.FC = () => {
 
       if (!siteId) return;
 
-      const wire = toTierDraft(draft);
+      const wire = toTierDraft(draft, tiers);
       const result =
         draft.id === null
           ? await createTier(siteId, wire)
@@ -209,7 +223,7 @@ export const ManageTab: React.FC = () => {
       const { message } = failureMessage(result);
       showToast({ tone: "error", message: shorten(message) });
     },
-    [reload, showToast, siteId]
+    [reload, showToast, siteId, tiers]
   );
 
   if (!siteId) {
@@ -218,7 +232,7 @@ export const ManageTab: React.FC = () => {
         <EmptyState
           icon={<Link2 aria-hidden={true} />}
           title="Connect this project first"
-          description="Members and tiers are stored against a connected Framer project. Open the Connect tab to link one."
+          description="Members and tiers are stored against a connected Framer project. Open Account, top right, to link one."
         />
       </div>
     );
@@ -246,6 +260,10 @@ export const ManageTab: React.FC = () => {
           onCreateFirstTier={() => setSegment("tiers")}
           profileFields={profileFields}
         />
+      ) : segment === "payments" ? (
+        <PaymentsPanel siteId={siteId} />
+      ) : segment === "files" ? (
+        <FilesPanel siteId={siteId} />
       ) : (
         <TierEditor
           tiers={tiers}
@@ -315,14 +333,29 @@ function shorten(message: string, limit = 45): string {
  * rounding errors". A blank price is null, meaning the tier is not sold on that
  * interval, which is different from zero.
  */
-function toTierDraft(draft: TierFormDraft): TierDraft {
+function toTierDraft(draft: TierFormDraft, tiers: ReadonlyArray<SiteTierRecord>): TierDraft {
   const price = (value: string): number | null => {
     const parsed = parseMinor(value);
     return parsed.ok ? parsed.minor : null;
   };
 
+  // FP-16: one row per currency and interval that has a price.
+  const extraPrices = draft.extraPrices.flatMap((extra) =>
+    (
+      [
+        ["month", extra.monthly],
+        ["year", extra.annual],
+        ["lifetime", extra.lifetime],
+      ] as const
+    ).flatMap(([interval, value]) => {
+      const amountMinor = price(value);
+      return amountMinor !== null && amountMinor > 0 ? [{ currency: extra.currency, interval, amountMinor }] : [];
+    })
+  );
+
   return {
-    key: draft.key,
+    key: resolvedTierKey(draft, tiers),
+    extraPrices,
     name: draft.name.trim(),
     monthlyPriceMinor: price(draft.monthlyPrice),
     annualPriceMinor: price(draft.annualPrice),

@@ -54,7 +54,12 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
           const invalid = !isSafeSitePath(current);
 
           return (
-            <FieldRow key={spec.field} label={spec.label} htmlFor={`settings-${spec.field}`}>
+            <FieldRow
+              key={spec.field}
+              label={spec.label}
+              htmlFor={`settings-${spec.field}`}
+              hint={spec.hint}
+            >
               <TextField
                 id={`settings-${spec.field}`}
                 value={current}
@@ -84,7 +89,15 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
       )}
 
       <FieldRows>
-        <FieldRow label="Sign in opens with" fill>
+        <FieldRow
+          label="Sign in opens with"
+          fill
+          hint={
+            value.defaultMethod === "otp"
+              ? "Email codes are not built yet, so visitors see the password form until they are."
+              : "The form visitors see first. They can switch to the other method."
+          }
+        >
           {/*
             A segmented control rather than a select: two options, and the
             choice is visible without opening anything. It still only takes
@@ -102,7 +115,15 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
           A checkbox, not a toggle. PRD section 7.5 reserves the toggle for
           instant-apply controls, and nothing here applies until Save.
         */}
-        <FieldRow label="Allow new sign ups" htmlFor="settings-allow-registration">
+        <FieldRow
+          label="Allow new sign ups"
+          htmlFor="settings-allow-registration"
+          hint={
+            value.allowRegistration
+              ? "Visitors can create an account from the sign in page."
+              : "Only members you add can sign in. The sign up form is hidden."
+          }
+        >
           <Checkbox
             id="settings-allow-registration"
             checked={value.allowRegistration}
@@ -121,13 +142,6 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
         </FieldRow>
       </FieldRows>
 
-      <p className="settings-help">
-        {value.defaultMethod === "otp"
-          ? "Email codes are not built yet, so visitors see the password form until they are."
-          : value.allowRegistration
-            ? "Visitors can create an account from the sign in page."
-            : "Only members you add can sign in. The sign up form is hidden."}
-      </p>
     </>
   );
 };

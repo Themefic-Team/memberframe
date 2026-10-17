@@ -1,5 +1,7 @@
 # Feature: Tri-Gateway Smart Payment Connect
 
+> **Superseded on 2026-10-16** by [17-payments-and-billing.md](17-payments-and-billing.md). Gateway keys moved from Settings to Manage, Payments, with an encrypted store, test and live modes, and all three gateways. Kept for the history of the Phase 1 decisions.
+
 Technical development specification, user flow, architectural wiring, and testing checklist for the gateway key vault and Stripe checkout.
 
 **PRD reference**: [F03](../memberframe-complete-prd.md) section 8

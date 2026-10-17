@@ -100,6 +100,8 @@ Every Framer plugin built in this ecosystem conforms to four non-negotiable pill
 The AI agent **MUST ALWAYS** use `.primary-cta` for every primary call-to-action button in all plugins. Never generate generic or ad-hoc primary buttons.
 
 ### 3.1. The Signature Double-Gradient Border Technique
+
+> Superseded. The authoritative .primary-cta (brand gradient, Shadow/Primary, flat hover) is section 3 of references/design-tokens.css, and the rule is .agents/rules/design-system.md section 10. The block below is kept for history only.
 ```css
 .primary-cta {
   font-family: var(--font-sans, "Inter", sans-serif);
@@ -184,14 +186,16 @@ html[data-user-theme="light"] body { ... }
 html[data-user-theme="dark"] body { ... }
 ```
 
-### 4.2. Authoritative Token Mapping
-- App Background: `var(--framefic-page-bg)` (Dark: `#201f1f` | Light: `#f4f7fb`)
-- Surfaces / Cards: `var(--framefic-surface)` (Dark: `#201f1f` | Light: `#ffffff`)
-- Inner Cards / Inputs: `var(--bg-card-inner)` (Dark: `#2b2b2b` | Light: `#f1f4f9`)
-- Dividers & Borders: `var(--framefic-surface-border)` (Dark: `#3b3a3a` | Light: `#d2dae5`)
-- Headings & Primary Text: `var(--title)` (Dark: `#edf0f7` | Light: `#18202b`)
-- Paragraph Text: `var(--paragraph)` (Dark: `#c7ccd6` | Light: `#48525b`)
-- Brand Accent: `var(--secondary-default)` (Dark: `#708aff` | Light: `#5271ff`)
+### 4.2. Authoritative Token Mapping (Foundations v0.4.0)
+The full table, the surface ladder, and the type, spacing, and radius scales are in `.agents/rules/design-system.md`. Summary:
+- App Background: `var(--framer-color-bg)` (Dark: `#101010` | Light: `#ffffff`)
+- Cards / Tiles / Rows: `var(--px-color-bg-raised)` + `var(--px-shadow-card)` (Dark: `#18191b` | Light: `#ffffff`)
+- Inner Wells / Footer: `var(--framer-color-bg-secondary)` (Dark: `#181818` | Light: `#f5f5f5`)
+- Inputs / Controls: `var(--framer-color-bg-tertiary)` (Dark: `#202020` | Light: `#ededed`)
+- Dividers & Borders: `var(--framer-color-divider)` (Dark: white 4% | Light: black 5%)
+- Headings & Primary Text: `var(--framer-color-text)` (Dark: `#ffffff` | Light: `#1b1f22`)
+- Paragraph Text: `var(--framer-color-text-secondary)` (Dark: `#cbcbcb` | Light: `#5c6670`)
+- Brand Text: `var(--px-color-text-brand)` (Dark: `#8fa3ff` | Light: `#4761db`). Never `#5271ff` as text, it fails AA.
 
 ### 4.3. Strict Icon Standard: Lucide Icons or Framer Icons Only — Strictly NO Emojis
 1. **Permitted Icons**: Use ONLY official icons from `lucide-react` (e.g., `<UserRound />`, `<Crown />`, `<Lock />`, `<Plus />`, `<Sparkles />`, `<HelpCircle />`, `<ExternalLink />`, `<Check />`, `<X />`, `<ChevronDown />`) or Framer SVG icons.

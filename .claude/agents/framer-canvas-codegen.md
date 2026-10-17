@@ -36,10 +36,21 @@ You author the React code components that MemberFrame deploys onto the user's Fr
 - Never ship a component that lets an unpaid user deploy unlocked code.
 - Validate the origin on any `postMessage` handler.
 
+## The Appearance Contract (Every Canvas Component)
+
+Every component carries the shared appearance block between `// @memberframe-appearance-start` and `// @memberframe-appearance-end`, byte-identical to the other components. Copy it from `MemberAuth.tsx`; never edit one copy alone. `test/canvasAppearanceParity.test.ts` holds the copies identical and executes the sanitizers.
+
+- **Theme is a control, defaulting to Light.** Root class `mfThemeClass(theme)`, palette from `<style>{mfThemeCss(".your-root")}</style>` before `cssContent`. Never key the palette off `@media (prefers-color-scheme)` yourself: the Framer canvas is light and that query follows the visitor's OS, which is how the published site once turned dark while the editor showed light.
+- **Every colour, radius, and spacing rule reads `--mf-c-*` or `--mf-*`.** Card padding `var(--mf-pad, N)`, gap `var(--mf-gap, N)`, border `var(--mf-border-width, 1px)`, every `font-size` as `calc(Npx * var(--mf-text-scale, 1))`.
+- **Creator values reach CSS only through `mfAppearanceVars`** in a scoped `[data-…="${scope}"]` style block. Never interpolate a prop into CSS directly.
+- **Fixed size by default**: `@framerSupportedLayoutWidth any-prefer-fixed`, `@framerSupportedLayoutHeight any-prefer-fixed`, plus intrinsic width and height. The root and card fill the frame (`width/height: 100%`, scroll inside).
+- **Sidebar**: `accentColor` and `borderRadius` controls, then `...mfAppearanceControls({ padding, gap, shadow })` and `labels: mfLabelControls(YOUR_LABELS)`. Every visible string is a label, except wording that is a security property (say why in a comment).
+- **Control defaults read `CONFIG`**, so what the creator set in the plugin panel is what the sidebar shows.
+
 ## Before You Finish
 
 ```
-npm run lint:css && npx tsc --noEmit && npm run build
+npm run lint:css && npm run lint:design && npx tsc --noEmit && npm test && npm run build
 ```
 
 Then update the feature's doc in `docs/development-docs/`, including the complete Property Controls table.

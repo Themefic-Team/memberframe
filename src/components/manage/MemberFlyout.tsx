@@ -2,8 +2,7 @@ import React, { useCallback, useState } from "react";
 import { Crown, Link2, ShieldOff, X } from "lucide-react";
 import { Button, FieldRow, FieldRows, IconButton, Select } from "../ui";
 import type { SiteMemberRecord } from "../../types/site";
-import { SELECTABLE_TIER_KEYS } from "./tierValidation";
-import { REQUIRED_TIER_LABELS, type TierKey } from "../../types/member";
+import { siteTiers, type TierKey } from "../../types/member";
 import { statusLabel, tierLabel } from "./memberFilters";
 import {
   displayValue,
@@ -84,9 +83,10 @@ const MemberProfileValues: React.FC<{
   );
 };
 
-const TIER_OPTIONS: ReadonlyArray<{ value: TierKey; label: string }> = SELECTABLE_TIER_KEYS.map(
-  (key) => ({ value: key, label: REQUIRED_TIER_LABELS[key] })
-);
+/** The site's own tiers, read when the flyout renders, so custom tiers are offered too. */
+function tierOptions(): ReadonlyArray<{ value: TierKey; label: string }> {
+  return siteTiers().map((tier) => ({ value: tier.key, label: tier.name }));
+}
 
 /**
  * The row action flyout. PRD task 2.2, feature F02.
@@ -145,7 +145,7 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
           <Select
             id={`member-tier-${member.id}`}
             value={member.tier}
-            options={TIER_OPTIONS}
+            options={tierOptions()}
             disabled={busy}
             onChange={(tier) => onAction({ kind: "change_tier", tier })}
             fill

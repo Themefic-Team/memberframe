@@ -175,7 +175,7 @@ const STRIPE_FIELDS: ReadonlyArray<IntegrationField> = [
 const LEMONSQUEEZY_FIELDS: ReadonlyArray<IntegrationField> = [
   {
     key: "storeId",
-    label: "Store id",
+    label: "Store ID",
     type: "text",
     placeholder: "12345",
     required: true,
@@ -203,7 +203,7 @@ const LEMONSQUEEZY_FIELDS: ReadonlyArray<IntegrationField> = [
 const RAZORPAY_FIELDS: ReadonlyArray<IntegrationField> = [
   {
     key: "keyId",
-    label: "Key id",
+    label: "Key ID",
     type: "text",
     placeholder: "rzp_live_ or rzp_test_",
     required: true,
@@ -233,7 +233,7 @@ const RAZORPAY_FIELDS: ReadonlyArray<IntegrationField> = [
 const GOOGLE_FIELDS: ReadonlyArray<IntegrationField> = [
   {
     key: "clientId",
-    label: "Client id",
+    label: "Client ID",
     type: "text",
     placeholder: "000000.apps.googleusercontent.com",
     required: true,
@@ -266,7 +266,7 @@ const GOOGLE_FIELDS: ReadonlyArray<IntegrationField> = [
 const GITHUB_FIELDS: ReadonlyArray<IntegrationField> = [
   {
     key: "clientId",
-    label: "Client id",
+    label: "Client ID",
     type: "text",
     placeholder: "Ov23li... or Iv1.000000",
     required: true,
@@ -299,18 +299,18 @@ const GITHUB_FIELDS: ReadonlyArray<IntegrationField> = [
 const APPLE_FIELDS: ReadonlyArray<IntegrationField> = [
   {
     key: "clientId",
-    label: "Services ID / Client ID",
+    label: "Services ID",
     type: "text",
     placeholder: "com.example.memberframe.client",
     required: true,
     secret: false,
-    help: "Services ID identifier configured in Apple Developer account.",
+    help: "Your Services ID, which Apple uses as the client ID. From Apple Developer > Identifiers > Services IDs.",
   },
   {
     key: "teamId",
-    label: "Apple Team ID",
+    label: "Team ID",
     type: "text",
-    placeholder: "10-character Team ID (e.g. DEF1234567)",
+    placeholder: "DEF1234567",
     required: false,
     secret: false,
     help: "From Apple Developer Account > Membership > Team ID.",
@@ -319,19 +319,19 @@ const APPLE_FIELDS: ReadonlyArray<IntegrationField> = [
     key: "keyId",
     label: "Key ID",
     type: "text",
-    placeholder: "10-character Key ID (e.g. ABC1234XYZ)",
+    placeholder: "ABC1234XYZ",
     required: false,
     secret: false,
     help: "From Apple Developer Account > Certificates, Identifiers & Profiles > Keys.",
   },
   {
     key: "clientSecret",
-    label: "Private Key (.p8) or Client secret",
+    label: "Private key",
     type: "password",
-    placeholder: "Paste your .p8 private key or pre-generated secret",
+    placeholder: "Paste the .p8 key",
     required: true,
     secret: true,
-    help: "Apple .p8 Private Key content (or generated client secret) to sign tokens.",
+    help: "The contents of your Apple .p8 private key, or a client secret you generated. Used to sign sign-in requests.",
   },
   {
     key: "redirect_url",
@@ -350,7 +350,7 @@ const APPLE_FIELDS: ReadonlyArray<IntegrationField> = [
 const DISCORD_FIELDS: ReadonlyArray<IntegrationField> = [
   {
     key: "clientId",
-    label: "Client id (Application ID)",
+    label: "Application ID",
     type: "text",
     placeholder: "123456789012345678",
     required: true,

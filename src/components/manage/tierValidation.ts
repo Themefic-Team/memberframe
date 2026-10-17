@@ -16,23 +16,17 @@
  * the creator has to interpret.
  */
 
-import { REQUIRED_TIER_LABELS, type TierKey } from "../../types/member";
+import { REQUIRED_TIER_LABELS, requiredTierLabel, type TierKey } from "../../types/member";
 import type { CurrencyCode, SiteTierRecord } from "../../types/site";
 import { MAX_MINOR_AMOUNT } from "../../utils/money";
 
 /**
- * The tier keys a creator may choose.
+ * The built in tier keys, offered first in the editor.
  *
- * CONFLICT C9: F02 types `SiteTierRecord.key` as `string` and comments it
- * `"tier_1" | "tier_2" | "vip" | custom`, so custom keys are intended. F01's
- * `requiredTier` property control is a fixed `Enum` of five options, so a
- * custom key could never be selected on a gate. Phase 1 therefore offers the
- * four known keys and says so in the UI.
- *
- * The fix is already available and is worth recording: the gate's component
- * file is generated per creator, so the generator can emit the site's own tier
- * keys as the `Enum` options once `GET /api/site/tiers` exists. Written up in
- * `docs/development-docs/02-member-tier-cockpit.md` section 5.1.
+ * CONFLICT C9, resolved 2026-10-16. Custom keys are allowed now: the generator
+ * writes the site's real tiers into the gate's Access Tier list, and gates
+ * compare ranks from the site's tier table. A custom key is made from the
+ * tier's name by `keyFromName`.
  */
 export const SELECTABLE_TIER_KEYS: ReadonlyArray<TierKey> = [
   "free_member",
@@ -43,6 +37,66 @@ export const SELECTABLE_TIER_KEYS: ReadonlyArray<TierKey> = [
 
 export const TIER_KEY_OPTIONS: ReadonlyArray<{ value: TierKey; label: string }> =
   SELECTABLE_TIER_KEYS.map((key) => ({ value: key, label: REQUIRED_TIER_LABELS[key] }));
+
+/** The editor's "make a key from the name" choice. Never stored. */
+export const CUSTOM_TIER_KEY = "__custom__";
+
+/** Lowercase, digits, underscore, starting with a letter. Matches the API. */
+export const TIER_KEY_PATTERN = /^[a-z][a-z0-9_]{1,49}$/;
+
+/**
+ * A key from a tier's name: "Pro Plus" becomes `pro_plus`, and a clash with
+ * a key already in use gets a number, `pro_plus_2`.
+ */
+export function keyFromName(name: string, taken: ReadonlyArray<string>): string {
+  let base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  if (!/^[a-z]/.test(base)) base = `tier_${base}`.replace(/_+$/, "");
+  if (base.length < 2) base = "tier";
+
+  let key = base;
+  for (let suffix = 2; taken.includes(key) || SELECTABLE_TIER_KEYS.includes(key); suffix++) {
+    key = `${base}_${suffix}`;
+  }
+  return key;
+}
+
+/** The key a draft will be saved under. */
+export function resolvedTierKey(draft: TierFormDraft, siblings: ReadonlyArray<SiteTierRecord>): string {
+  if (draft.key !== CUSTOM_TIER_KEY) return draft.key;
+  const others = siblings.filter((tier) => tier.id !== draft.id).map((tier) => tier.key);
+  return keyFromName(draft.name, others);
+}
+
+/**
+ * The Tier type choices: built in keys no other tier uses, then the custom
+ * choice. An existing tier's key is fixed, so editing shows just its own.
+ */
+export function tierKeyOptions(
+  draft: TierFormDraft,
+  siblings: ReadonlyArray<SiteTierRecord>
+): ReadonlyArray<{ value: string; label: string }> {
+  if (draft.id !== null) return [{ value: draft.key, label: requiredTierLabel(draft.key) }];
+  const used = siblings.map((tier) => tier.key);
+  return [
+    ...SELECTABLE_TIER_KEYS.filter((key) => !used.includes(key)).map((key) => ({
+      value: key,
+      label: REQUIRED_TIER_LABELS[key] ?? key,
+    })),
+    { value: CUSTOM_TIER_KEY, label: "Custom, from the name" },
+  ];
+}
+
+/** One extra currency's prices as typed, FP-16 section 6.2. */
+export interface ExtraPriceDraft {
+  currency: CurrencyCode;
+  monthly: string;
+  annual: string;
+  lifetime: string;
+}
 
 export const TIER_NAME_MAX_LENGTH = 40;
 export const RANK_MIN = 0;
@@ -64,6 +118,8 @@ export interface TierFormDraft {
   currency: CurrencyCode;
   rank: string;
   isActive: boolean;
+  /** Prices in other currencies. Each currency once, never the base one. */
+  extraPrices: ExtraPriceDraft[];
 }
 
 export const EMPTY_TIER_FORM_DRAFT: TierFormDraft = {
@@ -76,6 +132,7 @@ export const EMPTY_TIER_FORM_DRAFT: TierFormDraft = {
   currency: "USD",
   rank: "1",
   isActive: true,
+  extraPrices: [],
 };
 
 /** One message per field, keyed by field name, for inline rendering. */
@@ -114,9 +171,12 @@ export function validateTierDraft(
     errors.name = "Another tier already uses that name.";
   }
 
-  if (!SELECTABLE_TIER_KEYS.includes(draft.key)) {
+  const key = resolvedTierKey(draft, siblings);
+  if (draft.key === CUSTOM_TIER_KEY && name === "") {
+    errors.key = "Enter a name first. The key is made from it.";
+  } else if (!TIER_KEY_PATTERN.test(key)) {
     errors.key = "Choose one of the available tier types.";
-  } else if (others.some((tier) => tier.key === draft.key)) {
+  } else if (others.some((tier) => tier.key === key)) {
     // A key maps to one tier. Two tiers sharing a key means a gate naming it
     // resolves against whichever the lookup finds first.
     errors.key = "A tier with that type already exists.";
@@ -127,6 +187,9 @@ export function validateTierDraft(
 
   const priceErrors = validatePrices(draft);
   Object.assign(errors, priceErrors);
+
+  const extraError = validateExtraPrices(draft);
+  if (extraError) errors.extraPrices = extraError;
 
   return { errors, valid: Object.keys(errors).length === 0 };
 }
@@ -201,6 +264,26 @@ function validatePrices(draft: TierFormDraft): TierFieldErrors {
   }
 
   return errors;
+}
+
+/** Other currencies: each once, not the base currency, each price a valid amount. */
+function validateExtraPrices(draft: TierFormDraft): string | null {
+  const seen = new Set<string>();
+  for (const extra of draft.extraPrices) {
+    if (extra.currency === draft.currency) return `${extra.currency} is this tier's own currency. Use the prices above.`;
+    if (seen.has(extra.currency)) return `${extra.currency} is listed twice.`;
+    seen.add(extra.currency);
+
+    const values = [extra.monthly, extra.annual, extra.lifetime].map((value) => value.trim());
+    if (values.every((value) => value === "")) return `Set at least one ${extra.currency} price, or remove it.`;
+    for (const value of values) {
+      if (value === "") continue;
+      if (!/^\d+(?:[.,]\d{0,2})?$/.test(value)) return `${extra.currency} prices use digits and up to two decimal places.`;
+      const minor = toMinorUnsafe(value);
+      if (minor === null || minor > MAX_MINOR_AMOUNT) return `An ${extra.currency} price is too high.`;
+    }
+  }
+  return null;
 }
 
 /**

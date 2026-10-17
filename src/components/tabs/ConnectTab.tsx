@@ -18,7 +18,7 @@ import {
 } from "../connect/connectValidation";
 
 /**
- * The Connect tab. The first thing a creator uses, and the thing every other
+ * The Connect view, behind the Account icon. The first thing a creator uses, and the thing every other
  * tab depends on.
  *
  * ## What it actually does
@@ -233,7 +233,10 @@ export const ConnectTab: React.FC = () => {
             <FieldRow label="Framer project">
               <span className="connect-value">{shortProjectId(connection.framerProjectId)}</span>
             </FieldRow>
-            <FieldRow label="Site key">
+            <FieldRow
+              label="Site key"
+              hint="Public. It identifies this site to MemberFrame and is built into every component you add."
+            >
               {/*
                 Shown in full and on purpose. It is baked into every generated
                 canvas component and therefore readable in the page source of
@@ -359,7 +362,12 @@ export const ConnectTab: React.FC = () => {
       {codeSentTo === null ? (
         <section className="section-group">
           <FieldRows>
-            <FieldRow label="Your email" htmlFor="connect-email" fill>
+            <FieldRow
+              label="Your email"
+              htmlFor="connect-email"
+              fill
+              hint="Framer does not share your email with plugins, so we ask once and send a code to confirm it."
+            >
               <TextField
                 id="connect-email"
                 type="email"
@@ -378,10 +386,6 @@ export const ConnectTab: React.FC = () => {
 
           {problem ? <p className="connect-problem">{problem}</p> : null}
 
-          <p className="connect-help">
-            Framer does not share your email with plugins, so we ask once and
-            send a code to confirm it.
-          </p>
 
           {/* This view's one and only `.primary-cta`. */}
           <Button

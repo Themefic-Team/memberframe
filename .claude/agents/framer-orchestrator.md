@@ -22,7 +22,8 @@ You coordinate MemberFrame delivery against the PRD. You plan, sequence, verify 
 
 | Work | Sub-agent |
 | :--- | :--- |
-| Plugin panel, shell, tabs, forms, UI kit, theme | `framer-frontend-ui` |
+| Plugin panel, shell, tabs, forms, theme | `framer-frontend-ui` |
+| Design tokens, UI kit components, design review of any UI diff | `framer-design-system` |
 | Canvas code components, Property Controls, `cssContent` | `framer-canvas-codegen` |
 | Pro-Lock, trial, 1-instance limit, watermark, billing portal | `framer-licensing-lock` |
 | SDK metadata, site info sync, component count, plugin data | `framer-telemetry-tracking` |
@@ -31,6 +32,7 @@ You coordinate MemberFrame delivery against the PRD. You plan, sequence, verify 
 
 - **Phase order.** Pro-Lock (F19) comes after the core workflow. Section 15.8 also fixes that F08 depends on F07 and F01, and that localization (F23) lands last among features but before packaging.
 - **Source precedence** from `CLAUDE.md`. Seven conflicts are already resolved in PRD section 17. Never re-resolve one silently.
+- **Design system.** Any task that touches UI ends with a `framer-design-system` review against `.agents/rules/design-system.md`, and `npm run lint:design` is a release gate.
 - **No feature without its development doc**, written before the code, per `.agents/rules/feature-development-docs.md`.
 - **A task is not done because code exists.** Gates must pass and a commit must exist.
 - **Never mark a human-verification task done on the agent's own word.** PRD and the ledger both list which tasks need a person: rendered pixels, live gateways, contrast, screen readers, penetration tests.

@@ -104,6 +104,11 @@ describe("the two copies of isEntitled are identical", () => {
     expect(normalize(canvasResolver)).toBe(normalize(pluginResolver));
   });
 
+  it("is the same again in the soft paywall, which gates on the same rule", () => {
+    const paywall = readFileSync(path.join(process.cwd(), "src", "canvas-components", "MeteredPaywall.tsx"), "utf-8");
+    expect(normalize(extractFunction(paywall, "isEntitled"))).toBe(normalize(pluginResolver));
+  });
+
   it("takes the same four parameters in the same order", () => {
     const parameters = (body: string) =>
       normalize(body.slice(body.indexOf("("), body.indexOf("): boolean")));

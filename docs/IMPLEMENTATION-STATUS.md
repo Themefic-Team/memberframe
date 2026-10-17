@@ -191,9 +191,9 @@ PRD section 15.5. **Goal**: all three gateways live, metering and SEO shipped, l
 | 3.1 | Integrate Lemon Squeezy routing and key validation           | F03     | `services/checkoutService.ts`, Settings vault | todo   |        |
 | 3.2 | Integrate Razorpay with UPI, including the INR currency path | F03     | `services/checkoutService.ts`                 | todo   |        |
 | 3.3 | Implement geolocation routing with a manual override         | F03     | `services/gatewayRouter.ts`                   | todo   |        |
-| 3.4 | Author `<MeteredPaywall>` with the counter pill              | F07     | `canvas-components/MeteredPaywall.tsx`        | todo   |        |
-| 3.5 | Build encrypted client-side read tracking                    | F07     | `utils/meteredStorage.ts`                     | todo   |        |
-| 3.6 | Build the Schema.org JSON-LD injector                        | F08     | `utils/schemaInjector.ts`                     | todo   |        |
+| 3.4 | Author `<MeteredPaywall>` with the counter pill              | F07     | `canvas-components/MeteredPaywall.tsx`        | done   |        |
+| 3.5 | Build encrypted client-side read tracking                    | F07     | meter block in `MeteredPaywall.tsx`, server meter in the API | done   |        |
+| 3.6 | Build the Schema.org JSON-LD injector                        | F08     | schema block in `MeteredPaywall.tsx` and `MemberGate.tsx` | done   |        |
 | 3.7 | Implement the grace period banner and `past_due` handling    | F18     | `canvas-components/shared/GraceBanner.tsx`    | todo   |        |
 
 ### Week 4
@@ -228,7 +228,7 @@ PRD section 15.6.
 | 5.2 | Implement invoice listing with cross-member access protection    | F06     | Dashboard billing tab                                              | todo   |        |
 | 5.3 | Author `<CMSGatedTemplate>` with boolean and enum bindings       | F09     | `canvas-components/CMSGatedTemplate.tsx`                           | todo   |        |
 | 5.4 | Verify CMS gating on a 300-item collection with no per-item call | F09     | verification task                                                  | todo   |        |
-| 5.5 | Author `<ProtectedDownload>` with signed URL handling            | F10     | `canvas-components/ProtectedDownload.tsx`                          | todo   |        |
+| 5.5 | Author `<ProtectedDownload>` with signed URL handling            | F10     | `canvas-components/ProtectedDownload.tsx`                          | done   |        |
 | 5.6 | Declare the remaining `framer.json` permissions                  | All     | `CodeFile.remove`, `Node.remove`, `setPluginData`, `getPluginData` | todo   |        |
 
 ### Week 6
@@ -253,7 +253,7 @@ PRD section 15.7.
 
 | #   | Task                                                         | Feature | Files                                         | Status | Commit |
 | :-- | :----------------------------------------------------------- | :------ | :-------------------------------------------- | :----- | :----- |
-| 7.1 | Author `<BookmarkButton>` and `<BookmarksTray>`              | F14     | `canvas-components/Bookmark*.tsx`             | todo   |        |
+| 7.1 | Author `<BookmarkButton>` and `<BookmarksTray>`              | F14     | `canvas-components/Bookmark*.tsx`             | done   |        |
 | 7.2 | Author `<MemberDirectory>` with opt-in enforcement           | F15     | `canvas-components/MemberDirectory.tsx`       | todo   |        |
 | 7.3 | Author `<DonationSlider>` with server-side amount validation | F13     | `canvas-components/DonationSlider.tsx`        | todo   |        |
 | 7.4 | Author `<MemberAnnouncementBar>`                             | F17     | `canvas-components/MemberAnnouncementBar.tsx` | todo   |        |

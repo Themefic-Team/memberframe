@@ -30,6 +30,7 @@ import type {
   GatewayVaultDraft,
   MemberPage,
   SiteGatewayStatus,
+  TierExtraPrice,
   SiteTierRecord,
 } from "../types/site";
 import { MEMBER_PAGE_SIZE } from "../types/site";
@@ -129,6 +130,8 @@ export interface TierDraft {
   currency: CurrencyCode;
   rank: number;
   isActive: boolean;
+  /** FP-16. Replaces the tier's extra currency prices when present. */
+  extraPrices?: ReadonlyArray<TierExtraPrice>;
 }
 
 export function createTier(

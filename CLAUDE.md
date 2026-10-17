@@ -20,7 +20,7 @@ Do not re-derive decisions. They are already made and recorded. If the PRD and t
 
 When documents conflict, higher wins:
 
-1. `.agents/rules/` mandatory engineering standards
+1. `.agents/rules/` mandatory engineering standards. For anything visual, `.agents/rules/design-system.md` (Pixelfic UI Kit Foundations v0.4.0) is the binding rule, and Figma outranks the reference CSS
 2. `.agents/skills/framer-plugin-suite/references/` implementation references
 3. `instruction/` company doc and writing standards
 4. `docs/memberframe-complete-prd.md` the product specification
@@ -34,7 +34,7 @@ Seven known conflicts are already resolved in PRD section 17. Never silently re-
 
 ```
 read status row -> read PRD section -> write/update development doc -> code
-  -> npm run lint:css && npx tsc --noEmit && npm test && npm run build
+  -> npm run lint:css && npm run lint:design && npx tsc --noEmit && npm test && npm run build
   -> set the status row to "awaiting review"
   -> PROPOSE a commit message and stop
 ```
@@ -50,7 +50,7 @@ feat(F01): task 1.4 canvas code generator
 
 What changed and why, in prose.
 
-Gates: lint:css, tsc --noEmit, test, build all pass.
+Gates: lint:css, lint:design, tsc --noEmit, test, build all pass.
 Needs human verification: <anything the agent could not check>
 ```
 
@@ -69,6 +69,8 @@ The user commits, so the agent cannot know the SHA in the same turn. Backfill it
 | Command | Checks |
 | :--- | :--- |
 | `npm run lint:css` | Zero `style={{ }}` in JSX. Mandatory, no exceptions |
+| `npm run lint:design` | Design system: no colour literals, type/spacing/radius on scale, no unknown tokens, no brand-primary text, no uppercase, no emoji or dashes |
+| `npm run sync:tokens` | After editing the reference `design-tokens.css`: regenerates the three slices and proves zero drift |
 | `npx tsc --noEmit` | Types in `src` and `test` |
 | `npm test` | `vitest run` over `test/**/*.test.ts` |
 | `npm run build` | `tsc && vite build` |
@@ -85,11 +87,13 @@ Never import the `framer` singleton as a value in a test. It posts to a parent w
 Full text in [`.agents/rules/framer-sdd-standards.md`](.agents/rules/framer-sdd-standards.md). These are the ones most easily violated:
 
 - **Zero inline CSS.** Never `style={{ }}` in JSX. External `.css` only. Semantic class names and state classes (`.is-active`, `.is-locked`). Canvas components consolidate styling into a `cssContent` string injected via `<style>`.
-- **Zero hardcoded hex.** Use design tokens: `var(--framefic-page-bg)`, `var(--framefic-surface)`, `var(--title)`, `var(--paragraph)`, `var(--framefic-surface-border)`, `var(--secondary-default)`.
+- **Match the Pixelfic UI Kit exactly.** Every new screen is built from kit components (`src/components/ui/`), on the surface ladder (panel bg/default, cards bg/raised + hairline + Shadow/Card, popovers Shadow/Popover), with type, spacing, and radius from the Foundations scales. Full rule: [`.agents/rules/design-system.md`](.agents/rules/design-system.md). Missing component: add it to the kit first, never a lookalike in feature CSS.
+- **Zero hardcoded hex.** Use design tokens by their Figma names: `--framer-color-bg`, `--framer-color-text-secondary`, `--px-color-bg-raised`, `--framer-color-divider`, `--px-color-text-brand`. Never `--secondary-default` as text: #5271FF fails AA.
 - **Exactly one `.primary-cta` per view.** Brand gradient 180deg `#5271ff` to `#3b51b8`. Never flat `#5271FF` as a button fill, it fails WCAG AA at 4.07:1.
 - **Icons: Lucide React or Framer SVG only.** Zero unicode emoji anywhere, including docs and UI copy. All icons `stroke="currentColor"`.
-- **Window geometry**: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse goes to height 48.
-- **Four-part shell**: Header 48px, Tab Bar 36px, Content Scroll Area, Footer 40px.
+- **Window geometry**: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse goes to height 36.
+- **Three-part shell**: Tab Bar 36px (top row: 4 tabs, then the Account icon), Content Scroll Area, Footer 40px. Collapse is a `framer.setMenu` item in Framer's own window bar, beside its close button. No plugin header: Framer's own window bar already shows the name and close, and the SDK cannot hide it. Connect opens from the Account icon, not a tab.
+- **`framer.css` is imported in a cascade layer** via `src/styles/framer-base.css`, so kit classes always beat its bare-element rules. Never import it directly.
 - **Form controls**: `.field-row` pattern, label left and control right, 30px tall, 8px radius, control width 160px or `.fill`.
 - **Theme sync**: honor `body[data-framer-theme]` and `html[data-user-theme]`. Both themes must hit WCAG AA.
 - **`framer.mode` guardrail**: always check before `framer.getCodeFiles()`. Never call it during `configureManagedCollection` or `syncManagedCollection`.
@@ -111,8 +115,8 @@ From [`instruction/INSTRUCTION.md`](instruction/INSTRUCTION.md), applies to UI c
 
 | Working on | Read first |
 | :--- | :--- |
-| Any UI or CSS | `.agents/skills/framer-plugin-suite/references/design-tokens.css`, PRD section 7 |
-| A canvas code component | `.agents/.../canvas-component-template.md`, PRD sections 8 and 9 |
+| Any UI or CSS | `.agents/rules/design-system.md` first, then `.agents/skills/framer-plugin-suite/references/design-tokens.css`, PRD section 7. Review with the `framer-design-system` agent |
+| A canvas code component | `.agents/.../canvas-component-template.md`, PRD sections 8 and 9, and the appearance contract in `.claude/agents/framer-canvas-codegen.md` (shared block, Theme default Light, fixed size, Labels) |
 | Pro-Lock, trial, watermark | `.agents/.../pro-lock-engine.md`, `pricing-and-trial-lifecycle.md`, PRD section 12 |
 | Telemetry or plugin data | `.agents/.../telemetry-and-tracking.md`, PRD section 13 |
 | Account or subscription UI | `.agents/.../profile-and-subscription-ui.md` |
@@ -125,7 +129,8 @@ From [`instruction/INSTRUCTION.md`](instruction/INSTRUCTION.md), applies to UI c
 ## Repo Facts That Bite
 
 - **`src/` holds the Phase 0 shell**: four-part shell, UI kit, theme hook, four tabs. The feature directories in PRD section 6.3 (`manage/`, `studio/`, `account/`, `canvas-components/`, `services/`) are still unbuilt.
-- **The three CSS files under `src/styles/` plus `App.css` are verbatim slices** of `.agents/skills/framer-plugin-suite/references/design-tokens.css`. Each carries a provenance header with the exact `diff` command that proves it has not drifted. Do not hand-edit them. New styling goes in a per-feature file like `shell.css`.
+- **`src/styles/design-tokens.css`, `src/styles/components.css`, and `src/App.css` are verbatim slices** of `.agents/skills/framer-plugin-suite/references/design-tokens.css`. Each carries a provenance header with the exact `diff` command that proves it has not drifted. Do not hand-edit them: edit the reference and run `npm run sync:tokens`. Kit-level styling goes in `src/styles/kit.css`; feature layout goes in a per-feature file like `manage.css`.
+- **`framer-plugin/framer.css` styles every `<button>`** at height 30, `flex-shrink: 0`, `overflow: hidden` (width is reset in `shell.css`). A button holding more than one line of text must set `height: auto` or it clips.
 - **`framer.json` permissions is `[]`.** Declare each permission in the task that first needs it (tasks 1.6 and 5.6), not preemptively. This is why the active tab and theme preference persist to `localStorage`: `setPluginData` is not permitted until 5.6.
 - **The dev server is HTTPS with a self-signed cert** (`@vitejs/plugin-basic-ssl`). The agent's browser pane cannot load it. Server-side checks work, but only in this exact shape: `curl -sk --http1.1 https://127.0.0.1:5173/...`. Both flags matter, and `localhost` fails where `127.0.0.1` succeeds. Vite's own log (via preview logs) is the better signal: a transform error shows up there.
 - **`Framer-Agent/` and `instruction/` are vendored copies** of the agent ecosystem where `.agent/` is the correct directory name. The live copy is `.agents/`. Do not "fix" paths inside those two trees.

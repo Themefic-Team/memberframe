@@ -33,6 +33,11 @@ import memberGateSource from "../canvas-components/MemberGate.tsx?raw";
 import memberAuthSource from "../canvas-components/MemberAuth.tsx?raw";
 import memberDashboardSource from "../canvas-components/MemberDashboard.tsx?raw";
 import onboardingModalSource from "../canvas-components/OnboardingModal.tsx?raw";
+import memberPricingSource from "../canvas-components/MemberPricing.tsx?raw";
+import meteredPaywallSource from "../canvas-components/MeteredPaywall.tsx?raw";
+import protectedDownloadSource from "../canvas-components/ProtectedDownload.tsx?raw";
+import bookmarkButtonSource from "../canvas-components/BookmarkButton.tsx?raw";
+import bookmarksTraySource from "../canvas-components/BookmarksTray.tsx?raw";
 import { isSafeSitePath } from "./siteSettingsService";
 import { SESSION_CACHE_TTL_MS, deployBaseUrl } from "../config/backend";
 import {
@@ -46,6 +51,10 @@ import {
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
   DEFAULT_MEMBER_GATE_CONFIG,
   DEFAULT_ONBOARDING_MODAL_CONFIG,
+  DEFAULT_MEMBER_PRICING_CONFIG,
+  PRICING_RADIUS_MAX,
+  PRICING_RADIUS_MIN,
+  type MemberPricingConfig,
   ONBOARDING_RADIUS_MAX,
   ONBOARDING_RADIUS_MIN,
   type OnboardingModalConfig,
@@ -54,6 +63,19 @@ import {
   type MemberAuthConfig,
   type MemberDashboardConfig,
   type MemberGateConfig,
+  CONTENT_RADIUS_MAX,
+  DEFAULT_BOOKMARK_BUTTON_CONFIG,
+  DEFAULT_BOOKMARKS_TRAY_CONFIG,
+  DEFAULT_METERED_PAYWALL_CONFIG,
+  DEFAULT_PROTECTED_DOWNLOAD_CONFIG,
+  METERED_QUOTA_MAX,
+  METERED_QUOTA_MIN,
+  TRAY_MAX_ITEMS_MAX,
+  TRAY_MAX_ITEMS_MIN,
+  type BookmarkButtonConfig,
+  type BookmarksTrayConfig,
+  type MeteredPaywallConfig,
+  type ProtectedDownloadConfig,
 } from "../types/canvas";
 import type { RequiredTier } from "../types/member";
 
@@ -163,10 +185,16 @@ function sanitizeText(value: string, maxLength: number): string {
  * Anything unrecognised falls back to F01's own default rather than throwing:
  * the creator's other five fields are still worth deploying.
  */
+/** A custom tier key, as the API accepts it. Conflict C9, resolved. */
+const CUSTOM_TIER_KEY_PATTERN = /^[a-z][a-z0-9_]{1,49}$/;
+
 export function normalizeGateConfig(config: MemberGateConfig): MemberGateConfig {
-  const requiredTier = ALLOWED_REQUIRED_TIERS.includes(config.requiredTier)
-    ? config.requiredTier
-    : DEFAULT_MEMBER_GATE_CONFIG.requiredTier;
+  const requiredTier =
+    ALLOWED_REQUIRED_TIERS.includes(config.requiredTier) ||
+    // "anyone" is shaped like a key and gates nothing, so it is never accepted.
+    (config.requiredTier !== "anyone" && CUSTOM_TIER_KEY_PATTERN.test(String(config.requiredTier)))
+      ? config.requiredTier
+      : DEFAULT_MEMBER_GATE_CONFIG.requiredTier;
 
   const fallbackAction = ALLOWED_FALLBACK_ACTIONS.includes(config.fallbackAction)
     ? config.fallbackAction
@@ -250,6 +278,12 @@ export interface DeployContext {
    */
   signupPath?: string;
   resetPath?: string;
+  /**
+   * The site's tiers, when the panel has them. The gate's Access Tier list is
+   * written from these, so a creator's custom tiers can be chosen in Framer.
+   * Absent or empty keeps the built in four.
+   */
+  tiers?: ReadonlyArray<{ key: string; name: string; rank: number }>;
 }
 
 /**
@@ -310,7 +344,7 @@ export interface CanvasComponentDescriptor<Config> {
    * rename the export, so Framer lists `MemberLogin` rather than a second
    * `MemberAuth`. Must throw `CodeGenerationError` when it cannot apply.
    */
-  transform?: (code: string) => string;
+  transform?: (code: string, context: DeployContext) => string;
 }
 
 /**
@@ -356,7 +390,7 @@ export function generateComponentCode<Config>(
   const source = sourceOverride ?? descriptor.source;
   const normalized = descriptor.normalize(config);
   const replaced = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized, context));
-  const code = descriptor.transform ? descriptor.transform(replaced) : replaced;
+  const code = descriptor.transform ? descriptor.transform(replaced, context) : replaced;
 
   return { fileName: descriptor.fileName, code, config: normalized };
 }
@@ -407,12 +441,61 @@ function replaceConfigBlock(source: string, block: string): string {
    MEMBER GATE, PRD task 1.7, feature F01
    ========================================================================== */
 
+const GATE_TIER_OPTIONS_LINE = `    options: ["signed_in", "free_member", "tier_1", "tier_2", "vip"],`;
+const GATE_TIER_TITLES_LINE = `    optionTitles: ["Any Signed In", "Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],`;
+
+/**
+ * Write the site's tiers into the gate's Access Tier control: "Any Signed In"
+ * first, then every tier by rank, named as the creator named it. Keys and
+ * names go through `encodeLiteral`, so a tier name cannot break out of the
+ * string it is written into.
+ */
+export function withSiteTiers(code: string, context: DeployContext): string {
+  return rewriteTierOptions(code, context, {
+    optionsLine: GATE_TIER_OPTIONS_LINE,
+    titlesLine: GATE_TIER_TITLES_LINE,
+    leading: [["signed_in", "Any Signed In"]],
+    what: "The gate's Access Tier options",
+  });
+}
+
+/**
+ * Swap one tier Enum's two lines for the site's own tiers, by rank, after the
+ * fixed leading entries. Shared by the gate and the paywall.
+ */
+function rewriteTierOptions(
+  code: string,
+  context: DeployContext,
+  spec: { optionsLine: string; titlesLine: string; leading: ReadonlyArray<readonly [string, string]>; what: string }
+): string {
+  const tiers = (context.tiers ?? []).filter((tier) => CUSTOM_TIER_KEY_PATTERN.test(tier.key));
+  if (tiers.length === 0) return code;
+
+  if (occurrences(code, spec.optionsLine) !== 1 || occurrences(code, spec.titlesLine) !== 1) {
+    throw new CodeGenerationError(
+      `${spec.what} are not in the shape the generator rewrites. Keep options and optionTitles on one line each.`
+    );
+  }
+
+  const ordered = [...tiers].sort((a, b) => a.rank - b.rank);
+  const keys = [...spec.leading.map(([key]) => key), ...ordered.map((tier) => tier.key)];
+  const titles = [
+    ...spec.leading.map(([, title]) => title),
+    ...ordered.map((tier) => sanitizeText(tier.name, 60) || tier.key),
+  ];
+
+  return code
+    .replace(spec.optionsLine, `    options: [${keys.map(encodeLiteral).join(", ")}],`)
+    .replace(spec.titlesLine, `    optionTitles: [${titles.map(encodeLiteral).join(", ")}],`);
+}
+
 export const MEMBER_GATE_DESCRIPTOR: CanvasComponentDescriptor<MemberGateConfig> = {
   id: "member_gate",
   fileName: MEMBER_GATE_FILE_NAME,
   source: memberGateSource,
   configTypeName: "GateConfig",
   normalize: normalizeGateConfig,
+  transform: withSiteTiers,
   serializeFields: (config, context) => [
     `  requiredTier: ${encodeLiteral(config.requiredTier)},`,
     `  fallbackAction: ${encodeLiteral(config.fallbackAction)},`,
@@ -724,6 +807,62 @@ export function generateMemberDashboardCode(
 }
 
 /* ==========================================================================
+   MEMBER PRICING, feature plan FP-16
+   ========================================================================== */
+
+export const MEMBER_PRICING_FILE_NAME = "MemberPricing.tsx";
+
+/** Clamp and whitelist before emission, same contract as the others. */
+export function normalizePricingConfig(config: MemberPricingConfig): MemberPricingConfig {
+  return {
+    headline: sanitizeText(String(config.headline ?? ""), MAX_CARD_TITLE),
+    subheadline: sanitizeText(String(config.subheadline ?? ""), MAX_CARD_DESCRIPTION),
+    defaultInterval: config.defaultInterval === "year" ? "year" : "month",
+    showLifetime: config.showLifetime !== false,
+    showFreeTier: config.showFreeTier !== false,
+    highlightTier: sanitizeText(String(config.highlightTier ?? ""), 100),
+    accentColor: isSafeCssColor(config.accentColor)
+      ? config.accentColor
+      : DEFAULT_MEMBER_PRICING_CONFIG.accentColor,
+    borderRadius: Math.max(
+      PRICING_RADIUS_MIN,
+      Math.min(PRICING_RADIUS_MAX, Math.round(Number(config.borderRadius) || 0))
+    ),
+  };
+}
+
+export const MEMBER_PRICING_DESCRIPTOR: CanvasComponentDescriptor<MemberPricingConfig> = {
+  id: "member_pricing",
+  fileName: MEMBER_PRICING_FILE_NAME,
+  source: memberPricingSource,
+  configTypeName: "PricingConfig",
+  normalize: normalizePricingConfig,
+  serializeFields: (config, context) => [
+    `  headline: ${encodeLiteral(config.headline)},`,
+    `  subheadline: ${encodeLiteral(config.subheadline)},`,
+    `  defaultInterval: ${encodeLiteral(config.defaultInterval)},`,
+    `  showLifetime: ${config.showLifetime},`,
+    `  showFreeTier: ${config.showFreeTier},`,
+    `  highlightTier: ${encodeLiteral(config.highlightTier)},`,
+    `  accentColor: ${encodeLiteral(config.accentColor)},`,
+    `  borderRadius: ${config.borderRadius},`,
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+    // A signed-out buyer makes an account first. The sign up page when the
+    // site has its own, otherwise the sign in page, whose form has sign up.
+    `  signupPath: ${encodeLiteral(context.signupPath || context.loginPath || "/login")},`,
+  ],
+};
+
+export function generateMemberPricingCode(
+  config: MemberPricingConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<MemberPricingConfig> {
+  return generateComponentCode(MEMBER_PRICING_DESCRIPTOR, config, source, context);
+}
+
+/* ==========================================================================
    ONBOARDING MODAL, feature plan FP-09, PRD feature F16, task 6.3
    ========================================================================== */
 
@@ -780,4 +919,204 @@ export function generateOnboardingModalCode(
   context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): GeneratedCanvasFile<OnboardingModalConfig> {
   return generateComponentCode(ONBOARDING_MODAL_DESCRIPTOR, config, source, context);
+}
+
+/* ==========================================================================
+   CONTENT COMPONENTS: FP-07 soft paywall, FP-12 downloads, FP-10 bookmarks
+   ========================================================================== */
+
+export const METERED_PAYWALL_FILE_NAME = "MeteredPaywall.tsx";
+export const PROTECTED_DOWNLOAD_FILE_NAME = "ProtectedDownload.tsx";
+export const BOOKMARK_BUTTON_FILE_NAME = "BookmarkButton.tsx";
+export const BOOKMARKS_TRAY_FILE_NAME = "BookmarksTray.tsx";
+
+/** Every content component reads the same connection and sign in page. */
+function contentContextFields(context: DeployContext): string[] {
+  return [
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+    `  loginPath: ${encodeLiteral(isSafeSitePath(context.loginPath) ? context.loginPath : "/login")},`,
+  ];
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const number = Math.round(Number(value));
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+}
+
+function colorOr(value: string, fallback: string): string {
+  return isSafeCssColor(value) ? value : fallback;
+}
+
+export function normalizeMeteredPaywallConfig(config: MeteredPaywallConfig): MeteredPaywallConfig {
+  const defaults = DEFAULT_METERED_PAYWALL_CONFIG;
+  return {
+    freeQuotaCount: clampInt(config.freeQuotaCount, METERED_QUOTA_MIN, METERED_QUOTA_MAX, defaults.freeQuotaCount),
+    quotaPeriod: config.quotaPeriod === "weekly" ? "weekly" : "monthly",
+    blurIntensity: clampInt(config.blurIntensity, BLUR_MIN, BLUR_MAX, defaults.blurIntensity),
+    showCounterPill: config.showCounterPill !== false,
+    ctaLabel: sanitizeText(String(config.ctaLabel ?? ""), MAX_CARD_TITLE) || defaults.ctaLabel,
+    cardTitle: sanitizeText(String(config.cardTitle ?? ""), MAX_CARD_TITLE),
+    cardDescription: sanitizeText(String(config.cardDescription ?? ""), MAX_CARD_DESCRIPTION),
+    accentColor: colorOr(config.accentColor, defaults.accentColor),
+    borderRadius: clampInt(config.borderRadius, 0, CONTENT_RADIUS_MAX, defaults.borderRadius),
+  };
+}
+
+const PAYWALL_TIER_OPTIONS_LINE = `    options: ["any_paid", "signed_in", "free_member", "tier_1", "tier_2", "vip"],`;
+const PAYWALL_TIER_TITLES_LINE = `    optionTitles: ["Any Paid Plan", "Any Signed In", "Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],`;
+
+export const METERED_PAYWALL_DESCRIPTOR: CanvasComponentDescriptor<MeteredPaywallConfig> = {
+  id: "metered_paywall",
+  fileName: METERED_PAYWALL_FILE_NAME,
+  source: meteredPaywallSource,
+  configTypeName: "PaywallConfig",
+  normalize: normalizeMeteredPaywallConfig,
+  serializeFields: (config, context) => [
+    `  freeQuotaCount: ${config.freeQuotaCount},`,
+    `  quotaPeriod: ${encodeLiteral(config.quotaPeriod)},`,
+    `  blurIntensity: ${config.blurIntensity},`,
+    `  showCounterPill: ${config.showCounterPill},`,
+    `  ctaLabel: ${encodeLiteral(config.ctaLabel)},`,
+    `  cardTitle: ${encodeLiteral(config.cardTitle)},`,
+    `  cardDescription: ${encodeLiteral(config.cardDescription)},`,
+    `  accentColor: ${encodeLiteral(config.accentColor)},`,
+    `  borderRadius: ${config.borderRadius},`,
+    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
+    `  sessionTtlMs: ${SESSION_CACHE_TTL_MS},`,
+    `  siteKey: ${encodeLiteral(context.siteKey)},`,
+    `  loginPath: ${encodeLiteral(isSafeSitePath(context.loginPath) ? context.loginPath : "/login")},`,
+    `  pricingPath: ${encodeLiteral("/pricing")},`,
+  ],
+  // Full Access For lists the site's own tiers after Any Paid Plan and Any Signed In.
+  transform: (code, context) =>
+    rewriteTierOptions(code, context, {
+      optionsLine: PAYWALL_TIER_OPTIONS_LINE,
+      titlesLine: PAYWALL_TIER_TITLES_LINE,
+      leading: [
+        ["any_paid", "Any Paid Plan"],
+        ["signed_in", "Any Signed In"],
+      ],
+      what: "The paywall's Full Access For options",
+    }),
+};
+
+export function generateMeteredPaywallCode(
+  config: MeteredPaywallConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<MeteredPaywallConfig> {
+  return generateComponentCode(METERED_PAYWALL_DESCRIPTOR, config, source, context);
+}
+
+const ICON_TYPES: ReadonlyArray<ProtectedDownloadConfig["iconType"]> = ["download", "file", "archive", "code"];
+
+export function normalizeProtectedDownloadConfig(config: ProtectedDownloadConfig): ProtectedDownloadConfig {
+  const defaults = DEFAULT_PROTECTED_DOWNLOAD_CONFIG;
+  return {
+    buttonText: sanitizeText(String(config.buttonText ?? ""), MAX_CARD_TITLE) || defaults.buttonText,
+    lockedButtonText: sanitizeText(String(config.lockedButtonText ?? ""), MAX_CARD_TITLE) || defaults.lockedButtonText,
+    iconType: ICON_TYPES.includes(config.iconType) ? config.iconType : defaults.iconType,
+    accentColor: colorOr(config.accentColor, defaults.accentColor),
+    borderRadius: clampInt(config.borderRadius, 0, CONTENT_RADIUS_MAX, defaults.borderRadius),
+    defaultAssetId: sanitizeText(String(config.defaultAssetId ?? ""), 100),
+  };
+}
+
+export const PROTECTED_DOWNLOAD_DESCRIPTOR: CanvasComponentDescriptor<ProtectedDownloadConfig> = {
+  id: "protected_download",
+  fileName: PROTECTED_DOWNLOAD_FILE_NAME,
+  source: protectedDownloadSource,
+  configTypeName: "DownloadConfig",
+  normalize: normalizeProtectedDownloadConfig,
+  serializeFields: (config, context) => [
+    `  buttonText: ${encodeLiteral(config.buttonText)},`,
+    `  lockedButtonText: ${encodeLiteral(config.lockedButtonText)},`,
+    `  iconType: ${encodeLiteral(config.iconType)},`,
+    `  accentColor: ${encodeLiteral(config.accentColor)},`,
+    `  borderRadius: ${config.borderRadius},`,
+    ...contentContextFields(context),
+    `  pricingPath: ${encodeLiteral("/pricing")},`,
+    `  defaultAssetId: ${encodeLiteral(config.defaultAssetId ?? "")},`,
+  ],
+};
+
+export function generateProtectedDownloadCode(
+  config: ProtectedDownloadConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<ProtectedDownloadConfig> {
+  return generateComponentCode(PROTECTED_DOWNLOAD_DESCRIPTOR, config, source, context);
+}
+
+const ICON_SHAPES: ReadonlyArray<BookmarkButtonConfig["iconShape"]> = ["bookmark", "heart", "star"];
+
+export function normalizeBookmarkButtonConfig(config: BookmarkButtonConfig): BookmarkButtonConfig {
+  const defaults = DEFAULT_BOOKMARK_BUTTON_CONFIG;
+  return {
+    iconShape: ICON_SHAPES.includes(config.iconShape) ? config.iconShape : defaults.iconShape,
+    activeFillColor: colorOr(config.activeFillColor, defaults.activeFillColor),
+    showLabel: config.showLabel === true,
+    labelText: sanitizeText(String(config.labelText ?? ""), 60) || defaults.labelText,
+  };
+}
+
+export const BOOKMARK_BUTTON_DESCRIPTOR: CanvasComponentDescriptor<BookmarkButtonConfig> = {
+  id: "bookmark_button",
+  fileName: BOOKMARK_BUTTON_FILE_NAME,
+  source: bookmarkButtonSource,
+  configTypeName: "BookmarkButtonConfig",
+  normalize: normalizeBookmarkButtonConfig,
+  serializeFields: (config, context) => [
+    `  iconShape: ${encodeLiteral(config.iconShape)},`,
+    `  activeFillColor: ${encodeLiteral(config.activeFillColor)},`,
+    `  showLabel: ${config.showLabel},`,
+    `  labelText: ${encodeLiteral(config.labelText)},`,
+    ...contentContextFields(context),
+  ],
+};
+
+export function generateBookmarkButtonCode(
+  config: BookmarkButtonConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<BookmarkButtonConfig> {
+  return generateComponentCode(BOOKMARK_BUTTON_DESCRIPTOR, config, source, context);
+}
+
+export function normalizeBookmarksTrayConfig(config: BookmarksTrayConfig): BookmarksTrayConfig {
+  const defaults = DEFAULT_BOOKMARKS_TRAY_CONFIG;
+  return {
+    drawerSide: config.drawerSide === "left" ? "left" : "right",
+    emptyStateText: sanitizeText(String(config.emptyStateText ?? ""), MAX_CARD_DESCRIPTION) || defaults.emptyStateText,
+    maxItems: clampInt(config.maxItems, TRAY_MAX_ITEMS_MIN, TRAY_MAX_ITEMS_MAX, defaults.maxItems),
+    showBadge: config.showBadge !== false,
+    accentColor: colorOr(config.accentColor, defaults.accentColor),
+    borderRadius: clampInt(config.borderRadius, 0, CONTENT_RADIUS_MAX, defaults.borderRadius),
+  };
+}
+
+export const BOOKMARKS_TRAY_DESCRIPTOR: CanvasComponentDescriptor<BookmarksTrayConfig> = {
+  id: "bookmarks_tray",
+  fileName: BOOKMARKS_TRAY_FILE_NAME,
+  source: bookmarksTraySource,
+  configTypeName: "TrayConfig",
+  normalize: normalizeBookmarksTrayConfig,
+  serializeFields: (config, context) => [
+    `  drawerSide: ${encodeLiteral(config.drawerSide)},`,
+    `  emptyStateText: ${encodeLiteral(config.emptyStateText)},`,
+    `  maxItems: ${config.maxItems},`,
+    `  showBadge: ${config.showBadge},`,
+    `  accentColor: ${encodeLiteral(config.accentColor)},`,
+    `  borderRadius: ${config.borderRadius},`,
+    ...contentContextFields(context),
+  ],
+};
+
+export function generateBookmarksTrayCode(
+  config: BookmarksTrayConfig,
+  source?: string,
+  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
+): GeneratedCanvasFile<BookmarksTrayConfig> {
+  return generateComponentCode(BOOKMARKS_TRAY_DESCRIPTOR, config, source, context);
 }

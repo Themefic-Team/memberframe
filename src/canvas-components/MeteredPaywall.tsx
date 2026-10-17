@@ -1,0 +1,1524 @@
+/**
+ * `<MeteredPaywall>`, the soft paywall. PRD features F07 and F08, feature plan
+ * FP-07, tasks 3.4 to 3.6.
+ *
+ * Two kinds of soft paywall, one component:
+ *
+ *   - Metered: a visitor reads a set number of articles free each week or
+ *     month. Each new article shows a counter pill; the one past the limit is
+ *     cut after its opening paragraphs, frosted, and topped with a lock card.
+ *     Re-opening an article already counted is free.
+ *   - Read More: every visitor without access sees the opening paragraphs and
+ *     the lock card, always. The classic teaser.
+ *
+ * Members on the plan chosen in Full Access For read everything, with no pill.
+ *
+ * ## Where the count lives
+ *
+ * A signed-out visitor is metered on their device, in obfuscated storage
+ * (`mf_metered_v1:<site>`). Clearing it or opening a private window resets
+ * the count: PRD F07 accepts that, as every metered publisher does. A signed-in
+ * member is metered on the server (`POST /api/member/meter`), which is exact
+ * across devices; the device's count for the current cycle is folded in the
+ * first time, so signing in never hands out extra articles.
+ *
+ * ## SEO, F08
+ *
+ * The article stays in the page, whole, for every visitor. It is cut and
+ * frosted with CSS, never removed, so a crawler and a person receive the same
+ * markup and nothing is cloaked. The component adds Schema.org JSON-LD to the
+ * head, `isAccessibleForFree: False` with `hasPart` pointing at
+ * `.memberframe-gated-body`, which is how Google recognises a legitimate
+ * paywall. A determined visitor can read the text in developer tools; content
+ * that must stay secret belongs behind `<MemberGate>` set to Hide Completely.
+ *
+ * ## This file leaves the repository
+ *
+ * Written into the creator's project by the code generator and run on their
+ * published site. It imports only `react`, `framer`, and icons Framer is known
+ * to provide; the meter's rules and the schema helper are local copies, held
+ * to their twins by tests.
+ */
+
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { addPropertyControls, ControlType, RenderTarget } from "framer";
+import { Lock } from "lucide-react";
+
+// ============================================================================
+// LICENSING AND TRIAL STATE
+// ============================================================================
+// Rewritten in place by F19's `enforceLockState` regex patcher.
+const IS_LOCKED = false;
+const IS_TRIAL = false;
+// @plugin-lock-state: unlocked
+// @plugin-trial-state: paid
+
+// @memberframe-appearance-start
+// ============================================================================
+// APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
+// ============================================================================
+// Byte-identical in every canvas component: MemberAuth, MemberDashboard,
+// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
+// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// `test/canvasAppearanceParity.test.ts`, which also compiles this block and
+// runs it. A canvas component is compiled by Framer alone and cannot import
+// from this repository, so the copy is the architecture. Edit all or none.
+//
+// One vocabulary for every component. The Theme control picks a palette, the
+// creator's Colors, Typography, and Layout groups override it, and every rule
+// in a component's stylesheet reads the resolved `--mf-c-*` values.
+//
+// ## Theme is a control, not the visitor's operating system
+//
+// These components used to switch palette on `prefers-color-scheme` alone.
+// The Framer canvas renders light, but that media query follows the visitor's
+// OS, so a published page turned dark for every visitor with a dark OS while
+// the editor showed light. Theme now defaults to Light, matching the editor,
+// and "Match visitor" is still offered as an explicit choice.
+//
+// ## Every creator value is sanitized before it reaches a style block
+//
+// Colors, the font family, and the numbers below end up inside a `<style>`
+// element. A Framer variable can set a prop the code generator never saw, so
+// each value is checked here, at runtime, and anything that could close a
+// declaration is dropped in favour of the theme default.
+
+type MfThemeMode = "light" | "dark" | "auto";
+
+type MfColorKey = "onAccent" | "surface" | "text" | "muted" | "border" | "field";
+
+interface MfAppearanceProps {
+  theme?: MfThemeMode;
+  colors?: Partial<Record<MfColorKey, string>> | null;
+  typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
+  layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  labels?: Record<string, unknown> | null;
+}
+
+interface MfAppearanceInput extends MfAppearanceProps {
+  accent: unknown;
+  radius: unknown;
+  radiusMax: number;
+  /** The component's look before Layout existed: a card has a shadow, a page section does not. */
+  shadowByDefault: boolean;
+}
+
+const MF_DEFAULT_ACCENT = "#5271ff";
+
+const MF_COLOR_VARS: Record<MfColorKey, string> = {
+  onAccent: "--mf-on-accent",
+  surface: "--mf-surface",
+  text: "--mf-text",
+  muted: "--mf-muted",
+  border: "--mf-border",
+  field: "--mf-field",
+};
+
+const MF_PLAIN_COLOR =
+  /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.%\s,/]+\)|hsla?\(\s*[\d.%\s,/a-z]+\)|transparent)$/;
+
+/**
+ * A colour, and nothing but a colour, or the fallback.
+ *
+ * Accepts hex, rgb(a), hsl(a), and a Framer colour style, which arrives as
+ * `var(--token-id, rgb(...))`, sometimes followed by a name comment that is
+ * stripped first. A brace, a semicolon, an angle bracket, a backslash, or a
+ * comment anywhere else rejects the value outright.
+ */
+function mfSafeColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+
+  const colour = value.replace(/\s*\/\*[^*]*\*\/\s*$/, "").trim();
+  if (colour === "" || colour.length > 160) return fallback;
+  if (/[;{}<>\\]/.test(colour) || colour.indexOf("/*") !== -1) return fallback;
+  if (MF_PLAIN_COLOR.test(colour)) return colour;
+
+  const token = /^var\(\s*--[a-zA-Z0-9_-]+\s*(?:,\s*(.+))?\)$/.exec(colour);
+  if (token && (token[1] === undefined || MF_PLAIN_COLOR.test(token[1].trim()))) return colour;
+
+  return fallback;
+}
+
+/** A finite number inside the range, or the fallback. */
+function mfNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const number = typeof value === "number" ? value : Number(value);
+  if (typeof value === "string" && value.trim() === "") return fallback;
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+/**
+ * The family out of a Font control value, or null.
+ *
+ * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
+ * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ */
+function mfFontFamily(font: unknown): string | null {
+  let family = "";
+  if (typeof font === "string") family = font;
+  else if (font && typeof font === "object") {
+    const candidate = (font as { fontFamily?: unknown }).fontFamily;
+    if (typeof candidate === "string") family = candidate;
+  }
+
+  family = family.trim();
+  if (family === "" || family.length > 300) return null;
+  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  return family;
+}
+
+/** The root class for a theme. Anything unknown is Light, the editor's look. */
+function mfThemeClass(theme: unknown): string {
+  if (theme === "dark") return "is-dark";
+  if (theme === "auto") return "is-auto";
+  return "is-light";
+}
+
+/** `{name}` placeholders in a creator's label, filled with plain text. */
+function mfFill(template: string, values: Record<string, string | number>): string {
+  let out = template;
+  for (const key of Object.keys(values)) out = out.split(`{${key}}`).join(String(values[key]));
+  return out;
+}
+
+/**
+ * One label: the creator's text when they typed some, the default otherwise.
+ * Labels render as React text, never as markup, so they need no escaping.
+ */
+function mfLabel(
+  labels: Record<string, unknown> | null | undefined,
+  defaults: Record<string, readonly [string, string]>,
+  key: string
+): string {
+  const value = labels ? labels[key] : undefined;
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return defaults[key] ? defaults[key][1] : "";
+}
+
+/**
+ * The scoped custom properties for one instance.
+ *
+ * Every `--mf-*` is declared, set or `initial`. `initial` makes `var()` fall
+ * back to the theme default, and declaring it stops a component nested inside
+ * another from inheriting the outer one's overrides.
+ */
+function mfAppearanceVars(input: MfAppearanceInput): string {
+  const lines: string[] = [];
+  const set = (name: string, value: string | null) => {
+    lines.push(`${name}: ${value === null ? "initial" : value};`);
+  };
+
+  set("--mf-accent", mfSafeColor(input.accent, MF_DEFAULT_ACCENT));
+  set("--mf-radius", `${Math.round(mfNumber(input.radius, 0, input.radiusMax, 10))}px`);
+
+  const colors = input.colors || {};
+  for (const key of Object.keys(MF_COLOR_VARS) as MfColorKey[]) {
+    const colour = mfSafeColor(colors[key], "");
+    set(MF_COLOR_VARS[key], colour === "" ? null : colour);
+  }
+
+  const typography = input.typography || {};
+  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
+
+  const layout = input.layout || {};
+  const px = (value: unknown, max: number) =>
+    value === undefined || value === null ? null : `${Math.round(mfNumber(value, 0, max, 0))}px`;
+  set("--mf-pad", px(layout.padding, 64));
+  set("--mf-gap", px(layout.gap, 48));
+  set("--mf-border-width", px(layout.borderWidth, 4));
+  const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
+  set("--mf-card-shadow", shadow ? null : "none");
+
+  return lines.join(" ");
+}
+
+const MF_LIGHT = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #ffffff);
+  --mf-c-text: var(--mf-text, #18202b);
+  --mf-c-muted: var(--mf-muted, #5b6472);
+  --mf-c-border: var(--mf-border, rgba(16, 24, 40, 0.12));
+  --mf-c-field: var(--mf-field, #f4f5f7);
+  --mf-c-danger: #dc2626;
+  --mf-c-veil: rgba(255, 255, 255, 0.55);
+  --mf-c-backdrop: rgba(15, 17, 23, 0.55);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(16, 24, 40, 0.14));
+  color-scheme: light;`;
+
+const MF_DARK = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #18191b);
+  --mf-c-text: var(--mf-text, #ffffff);
+  --mf-c-muted: var(--mf-muted, #cbcbcb);
+  --mf-c-border: var(--mf-border, rgba(255, 255, 255, 0.1));
+  --mf-c-field: var(--mf-field, #202020);
+  --mf-c-danger: #f87171;
+  --mf-c-veil: rgba(12, 14, 18, 0.55);
+  --mf-c-backdrop: rgba(0, 0, 0, 0.62);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(0, 0, 0, 0.45));
+  color-scheme: dark;`;
+
+/** The palette for a component root, per theme. Emitted before the component's own CSS. */
+function mfThemeCss(root: string): string {
+  return `
+${root} {${MF_LIGHT}
+  --mf-c-radius: var(--mf-radius, 10px);
+  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  font-family: var(--mf-c-font);
+}
+${root}.is-dark {${MF_DARK}
+}
+@media (prefers-color-scheme: dark) {
+  ${root}.is-auto {${MF_DARK}
+  }
+}
+`;
+}
+
+/**
+ * The shared property controls: Theme, Colors, Typography, Layout.
+ *
+ * Return types are inferred on purpose. Framer's real `framer` module and this
+ * repo's shim name their control types differently, and this file compiles
+ * against both.
+ *
+ * Colours are optional, so an untouched one stays undefined and the theme
+ * default shows through. Layout defaults are the component's own, passed in,
+ * so a fresh instance looks exactly as it did before the group existed.
+ */
+function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
+  return {
+    theme: {
+      type: ControlType.Enum,
+      title: "Theme",
+      options: ["light", "dark", "auto"],
+      optionTitles: ["Light", "Dark", "Match visitor"],
+      defaultValue: "light",
+    },
+    colors: {
+      type: ControlType.Object,
+      title: "Colors",
+      buttonTitle: "Colors",
+      controls: {
+        surface: { type: ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+      },
+    },
+    typography: {
+      type: ControlType.Object,
+      title: "Typography",
+      buttonTitle: "Typography",
+      controls: {
+        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
+        font: {
+          type: ControlType.Font,
+          title: "Font",
+          controls: "basic" as const,
+          defaultFontType: "sans-serif" as const,
+        },
+        textScale: {
+          type: ControlType.Number,
+          title: "Text size",
+          min: 70,
+          max: 160,
+          step: 5,
+          unit: "%",
+          defaultValue: 100,
+        },
+      },
+    },
+    layout: {
+      type: ControlType.Object,
+      title: "Layout",
+      buttonTitle: "Layout",
+      controls: {
+        padding: {
+          type: ControlType.Number,
+          title: "Padding",
+          min: 0,
+          max: 64,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.padding,
+        },
+        gap: {
+          type: ControlType.Number,
+          title: "Spacing",
+          min: 0,
+          max: 48,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.gap,
+        },
+        borderWidth: {
+          type: ControlType.Number,
+          title: "Border",
+          min: 0,
+          max: 4,
+          step: 1,
+          unit: "px",
+          defaultValue: 1,
+        },
+        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+      },
+    },
+  };
+}
+
+/** The Labels group, one String control per entry: key -> [title, default text]. */
+function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
+  const controls: Record<
+    string,
+    { type: typeof ControlType.String; title: string; defaultValue: string }
+  > = {};
+  for (const key of Object.keys(defaults)) {
+    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+  }
+  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+// @memberframe-appearance-end
+
+// @memberframe-schema-start
+// ============================================================================
+// SCHEMA.ORG PAYWALL MARKUP, PRD F08
+// ============================================================================
+// Byte-identical in MemberGate and MeteredPaywall, held so by
+// `test/softPaywall.test.ts`. One script per page, added to the head on the
+// published site only: the canvas is not a page Google reads.
+
+const MF_GATED_BODY_CLASS = "memberframe-gated-body";
+const MF_SCHEMA_ID = "memberframe-paywall-schema";
+const MF_SCHEMA_TYPES = ["Article", "NewsArticle", "BlogPosting", "CreativeWork"];
+
+/** The JSON-LD for a page whose `.memberframe-gated-body` is paid content. */
+function mfPaywallSchema(type: string, headline: string, url: string): string {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": MF_SCHEMA_TYPES.indexOf(type) === -1 ? "Article" : type,
+    headline: headline.slice(0, 110),
+    url,
+    isAccessibleForFree: "False",
+    hasPart: {
+      "@type": "WebPageElement",
+      isAccessibleForFree: "False",
+      cssSelector: `.${MF_GATED_BODY_CLASS}`,
+    },
+  };
+  // `<` escaped so the text can never close the script element it sits in.
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+/** Add the markup once per page. Later instances find it and do nothing. */
+function mfInjectPaywallSchema(type: string): void {
+  if (typeof document === "undefined" || document.getElementById(MF_SCHEMA_ID)) return;
+  const canonical = document.querySelector('link[rel="canonical"]');
+  const href = canonical ? canonical.getAttribute("href") : null;
+  const url = href && /^https?:\/\//.test(href) ? href : window.location.origin + window.location.pathname;
+  const script = document.createElement("script");
+  script.type = "application/ld+json";
+  script.id = MF_SCHEMA_ID;
+  script.textContent = mfPaywallSchema(type, document.title || "", url);
+  document.head.appendChild(script);
+}
+// @memberframe-schema-end
+
+// @memberframe-meter-start
+// ============================================================================
+// THE METER, PRD F07
+// ============================================================================
+// The same rule as `decideMeter` in the API's `services/meterService.ts`, so a
+// signed-out visitor and a signed-in member are counted alike. Pure, and run
+// by `test/softPaywall.test.ts`.
+
+interface MeterState {
+  slugs: string[];
+  cycleStart: number;
+}
+
+interface MeterAnswer {
+  allowed: boolean;
+  alreadyRead: boolean;
+  count: number;
+  limit: number;
+  remaining: number;
+  position: number | null;
+  cycleStart: number;
+  resetsAt: number;
+}
+
+const METER_DAY_MS = 86400000;
+const METER_MAX_SLUGS = 500;
+
+function decideMeter(
+  state: MeterState | null,
+  slug: string,
+  limit: number,
+  periodDays: number,
+  now: number,
+  deviceReads: ReadonlyArray<string> = []
+): { state: MeterState; answer: MeterAnswer } {
+  const windowMs = periodDays * METER_DAY_MS;
+  let current = state && now - state.cycleStart < windowMs && now >= state.cycleStart ? state : null;
+
+  if (!current) {
+    const carried = Array.from(new Set(deviceReads)).slice(0, limit);
+    current = { slugs: carried, cycleStart: now };
+  }
+
+  const slugs = current.slugs.slice();
+  let index = slugs.indexOf(slug);
+  const alreadyRead = index !== -1;
+
+  if (!alreadyRead && slugs.length < limit) {
+    slugs.push(slug);
+    index = slugs.length - 1;
+  }
+
+  const allowed = index !== -1;
+  const next = { slugs: slugs.slice(-METER_MAX_SLUGS), cycleStart: current.cycleStart };
+
+  return {
+    state: next,
+    answer: {
+      allowed,
+      alreadyRead,
+      count: Math.min(next.slugs.length, limit),
+      limit,
+      remaining: Math.max(0, limit - next.slugs.length),
+      position: allowed ? index + 1 : null,
+      cycleStart: next.cycleStart,
+      resetsAt: next.cycleStart + windowMs,
+    },
+  };
+}
+
+/** What the device keeps. */
+interface DeviceMeter {
+  deviceId: string;
+  periodDays: number;
+  slugs: string[];
+  cycleStart: number;
+}
+
+/** FNV-1a, 32 bit, as hex. A tamper check, not a secret. */
+function meterChecksum(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/** XOR with a stream seeded from the site, so the stored value is not plain JSON a visitor can edit. */
+function meterXor(text: string, seed: string): string {
+  let state = parseInt(meterChecksum(seed), 16) || 1;
+  let out = "";
+  for (let index = 0; index < text.length; index += 1) {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    out += String.fromCharCode(text.charCodeAt(index) ^ (state & 0xff));
+  }
+  return out;
+}
+
+function encodeMeter(record: DeviceMeter, seed: string): string {
+  const plain = JSON.stringify(record);
+  // encodeURIComponent first so every character is one byte before the XOR.
+  const bytes = meterXor(encodeURIComponent(plain), seed);
+  return `v1.${btoa(bytes)}.${meterChecksum(plain + seed)}`;
+}
+
+/** The stored meter, or null when it is missing, edited, or from another site. */
+function decodeMeter(raw: string | null, seed: string): DeviceMeter | null {
+  if (!raw) return null;
+  const parts = raw.split(".");
+  if (parts.length !== 3 || parts[0] !== "v1") return null;
+  try {
+    const plain = decodeURIComponent(meterXor(atob(parts[1]), seed));
+    if (meterChecksum(plain + seed) !== parts[2]) return null;
+    const value = JSON.parse(plain) as DeviceMeter;
+    if (
+      typeof value.deviceId !== "string" ||
+      typeof value.cycleStart !== "number" ||
+      typeof value.periodDays !== "number" ||
+      !Array.isArray(value.slugs)
+    ) {
+      return null;
+    }
+    value.slugs = value.slugs.filter((slug) => typeof slug === "string").slice(-METER_MAX_SLUGS);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** The slugs counted in the device's current cycle, for folding into a member's server meter. */
+function currentDeviceReads(record: DeviceMeter | null, periodDays: number, now: number): string[] {
+  if (!record || record.periodDays !== periodDays) return [];
+  if (now - record.cycleStart >= periodDays * METER_DAY_MS || now < record.cycleStart) return [];
+  return record.slugs.slice(0, 10);
+}
+
+/**
+ * Which counter wording fits: "Article 2 of 3" or, with a limit of one, "Your
+ * free article"; then "2 free articles remaining", "1 free article remaining",
+ * or "Last free article". Label keys, so a creator's own copy still applies.
+ */
+function meterPillKeys(answer: MeterAnswer): { main: string; sub: string } {
+  return {
+    main: answer.limit === 1 ? "pillCountOne" : "pillCount",
+    sub: answer.remaining === 0 ? "pillLast" : answer.remaining === 1 ? "pillRemainingOne" : "pillRemaining",
+  };
+}
+
+/** An article's identity: the creator's Article ID, or the page path. */
+function articleSlug(articleId: string, pathname: string): string {
+  const source = articleId.trim() !== "" ? articleId.trim() : pathname.replace(/\/+$/, "") || "/";
+  return source.replace(/[^A-Za-z0-9\-_./:]/g, "-").slice(0, 191) || "/";
+}
+// @memberframe-meter-end
+
+/**
+ * `useLayoutEffect` in the browser, `useEffect` while Framer pre-renders the
+ * page on its server, where a layout effect cannot run and only warns.
+ */
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+// ============================================================================
+// DATA CONTRACTS
+// ============================================================================
+
+type TierKey = "free_member" | "tier_1" | "tier_2" | "vip" | (string & {});
+type RequiredTier = "anyone" | "signed_in" | TierKey;
+type MemberStatus = "active" | "trialing" | "past_due" | "canceled";
+/** Who reads without a meter: any paid plan, any signed-in member, or a tier and up. */
+type UnlimitedTier = "any_paid" | "signed_in" | TierKey;
+type PaywallMode = "metered" | "teaser";
+type QuotaPeriod = "weekly" | "monthly";
+
+interface MemberSessionData {
+  memberId: string;
+  email: string;
+  name: string | null;
+  activeTier: TierKey;
+  status: MemberStatus;
+  currentPeriodEnd: number;
+  gracePeriodEndsAt: number;
+  siteId: string;
+}
+
+interface TierLadderEntry {
+  key: TierKey;
+  rank: number;
+  name: string;
+}
+
+const DEFAULT_SITE_TIERS: ReadonlyArray<TierLadderEntry> = [
+  { key: "free_member", rank: 0, name: "Free" },
+  { key: "tier_1", rank: 1, name: "Silver" },
+  { key: "tier_2", rank: 2, name: "Gold" },
+  { key: "vip", rank: 3, name: "VIP" },
+];
+
+interface PaywallConfig {
+  freeQuotaCount: number;
+  quotaPeriod: QuotaPeriod;
+  blurIntensity: number;
+  showCounterPill: boolean;
+  ctaLabel: string;
+  cardTitle: string;
+  cardDescription: string;
+  accentColor: string;
+  borderRadius: number;
+  apiBaseUrl: string;
+  sessionTtlMs: number;
+  /** Public. Identifies the tenant; the request's Origin is what authorizes. */
+  siteKey: string;
+  loginPath: string;
+  pricingPath: string;
+}
+
+const ENV_API_BASE_URL =
+  (typeof import.meta !== "undefined" &&
+    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
+  "";
+
+// @memberframe-config-start
+const CONFIG: PaywallConfig = {
+  freeQuotaCount: 3,
+  quotaPeriod: "monthly",
+  blurIntensity: 8,
+  showCounterPill: true,
+  ctaLabel: "Subscribe to continue reading",
+  cardTitle: "Enjoying this article?",
+  cardDescription: "You have reached your free reading limit for this {period}.",
+  accentColor: "#5271ff",
+  borderRadius: 14,
+  apiBaseUrl: ENV_API_BASE_URL,
+  sessionTtlMs: 60000,
+  siteKey: "",
+  loginPath: "/login",
+  pricingPath: "/pricing",
+};
+// @memberframe-config-end
+
+/** Shared with MemberAuth, the Route Shield, and the other components. Change together. */
+const HINT_KEY = `memberframe:signed-in:${CONFIG.siteKey}`;
+const RETURN_KEY = `memberframe:return-to:${CONFIG.siteKey}`;
+const METER_STORAGE_KEY = `mf_metered_v1:${CONFIG.siteKey}`;
+const METER_SEED = `memberframe-meter:${CONFIG.siteKey}`;
+
+const PERIOD_DAYS: Record<QuotaPeriod, number> = { weekly: 7, monthly: 30 };
+
+// ============================================================================
+// ENTITLEMENT
+// ============================================================================
+// `isEntitled` is the gate's resolver, verbatim, held to the plugin's copy by
+// `test/memberGateParity.test.ts`. `readsUnlimited` adds "any paid plan".
+
+function isEntitled(
+  session: MemberSessionData | null,
+  requiredTier: RequiredTier,
+  tiers: ReadonlyArray<TierLadderEntry> = DEFAULT_SITE_TIERS,
+  nowSeconds: number = Date.now() / 1000
+): boolean {
+  if (requiredTier === "anyone") return true;
+  if (!session) return false;
+
+  const statusOk =
+    session.status === "active" ||
+    session.status === "trialing" ||
+    (session.status === "past_due" && nowSeconds < session.gracePeriodEndsAt) ||
+    (session.status === "canceled" && nowSeconds < session.currentPeriodEnd);
+
+  if (!statusOk) return false;
+  if (requiredTier === "signed_in") return true;
+
+  const required = tiers.find((tier) => tier.key === requiredTier);
+  const held = tiers.find((tier) => tier.key === session.activeTier);
+
+  if (!required || !held) return false;
+
+  return held.rank >= required.rank;
+}
+
+/**
+ * "Any paid plan" is every tier above the site's lowest, which is the free
+ * tier on every ladder MemberFrame creates. A member whose tier the ladder does
+ * not know is not paid, which fails toward the meter rather than toward free.
+ */
+function readsUnlimited(
+  session: MemberSessionData | null,
+  unlimited: UnlimitedTier,
+  tiers: ReadonlyArray<TierLadderEntry>
+): boolean {
+  if (unlimited !== "any_paid") return isEntitled(session, unlimited, tiers);
+  if (!session || !isEntitled(session, "signed_in", tiers)) return false;
+  const lowest = tiers.reduce((min, tier) => Math.min(min, tier.rank), Infinity);
+  const held = tiers.find((tier) => tier.key === session.activeTier);
+  return held !== undefined && held.rank > lowest;
+}
+
+// ============================================================================
+// SESSION AND METER CALLS
+// ============================================================================
+
+type SessionResult =
+  | { kind: "member"; session: MemberSessionData; tiers: ReadonlyArray<TierLadderEntry> }
+  | { kind: "guest"; tiers: ReadonlyArray<TierLadderEntry> }
+  | { kind: "unavailable" };
+
+function readLadder(value: unknown): ReadonlyArray<TierLadderEntry> {
+  if (!Array.isArray(value)) return DEFAULT_SITE_TIERS;
+  const tiers = value.filter(
+    (entry): entry is TierLadderEntry =>
+      Boolean(entry) && typeof entry.key === "string" && typeof entry.rank === "number"
+  );
+  return tiers.length > 0 ? tiers : DEFAULT_SITE_TIERS;
+}
+
+function apiHeaders(withBody: boolean): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (withBody) headers["Content-Type"] = "application/json";
+  if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  return headers;
+}
+
+/** One session request per page, however many paywalls it carries. */
+let cachedSession: { at: number; value: Promise<SessionResult> } | null = null;
+
+async function requestSession(): Promise<SessionResult> {
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/member/session`, {
+      credentials: "include",
+      headers: apiHeaders(false),
+    });
+    const body = (await response.json().catch(() => ({}))) as { member?: MemberSessionData; tiers?: unknown };
+    const tiers = readLadder(body.tiers);
+    if (response.status === 401) return { kind: "guest", tiers };
+    if (!response.ok || !body.member || typeof body.member.status !== "string") return { kind: "unavailable" };
+    return { kind: "member", session: body.member, tiers };
+  } catch {
+    return { kind: "unavailable" };
+  }
+}
+
+function loadSession(): Promise<SessionResult> {
+  const now = Date.now();
+  if (cachedSession && now - cachedSession.at < CONFIG.sessionTtlMs) return cachedSession.value;
+  const value = requestSession();
+  cachedSession = { at: now, value };
+  return value;
+}
+
+/** The exact meter for a signed-in member. Null when it cannot be reached. */
+async function serverMeter(
+  slug: string,
+  limit: number,
+  period: QuotaPeriod,
+  deviceReads: string[]
+): Promise<MeterAnswer | null> {
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/member/meter`, {
+      method: "POST",
+      credentials: "include",
+      headers: apiHeaders(true),
+      body: JSON.stringify({ slug, limit, period, deviceReads }),
+    });
+    if (!response.ok) return null;
+    const answer = (await response.json()) as MeterAnswer;
+    return typeof answer.allowed === "boolean" ? answer : null;
+  } catch {
+    return null;
+  }
+}
+
+function readDevice(): DeviceMeter | null {
+  try {
+    return decodeMeter(window.localStorage.getItem(METER_STORAGE_KEY), METER_SEED);
+  } catch {
+    return null;
+  }
+}
+
+function writeDevice(record: DeviceMeter): void {
+  try {
+    window.localStorage.setItem(METER_STORAGE_KEY, encodeMeter(record, METER_SEED));
+  } catch {
+    // Blocked storage meters nothing, which is the same as a private window.
+  }
+}
+
+function randomDeviceId(): string {
+  const bytes = new Uint8Array(12);
+  try {
+    window.crypto.getRandomValues(bytes);
+  } catch {
+    for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** Count this article on the device and say whether it may be read. */
+function deviceMeter(slug: string, limit: number, period: QuotaPeriod): MeterAnswer {
+  const periodDays = PERIOD_DAYS[period];
+  const stored = readDevice();
+  const state = stored && stored.periodDays === periodDays ? { slugs: stored.slugs, cycleStart: stored.cycleStart } : null;
+  const { state: next, answer } = decideMeter(state, slug, limit, periodDays, Date.now());
+  writeDevice({ deviceId: stored?.deviceId ?? randomDeviceId(), periodDays, slugs: next.slugs, cycleStart: next.cycleStart });
+  return answer;
+}
+
+function signedInHint(): boolean {
+  try {
+    return window.localStorage.getItem(HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function safePath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && value.indexOf("\\") === -1;
+}
+
+/** Remember this page, so signing in brings the reader back to the article. */
+function rememberReturn(): void {
+  try {
+    const path = `${window.location.pathname}${window.location.search}`;
+    if (safePath(path)) window.sessionStorage.setItem(RETURN_KEY, JSON.stringify({ path, ts: Date.now() }));
+  } catch {
+    // Without storage the reader lands on the site's after-sign-in page.
+  }
+}
+
+// ============================================================================
+// STYLES
+// ============================================================================
+
+const cssContent = `
+.mf-meter {
+  --mf-meter-blur: 8px;
+  --mf-meter-cut: 320px;
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  min-width: 240px;
+  color: var(--mf-c-text);
+  font-size: calc(14px * var(--mf-text-scale, 1));
+  line-height: 1.5;
+}
+.mf-meter-body { position: relative; width: 100%; }
+.mf-meter-body.is-cut { max-height: var(--mf-meter-cut); overflow: hidden; }
+.mf-meter-fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: min(200px, 70%);
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0%, var(--mf-c-surface) 92%);
+  backdrop-filter: blur(var(--mf-meter-blur));
+  -webkit-backdrop-filter: blur(var(--mf-meter-blur));
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.85) 45%, rgba(0, 0, 0, 1) 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.85) 45%, rgba(0, 0, 0, 1) 100%);
+}
+.mf-meter-card {
+  box-sizing: border-box; position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: var(--mf-gap, 10px);
+  max-width: 420px; margin: -48px auto 0; padding: var(--mf-pad, 24px);
+  text-align: center; color: var(--mf-c-text); background: var(--mf-c-surface);
+  border: var(--mf-border-width, 1px) solid var(--mf-c-border); border-radius: var(--mf-c-radius);
+  box-shadow: var(--mf-c-shadow);
+}
+.mf-meter-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px;
+  color: var(--mf-c-accent); background: color-mix(in srgb, var(--mf-c-accent) 12%, transparent);
+}
+.mf-meter-icon svg { width: 18px; height: 18px; stroke: currentColor; }
+.mf-meter-title { margin: 0; font-size: calc(17px * var(--mf-text-scale, 1)); font-weight: 600; line-height: 1.3; }
+.mf-meter-text { margin: 0; color: var(--mf-c-muted); }
+.mf-meter-cta {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center; margin-top: 4px;
+  padding: 10px 20px; border: 0; border-radius: max(0px, calc(var(--mf-c-radius) * 0.6));
+  background: var(--mf-c-accent); color: var(--mf-c-on-accent);
+  font: inherit; font-weight: 600; cursor: pointer; text-decoration: none;
+}
+.mf-meter-cta:hover { filter: brightness(1.06); }
+.mf-meter-cta:focus-visible, .mf-meter-link:focus-visible, .mf-meter-pill button:focus-visible, .mf-meter-pill a:focus-visible {
+  outline: 2px solid var(--mf-c-accent); outline-offset: 2px;
+}
+.mf-meter-link {
+  appearance: none; border: 0; padding: 0; margin: 0; background: transparent; color: var(--mf-c-muted);
+  font: inherit; font-size: calc(13px * var(--mf-text-scale, 1)); text-decoration: underline; cursor: pointer;
+}
+.mf-meter-pill {
+  position: fixed; left: 50%; bottom: 20px; z-index: 2147483000; transform: translateX(-50%);
+  box-sizing: border-box; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 16px; border-radius: 999px;
+  color: var(--mf-c-text); background: var(--mf-c-surface); border: 1px solid var(--mf-c-border);
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.18);
+  font-size: calc(13px * var(--mf-text-scale, 1)); line-height: 1.35;
+  animation: mf-meter-rise 0.28s ease-out;
+}
+.mf-meter-pill-text { display: flex; flex-direction: column; min-width: 0; }
+.mf-meter-pill-main { font-weight: 600; }
+.mf-meter-pill-sub { color: var(--mf-c-muted); font-size: calc(12px * var(--mf-text-scale, 1)); }
+.mf-meter-dots { display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.mf-meter-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--mf-c-border); }
+.mf-meter-dot.is-used { background: var(--mf-c-accent); }
+.mf-meter-pill a {
+  flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; background: var(--mf-c-accent); color: var(--mf-c-on-accent);
+  font-weight: 600; text-decoration: none;
+}
+.mf-meter-close {
+  appearance: none; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--mf-c-muted); cursor: pointer;
+}
+.mf-meter-close svg { width: 14px; height: 14px; }
+@keyframes mf-meter-rise { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .mf-meter-pill { animation: none; } }
+.mf-meter-badge {
+  position: absolute; top: 8px; left: 8px; z-index: 20; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font-size: calc(11px * var(--mf-text-scale, 1)); font-weight: 600;
+  color: var(--mf-c-on-accent); background: var(--mf-c-accent); box-shadow: var(--mf-c-shadow);
+}
+.mf-meter-badge svg { width: 11px; height: 11px; stroke: currentColor; }
+.mf-meter-placeholder {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 16px;
+  border: 1px dashed var(--mf-c-border); border-radius: 12px; background: var(--mf-c-surface); color: var(--mf-c-muted);
+  font-size: calc(12px * var(--mf-text-scale, 1));
+}
+.mf-meter-placeholder strong { color: var(--mf-c-text); font-size: calc(13px * var(--mf-text-scale, 1)); }
+.mf-meter-prolock {
+  position: absolute; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(15, 17, 23, 0.72);
+}
+.mf-meter-watermark {
+  position: absolute; right: 8px; bottom: 8px; z-index: 110; padding: 3px 8px; border-radius: 999px;
+  font-size: calc(10px * var(--mf-text-scale, 1)); font-weight: 600; color: var(--mf-c-on-accent);
+  background: rgba(15, 17, 23, 0.82); text-decoration: none;
+}
+`;
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+const METER_LABELS: Record<string, readonly [string, string]> = {
+  pillCount: ["Counter", "Article {n} of {limit} free articles this {period}"],
+  pillCountOne: ["Counter, one article", "Your free article this {period}"],
+  pillRemaining: ["Articles left", "{remaining} free articles remaining"],
+  pillRemainingOne: ["One article left", "1 free article remaining"],
+  pillLast: ["Last article", "Last free article"],
+  pillSubscribe: ["Counter button", "Subscribe"],
+  pillClose: ["Close counter", "Close"],
+  periodWeek: ["Week word", "week"],
+  periodMonth: ["Month word", "month"],
+  teaserTitle: ["Read More title", "Keep reading"],
+  teaserText: ["Read More text", "Join to unlock the rest of this article."],
+  upgradeTitle: ["Upgrade title", "Upgrade to keep reading"],
+  upgradeText: ["Upgrade text", "Your plan does not include this article."],
+  signInLink: ["Sign in link", "Already a member? Sign in"],
+  checking: ["Checking", "Checking your access"],
+};
+
+/** The lock card's reason. */
+type LockReason = "meter" | "teaser" | "upgrade";
+
+type View =
+  | { phase: "checking" }
+  | { phase: "open"; meter: MeterAnswer | null }
+  | { phase: "locked"; reason: LockReason; signedIn: boolean };
+
+export interface MeteredPaywallProps extends MfAppearanceProps {
+  /** `ControlType.ComponentInstance`. The article body being protected. */
+  contentSlot?: React.ReactNode;
+  mode?: PaywallMode;
+  freeQuotaCount?: number;
+  quotaPeriod?: QuotaPeriod;
+  unlimitedTier?: UnlimitedTier;
+  articleId?: string;
+  previewParagraphs?: number;
+  previewHeight?: number;
+  blurIntensity?: number;
+  showCounterPill?: boolean;
+  ctaLabel?: string;
+  cardTitle?: string;
+  cardDescription?: string;
+  showSignInLink?: boolean;
+  pricingPath?: string;
+  loginPath?: string;
+  seoMarkup?: boolean;
+  schemaType?: string;
+  canvasPreview?: "open" | "locked";
+  accentColor?: string;
+  borderRadius?: number;
+}
+
+const BLUR_MIN = 2;
+const BLUR_MAX = 20;
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden={true}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+/**
+ * Fit height is the natural setting: the component is as tall as the article.
+ * Fixed stays available for a teaser box of a set size.
+ *
+ * @framerIntrinsicWidth 640
+ * @framerIntrinsicHeight 520
+ * @framerSupportedLayoutWidth any-prefer-fixed
+ * @framerSupportedLayoutHeight any-prefer-fixed
+ */
+export default function MeteredPaywall(props: MeteredPaywallProps) {
+  const {
+    contentSlot,
+    mode = "metered",
+    freeQuotaCount = CONFIG.freeQuotaCount,
+    quotaPeriod = CONFIG.quotaPeriod,
+    unlimitedTier = "any_paid",
+    articleId = "",
+    previewParagraphs = 2,
+    previewHeight = 320,
+    blurIntensity = CONFIG.blurIntensity,
+    showCounterPill = CONFIG.showCounterPill,
+    ctaLabel = CONFIG.ctaLabel,
+    cardTitle = CONFIG.cardTitle,
+    cardDescription = CONFIG.cardDescription,
+    showSignInLink = true,
+    pricingPath = CONFIG.pricingPath,
+    loginPath = CONFIG.loginPath,
+    seoMarkup = true,
+    schemaType = "Article",
+    canvasPreview = "open",
+    accentColor = CONFIG.accentColor,
+    borderRadius = CONFIG.borderRadius,
+    theme = "light",
+    colors,
+    typography,
+    layout,
+    labels,
+  } = props;
+
+  const t = (key: string, values: Record<string, string | number> = {}) =>
+    mfFill(mfLabel(labels, METER_LABELS, key), values);
+
+  const rawId = useId();
+  const scope = useMemo(() => `mfm${rawId.replace(/[^a-zA-Z0-9]/g, "")}`, [rawId]);
+  const onCanvas = useMemo(() => {
+    const target = RenderTarget.current();
+    return target === RenderTarget.canvas || target === RenderTarget.thumbnail;
+  }, []);
+
+  const limit = Math.round(mfNumber(freeQuotaCount, 1, 10, 3));
+  const period: QuotaPeriod = quotaPeriod === "weekly" ? "weekly" : "monthly";
+  const periodWord = t(period === "weekly" ? "periodWeek" : "periodMonth");
+  const slug = useMemo(
+    () => articleSlug(String(articleId ?? ""), typeof window === "undefined" ? "/" : window.location.pathname),
+    [articleId]
+  );
+
+  const [view, setView] = useState<View>({ phase: "checking" });
+  const [pillClosed, setPillClosed] = useState(false);
+  const counted = useRef<string | null>(null);
+
+  // ---- Decide, once per article and visitor ----
+  useEffect(() => {
+    if (onCanvas) return;
+    let active = true;
+
+    const settle = (next: View) => {
+      if (active) setView(next);
+    };
+    const fromAnswer = (answer: MeterAnswer, signedIn: boolean): View =>
+      answer.allowed ? { phase: "open", meter: answer } : { phase: "locked", reason: "meter", signedIn };
+
+    async function decide(force: boolean) {
+      const key = `${slug}|${mode}|${limit}|${period}|${unlimitedTier}`;
+      if (!force && counted.current === key) return;
+      counted.current = key;
+
+      const hinted = signedInHint();
+      let deviceAnswer: MeterAnswer | null = null;
+
+      // A visitor with no sign-in hint is almost certainly signed out, so the
+      // device decides at once and the article does not wait on the network.
+      if (!hinted) {
+        if (mode === "teaser") settle({ phase: "locked", reason: "teaser", signedIn: false });
+        else {
+          deviceAnswer = deviceMeter(slug, limit, period);
+          settle(fromAnswer(deviceAnswer, false));
+        }
+      }
+
+      const result = await loadSession();
+      if (!active) return;
+
+      if (result.kind === "member") {
+        if (readsUnlimited(result.session, unlimitedTier, result.tiers)) {
+          settle({ phase: "open", meter: null });
+          return;
+        }
+        if (mode === "teaser") {
+          settle({ phase: "locked", reason: "upgrade", signedIn: true });
+          return;
+        }
+        const reads = currentDeviceReads(readDevice(), PERIOD_DAYS[period], Date.now());
+        const answer = await serverMeter(slug, limit, period, reads);
+        if (!active) return;
+        if (answer) settle(fromAnswer(answer, true));
+        else settle(fromAnswer(deviceAnswer ?? deviceMeter(slug, limit, period), true));
+        return;
+      }
+
+      // Signed out, or the check failed: the device's count stands.
+      if (hinted) {
+        if (mode === "teaser") settle({ phase: "locked", reason: "teaser", signedIn: false });
+        else settle(fromAnswer(deviceMeter(slug, limit, period), false));
+      }
+    }
+
+    void decide(false);
+
+    const onSession = () => {
+      cachedSession = null;
+      void decide(true);
+    };
+    window.addEventListener("memberframe:session-updated", onSession);
+    return () => {
+      active = false;
+      window.removeEventListener("memberframe:session-updated", onSession);
+    };
+  }, [onCanvas, slug, mode, limit, period, unlimitedTier]);
+
+  // ---- F08: the paywall markup, the same for every visitor ----
+  useEffect(() => {
+    if (onCanvas || !seoMarkup) return;
+    mfInjectPaywallSchema(schemaType);
+  }, [onCanvas, seoMarkup, schemaType]);
+
+  const effective: View = onCanvas
+    ? canvasPreview === "locked"
+      ? { phase: "locked", reason: mode === "teaser" ? "teaser" : "meter", signedIn: false }
+      : { phase: "open", meter: null }
+    : view;
+  const cut = effective.phase !== "open";
+
+  // ---- Where the preview ends: after N paragraphs, or at the preview height ----
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [cutAt, setCutAt] = useState<number>(() => Math.round(mfNumber(previewHeight, 80, 2000, 320)));
+
+  // Locked text is visible as a teaser but not reachable: `inert` keeps focus
+  // and screen readers out of what the frost covers (F08), and the lock card
+  // is the next thing they reach. Set on the node, which every React accepts.
+  const locked = effective.phase === "locked";
+  useBrowserLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    if (locked) body.setAttribute("inert", "");
+    else body.removeAttribute("inert");
+  }, [locked, contentSlot]);
+
+  useBrowserLayoutEffect(() => {
+    const fallback = Math.round(mfNumber(previewHeight, 80, 2000, 320));
+    const body = bodyRef.current;
+    if (!cut || !body) {
+      setCutAt(fallback);
+      return;
+    }
+    const wanted = Math.round(mfNumber(previewParagraphs, 1, 20, 2));
+    const paragraphs = body.querySelectorAll("p");
+    const last = paragraphs[wanted - 1] as HTMLElement | undefined;
+    if (!last || paragraphs.length <= wanted) {
+      setCutAt(fallback);
+      return;
+    }
+    const top = body.getBoundingClientRect().top;
+    const bottom = last.getBoundingClientRect().bottom;
+    // A little of the next paragraph shows under the frost, as a teaser should.
+    setCutAt(Math.max(80, Math.round(bottom - top + 56)));
+  }, [cut, previewParagraphs, previewHeight, contentSlot]);
+
+  const blur = Math.round(mfNumber(blurIntensity, BLUR_MIN, BLUR_MAX, CONFIG.blurIntensity));
+  const scopedCss =
+    `[data-mf-meter="${scope}"] { --mf-meter-blur: ${blur}px; --mf-meter-cut: ${cutAt}px; ` +
+    mfAppearanceVars({
+      accent: accentColor,
+      radius: borderRadius,
+      radiusMax: 32,
+      shadowByDefault: true,
+      colors,
+      typography,
+      layout,
+    }) +
+    " }";
+
+  const goPricing = () => {
+    if (onCanvas) return;
+    rememberReturn();
+    const target = safePath(pricingPath) ? pricingPath : CONFIG.pricingPath;
+    if (target && window.location.pathname !== target) window.location.assign(target);
+  };
+
+  const goSignIn = () => {
+    if (onCanvas) return;
+    rememberReturn();
+    window.dispatchEvent(new CustomEvent("memberframe:open-auth", { detail: { reason: "paywall" } }));
+    const target = safePath(loginPath) ? loginPath : CONFIG.loginPath;
+    if (target && window.location.pathname !== target) window.location.assign(target);
+  };
+
+  function lockCard(reason: LockReason, signedIn: boolean) {
+    const values = { period: periodWord, limit };
+    const title = reason === "meter" ? mfFill(cardTitle, values) : reason === "upgrade" ? t("upgradeTitle") : t("teaserTitle");
+    const text =
+      reason === "meter" ? mfFill(cardDescription, values) : reason === "upgrade" ? t("upgradeText") : t("teaserText");
+    return (
+      <div className="mf-meter-card" role="region" aria-label={title}>
+        <span className="mf-meter-icon">
+          <Lock aria-hidden={true} />
+        </span>
+        <h3 className="mf-meter-title">{title}</h3>
+        <p className="mf-meter-text">{text}</p>
+        <button type="button" className="mf-meter-cta" onClick={goPricing}>
+          {ctaLabel || CONFIG.ctaLabel}
+        </button>
+        {showSignInLink && !signedIn ? (
+          <button type="button" className="mf-meter-link" onClick={goSignIn}>
+            {t("signInLink")}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  function pill(meter: MeterAnswer) {
+    if (!showCounterPill || pillClosed || meter.position === null) return null;
+    const values = { n: meter.position, limit: meter.limit, period: periodWord, remaining: meter.remaining };
+    const keys = meterPillKeys(meter);
+    const main = t(keys.main, values);
+    const sub = t(keys.sub, values);
+    const dots = Array.from({ length: meter.limit }, (_, index) => index < meter.count);
+    return (
+      <div className="mf-meter-pill" role="status" aria-live="polite">
+        <span className="mf-meter-dots" aria-hidden={true}>
+          {dots.map((used, index) => (
+            <span key={index} className={`mf-meter-dot${used ? " is-used" : ""}`} />
+          ))}
+        </span>
+        <span className="mf-meter-pill-text">
+          <span className="mf-meter-pill-main">{main}</span>
+          <span className="mf-meter-pill-sub">{sub}</span>
+        </span>
+        <a
+          href={safePath(pricingPath) ? pricingPath : CONFIG.pricingPath}
+          onClick={() => rememberReturn()}
+        >
+          {t("pillSubscribe")}
+        </a>
+        <button type="button" className="mf-meter-close" aria-label={t("pillClose")} onClick={() => setPillClosed(true)}>
+          <CloseIcon />
+        </button>
+      </div>
+    );
+  }
+
+  function body(): React.ReactNode {
+    if (!contentSlot) {
+      return onCanvas ? (
+        <div className="mf-meter-placeholder">
+          <strong>Connect the article body</strong>
+          <span>
+            In the right sidebar, pick the frame or stack that holds the article in the Article Body slot. Set the
+            height to Fit so the paywall grows with the article.
+          </span>
+        </div>
+      ) : null;
+    }
+
+    return (
+      <React.Fragment>
+        {onCanvas ? (
+          <span className="mf-meter-badge">
+            <Lock aria-hidden={true} />
+            <span>
+              {mode === "teaser" ? "Read More paywall" : `${limit} free per ${period === "weekly" ? "week" : "month"}`}
+            </span>
+          </span>
+        ) : null}
+        <div
+          ref={bodyRef}
+          className={`mf-meter-body ${MF_GATED_BODY_CLASS}${cut ? " is-cut" : ""}`}
+          aria-busy={effective.phase === "checking" ? true : undefined}
+        >
+          {contentSlot}
+          {cut ? <div className="mf-meter-fade" aria-hidden={true} /> : null}
+        </div>
+        {locked ? lockCard(effective.reason, effective.signedIn) : null}
+        {effective.phase === "open" && effective.meter ? pill(effective.meter) : null}
+      </React.Fragment>
+    );
+  }
+
+  const proLock = IS_LOCKED ? (
+    <div className="mf-meter-prolock">
+      <div className="mf-meter-card">
+        <h3 className="mf-meter-title">Component Locked</h3>
+        <p className="mf-meter-text">Open the MemberFrame plugin to activate your license or start a free trial.</p>
+      </div>
+    </div>
+  ) : null;
+
+  const watermark =
+    IS_TRIAL && !IS_LOCKED ? (
+      <a className="mf-meter-watermark" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
+        Trial Version
+      </a>
+    ) : null;
+
+  return (
+    <div className={`mf-meter ${mfThemeClass(theme)}`} data-mf-meter={scope}>
+      <style>{mfThemeCss(".mf-meter")}</style>
+      <style>{cssContent}</style>
+      <style>{scopedCss}</style>
+      {body()}
+      {proLock}
+      {watermark}
+    </div>
+  );
+}
+
+// ============================================================================
+// PROPERTY CONTROLS, PRD F07
+// ============================================================================
+
+addPropertyControls(MeteredPaywall, {
+  contentSlot: {
+    type: ControlType.ComponentInstance,
+    title: "Article Body",
+  },
+  mode: {
+    type: ControlType.Enum,
+    title: "Paywall Type",
+    options: ["metered", "teaser"],
+    optionTitles: ["Free Articles Meter", "Read More Teaser"],
+    defaultValue: "metered",
+  },
+  freeQuotaCount: {
+    type: ControlType.Number,
+    title: "Free Articles",
+    min: 1,
+    max: 10,
+    step: 1,
+    displayStepper: true,
+    defaultValue: CONFIG.freeQuotaCount,
+    hidden: (props) => props.mode === "teaser",
+  },
+  quotaPeriod: {
+    type: ControlType.Enum,
+    title: "Reset Window",
+    options: ["weekly", "monthly"],
+    optionTitles: ["Every 7 Days", "Every 30 Days"],
+    defaultValue: CONFIG.quotaPeriod,
+    hidden: (props) => props.mode === "teaser",
+  },
+  unlimitedTier: {
+    type: ControlType.Enum,
+    title: "Full Access For",
+    // The generator replaces these two lines with the site's own tiers, by
+    // rank, after the first two. Keep them on one line each.
+    options: ["any_paid", "signed_in", "free_member", "tier_1", "tier_2", "vip"],
+    optionTitles: ["Any Paid Plan", "Any Signed In", "Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],
+    defaultValue: "any_paid",
+  },
+  articleId: {
+    type: ControlType.String,
+    title: "Article ID",
+    placeholder: "Page path",
+    defaultValue: "",
+  },
+  previewParagraphs: {
+    type: ControlType.Number,
+    title: "Free Paragraphs",
+    min: 1,
+    max: 20,
+    step: 1,
+    displayStepper: true,
+    defaultValue: 2,
+  },
+  previewHeight: {
+    type: ControlType.Number,
+    title: "Preview Height",
+    min: 80,
+    max: 2000,
+    step: 10,
+    unit: "px",
+    defaultValue: 320,
+  },
+  blurIntensity: {
+    type: ControlType.Number,
+    title: "Blur Amount",
+    min: BLUR_MIN,
+    max: BLUR_MAX,
+    step: 1,
+    unit: "px",
+    defaultValue: CONFIG.blurIntensity,
+  },
+  showCounterPill: {
+    type: ControlType.Boolean,
+    title: "Show Counter",
+    defaultValue: CONFIG.showCounterPill,
+    hidden: (props) => props.mode === "teaser",
+  },
+
+  /* ---- Lock card ---- */
+
+  cardTitle: {
+    type: ControlType.String,
+    title: "Lock Title",
+    defaultValue: CONFIG.cardTitle,
+    hidden: (props) => props.mode === "teaser",
+  },
+  cardDescription: {
+    type: ControlType.String,
+    title: "Lock Message",
+    displayTextArea: true,
+    defaultValue: CONFIG.cardDescription,
+    hidden: (props) => props.mode === "teaser",
+  },
+  ctaLabel: {
+    type: ControlType.String,
+    title: "Unlock Button",
+    defaultValue: CONFIG.ctaLabel,
+  },
+  showSignInLink: {
+    type: ControlType.Boolean,
+    title: "Sign In Link",
+    defaultValue: true,
+  },
+  pricingPath: {
+    type: ControlType.String,
+    title: "Pricing Page",
+    defaultValue: CONFIG.pricingPath,
+  },
+  loginPath: {
+    type: ControlType.String,
+    title: "Sign In Page",
+    defaultValue: CONFIG.loginPath,
+    hidden: (props) => props.showSignInLink === false,
+  },
+
+  /* ---- SEO, F08 ---- */
+
+  seoMarkup: {
+    type: ControlType.Boolean,
+    title: "SEO Paywall Markup",
+    defaultValue: true,
+  },
+  schemaType: {
+    type: ControlType.Enum,
+    title: "Content Type",
+    options: ["Article", "NewsArticle", "BlogPosting", "CreativeWork"],
+    optionTitles: ["Article", "News Article", "Blog Post", "Other Content"],
+    defaultValue: "Article",
+    hidden: (props) => props.seoMarkup === false,
+  },
+  canvasPreview: {
+    type: ControlType.Enum,
+    title: "Canvas Preview",
+    options: ["open", "locked"],
+    optionTitles: ["Open", "Locked"],
+    displaySegmentedControl: true,
+    defaultValue: "open",
+  },
+
+  /* ---- Style, then the shared appearance groups and Labels ---- */
+
+  accentColor: {
+    type: ControlType.Color,
+    title: "Accent Color",
+    defaultValue: CONFIG.accentColor,
+  },
+  borderRadius: {
+    type: ControlType.Number,
+    title: "Corner Radius",
+    min: 0,
+    max: 32,
+    step: 1,
+    unit: "px",
+    defaultValue: CONFIG.borderRadius,
+  },
+  ...mfAppearanceControls({ padding: 24, gap: 10, shadow: true }),
+  labels: mfLabelControls(METER_LABELS),
+});

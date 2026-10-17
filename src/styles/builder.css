@@ -37,8 +37,8 @@
   justify-content: center;
   min-height: 168px;
   padding: 16px;
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--framefic-surface-border);
+  border-radius: var(--radius-8);
+  border: 1px solid var(--framer-color-divider);
   background-color: var(--framefic-page-bg);
   overflow: hidden;
   box-sizing: border-box;
@@ -106,7 +106,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: var(--paragraph-faint);
   background-color: var(--framer-color-bg-tertiary);
 }
@@ -151,7 +151,11 @@
   box-sizing: border-box;
 }
 
+/* Foundations: filled part brand/primary, empty part control/track. The fill
+   stop arrives as --slider-fill from Slider.tsx. */
 .framefic-slider-input {
+  --slider-fill: 0%;
+
   appearance: none;
   -webkit-appearance: none;
   flex: 1;
@@ -161,48 +165,64 @@
   margin: 0;
   padding: 0;
   border: none;
-  border-radius: 999px;
-  background-color: var(--framer-color-bg-tertiary);
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    to right,
+    var(--px-brand-primary) 0%,
+    var(--px-brand-primary) var(--slider-fill),
+    var(--px-color-control-track) var(--slider-fill),
+    var(--px-color-control-track) 100%
+  );
   cursor: pointer;
 }
 
+/* The knob is white in both themes, like the Toggle knob when checked. */
 .framefic-slider-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
   width: 12px;
   height: 12px;
-  border-radius: 999px;
-  border: 1px solid var(--framefic-surface-border);
-  background-color: var(--framefic-surface);
-  box-shadow: var(--framefic-card-shadow);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--px-color-border-selected);
+  background-color: var(--px-brand-on-primary);
+  box-shadow: var(--px-shadow-popover);
   cursor: pointer;
 }
 
 .framefic-slider-input::-moz-range-thumb {
   width: 12px;
   height: 12px;
-  border-radius: 999px;
-  border: 1px solid var(--framefic-surface-border);
-  background-color: var(--framefic-surface);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--px-color-border-selected);
+  background-color: var(--px-brand-on-primary);
+  box-shadow: var(--px-shadow-popover);
   cursor: pointer;
 }
 
-/* The 3px halo PRD section 7.5 specifies. --px-brand-subtle is already
-   rgba(82, 113, 255, 0.20), the exact value the rule names. */
 .framefic-slider-input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--px-brand-subtle);
+  box-shadow: var(--px-focus-halo);
 }
 
-/* Tabular figures so the row does not jitter as the number changes width. */
+/* The readout chip from the Figma slider: "12 px" on bg/tertiary. Tabular
+   figures so the row does not jitter as the number changes width. */
 .framefic-slider-value {
-  min-width: 34px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 40px;
+  height: 20px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-6);
+  background: var(--framer-color-bg-tertiary);
+  font: var(--text-body);
   font-variant-numeric: tabular-nums;
   color: var(--title);
-  text-align: right;
+}
+
+.framefic-slider-unit {
+  color: var(--paragraph-faint);
 }
 
 /* --------------------------------------------------------------------------
@@ -237,7 +257,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: var(--paragraph-faint);
   background-color: var(--framer-color-bg-tertiary);
 }
@@ -258,9 +278,9 @@
   width: 100%;
   min-height: 84px;
   padding: 12px;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-10);
   border: 1px dashed var(--framefic-surface-border);
-  background-color: var(--framefic-surface);
+  background: var(--px-color-bg-raised);
   text-align: center;
   box-sizing: border-box;
 }
@@ -275,7 +295,7 @@
 .memberframe-slot-stub-hint {
   font-family: var(--font-sans);
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px;
   color: var(--paragraph-faint);
   max-width: 200px;
 }
@@ -303,11 +323,11 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 14px 12px;
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--framefic-surface-border);
-  background-color: var(--framefic-surface);
-  box-shadow: var(--framefic-card-shadow);
+  padding: var(--space-16) var(--space-12);
+  border-radius: var(--radius-14);
+  border: 1px solid var(--framer-color-divider);
+  background-color: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-popover);
   text-align: center;
   box-sizing: border-box;
 }
@@ -318,8 +338,8 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 999px;
-  color: var(--secondary-default);
+  border-radius: var(--radius-full);
+  color: var(--px-color-text-brand);
   background-color: var(--px-brand-subtle);
 }
 
@@ -342,7 +362,7 @@
   margin: 0;
   font-family: var(--font-sans);
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px;
   color: var(--paragraph);
 }
 
@@ -350,7 +370,7 @@
   margin: 0;
   font-family: var(--font-sans);
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px;
   color: var(--paragraph-faint);
 }
 
@@ -361,15 +381,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
-  margin-top: 4px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
+  height: 30px;
+  margin-top: var(--space-4);
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-8);
   background: var(--px-brand-gradient);
+  box-shadow: var(--px-shadow-primary);
   color: var(--px-brand-on-primary);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
+  font: var(--text-body-strong);
   user-select: none;
 }
 
@@ -403,15 +422,16 @@
   flex-direction: column;
   gap: 2px;
   padding: 8px 10px;
-  border: 1px solid var(--framefic-surface-border);
-  border-radius: 8px;
-  background: var(--framefic-surface);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-10);
+  background: var(--px-color-bg-raised);
   min-width: 0;
+  box-shadow: var(--px-shadow-card);
 }
 
 .builder-page-path {
   color: var(--title);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;

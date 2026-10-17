@@ -255,6 +255,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
                     label={field.label}
                     htmlFor={`integration-${definition.id}-${field.key}`}
                     error={problem ?? undefined}
+                    hint={field.help}
                     fill
                   >
                     <div className="integration-input">
@@ -298,9 +299,6 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
                     </div>
                   </FieldRow>
 
-                  {field.help && !problem ? (
-                    <p className="integration-field-help">{field.help}</p>
-                  ) : null}
                 </React.Fragment>
               );
             })}

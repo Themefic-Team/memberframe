@@ -9,14 +9,14 @@ model: inherit
 
 You build the MemberFrame plugin panel: React + Vite inside the Framer plugin iframe.
 
-**Read first**: [`CLAUDE.md`](../../CLAUDE.md), then PRD section 7 (Plugin UI Specification), then `.agents/skills/framer-plugin-suite/references/design-tokens.css`.
+**Read first**: [`CLAUDE.md`](../../CLAUDE.md), then [`.agents/rules/design-system.md`](../../.agents/rules/design-system.md) (binding: every screen must match the Pixelfic UI Kit), then PRD section 7 (Plugin UI Specification), then `.agents/skills/framer-plugin-suite/references/design-tokens.css`.
 
 ## Scope
 
-- Window geometry: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse to height 48, restore to 640.
-- The four-part shell: Header 48px, Tab Bar 36px, Content Scroll Area, Footer 40px.
-- The four tabs plus the account icon button: Home, Builder, Manage, Settings.
-- The shared UI kit: Button, IconButton, FieldRow, Toggle, Checkbox, Segmented, Toast, Banner, EmptyState.
+- Window geometry: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse to height 36, restore to 640.
+- The three-part shell: Tab Bar 36px (Account icon on the right), Content Scroll Area, Footer 40px. No plugin header: Framer's window bar has the name and close, and Collapse is a `framer.setMenu` item in that bar.
+- The four tabs plus the account icon button: Home, Builder, Manage, Settings. The Account icon opens Connect.
+- Using the shared UI kit: Button, IconButton, FieldRow, TextField, Select, Toggle, Checkbox, Segmented, Slider, Badge, HeroCard, HelpTile, PluginCard, Toast, Banner, EmptyState. The kit itself is owned by `framer-design-system`; if a component is missing, ask it to add one (design-system rule section 9) rather than building a lookalike.
 - Customizer forms using the `.field-row` pattern.
 - Live Preview Studio and the state simulator.
 - Theme synchronization with `body[data-framer-theme]` and `html[data-user-theme]`.
@@ -27,7 +27,9 @@ You build the MemberFrame plugin panel: React + Vite inside the Framer plugin if
 ## Non-Negotiable
 
 - **Zero inline CSS.** Never `style={{ }}` in JSX. External `.css` only, semantic class names, state classes like `.is-active`.
-- **Zero hardcoded hex.** Design tokens only.
+- **Zero hardcoded hex.** Design tokens only, by their Figma names (design-system rule section 3).
+- **Every container sits on a surface rung** from design-system rule section 6: cards on bg/raised with hairline and Shadow/Card.
+- **Type, spacing, and radius come from the scales** in design-system rule sections 4 and 5. `npm run lint:design` enforces it.
 - **Exactly one `.primary-cta` per view.** Brand gradient, never flat `#5271FF` as a fill, it fails WCAG AA.
 - **Lucide React or Framer SVG icons only.** Zero unicode emoji.
 - Form controls are 30px tall, 8px radius, control width 160px or `.fill`.
@@ -38,9 +40,9 @@ You build the MemberFrame plugin panel: React + Vite inside the Framer plugin if
 ## Before You Finish
 
 ```
-npm run lint:css && npx tsc --noEmit && npm run build
+npm run lint:css && npm run lint:design && npx tsc --noEmit && npm run build
 ```
 
-All three must pass. Then update the feature's doc in `docs/development-docs/` and report which acceptance criteria you verified.
+All four must pass. Then run the design-system rule section 13 checklist, or hand the diff to `framer-design-system` for review. Then update the feature's doc in `docs/development-docs/` and report which acceptance criteria you verified.
 
 **You cannot see rendered pixels.** The dev server is HTTPS with a self-signed cert. Never claim a layout, contrast, or visual criterion passed. Say explicitly that it needs human verification in Framer.

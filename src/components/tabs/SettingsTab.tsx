@@ -17,18 +17,12 @@ import {
 } from "../settings/integrationRegistry";
 import type { ThemePreference } from "../../hooks/useFramerTheme";
 import { failureMessage } from "../../services/apiClient";
-import { fetchGatewayStatus, saveGatewayConfig } from "../../services/siteService";
 import { isSafeSitePath, saveSiteSettings } from "../../services/siteSettingsService";
 import { useConnection } from "../../hooks/useConnection";
+import { useSiteTiers } from "../../hooks/useSiteTiers";
 import type { AuthSettings, GatedPageRule } from "../../types/connection";
 import { deployBaseUrl } from "../../config/backend";
 import type { DeployContext } from "../../services";
-import {
-  EMPTY_GATEWAY_VAULT_DRAFT,
-  UNCONFIGURED_GATEWAY_STATUS,
-  type GatewayVaultDraft,
-  type SiteGatewayStatus,
-} from "../../types/site";
 
 export interface SettingsTabProps {
   themePreference: ThemePreference;
@@ -45,17 +39,14 @@ const VIEWS = [
 ] as const satisfies ReadonlyArray<{ value: SettingsView; label: string }>;
 
 /**
- * Whether there is anywhere encrypted to put a secret key.
+ * Whether the Integration tab may save secret fields.
  *
- * `gateway_configs` with AES-256-GCM is backend PRD phase B3 and is not built,
- * so this is false and every secret field in the Integration tab is disabled
- * with the reason on screen.
- *
- * A named constant rather than a literal `false` scattered through the tree,
- * because when that table lands this is the one line that changes, and a reader
- * looking for "why can I not save a Stripe secret key" should find it here.
+ * True since FP-16. Payment gateway keys no longer live in this tab: they
+ * have their own encrypted store behind Manage, Payments. What remains here
+ * are the sign in providers, whose client secrets the server reads to finish
+ * an OAuth exchange.
  */
-const SECRETS_SUPPORTED = false;
+const SECRETS_SUPPORTED = true;
 
 /**
  * The Settings tab. PRD task 2.4, feature F03, layout in section 7.3.
@@ -94,6 +85,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onChangeThemePreference,
 }) => {
   const { connection, settings, settingsVersion, applySettings } = useConnection();
+  const siteTierList = useSiteTiers(connection?.siteId ?? null);
   const siteId = connection?.siteId ?? null;
 
   const [view, setView] = useState<SettingsView>("config");
@@ -164,12 +156,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       afterLoginPath: settings?.auth.afterLoginPath ?? "",
       loginPath: settings?.auth.loginPath ?? "/login",
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+      tiers: siteTierList,
     }),
-    [connection, settings]
+    [connection, settings, siteTierList]
   );
 
-  const [draft, setDraft] = useState<GatewayVaultDraft>(EMPTY_GATEWAY_VAULT_DRAFT);
-  const [, setStatus] = useState<SiteGatewayStatus>(UNCONFIGURED_GATEWAY_STATUS);
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingIntegration, setSavingIntegration] = useState<IntegrationId | null>(null);
@@ -196,41 +187,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     return state;
   }, [settings]);
 
-  useEffect(() => {
-    if (!siteId) {
-      setStatus(UNCONFIGURED_GATEWAY_STATUS);
-      setFailure(null);
-      return;
-    }
-
-    let active = true;
-
-    void fetchGatewayStatus(siteId).then((result) => {
-      if (!active) return;
-
-      if (result.kind === "ok") {
-        setStatus(result.data);
-        setDraft((current) => ({
-          ...current,
-          defaultCurrency: result.data.defaultCurrency,
-          autoDetectGeolocation: result.data.autoDetectGeolocation,
-        }));
-        setFailure(null);
-      } else {
-        setStatus(UNCONFIGURED_GATEWAY_STATUS);
-        setFailure(failureMessage(result));
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [siteId]);
-
-  const handlePaymentsChange = useCallback((patch: Partial<GatewayVaultDraft>) => {
-    setDraft((current) => ({ ...current, ...patch }));
-  }, []);
-
   /**
    * A bad path is not merely untidy.
    *
@@ -255,14 +211,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     setSaving(true);
 
-    /*
-      The membership settings first, the payment routing second.
-
-      Order matters because they can fail independently and the membership
-      paths are the half a creator is most likely to be changing: a save that
-      wrote the routing and then failed on the paths would report failure while
-      having changed something, which is the worst of both.
-    */
+    // The membership settings. Payment routing moved to Manage, Payments
+    // (FP-16), which saves to its own table.
     if (auth) {
       const settingsResult = await saveSiteSettings(siteId, settingsVersion, { auth });
 
@@ -276,24 +226,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       applySettings(settingsResult.data.settings, settingsResult.data.version);
     }
 
-    // Currency and routing only. The key fields that used to travel with this
-    // call live in the Integration tab now, and `saveGatewayConfig` strips
-    // empty values, so nothing stored is blanked by sending none.
-    const result = await saveGatewayConfig(siteId, draft);
-
     setSaving(false);
-
-    if (result.kind === "ok") {
-      setStatus(result.data);
-      setFailure(null);
-      showToast({ tone: "success", message: "Settings saved" });
-      return;
-    }
-
-    const described = failureMessage(result);
-    setFailure(described);
-    showToast({ tone: "error", message: "Could not save settings" });
-  }, [applySettings, auth, draft, settingsVersion, showToast, siteId]);
+    setFailure(null);
+    showToast({ tone: "success", message: "Settings saved" });
+  }, [applySettings, auth, settingsVersion, showToast, siteId]);
 
   /**
    * Save one integration's non-secret values.
@@ -370,7 +306,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     if (!siteId) {
       showToast({
         tone: "neutral",
-        message: "Connect this project in the Connect tab before saving page locks.",
+        message: "Connect this project from Account, top right, before saving page locks.",
       });
       return;
     }
@@ -432,9 +368,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             onChangeThemePreference={onChangeThemePreference}
             auth={auth}
             onChangeAuth={setAuth}
-            currency={draft.defaultCurrency}
-            autoDetectGeolocation={draft.autoDetectGeolocation}
-            onChangePayments={handlePaymentsChange}
             failure={failure}
             saving={saving}
           />
@@ -482,6 +415,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           onSave={() => void handleSavePageLocks()}
           deployContext={deployContext}
           siteConnected={siteId !== null}
+          tiers={siteTierList}
         />
       ) : (
         <>

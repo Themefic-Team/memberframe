@@ -30,6 +30,8 @@ Status values: `planned`, `in progress`, `done`.
 | Doc | Feature | PRD | Phase | Priority | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `00-plugin-shell.md` | Plugin Shell, UI Kit, and Theme Sync | section 7, no F number | 0 | P0 | in progress |
+| `00-design-system.md` | Design System Alignment To Foundations v0.4.0 | section 7, no F number | 0 | P0 | in progress |
+| `00-canvas-appearance.md` | Canvas Component Appearance And Sizing | sections 8 and 9, no F number | 1 | P0 | in progress |
 | `00-test-harness.md` | Test Harness and Framer SDK Mock | section 16.1, no F number | 0 | P0 | in progress |
 | `00-api-client.md` | Backend API Client | sections 10.1 and 10.6, no F number | 1 | P0 | in progress |
 | `00-member-data-model.md` | Member Data Model, And Why Not The CMS | sections 10, 11, 14.1, no F number | 1 | P0 | in progress |
@@ -45,14 +47,14 @@ Status values: `planned`, `in progress`, `done`.
 | `10-apple-signin-setup.md` | Apple Sign-In Setup and Runtime Architecture | F05, OAuth 2.0 | 1 | P0 | done |
 | `11-discord-oauth-setup.md` | Discord OAuth Sign-In Setup and Runtime Architecture | F05, OAuth 2.0 | 1 | P0 | done |
 | `06-member-dashboard.md` | Canvas-Native Member Billing Portal | F06 | 3 | P0 | planned |
-| `07-metered-paywall.md` | Dynamic Metered Soft Paywall | F07 | 2 | P1 | planned |
-| `08-schema-injection.md` | SEO-Preserving Schema.org Injection | F08 | 2 | P1 | planned |
+| `18-content-features.md` | Dynamic Metered Soft Paywall (and Read More) | F07, feature plan FP-07 | 2 | P1 | done |
+| `18-content-features.md` | SEO-Preserving Schema.org Injection | F08 | 2 | P1 | done |
 | `09-cms-gated-template.md` | Framer CMS Item-Level Gating | F09 | 3 | P1 | planned |
-| `10-protected-download.md` | Expiring Secure Asset Vault | F10 | 3 | P1 | planned |
+| `18-content-features.md` | Expiring Secure Asset Vault (Upgrade to Download) | F10, feature plan FP-12 | 3 | P1 | done |
 | `11-creator-lms-suite.md` | Creator LMS Suite | F11 | 2 | P1 | planned |
 | `12-team-management.md` | B2B Team Accounts and Seat Invites | F12 | 3 | P2 | planned |
 | `13-donation-slider.md` | Pay-What-You-Want Donation Slider | F13 | 4 | P1 | planned |
-| `14-member-bookmarks.md` | Member Bookmarks and Saved Tray | F14 | 4 | P2 | planned |
+| `18-content-features.md` | Member Bookmarks and Saved Tray | F14, feature plan FP-10 | 4 | P2 | done |
 | `15-member-directory.md` | Member Directory with Tier Badges | F15 | 4 | P2 | planned |
 | `16-onboarding-modal.md` | Custom Profile Fields and Progressive Onboarding | F16, feature plan FP-09 | 3 | P2 | in progress |
 | `17-announcement-bar.md` | Targeted Member Announcement Bar | F17 | 4 | P2 | planned |

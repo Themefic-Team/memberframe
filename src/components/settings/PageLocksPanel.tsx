@@ -5,15 +5,26 @@ import {
   Code2,
   Copy,
   ExternalLink,
-  Layers,
   Plus,
   Save,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { Banner, Button, FieldRow, FieldRows, IconButton, Select, TextField, Toggle } from "../ui";
+import {
+  Badge,
+  Banner,
+  Button,
+  FieldRow,
+  FieldRows,
+  IconButton,
+  Segmented,
+  Select,
+  TextField,
+  Toggle,
+} from "../ui";
 import type { GatedPageFallbackAction, GatedPageRule, GatedPageTier } from "../../types/connection";
 import { isSafeSitePath } from "../../services/siteSettingsService";
+import { DEFAULT_SITE_TIERS, type TierLadderEntry } from "../../types/member";
 import { framer } from "framer-plugin";
 import {
   deployCanvasComponent,
@@ -34,15 +45,30 @@ export interface PageLocksPanelProps {
   deployContext: DeployContext;
   onNavigateToBuilder?: () => void;
   siteConnected?: boolean;
+  /** The site's tiers, for the Required tier picker. Custom tiers included. */
+  tiers?: ReadonlyArray<TierLadderEntry>;
 }
 
-const TIER_OPTIONS: ReadonlyArray<{ value: GatedPageTier; label: string }> = [
-  { value: "signed_in", label: "Any signed in member" },
-  { value: "free_member", label: "Free member or higher" },
-  { value: "tier_1", label: "Tier 1: Silver or higher" },
-  { value: "tier_2", label: "Tier 2: Gold or higher" },
-  { value: "vip", label: "VIP member only" },
+const GATING_METHODS: ReadonlyArray<{ value: "overrides" | "component"; label: string }> = [
+  { value: "overrides", label: "Code overrides" },
+  { value: "component", label: "Canvas component" },
 ];
+
+/**
+ * "Any signed in member", then the site's own tiers by rank, custom ones
+ * included (conflict C9). The highest rank reads "only", the rest "or higher".
+ */
+function tierOptions(tiers: ReadonlyArray<TierLadderEntry>): ReadonlyArray<{ value: GatedPageTier; label: string }> {
+  const ordered = [...tiers].sort((a, b) => a.rank - b.rank);
+  const top = ordered[ordered.length - 1]?.key;
+  return [
+    { value: "signed_in", label: "Any signed in member" },
+    ...ordered.map((tier) => ({
+      value: tier.key,
+      label: tier.key === top ? `${tier.name} only` : `${tier.name} or higher`,
+    })),
+  ];
+}
 
 const FALLBACK_OPTIONS: ReadonlyArray<{ value: GatedPageFallbackAction; label: string }> = [
   { value: "redirect", label: "Redirect visitor away" },
@@ -58,6 +84,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
   deployContext,
   onNavigateToBuilder,
   siteConnected,
+  tiers = DEFAULT_SITE_TIERS,
 }) => {
   const showToast = useToast();
   const [deployingGate, setDeployingGate] = useState(false);
@@ -274,15 +301,18 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
       {/* GLOBAL ROUTE SHIELD (RECOMMENDED ZERO-FOUC ENGINE)                 */}
       {/* ------------------------------------------------------------------ */}
       <section className="section-group">
-         
+        <div className="section-header">
+          <div className="section-title-row">
+            <h2 className="section-title">Route Shield</h2>
+            <Badge tone="brand">Recommended</Badge>
+          </div>
+          <p className="section-subtitle">
+            One script that keeps locked pages from showing before access is checked.
+          </p>
+        </div>
 
         <div className="shield-code-card">
-          <div className="shield-code-desc">
-            <p>
-              Paste this 1-line script once into Framer&apos;s <strong>Site Settings &gt; General &gt; Custom Code &gt; End of &lt;head&gt; tag</strong>.
-              All active rules configured in the table below will automatically intercept unauthorized visitors before private content paints.
-            </p>
-          </div>
+        
 
           <div className="shield-snippet-box">
             <code className="shield-snippet-text">{shieldSnippet}</code>
@@ -295,19 +325,19 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
               {copiedSnippet ? (
                 <>
                   <Check size={13} stroke="currentColor" aria-hidden={true} />
-                  <span>Copied!</span>
+                  <span>Copied</span>
                 </>
               ) : (
                 <>
                   <Copy size={13} stroke="currentColor" aria-hidden={true} />
-                  <span>Copy Script</span>
+                  <span>Copy script</span>
                 </>
               )}
             </Button>
           </div>
 
           <div className="shield-quick-steps">
-            <span className="shield-steps-title">Quick 3-step setup in Framer:</span>
+            <span className="shield-steps-title">Set up in Framer</span>
             <ol className="shield-steps-list">
               <li>In Framer top bar, click <strong>Site Settings</strong>.</li>
               <li>Navigate to <strong>General &gt; Custom Code &gt; End of &lt;head&gt; tag</strong>.</li>
@@ -318,11 +348,11 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
       </section>
 
       <section className="section-group">
-        <div className="section-header-row">
+        <div className="section-header">
           <h2 className="section-title">Locked Routes &amp; Rules</h2>
-          <span className="section-subtitle">
+          <p className="section-subtitle">
             Configure URL protection rules enforced globally by the Shield script and on canvas by MemberGate.
-          </span>
+          </p>
         </div>
 
         {hasInvalidPath ? (
@@ -346,7 +376,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
 
             return (
               <div
-                key={`rule-${rule.path}-${index}`}
+                key={index}
                 className={cn("page-rule-card", isExpanded && "is-open")}
               >
                 <div
@@ -432,13 +462,23 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                         <Select
                           id={`rule-tier-${index}`}
                           value={rule.requiredTier}
-                          options={TIER_OPTIONS}
+                          options={tierOptions(tiers)}
                           disabled={saving || !rule.enabled}
                           onChange={(val) => handleUpdate(index, "requiredTier", val)}
                         />
                       </FieldRow>
 
-                      <FieldRow label="Locked action" htmlFor={`rule-action-${index}`}>
+                      <FieldRow
+                        label="Locked action"
+                        htmlFor={`rule-action-${index}`}
+                        hint={
+                          rule.fallbackAction === "redirect"
+                            ? "Sends signed-out visitors to another page before the content shows."
+                            : rule.fallbackAction === "blur"
+                              ? "Keeps visitors on the page and blurs the content under a lock card."
+                              : "Replaces the page content with a members-only lock card."
+                        }
+                      >
                         <Select
                           id={`rule-action-${index}`}
                           value={rule.fallbackAction}
@@ -448,17 +488,13 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                         />
                       </FieldRow>
 
-                      <span className="rule-field-caption">
-                        {rule.fallbackAction === "redirect"
-                          ? "Action: Automatically forwards unauthenticated visitors to another page before content renders."
-                          : rule.fallbackAction === "blur"
-                          ? "Action: Keeps visitors on the page URL but blurs content with a frosted lock card."
-                          : "Action: Replaces page content with a members-only lock card."}
-                      </span>
-
                       {rule.fallbackAction === "redirect" ? (
                         <>
-                          <FieldRow label="Redirect to" htmlFor={`rule-redir-select-${index}`}>
+                          <FieldRow
+                            label="Redirect to"
+                            htmlFor={`rule-redir-select-${index}`}
+                            hint="Signed-out visitors who open this page are sent here."
+                          >
                             <Select
                               id={`rule-redir-select-${index}`}
                               value={isCustomRedirect ? "__custom__" : currentRedirect}
@@ -487,19 +523,15 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                               />
                             </FieldRow>
                           ) : null}
-
-                          <span className="rule-field-caption">
-                            Destination: Unauthenticated or logged-out visitors trying to view this page will be redirected here.
-                          </span>
                         </>
                       ) : null}
                     </FieldRows>
 
                     <div className="page-rule-deploy-box">
                       <div className="page-rule-deploy-info">
-                        <span className="page-rule-deploy-title">Apply to Canvas Page</span>
+                        <span className="page-rule-deploy-title">Apply to canvas page</span>
                         <p className="page-rule-deploy-text">
-                          Framer enforces page locks via <code>MemberGate</code> on your canvas.
+                          Framer enforces page locks via <code className="code-chip">MemberGate</code> on your canvas.
                         </p>
                       </div>
                       <Button
@@ -509,7 +541,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                         onClick={() => void handleDeployGateForRule(rule)}
                       >
                         <Code2 size={13} stroke="currentColor" aria-hidden={true} />
-                        <span>Deploy Gate</span>
+                        <span>Deploy gate</span>
                       </Button>
                     </div>
                   </div>
@@ -527,47 +559,25 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
         </div>
       </section>
 
-      <section className="section-group">
-        <div className="section-header-row">
+      {/* <section className="section-group">
+        <div className="section-header">
           <h2 className="section-title">On-Page Section Gating</h2>
-          <span className="section-subtitle">
+          <p className="section-subtitle">
             Gate individual sections, stacks, or components inside any page for different member tiers.
-          </span>
+          </p>
         </div>
 
         <div className="onpage-guide-card">
-          <div className="onpage-tab-bar" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={gatingMethod === "overrides"}
-              className={cn("onpage-tab-btn", gatingMethod === "overrides" && "is-active")}
-              onClick={() => setGatingMethod("overrides")}
-            >
-              <Code2 size={13} stroke="currentColor" aria-hidden={true} />
-              <span>Method 1: Code Overrides (Per-Frame)</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={gatingMethod === "component"}
-              className={cn("onpage-tab-btn", gatingMethod === "component" && "is-active")}
-              onClick={() => setGatingMethod("component")}
-            >
-              <Layers size={13} stroke="currentColor" aria-hidden={true} />
-              <span>Method 2: Canvas Component</span>
-            </button>
-          </div>
+          <Segmented
+            label="Gating method"
+            options={GATING_METHODS}
+            value={gatingMethod}
+            onChange={setGatingMethod}
+          />
 
           {gatingMethod === "overrides" ? (
             <>
-              <div className="onpage-guide-head">
-                <span className="onpage-guide-badge">
-                  <Code2 size={12} stroke="currentColor" aria-hidden={true} />
-                  <span>Framer Code Overrides</span>
-                </span>
-                <h3 className="onpage-guide-title">Multi-Tier Section Locking via Overrides</h3>
-              </div>
+              <h3 className="onpage-guide-title">Lock Sections With Overrides</h3>
               <p className="onpage-guide-text">
                 Select any native Frame, Stack, or Grid on the canvas and attach an override. You can attach different overrides to different frames on the same page:
               </p>
@@ -580,7 +590,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                   <strong>Open Code Overrides:</strong> In Framer&apos;s right sidebar, scroll to the bottom to <strong>Code overrides</strong>.
                 </li>
                 <li>
-                  <strong>Choose File:</strong> Select File: <code>MemberGate</code>.
+                  <strong>Choose File:</strong> Select File: <code className="code-chip">MemberGate</code>.
                 </li>
                 <li>
                   <strong>Pick Override for Tier:</strong> Select the override matching that section&apos;s target tier:
@@ -599,44 +609,44 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                   <tbody>
                     <tr>
                       <td>Any Signed In</td>
-                      <td><code>withSignedInOnly</code></td>
-                      <td><code>withSignedInHide</code></td>
+                      <td><code className="code-chip">withSignedInOnly</code></td>
+                      <td><code className="code-chip">withSignedInHide</code></td>
                     </tr>
                     <tr>
                       <td>Free Member</td>
-                      <td><code>withFreeTier</code></td>
-                      <td><code>withFreeTierHide</code></td>
+                      <td><code className="code-chip">withFreeTier</code></td>
+                      <td><code className="code-chip">withFreeTierHide</code></td>
                     </tr>
                     <tr>
                       <td>Tier 1: Silver</td>
-                      <td><code>withSilverTier</code></td>
-                      <td><code>withSilverTierHide</code></td>
+                      <td><code className="code-chip">withSilverTier</code></td>
+                      <td><code className="code-chip">withSilverTierHide</code></td>
                     </tr>
                     <tr>
                       <td>Tier 2: Gold</td>
-                      <td><code>withGoldTier</code></td>
-                      <td><code>withGoldTierHide</code></td>
+                      <td><code className="code-chip">withGoldTier</code></td>
+                      <td><code className="code-chip">withGoldTierHide</code></td>
                     </tr>
                     <tr>
                       <td>VIP Member</td>
-                      <td><code>withVipTier</code></td>
-                      <td><code>withVipTierHide</code></td>
+                      <td><code className="code-chip">withVipTier</code></td>
+                      <td><code className="code-chip">withVipTierHide</code></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
               <div className="onpage-example-box">
-                <span className="onpage-example-title">Multi-Tier Example on a Single Page:</span>
+                <span className="onpage-example-title">Several tiers on one page</span>
                 <p className="onpage-example-text">
                   To serve different content to different tiers on the same page, design separate frames side-by-side or stacked on your canvas:
                 </p>
-                <p className="onpage-example-text">
-                  • <strong>Frame A (Free):</strong> Code overrides &rarr; <code>withFreeTier</code><br />
-                  • <strong>Frame B (Silver):</strong> Code overrides &rarr; <code>withSilverTier</code><br />
-                  • <strong>Frame C (Gold):</strong> Code overrides &rarr; <code>withGoldTier</code><br />
-                  • <strong>Frame D (VIP):</strong> Code overrides &rarr; <code>withVipTier</code>
-                </p>
+                <ul className="onpage-example-list">
+                  <li><strong>Frame A (Free):</strong> <code className="code-chip">withFreeTier</code></li>
+                  <li><strong>Frame B (Silver):</strong> <code className="code-chip">withSilverTier</code></li>
+                  <li><strong>Frame C (Gold):</strong> <code className="code-chip">withGoldTier</code></li>
+                  <li><strong>Frame D (VIP):</strong> <code className="code-chip">withVipTier</code></li>
+                </ul>
                 <p className="onpage-example-text">
                   Framer automatically checks the visitor&apos;s session rank and renders only the authorized sections for each member tier.
                 </p>
@@ -644,20 +654,14 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
             </>
           ) : (
             <>
-              <div className="onpage-guide-head">
-                <span className="onpage-guide-badge">
-                  <Layers size={12} stroke="currentColor" aria-hidden={true} />
-                  <span>Visual Canvas Component</span>
-                </span>
-                <h3 className="onpage-guide-title">Visual MemberGate Component</h3>
-              </div>
+              <h3 className="onpage-guide-title">Lock Sections With MemberGate</h3>
               <p className="onpage-guide-text">
-                Use the visual <code>&lt;MemberGate&gt;</code> component from Framer&apos;s component library to wrap and protect frames:
+                Use the visual <code className="code-chip">&lt;MemberGate&gt;</code> component from Framer&apos;s component library to wrap and protect frames:
               </p>
 
               <ol className="onpage-guide-steps">
                 <li>
-                  <strong>Add to Canvas:</strong> Open Framer&apos;s Assets or Components panel and drag <code>MemberGate</code> onto your page.
+                  <strong>Add to Canvas:</strong> Open Framer&apos;s Assets or Components panel and drag <code className="code-chip">MemberGate</code> onto your page.
                 </li>
                 <li>
                   <strong>Connect Frame:</strong> In Framer&apos;s right sidebar, link your section to the <strong>Protected Frame</strong> slot.
@@ -666,7 +670,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                   <strong>Configure Tier &amp; Action:</strong> Use Framer&apos;s property controls to choose the <strong>Access Tier</strong> (Signed In, Free, Silver, Gold, VIP) and <strong>Locked State</strong> (Frosted Blur, Completely Hide, or Redirect).
                 </li>
                 <li>
-                  <strong>Multi-Tier Setup:</strong> You can add multiple <code>MemberGate</code> components onto the same page, each with its own Access Tier property control setting.
+                  <strong>Multi-Tier Setup:</strong> You can add multiple <code className="code-chip">MemberGate</code> components onto the same page, each with its own Access Tier property control setting.
                 </li>
               </ol>
             </>
@@ -679,28 +683,29 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
               disabled={deployingGate || saving}
             >
               <Code2 size={14} stroke="currentColor" aria-hidden={true} />
-              <span>{deployingGate ? "Updating..." : "Deploy / Update MemberGate Code"}</span>
+              <span>{deployingGate ? "Deploying..." : "Deploy MemberGate"}</span>
             </Button>
             {onNavigateToBuilder ? (
               <Button variant="ghost" onClick={onNavigateToBuilder}>
-                <span>Open in Builder</span>
+                <span>Open in builder</span>
                 <ExternalLink size={12} stroke="currentColor" aria-hidden={true} />
               </Button>
             ) : null}
           </div>
         </div>
-      </section>
+      </section> */}
 
       <div className="page-locks-footer">
-        <button
-          type="button"
-          className="primary-cta"
+        <Button
+          variant="primary"
+          size="md"
+          className="fill"
           disabled={saving || hasInvalidPath || siteConnected === false}
           onClick={onSave}
         >
-          <Save size={14} stroke="currentColor" aria-hidden={true} />
+          <Save aria-hidden={true} />
           <span>{saving ? "Saving..." : "Save page locks"}</span>
-        </button>
+        </Button>
         {siteConnected === false ? (
           <p className="settings-cta-note">Connect this project before saving page locks.</p>
         ) : hasInvalidPath ? (

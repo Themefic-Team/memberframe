@@ -1,31 +1,14 @@
 import React from "react";
-import { Banner, Checkbox, FieldRow, FieldRows, Segmented, Select } from "../ui";
+import { Banner } from "../ui";
 import { MembershipSettings } from "./MembershipSettings";
 import type { ThemePreference } from "../../hooks/useFramerTheme";
 import type { AuthSettings } from "../../types/connection";
-import type { CurrencyCode, GatewayVaultDraft } from "../../types/site";
-
-const THEME_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-] as const satisfies ReadonlyArray<{ value: ThemePreference; label: string }>;
-
-const CURRENCY_OPTIONS: ReadonlyArray<{ value: CurrencyCode; label: string }> = [
-  { value: "USD", label: "USD, US dollar" },
-  { value: "EUR", label: "EUR, euro" },
-  { value: "GBP", label: "GBP, pound sterling" },
-  { value: "INR", label: "INR, Indian rupee" },
-];
 
 export interface ConfigPanelProps {
   themePreference: ThemePreference;
   onChangeThemePreference: (preference: ThemePreference) => void;
   auth: AuthSettings | null;
   onChangeAuth: (next: AuthSettings) => void;
-  currency: CurrencyCode;
-  autoDetectGeolocation: boolean;
-  onChangePayments: (patch: Partial<GatewayVaultDraft>) => void;
   failure: { title: string; message: string } | null;
   saving: boolean;
 }
@@ -58,14 +41,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   onChangeThemePreference,
   auth,
   onChangeAuth,
-  currency,
-  autoDetectGeolocation,
-  onChangePayments,
   failure,
   saving,
 }) => (
   <>
-    
+    {failure ? <Banner tone="warning" title={failure.title} message={failure.message} /> : null}
 
     {auth ? (
       <section className="section-group">
@@ -74,43 +54,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       </section>
     ) : null}
 
-    <section className="section-group">
-      <h2 className="section-title">Payments</h2>
-
-      {failure ? <Banner tone="warning" title={failure.title} message={failure.message} /> : null}
-
-      <FieldRows>
-        <FieldRow label="Default currency" htmlFor="settings-currency">
-          <Select
-            id="settings-currency"
-            value={currency}
-            options={CURRENCY_OPTIONS}
-            onChange={(value) => onChangePayments({ defaultCurrency: value })}
-          />
-        </FieldRow>
-
-        {/*
-          A checkbox, not a toggle. It only takes effect on save, and PRD
-          section 7.5 reserves the toggle for instant-apply controls.
-        */}
-        <FieldRow label="Route by buyer location" htmlFor="settings-geo">
-          <Checkbox
-            id="settings-geo"
-            checked={autoDetectGeolocation}
-            onChange={(checked) => onChangePayments({ autoDetectGeolocation: checked })}
-          />
-        </FieldRow>
-      </FieldRows>
-
-      <p className="settings-help">
-        {autoDetectGeolocation
-          ? "Buyers are routed to the gateway that fits their country. Routing happens on the server."
-          : `Every buyer is charged in ${currency} through the gateway that supports it.`}
-      </p>
-
-      <p className="settings-help">
-        Gateway keys moved to the Integration tab.
-      </p>
-    </section>
+    {/* Currency, routing, and gateways moved to Manage, Payments, FP-16. */}
+    <p className="settings-help">Payments, currency, and gateway routing are in Manage, Payments.</p>
   </>
 );

@@ -40,6 +40,7 @@ Whenever generating or editing code in this workspace:
 3. **Mandatory Pre-Flight Check: `design-tokens.css` & Ecosystem Reference Adherence**:
    - Before writing or modifying any UI or CSS, the agent **MUST FIRST CHECK** if `design-tokens.css` (or `src/styles/variables.css`) exists in the project or references (`.agents/skills/framer-plugin-suite/references/design-tokens.css`).
    - If design tokens exist, the agent **MUST STRICTLY FOLLOW THE EXACT CSS RULES, TOKENS, AND VARIABLES** defined in the project. Do not introduce outside or arbitrary styling.
+   - The binding design rule is **`.agents/rules/design-system.md`** (Pixelfic UI Kit Foundations v0.4.0). Where any value below disagrees with it, that file wins.
    - The agent **MUST CONSULT AND FOLLOW all reference folders in the ecosystem** (`.agents/skills/framer-plugin-suite/references/` and existing plugins in the workspace) as well as **`SKILL.md`**.
    - Standard window geometry MUST be initialized in `src/App.tsx`:
      ```typescript
@@ -68,6 +69,7 @@ Whenever generating or editing code in this workspace:
    - **Sizes**: Small (30px, radius 8, plugin default) and Medium (36px, radius 10, prominent CTAs).
 
 6. **Mandatory Plugin Shell Architecture**:
+   - **MemberFrame override (2026-10-15, user decision):** no Plugin Header. Framer draws its own window bar with the name and close, and the SDK cannot hide it, so the shell is Tab Bar (with Collapse and Account icons), Content, Footer, and collapse goes to 36px. See `.agents/rules/design-system.md` section 7. The original standard follows for other plugins.
    - All plugins MUST use `<PluginShell>` with the authoritative 4-part shell structure:
      1. **Plugin Header (48px)**: 24px Logo (`.framefic-header-logo`), Plugin Name (`Title/Small`), Collapse toggle (`<ChevronDown size={14} />`), and Close (`<X size={14} />` calling `framer.closePlugin()`).
      2. **Tab Bar (36px)**: 2-4 Tabs with active 2px bottom gradient pill indicator (`.framefic-tab.active`), spacer, and Account icon button (`<UserRound size={16} />`).
@@ -104,8 +106,8 @@ Whenever generating or editing code in this workspace:
    - **Control Right (`.field-row-control`)**: Fixed `160px` or `.fill` (`100%`).
    - **Form Controls Specs**:
      - **Control Height & Radius**: Inputs, selects, and segmented controls are **strictly 30px tall** with **8px radius** (`var(--radius-md)`).
-     - **Background Fill**: `var(--framer-color-bg-tertiary)` (#ededed in Light, #313030 in Dark).
-     - **Focus State**: 1px tint ring (`var(--px-color-focus-ring, #0099ff)`) + 3px whisper halo (`box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20))`).
+     - **Background Fill**: `var(--framer-color-bg-tertiary)` (#ededed in Light, #202020 in Dark, Foundations v0.4.0).
+     - **Focus State**: 1px focus ring (`var(--px-color-focus-ring)`, brand #5271ff since v0.4.0) + 3px whisper halo (`box-shadow: var(--px-focus-halo)`).
      - **Error State**: 1px danger border (`var(--px-color-danger, #dc2626)`), with error message below linked via `aria-describedby`. Never rely on color alone for errors.
      - **Disabled State**: 50% opacity, `cursor: not-allowed`.
      - **Toggle (`.framefic-toggle`)**: 28x16px pill, 12x12px circle knob, `role="switch"`, `aria-checked`. Never use a toggle for settings that require a "Save" action — use Checkbox.

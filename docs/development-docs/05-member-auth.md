@@ -11,6 +11,8 @@ Second canvas component after `<MemberGate>`. Everything in
 a real file, what the config marker is for, and where its styling lives applies here unchanged. This doc
 records only what is specific to authentication.
 
+> **Appearance and sizing (2026-10-15):** Theme (Light by default), Colors, Typography, Layout, and Labels controls, fixed default size, and the shared colour sanitizer are documented once in [`00-canvas-appearance.md`](00-canvas-appearance.md). Redeploy from the Builder to update an existing file.
+
 ---
 
 ## 1. Overview and Problem Solved

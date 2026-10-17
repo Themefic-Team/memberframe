@@ -74,7 +74,8 @@ export interface StoredIntegrationSettings {
 }
 
 export type GatedPageFallbackAction = "redirect" | "blur" | "custom_card";
-export type GatedPageTier = "signed_in" | "free_member" | "tier_1" | "tier_2" | "vip";
+/** "signed_in" or any tier key, built in or custom. Conflict C9, resolved. */
+export type GatedPageTier = "signed_in" | "free_member" | "tier_1" | "tier_2" | "vip" | (string & {});
 
 export interface GatedPageRule {
   path: string;

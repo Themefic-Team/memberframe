@@ -62,6 +62,338 @@ const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
 
+// @memberframe-appearance-start
+// ============================================================================
+// APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
+// ============================================================================
+// Byte-identical in every canvas component: MemberAuth, MemberDashboard,
+// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
+// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// `test/canvasAppearanceParity.test.ts`, which also compiles this block and
+// runs it. A canvas component is compiled by Framer alone and cannot import
+// from this repository, so the copy is the architecture. Edit all or none.
+//
+// One vocabulary for every component. The Theme control picks a palette, the
+// creator's Colors, Typography, and Layout groups override it, and every rule
+// in a component's stylesheet reads the resolved `--mf-c-*` values.
+//
+// ## Theme is a control, not the visitor's operating system
+//
+// These components used to switch palette on `prefers-color-scheme` alone.
+// The Framer canvas renders light, but that media query follows the visitor's
+// OS, so a published page turned dark for every visitor with a dark OS while
+// the editor showed light. Theme now defaults to Light, matching the editor,
+// and "Match visitor" is still offered as an explicit choice.
+//
+// ## Every creator value is sanitized before it reaches a style block
+//
+// Colors, the font family, and the numbers below end up inside a `<style>`
+// element. A Framer variable can set a prop the code generator never saw, so
+// each value is checked here, at runtime, and anything that could close a
+// declaration is dropped in favour of the theme default.
+
+type MfThemeMode = "light" | "dark" | "auto";
+
+type MfColorKey = "onAccent" | "surface" | "text" | "muted" | "border" | "field";
+
+interface MfAppearanceProps {
+  theme?: MfThemeMode;
+  colors?: Partial<Record<MfColorKey, string>> | null;
+  typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
+  layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  labels?: Record<string, unknown> | null;
+}
+
+interface MfAppearanceInput extends MfAppearanceProps {
+  accent: unknown;
+  radius: unknown;
+  radiusMax: number;
+  /** The component's look before Layout existed: a card has a shadow, a page section does not. */
+  shadowByDefault: boolean;
+}
+
+const MF_DEFAULT_ACCENT = "#5271ff";
+
+const MF_COLOR_VARS: Record<MfColorKey, string> = {
+  onAccent: "--mf-on-accent",
+  surface: "--mf-surface",
+  text: "--mf-text",
+  muted: "--mf-muted",
+  border: "--mf-border",
+  field: "--mf-field",
+};
+
+const MF_PLAIN_COLOR =
+  /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.%\s,/]+\)|hsla?\(\s*[\d.%\s,/a-z]+\)|transparent)$/;
+
+/**
+ * A colour, and nothing but a colour, or the fallback.
+ *
+ * Accepts hex, rgb(a), hsl(a), and a Framer colour style, which arrives as
+ * `var(--token-id, rgb(...))`, sometimes followed by a name comment that is
+ * stripped first. A brace, a semicolon, an angle bracket, a backslash, or a
+ * comment anywhere else rejects the value outright.
+ */
+function mfSafeColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+
+  const colour = value.replace(/\s*\/\*[^*]*\*\/\s*$/, "").trim();
+  if (colour === "" || colour.length > 160) return fallback;
+  if (/[;{}<>\\]/.test(colour) || colour.indexOf("/*") !== -1) return fallback;
+  if (MF_PLAIN_COLOR.test(colour)) return colour;
+
+  const token = /^var\(\s*--[a-zA-Z0-9_-]+\s*(?:,\s*(.+))?\)$/.exec(colour);
+  if (token && (token[1] === undefined || MF_PLAIN_COLOR.test(token[1].trim()))) return colour;
+
+  return fallback;
+}
+
+/** A finite number inside the range, or the fallback. */
+function mfNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const number = typeof value === "number" ? value : Number(value);
+  if (typeof value === "string" && value.trim() === "") return fallback;
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+/**
+ * The family out of a Font control value, or null.
+ *
+ * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
+ * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ */
+function mfFontFamily(font: unknown): string | null {
+  let family = "";
+  if (typeof font === "string") family = font;
+  else if (font && typeof font === "object") {
+    const candidate = (font as { fontFamily?: unknown }).fontFamily;
+    if (typeof candidate === "string") family = candidate;
+  }
+
+  family = family.trim();
+  if (family === "" || family.length > 300) return null;
+  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  return family;
+}
+
+/** The root class for a theme. Anything unknown is Light, the editor's look. */
+function mfThemeClass(theme: unknown): string {
+  if (theme === "dark") return "is-dark";
+  if (theme === "auto") return "is-auto";
+  return "is-light";
+}
+
+/** `{name}` placeholders in a creator's label, filled with plain text. */
+function mfFill(template: string, values: Record<string, string | number>): string {
+  let out = template;
+  for (const key of Object.keys(values)) out = out.split(`{${key}}`).join(String(values[key]));
+  return out;
+}
+
+/**
+ * One label: the creator's text when they typed some, the default otherwise.
+ * Labels render as React text, never as markup, so they need no escaping.
+ */
+function mfLabel(
+  labels: Record<string, unknown> | null | undefined,
+  defaults: Record<string, readonly [string, string]>,
+  key: string
+): string {
+  const value = labels ? labels[key] : undefined;
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return defaults[key] ? defaults[key][1] : "";
+}
+
+/**
+ * The scoped custom properties for one instance.
+ *
+ * Every `--mf-*` is declared, set or `initial`. `initial` makes `var()` fall
+ * back to the theme default, and declaring it stops a component nested inside
+ * another from inheriting the outer one's overrides.
+ */
+function mfAppearanceVars(input: MfAppearanceInput): string {
+  const lines: string[] = [];
+  const set = (name: string, value: string | null) => {
+    lines.push(`${name}: ${value === null ? "initial" : value};`);
+  };
+
+  set("--mf-accent", mfSafeColor(input.accent, MF_DEFAULT_ACCENT));
+  set("--mf-radius", `${Math.round(mfNumber(input.radius, 0, input.radiusMax, 10))}px`);
+
+  const colors = input.colors || {};
+  for (const key of Object.keys(MF_COLOR_VARS) as MfColorKey[]) {
+    const colour = mfSafeColor(colors[key], "");
+    set(MF_COLOR_VARS[key], colour === "" ? null : colour);
+  }
+
+  const typography = input.typography || {};
+  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
+
+  const layout = input.layout || {};
+  const px = (value: unknown, max: number) =>
+    value === undefined || value === null ? null : `${Math.round(mfNumber(value, 0, max, 0))}px`;
+  set("--mf-pad", px(layout.padding, 64));
+  set("--mf-gap", px(layout.gap, 48));
+  set("--mf-border-width", px(layout.borderWidth, 4));
+  const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
+  set("--mf-card-shadow", shadow ? null : "none");
+
+  return lines.join(" ");
+}
+
+const MF_LIGHT = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #ffffff);
+  --mf-c-text: var(--mf-text, #18202b);
+  --mf-c-muted: var(--mf-muted, #5b6472);
+  --mf-c-border: var(--mf-border, rgba(16, 24, 40, 0.12));
+  --mf-c-field: var(--mf-field, #f4f5f7);
+  --mf-c-danger: #dc2626;
+  --mf-c-veil: rgba(255, 255, 255, 0.55);
+  --mf-c-backdrop: rgba(15, 17, 23, 0.55);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(16, 24, 40, 0.14));
+  color-scheme: light;`;
+
+const MF_DARK = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #18191b);
+  --mf-c-text: var(--mf-text, #ffffff);
+  --mf-c-muted: var(--mf-muted, #cbcbcb);
+  --mf-c-border: var(--mf-border, rgba(255, 255, 255, 0.1));
+  --mf-c-field: var(--mf-field, #202020);
+  --mf-c-danger: #f87171;
+  --mf-c-veil: rgba(12, 14, 18, 0.55);
+  --mf-c-backdrop: rgba(0, 0, 0, 0.62);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(0, 0, 0, 0.45));
+  color-scheme: dark;`;
+
+/** The palette for a component root, per theme. Emitted before the component's own CSS. */
+function mfThemeCss(root: string): string {
+  return `
+${root} {${MF_LIGHT}
+  --mf-c-radius: var(--mf-radius, 10px);
+  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  font-family: var(--mf-c-font);
+}
+${root}.is-dark {${MF_DARK}
+}
+@media (prefers-color-scheme: dark) {
+  ${root}.is-auto {${MF_DARK}
+  }
+}
+`;
+}
+
+/**
+ * The shared property controls: Theme, Colors, Typography, Layout.
+ *
+ * Return types are inferred on purpose. Framer's real `framer` module and this
+ * repo's shim name their control types differently, and this file compiles
+ * against both.
+ *
+ * Colours are optional, so an untouched one stays undefined and the theme
+ * default shows through. Layout defaults are the component's own, passed in,
+ * so a fresh instance looks exactly as it did before the group existed.
+ */
+function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
+  return {
+    theme: {
+      type: ControlType.Enum,
+      title: "Theme",
+      options: ["light", "dark", "auto"],
+      optionTitles: ["Light", "Dark", "Match visitor"],
+      defaultValue: "light",
+    },
+    colors: {
+      type: ControlType.Object,
+      title: "Colors",
+      buttonTitle: "Colors",
+      controls: {
+        surface: { type: ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+      },
+    },
+    typography: {
+      type: ControlType.Object,
+      title: "Typography",
+      buttonTitle: "Typography",
+      controls: {
+        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
+        font: {
+          type: ControlType.Font,
+          title: "Font",
+          controls: "basic" as const,
+          defaultFontType: "sans-serif" as const,
+        },
+        textScale: {
+          type: ControlType.Number,
+          title: "Text size",
+          min: 70,
+          max: 160,
+          step: 5,
+          unit: "%",
+          defaultValue: 100,
+        },
+      },
+    },
+    layout: {
+      type: ControlType.Object,
+      title: "Layout",
+      buttonTitle: "Layout",
+      controls: {
+        padding: {
+          type: ControlType.Number,
+          title: "Padding",
+          min: 0,
+          max: 64,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.padding,
+        },
+        gap: {
+          type: ControlType.Number,
+          title: "Spacing",
+          min: 0,
+          max: 48,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.gap,
+        },
+        borderWidth: {
+          type: ControlType.Number,
+          title: "Border",
+          min: 0,
+          max: 4,
+          step: 1,
+          unit: "px",
+          defaultValue: 1,
+        },
+        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+      },
+    },
+  };
+}
+
+/** The Labels group, one String control per entry: key -> [title, default text]. */
+function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
+  const controls: Record<
+    string,
+    { type: typeof ControlType.String; title: string; defaultValue: string }
+  > = {};
+  for (const key of Object.keys(defaults)) {
+    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+  }
+  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+// @memberframe-appearance-end
+
 // ============================================================================
 // CONTRACTS
 // ============================================================================
@@ -201,12 +533,100 @@ const LOGIN_PASSWORD_PATH = "/api/member/login-password";
 const FORGOT_PASSWORD_PATH = "/api/member/forgot-password";
 const RESET_PASSWORD_PATH = "/api/member/reset-password";
 const SESSION_PATH = "/api/member/session";
+/** Email confirmation for a new account. Confirms only; the member signs in next. */
+const VERIFY_EMAIL_PATH = "/api/member/verify-email";
+const RESEND_VERIFICATION_PATH = "/api/member/verify-email/resend";
+
+/*
+  Keys shared with the Route Shield script (the API's /shield.js). Change them
+  together.
+
+  The hint says this browser has a session here, so the shield hides the sign
+  in page until it has sent a signed-in member on, rather than flashing the
+  form first. The cache is the shield's 30 second session copy, dropped on any
+  change so a signed-out visitor cannot ride it onto a locked page. The denied
+  key is the page the shield just turned a signed-in member away from.
+*/
+const HINT_KEY = `memberframe:signed-in:${CONFIG.siteKey}`;
+const SESSION_CACHE_KEY = `__mf_session_${CONFIG.siteKey}`;
+const DENIED_KEY = `memberframe:denied:${CONFIG.siteKey}`;
+/** Carries a just-confirmed address from a sign up page to the sign in page. */
+const VERIFIED_KEY = `memberframe:verified:${CONFIG.siteKey}`;
+/**
+ * Written by `<MemberPricing>` when a signed-out visitor picks a plan: which
+ * tier, and the pricing page to come back to. Signing in sends them there
+ * instead of the After sign in page, and the checkout starts by itself.
+ */
+const CHECKOUT_INTENT_KEY = `memberframe:checkout-intent:${CONFIG.siteKey}`;
+const CHECKOUT_INTENT_TTL_MS = 30 * 60 * 1000;
+/**
+ * Written by `<BookmarkButton>`, `<BookmarksTray>`, `<ProtectedDownload>`, and
+ * `<MeteredPaywall>` when a signed-out visitor presses their sign in button:
+ * the page they were on. Signing in sends them back to it, where the bookmark
+ * saves itself, the download unlocks, or the article opens.
+ */
+const RETURN_KEY = `memberframe:return-to:${CONFIG.siteKey}`;
+
+/** The pricing page a signed-out buyer started from, or null. */
+function checkoutIntentPath(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_INTENT_KEY);
+    if (!raw) return null;
+    const intent = JSON.parse(raw) as { returnPath?: unknown; ts?: unknown };
+    if (typeof intent.ts !== "number" || Date.now() - intent.ts > CHECKOUT_INTENT_TTL_MS) return null;
+    const path = typeof intent.returnPath === "string" ? intent.returnPath : "";
+    return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") ? path : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The page a content component asked to come back to, once. Read clears it. */
+function returnPath(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(RETURN_KEY);
+    if (!raw) return null;
+    window.sessionStorage.removeItem(RETURN_KEY);
+    const saved = JSON.parse(raw) as { path?: unknown; ts?: unknown };
+    if (typeof saved.ts !== "number" || Date.now() - saved.ts > CHECKOUT_INTENT_TTL_MS) return null;
+    const path = typeof saved.path === "string" ? saved.path : "";
+    return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") ? path : null;
+  } catch {
+    return null;
+  }
+}
 
 function notifySessionUpdated(signedIn = true): void {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent("memberframe:session-updated", { detail: { signedIn } })
-    );
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.removeItem(SESSION_CACHE_KEY);
+    if (signedIn) window.localStorage.setItem(HINT_KEY, "1");
+    else window.localStorage.removeItem(HINT_KEY);
+  } catch {
+    // Storage can be blocked. The hint only saves a flash; nothing depends on it.
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("memberframe:session-updated", { detail: { signedIn } })
+  );
+}
+
+/**
+ * Was a signed-in member just turned away from this page by the shield?
+ * Sending them there again would bounce them straight back here, forever.
+ */
+function recentlyDenied(path: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(DENIED_KEY);
+    if (!raw) return false;
+    const denied = JSON.parse(raw) as { path?: unknown; ts?: unknown };
+    return denied.path === path && typeof denied.ts === "number" && Date.now() - denied.ts < 60_000;
+  } catch {
+    return false;
   }
 }
 
@@ -244,12 +664,14 @@ function apiHeaders(withBody: boolean): Record<string, string> {
  *      the state that was just established.
  */
 function redirectAfterAuth(): void {
-  const path = CONFIG.afterLoginPath || "/dashboard";
+  // A visitor who chose a plan before signing in goes back to finish buying
+  // it; one who pressed a content component's sign in goes back to that page.
+  const path = checkoutIntentPath() ?? returnPath() ?? (CONFIG.afterLoginPath || "/dashboard");
 
   if (path === "" || !path.startsWith("/")) return;
   if (path.startsWith("//") || path.includes("\\")) return;
   if (typeof window === "undefined") return;
-  if (window.location.pathname === path) return;
+  if (`${window.location.pathname}${window.location.search}` === path || window.location.pathname === path) return;
 
   window.location.assign(path);
 }
@@ -287,6 +709,95 @@ const RESEND_LOCK_SECONDS = 60;
 /** The message type the OAuth popup posts back. */
 const OAUTH_MESSAGE_TYPE = "memberframe-auth-result";
 
+/*
+  The social sign-in tab flow.
+
+  Sign in opens in a new tab. The provider's pages cut that tab's link back
+  to this window (Google sets Cross-Origin-Opener-Policy), and a cookie set
+  while the tab is on the API's own address lands in a different cookie
+  partition from the one this site's requests read. So neither postMessage
+  nor the API's cookie can finish the job.
+
+  Instead the API sends the tab back to this same page with a one-time code
+  in the fragment. MemberAuth on that page exchanges the code from the site's
+  own context, where the session cookie lands in the right partition. Then it
+  tells the original tab over a BroadcastChannel (same site, so the two tabs
+  can talk), and closes itself once the original tab answers. The original
+  tab goes to the configured After sign in page. If nobody answers, this tab
+  goes there itself.
+*/
+const OAUTH_CHANNEL = "memberframe-oauth";
+const OAUTH_EXCHANGE_PATH = "/api/member/oauth/exchange";
+const HANDOFF_PARAM = "mf_oauth";
+const HANDOFF_ERROR_PARAM = "mf_oauth_error";
+
+type OAuthHandoff = { code: string } | { error: string };
+
+/** The code or error the API put in this page's fragment, if any. */
+function readOAuthHandoff(): OAuthHandoff | null {
+  if (typeof window === "undefined") return null;
+
+  const hash = window.location.hash.replace(/^#/, "");
+  if (hash === "") return null;
+
+  const params = new URLSearchParams(hash);
+  const code = params.get(HANDOFF_PARAM);
+  if (code) return { code };
+
+  const error = params.get(HANDOFF_ERROR_PARAM);
+  if (error !== null) return { error: error || "cancelled" };
+
+  return null;
+}
+
+/** Plain words for the reasons the API can send back. */
+function oauthFailureMessage(reason: string): string {
+  if (reason.includes("not_configured")) {
+    return "This sign in option is not set up yet. Use your email instead.";
+  }
+  if (reason === "access_denied" || reason === "cancelled") {
+    return "Sign in was cancelled.";
+  }
+  return "That sign in did not complete. Try again.";
+}
+
+/**
+ * Tell the tab that started the sign in how it went.
+ *
+ * When it answers, this tab closes, which returns the visitor to it. When
+ * nobody answers within a moment (the tab was closed, or the browser has no
+ * BroadcastChannel), `fallback` runs here instead. `fallback` also runs if
+ * the browser refuses to close this tab.
+ */
+function announceOAuthResult(ok: boolean, message: string, fallback: () => void): void {
+  if (typeof BroadcastChannel === "undefined") {
+    fallback();
+    return;
+  }
+
+  const id = Math.random().toString(36).slice(2);
+  const channel = new BroadcastChannel(OAUTH_CHANNEL);
+  let answered = false;
+
+  channel.onmessage = (event: MessageEvent) => {
+    const data = event.data as { type?: unknown; id?: unknown } | null;
+    if (!data || data.type !== "ack" || data.id !== id) return;
+
+    answered = true;
+    channel.close();
+    window.close();
+    window.setTimeout(fallback, 400);
+  };
+
+  channel.postMessage({ type: "result", ok, message, id });
+
+  window.setTimeout(() => {
+    if (answered) return;
+    channel.close();
+    fallback();
+  }, 700);
+}
+
 /**
  * Why a code was refused.
  *
@@ -306,8 +817,8 @@ type VerifyFailure = "invalid_code" | "expired_code" | "too_many_attempts" | "un
 type AuthState =
   | { phase: "idle" }
   | { phase: "sending" }
-  | { phase: "code_sent"; email: string; resendAtMs: number }
-  | { phase: "verifying"; email: string; resendAtMs: number }
+  | { phase: "code_sent"; email: string; resendAtMs: number; purpose?: CodePurpose }
+  | { phase: "verifying"; email: string; resendAtMs: number; purpose?: CodePurpose }
   | { phase: "reset_requested"; email: string }
   | { phase: "signed_in" }
   | { phase: "error"; message: string; retryable: boolean };
@@ -323,6 +834,13 @@ type AuthState =
  */
 type AuthView = "otp" | "password_signin" | "password_signup" | "forgot" | "reset";
 
+/**
+ * What an emailed code is for. `signin` is the code sign in flow and ends in
+ * a session; `verify` confirms a new account's address and ends on the sign
+ * in form, with no session.
+ */
+type CodePurpose = "signin" | "verify";
+
 /** Why a password submit was refused by the server. FP-02 section 3.3. */
 type PasswordFailure =
   | "invalid_credentials"
@@ -331,35 +849,12 @@ type PasswordFailure =
   | "weak_password"
   | "token_expired"
   | "invalid_token"
+  | "registration_closed"
   | "unknown";
 
 // ============================================================================
 // PURE HELPERS
 // ============================================================================
-
-/**
- * Is this a colour, and nothing but a colour?
- *
- * The same whitelist the generator applies, repeated here because a prop can be
- * bound to a Framer variable at runtime, which the generator never sees. A
- * brace, a semicolon, or a comment opener has no place in a colour, so the
- * value is rejected rather than escaped.
- */
-function safeColor(value: string, fallback: string): string {
-  const colour = String(value ?? "").trim();
-
-  if (colour === "" || colour.length > 32) return fallback;
-  if (/^#[0-9a-fA-F]{3,8}$/.test(colour)) return colour;
-  if (/^rgba?\(\s*[\d.%\s,/]+\)$/.test(colour)) return colour;
-  if (/^hsla?\(\s*[\d.%\s,/deg]+\)$/.test(colour)) return colour;
-
-  return fallback;
-}
-
-function clampRadius(value: number): number {
-  if (!Number.isFinite(value)) return CONFIG.borderRadius;
-  return Math.min(24, Math.max(0, Math.round(value)));
-}
 
 /**
  * Good enough to catch a typo, not an attempt at RFC 5322.
@@ -562,6 +1057,8 @@ function passwordFailureMessage(reason: PasswordFailure): string {
       return "That reset link has expired. Request a new one.";
     case "invalid_token":
       return "That reset link is not valid. Request a new one.";
+    case "registration_closed":
+      return "New sign ups are closed on this site.";
     case "unknown":
       return "We could not complete that just now. Try again shortly.";
   }
@@ -630,32 +1127,27 @@ function apiOrigin(baseUrl: string): string | null {
 // here even though two values are dynamic.
 
 const cssContent = `
+/*
+  The palette comes from the shared appearance block (mfThemeCss), which
+  resolves Theme plus the creator's Colors into --mf-c-*. These names are
+  kept so every rule below reads as it always did.
+*/
 .memberframe-auth-root {
-  --memberframe-auth-accent: #5271ff;
-  --memberframe-auth-radius: 10px;
-  --memberframe-auth-surface: #ffffff;
-  --memberframe-auth-border: rgba(16, 24, 40, 0.12);
-  --memberframe-auth-title: #18202b;
-  --memberframe-auth-body: #5b6472;
-  --memberframe-auth-field: #f4f5f7;
-  --memberframe-auth-on-accent: #ffffff;
-  --memberframe-auth-danger: #dc2626;
-  --memberframe-auth-shadow: 0 12px 32px rgba(16, 24, 40, 0.14);
+  --memberframe-auth-accent: var(--mf-c-accent);
+  --memberframe-auth-radius: var(--mf-c-radius);
+  --memberframe-auth-surface: var(--mf-c-surface);
+  --memberframe-auth-border: var(--mf-c-border);
+  --memberframe-auth-title: var(--mf-c-text);
+  --memberframe-auth-body: var(--mf-c-muted);
+  --memberframe-auth-field: var(--mf-c-field);
+  --memberframe-auth-on-accent: var(--mf-c-on-accent);
+  --memberframe-auth-danger: var(--mf-c-danger);
+  --memberframe-auth-shadow: var(--mf-c-shadow);
 
   box-sizing: border-box;
+  /* Fills the frame the creator sized. Fixed by default, see the annotations. */
   width: 100%;
-  font-family: var(--framer-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-}
-
-@media (prefers-color-scheme: dark) {
-  .memberframe-auth-root {
-    --memberframe-auth-surface: #1b1f27;
-    --memberframe-auth-border: rgba(255, 255, 255, 0.14);
-    --memberframe-auth-title: #edf0f7;
-    --memberframe-auth-body: #b7bfcd;
-    --memberframe-auth-field: #23272f;
-    --memberframe-auth-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  }
+  height: 100%;
 }
 
 .memberframe-auth-root.is-modal {
@@ -666,21 +1158,33 @@ const cssContent = `
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(15, 17, 23, 0.55);
+  background: var(--mf-c-backdrop);
 }
 
+/*
+  Inline, the card is the component: it fills the frame in both directions and
+  scrolls if the creator makes the frame shorter than the form. In a modal it
+  keeps a readable width over the page.
+*/
 .memberframe-auth-card {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--mf-gap, 14px);
   width: 100%;
-  max-width: 360px;
-  padding: 24px;
-  border: 1px solid var(--memberframe-auth-border);
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--mf-pad, 24px);
+  border: var(--mf-border-width, 1px) solid var(--memberframe-auth-border);
   border-radius: calc(var(--memberframe-auth-radius) + 4px);
   background: var(--memberframe-auth-surface);
   box-shadow: var(--memberframe-auth-shadow);
+}
+
+.memberframe-auth-root.is-modal .memberframe-auth-card {
+  max-width: 400px;
+  height: auto;
+  max-height: 100%;
 }
 
 .memberframe-auth-head {
@@ -691,7 +1195,7 @@ const cssContent = `
 
 .memberframe-auth-headline {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--mf-text-scale, 1));
   font-weight: 600;
   line-height: 1.3;
   color: var(--memberframe-auth-title);
@@ -699,7 +1203,7 @@ const cssContent = `
 
 .memberframe-auth-welcome {
   margin: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--mf-text-scale, 1));
   line-height: 1.5;
   color: var(--memberframe-auth-body);
 }
@@ -723,7 +1227,7 @@ const cssContent = `
   border-radius: var(--memberframe-auth-radius);
   background: var(--memberframe-auth-surface);
   color: var(--memberframe-auth-title);
-  font-size: 13px;
+  font-size: calc(13px * var(--mf-text-scale, 1));
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.1s ease;
@@ -752,7 +1256,7 @@ const cssContent = `
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--mf-text-scale, 1));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -774,7 +1278,7 @@ const cssContent = `
 }
 
 .memberframe-auth-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   font-weight: 600;
   color: var(--memberframe-auth-title);
 }
@@ -789,7 +1293,7 @@ const cssContent = `
   background: var(--memberframe-auth-field);
   color: var(--memberframe-auth-title);
   font-family: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
 }
 
 .memberframe-auth-input:focus-visible {
@@ -800,7 +1304,7 @@ const cssContent = `
 
 .memberframe-auth-input.is-code {
   font-family: var(--framer-font-family-mono, ui-monospace, monospace);
-  font-size: 20px;
+  font-size: calc(20px * var(--mf-text-scale, 1));
   letter-spacing: 0.4em;
   text-align: center;
 }
@@ -890,7 +1394,7 @@ const cssContent = `
 
 .memberframe-auth-meter-label {
   min-width: 56px;
-  font-size: 11px;
+  font-size: calc(11px * var(--mf-text-scale, 1));
   font-weight: 600;
   text-align: right;
   color: var(--memberframe-auth-body);
@@ -906,7 +1410,7 @@ const cssContent = `
 }
 
 .memberframe-auth-hints li {
-  font-size: 11px;
+  font-size: calc(11px * var(--mf-text-scale, 1));
   line-height: 1.45;
   color: var(--memberframe-auth-danger);
 }
@@ -928,7 +1432,7 @@ const cssContent = `
   background: none;
   color: var(--memberframe-auth-body);
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--mf-text-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }
@@ -947,7 +1451,7 @@ const cssContent = `
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   color: var(--memberframe-auth-body);
   cursor: pointer;
 }
@@ -975,7 +1479,7 @@ const cssContent = `
   background: none;
   color: var(--memberframe-auth-accent);
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   font-weight: 600;
   text-align: center;
   cursor: pointer;
@@ -1005,7 +1509,7 @@ const cssContent = `
   border-radius: var(--memberframe-auth-radius);
   background: var(--memberframe-auth-accent);
   color: var(--memberframe-auth-on-accent);
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }
@@ -1043,7 +1547,7 @@ const cssContent = `
   background: none;
   color: var(--memberframe-auth-accent);
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }
@@ -1055,9 +1559,19 @@ const cssContent = `
 
 .memberframe-auth-error {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--mf-text-scale, 1));
   line-height: 1.45;
   color: var(--memberframe-auth-danger);
+}
+
+.memberframe-auth-success {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
+  background: color-mix(in srgb, var(--memberframe-auth-accent) 12%, transparent);
+  color: var(--mf-c-text);
+  font-size: calc(13px * var(--mf-text-scale, 1));
+  line-height: 1.45;
 }
 
 .memberframe-auth-done {
@@ -1077,7 +1591,7 @@ const cssContent = `
 
 .memberframe-auth-note {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--mf-text-scale, 1));
   line-height: 1.45;
   text-align: center;
   color: var(--memberframe-auth-body);
@@ -1104,7 +1618,7 @@ const cssContent = `
   align-self: center;
   padding: 3px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: calc(10px * var(--mf-text-scale, 1));
   font-weight: 600;
   text-decoration: none;
   color: var(--memberframe-auth-on-accent);
@@ -1162,6 +1676,68 @@ const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
   ),
 };
 
+/**
+ * Every visible string, as [sidebar title, default]. The Labels group edits
+ * them; an empty field falls back to the default. `{name}` placeholders are
+ * filled at render.
+ *
+ * Deliberately not here: the reset confirmation ("If {email} has an
+ * account..."). Its wording is a security property, FP-02 section 3.4 rule 3:
+ * a confident "we sent you a link" tells an attacker the address is
+ * registered, so it is not creator-editable. Validation and server messages
+ * are not here either; they are feedback, not design copy.
+ */
+const AUTH_LABELS: Record<string, readonly [string, string]> = {
+  continueWith: ["Provider button", "Continue with {provider}"],
+  divider: ["Divider", "or"],
+  signInTab: ["Sign in tab", "Sign in"],
+  signUpTab: ["Sign up tab", "Sign up"],
+  emailLabel: ["Email label", "Email address"],
+  emailPlaceholder: ["Email placeholder", "you@example.com"],
+  passwordLabel: ["Password label", "Password"],
+  newPasswordLabel: ["New password label", "New password"],
+  nameLabel: ["Name label", "Name (optional)"],
+  remember: ["Remember me", "Remember me for 30 days"],
+  signIn: ["Sign in button", "Sign in"],
+  signingIn: ["Signing in", "Signing in"],
+  createAccount: ["Create account button", "Create account"],
+  creating: ["Creating", "Creating"],
+  sendCode: ["Send code button", "Email me a code"],
+  sending: ["Sending", "Sending"],
+  codeLabel: ["Code label", "Enter the {length} digit code sent to {email}"],
+  verify: ["Verify button", "Verify code"],
+  checking: ["Checking", "Checking"],
+  resend: ["Resend", "Resend code"],
+  resendIn: ["Resend countdown", "Resend in {seconds}s"],
+  sendReset: ["Send reset button", "Send reset link"],
+  setPassword: ["Set password button", "Set new password"],
+  saving: ["Saving", "Saving"],
+  forgotLink: ["Forgot link", "Forgot password?"],
+  codeLink: ["Code link", "Email me a code instead"],
+  passwordLink: ["Password link", "Use a password instead"],
+  createLink: ["Create account link", "Create an account"],
+  haveAccountLink: ["Have account link", "Already have an account? Sign in"],
+  backLink: ["Back link", "Back to sign in"],
+  signupTitle: ["Sign up title", "Create your account"],
+  forgotTitle: ["Forgot title", "Reset your password"],
+  forgotText: ["Forgot text", "Enter your email and we will send you a reset link."],
+  resetTitle: ["New password title", "Choose a new password"],
+  resetText: ["New password text", "Pick something you have not used on another site."],
+  signedInTitle: ["Signed in title", "You Are Signed In"],
+  signedInText: [
+    "Signed in text",
+    "Protected sections unlock the next time this page checks your membership.",
+  ],
+  inboxTitle: ["Check inbox title", "Check Your Inbox"],
+  verifyTitle: ["Confirm email title", "Confirm your email"],
+  verifyText: ["Confirm email text", "We sent a code to your inbox. Enter it to finish creating your account."],
+  verifyButton: ["Confirm email button", "Confirm email"],
+  verifiedNotice: ["Email confirmed message", "Email confirmed. Sign in to continue."],
+  unverifiedNotice: ["Unconfirmed sign in message", "Confirm your email first. We sent a new code to your inbox."],
+  changeEmail: ["Change email link", "Use a different email"],
+  signInTitle: ["Sign in title", "Sign in to continue"],
+};
+
 const PROVIDER_LABELS: Record<OAuthProvider, string> = {
   google: "Google",
   apple: "Apple",
@@ -1173,7 +1749,7 @@ const PROVIDER_LABELS: Record<OAuthProvider, string> = {
 // COMPONENT
 // ============================================================================
 
-export interface MemberAuthProps {
+export interface MemberAuthProps extends MfAppearanceProps {
   authMode?: AuthDisplayMode;
   headline?: string;
   welcomeMessage?: string;
@@ -1196,6 +1772,16 @@ export interface MemberAuthProps {
   onClose?: () => void;
 }
 
+/**
+ * Fixed size by default, so the frame the creator draws is the card they get.
+ * The card fills it and scrolls if the frame is shorter than the form; Fit and
+ * Fill stay available in the sidebar.
+ *
+ * @framerIntrinsicWidth 360
+ * @framerIntrinsicHeight 620
+ * @framerSupportedLayoutWidth any-prefer-fixed
+ * @framerSupportedLayoutHeight any-prefer-fixed
+ */
 export default function MemberAuth(props: MemberAuthProps) {
   const {
     authMode = CONFIG.authMode,
@@ -1216,7 +1802,18 @@ export default function MemberAuth(props: MemberAuthProps) {
     resetPath = CONFIG.resetPath,
     otpPath = CONFIG.otpPath,
     onClose,
+    theme = "light",
+    colors,
+    typography,
+    layout,
+    labels,
   } = props;
+
+  /** One label, with `{name}` placeholders filled. */
+  const t = (key: string, values?: Record<string, string | number>): string => {
+    const text = mfLabel(labels, AUTH_LABELS, key);
+    return values ? mfFill(text, values) : text;
+  };
 
   /*
     A dedicated screen fixes what the general controls would otherwise decide.
@@ -1291,8 +1888,15 @@ export default function MemberAuth(props: MemberAuthProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  /** A success line above the form: the address was just confirmed. */
+  const [notice, setNotice] = useState<string | null>(null);
 
+  /** The sign-in tab this component opened, for the legacy popup message check. */
   const popupRef = useRef<Window | null>(null);
+  /** True from the moment this tab starts a social sign in until it settles. */
+  const oauthPendingRef = useRef(false);
+  /** Read once, before the effects below strip it from the address bar. */
+  const [handoff] = useState<OAuthHandoff | null>(readOAuthHandoff);
   const cardRef = useRef<HTMLDivElement>(null);
 
   /** F05: "A disabled provider does not render its button." */
@@ -1372,6 +1976,7 @@ export default function MemberAuth(props: MemberAuthProps) {
 
       setOauthBusy(null);
       popupRef.current = null;
+      oauthPendingRef.current = false;
 
       if (payload.ok === true) {
         setState({ phase: "signed_in" });
@@ -1391,6 +1996,55 @@ export default function MemberAuth(props: MemberAuthProps) {
     return () => window.removeEventListener("message", onMessage);
   }, [onCanvas]);
 
+  /*
+    The other tab finished. Answer it, so it closes and returns the visitor
+    here, then go where a sign in goes. Only the tab that started a sign in
+    answers, so a second open copy of the page does not also navigate.
+  */
+  useEffect(() => {
+    if (onCanvas || typeof BroadcastChannel === "undefined") return;
+
+    const channel = new BroadcastChannel(OAUTH_CHANNEL);
+
+    channel.onmessage = (event: MessageEvent) => {
+      const data = event.data as { type?: unknown; ok?: unknown; message?: unknown; id?: unknown } | null;
+      if (!data || data.type !== "result" || !oauthPendingRef.current) return;
+
+      oauthPendingRef.current = false;
+      popupRef.current = null;
+      channel.postMessage({ type: "ack", id: data.id });
+      setOauthBusy(null);
+
+      if (data.ok === true) {
+        setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        redirectAfterAuth();
+        return;
+      }
+
+      setState({
+        phase: "error",
+        message: typeof data.message === "string" ? data.message : oauthFailureMessage("unknown"),
+        retryable: true,
+      });
+    };
+
+    return () => channel.close();
+  }, [onCanvas]);
+
+  /*
+    The visitor came back to this tab without a result: they closed the
+    sign-in tab or wandered off. Stop the spinner, quietly. A result that
+    arrives later still settles it through the channel above.
+  */
+  useEffect(() => {
+    if (onCanvas || oauthBusy === null) return;
+
+    const onFocus = () => setOauthBusy(null);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [onCanvas, oauthBusy]);
+
   const startOAuth = useCallback(
     (provider: OAuthProvider) => {
       if (onCanvas) return;
@@ -1398,34 +2052,87 @@ export default function MemberAuth(props: MemberAuthProps) {
       setState({ phase: "idle" });
       setOauthBusy(provider);
 
-      const siteQuery = CONFIG.siteKey ? `?siteKey=${encodeURIComponent(CONFIG.siteKey)}` : "";
-      const url = `${CONFIG.apiBaseUrl}${OAUTH_PATH_PREFIX}${provider}${siteQuery}`;
-      const popup = window.open(url, "memberframe-oauth", "width=480,height=640");
+      // returnTo is this page, without its fragment. The API checks its
+      // origin against the site's allowlist before it will send a code there.
+      const query = new URLSearchParams();
+      if (CONFIG.siteKey) query.set("siteKey", CONFIG.siteKey);
+      query.set("returnTo", `${window.location.origin}${window.location.pathname}${window.location.search}`);
+      const url = `${CONFIG.apiBaseUrl}${OAUTH_PATH_PREFIX}${provider}?${query.toString()}`;
 
-      if (!popup) {
+      // A new tab, not a window. Passing size features ("width=480,...") is
+      // what makes a browser open a separate window; with none it opens a tab.
+      const tab = window.open(url, "memberframe-oauth");
+
+      if (!tab) {
         // F05: "OAuth popup blocked by the browser produces an actionable
         // inline error, not a silent failure."
         setOauthBusy(null);
         setState({
           phase: "error",
-          message: "Your browser blocked the sign in window. Allow popups for this site, then try again.",
+          message: "Your browser blocked the sign in tab. Allow popups for this site, then try again.",
           retryable: true,
         });
         return;
       }
 
-      popupRef.current = popup;
+      popupRef.current = tab;
+      oauthPendingRef.current = true;
     },
     [onCanvas]
+  );
+
+  /** A wrong confirmation code, shown under the code box while it stays open. */
+  const [codeError, setCodeError] = useState<string | null>(null);
+  /** The code step opened from a sign in, not a sign up, so the words fit. */
+  const [unverifiedSignIn, setUnverifiedSignIn] = useState(false);
+
+  /**
+   * The address is confirmed. Next is the sign in form, wherever the creator
+   * put it:
+   *
+   *   - one page for every step (`<MemberAuth>`): switch to sign in in place
+   *   - separate pages: go to the sign in page, which shows the same message
+   *     and fills in the address. The address travels in sessionStorage, not
+   *     the URL, so it stays out of history and the `Referer` header.
+   *
+   * A dedicated sign up screen with no usable sign in page falls back to the
+   * in-place form, so the visitor is never left on a dead end.
+   */
+  const emailConfirmed = useCallback(
+    (address: string) => {
+      setCode("");
+      setCodeError(null);
+      setUnverifiedSignIn(false);
+      setPassword("");
+
+      if (dedicated && screen !== "login" && linkablePath(loginPath, false)) {
+        try {
+          window.sessionStorage.setItem(VERIFIED_KEY, address);
+        } catch {
+          // Blocked storage: the sign in page loses its message, not its form.
+        }
+        setState({ phase: "idle" });
+        goTo(loginPath);
+        return;
+      }
+
+      setEmail(address);
+      setView("password_signin");
+      setNotice(t("verifiedNotice"));
+      setState({ phase: "idle" });
+    },
+    // `t` reads the labels prop, which is stable for one render's purposes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dedicated, loginPath, screen, labels]
   );
 
   // --------------------------------------------------------------------------
   // Email code flow
   // --------------------------------------------------------------------------
-  const sendCode = useCallback(async () => {
+  const sendCode = useCallback(async (purpose: CodePurpose = "signin", address: string = email) => {
     if (onCanvas) return;
 
-    if (!looksLikeEmail(email)) {
+    if (!looksLikeEmail(address)) {
       setState({ phase: "error", message: "Enter a valid email address.", retryable: true });
       return;
     }
@@ -1433,12 +2140,15 @@ export default function MemberAuth(props: MemberAuthProps) {
     setState({ phase: "sending" });
 
     try {
-      const response = await fetch(`${CONFIG.apiBaseUrl}${SEND_OTP_PATH}`, {
-        method: "POST",
-        credentials: "include",
-        headers: apiHeaders(true),
-        body: JSON.stringify({ email: email.trim() }),
-      });
+      const response = await fetch(
+        `${CONFIG.apiBaseUrl}${purpose === "verify" ? RESEND_VERIFICATION_PATH : SEND_OTP_PATH}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: apiHeaders(true),
+          body: JSON.stringify({ email: address.trim() }),
+        }
+      );
 
       if (response.status === 429) {
         setState({
@@ -1465,7 +2175,12 @@ export default function MemberAuth(props: MemberAuthProps) {
 
       setCode("");
       setNowMs(Date.now());
-      setState({ phase: "code_sent", email: email.trim(), resendAtMs: Date.now() + lock * 1000 });
+      setState({
+        phase: "code_sent",
+        email: address.trim(),
+        resendAtMs: Date.now() + lock * 1000,
+        purpose,
+      });
     } catch {
       setState({
         phase: "error",
@@ -1475,16 +2190,26 @@ export default function MemberAuth(props: MemberAuthProps) {
     }
   }, [email, onCanvas]);
 
+  /** Back out of confirming, to correct a mistyped address. */
+  const changeEmail = useCallback(() => {
+    setCode("");
+    setCodeError(null);
+    setUnverifiedSignIn(false);
+    setState({ phase: "idle" });
+    setView(unverifiedSignIn ? "password_signin" : "password_signup");
+  }, [unverifiedSignIn]);
+
   const verifyCode = useCallback(async () => {
     if (onCanvas) return;
     if (state.phase !== "code_sent") return;
     if (code.length !== CODE_LENGTH) return;
 
-    const { email: pendingEmail, resendAtMs } = state;
-    setState({ phase: "verifying", email: pendingEmail, resendAtMs });
+    const { email: pendingEmail, resendAtMs, purpose } = state;
+    setState({ phase: "verifying", email: pendingEmail, resendAtMs, purpose });
+    const confirming = purpose === "verify";
 
     try {
-      const response = await fetch(`${CONFIG.apiBaseUrl}${VERIFY_OTP_PATH}`, {
+      const response = await fetch(`${CONFIG.apiBaseUrl}${confirming ? VERIFY_EMAIL_PATH : VERIFY_OTP_PATH}`, {
         method: "POST",
         // The session arrives as an HTTP-only cookie, per PRD section 14.1 S2.
         // This component never sees it, which is the point.
@@ -1492,6 +2217,11 @@ export default function MemberAuth(props: MemberAuthProps) {
         headers: apiHeaders(true),
         body: JSON.stringify({ email: pendingEmail, code }),
       });
+
+      if (response.ok && confirming) {
+        emailConfirmed(pendingEmail);
+        return;
+      }
 
       if (response.ok) {
         setState({ phase: "signed_in" });
@@ -1506,6 +2236,16 @@ export default function MemberAuth(props: MemberAuthProps) {
       // F05: an expired code must read differently from a wrong one, and a dead
       // code differently again. A bare status cannot carry that, so the server
       // returns a reason and this maps it.
+      // A wrong confirmation code keeps the code step open, so the visitor
+      // can retype or resend without starting the sign up again.
+      if (confirming && reason !== "too_many_attempts") {
+        setCode("");
+        setState({ phase: "code_sent", email: pendingEmail, resendAtMs, purpose });
+        setNotice(null);
+        setCodeError(verifyFailureMessage(reason));
+        return;
+      }
+
       setState({
         phase: "error",
         message: verifyFailureMessage(reason),
@@ -1518,7 +2258,7 @@ export default function MemberAuth(props: MemberAuthProps) {
         retryable: true,
       });
     }
-  }, [code, onCanvas, state]);
+  }, [code, emailConfirmed, onCanvas, state]);
 
   // --------------------------------------------------------------------------
   // Password flows, feature plan FP-02
@@ -1536,7 +2276,7 @@ export default function MemberAuth(props: MemberAuthProps) {
     async (
       path: string,
       body: Record<string, unknown> | null,
-      onOk: () => void,
+      onOk: (data: Record<string, unknown>) => void,
       silentFail = false
     ) => {
       if (onCanvas) return;
@@ -1558,7 +2298,7 @@ export default function MemberAuth(props: MemberAuthProps) {
         setShowPassword(false);
 
         if (response.ok) {
-          onOk();
+          onOk(((await response.json().catch(() => ({}))) ?? {}) as Record<string, unknown>);
           return;
         }
 
@@ -1576,8 +2316,31 @@ export default function MemberAuth(props: MemberAuthProps) {
           return;
         }
 
-        const payload = (await response.json().catch(() => ({}))) as { reason?: PasswordFailure };
-        const reason: PasswordFailure = payload.reason ?? "unknown";
+        const payload = (await response.json().catch(() => ({}))) as {
+          reason?: PasswordFailure | "email_not_verified";
+          resendAfterSeconds?: unknown;
+        };
+
+        // The right password for an address that was never confirmed. The
+        // server has emailed a code; open the step that takes it.
+        if (payload.reason === "email_not_verified" && typeof body?.["email"] === "string") {
+          const wait = Number(payload.resendAfterSeconds);
+          setCode("");
+          setCodeError(null);
+          setNotice(null);
+          setNowMs(Date.now());
+          setState({
+            phase: "code_sent",
+            email: body["email"],
+            resendAtMs: Date.now() + (Number.isFinite(wait) ? wait : RESEND_LOCK_SECONDS) * 1000,
+            purpose: "verify",
+          });
+          setUnverifiedSignIn(true);
+          return;
+        }
+
+        // email_not_verified returned above, so what is left is a PasswordFailure.
+        const reason = (payload.reason ?? "unknown") as PasswordFailure;
 
         setState({
           phase: "error",
@@ -1606,7 +2369,9 @@ export default function MemberAuth(props: MemberAuthProps) {
   // to afterLoginPath (or /dashboard) so logged-in members never see the login form.
   // --------------------------------------------------------------------------
   useEffect(() => {
-    if (onCanvas) return;
+    // A handoff is being finished by the effect below; a 401 from this check
+    // landing after it would reset the form under the visitor.
+    if (onCanvas || handoff) return;
 
     void submitCredentials(
       SESSION_PATH,
@@ -1614,11 +2379,76 @@ export default function MemberAuth(props: MemberAuthProps) {
       () => {
         setState({ phase: "signed_in" });
         notifySessionUpdated(true);
-        redirectAfterAuth();
+        // Not back to a page the shield just turned this member away from:
+        // that page would send them here again, and round it would go.
+        if (!recentlyDenied(CONFIG.afterLoginPath || "/dashboard")) redirectAfterAuth();
       },
       true
     );
-  }, [onCanvas, submitCredentials]);
+  }, [onCanvas, handoff, submitCredentials]);
+
+  /*
+    A sign up page confirmed this address and sent the visitor here, to the
+    sign in page. Say so, and fill in the address. Read after mount rather
+    than in a state initializer: the published page is prerendered, and the
+    first client render has to match that HTML.
+  */
+  useEffect(() => {
+    if (onCanvas || typeof window === "undefined") return;
+
+    try {
+      const confirmed = window.sessionStorage.getItem(VERIFIED_KEY);
+      if (confirmed === null) return;
+      window.sessionStorage.removeItem(VERIFIED_KEY);
+      if (confirmed !== "") setEmail(confirmed);
+      setView("password_signin");
+      setNotice(t("verifiedNotice"));
+    } catch {
+      // Storage blocked: the sign in form still works, without the message.
+    }
+    // `t` reads the labels prop; the message is read once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCanvas]);
+
+  /*
+    This page is the sign-in tab, back from the provider with a code (or an
+    error) in its fragment. Strip it from the address bar first, so it is not
+    left in history, then exchange it through the same POST every other
+    credential call uses. See OAUTH_CHANNEL for the whole flow.
+  */
+  useEffect(() => {
+    if (onCanvas || !handoff) return;
+
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${window.location.search}`
+    );
+
+    const fail = (message: string) => {
+      setState({ phase: "error", message, retryable: true });
+      announceOAuthResult(false, message, () => undefined);
+    };
+
+    if ("error" in handoff) {
+      fail(oauthFailureMessage(handoff.error));
+      return;
+    }
+
+    let signedIn = false;
+    void submitCredentials(
+      OAUTH_EXCHANGE_PATH,
+      { code: handoff.code },
+      () => {
+        signedIn = true;
+        setState({ phase: "signed_in" });
+        notifySessionUpdated(true);
+        announceOAuthResult(true, "", redirectAfterAuth);
+      }
+    ).then(() => {
+      if (!signedIn) fail(oauthFailureMessage("unknown"));
+    });
+  }, [onCanvas, handoff, submitCredentials]);
 
   const signInWithPassword = useCallback(() => {
     setSubmitted(true);
@@ -1629,6 +2459,7 @@ export default function MemberAuth(props: MemberAuthProps) {
     // server is the only authority on whether it is correct.
     if (password === "") return;
 
+    setNotice(null);
     void submitCredentials(
       LOGIN_PASSWORD_PATH,
       { email: email.trim(), password, rememberMe },
@@ -1651,7 +2482,24 @@ export default function MemberAuth(props: MemberAuthProps) {
       // `name` is optional per FP-02 section 2.1, so an empty box sends null
       // rather than an empty string the backend would have to special-case.
       { email: email.trim(), password, name: name.trim() === "" ? null : name.trim() },
-      () => {
+      (data) => {
+        // The account exists but is not confirmed: no session yet. The API
+        // emailed a code, so the next step is the box that takes it.
+        if (data["verificationRequired"] === true) {
+          const wait = Number(data["resendAfterSeconds"]);
+          setCode("");
+          setCodeError(null);
+          setNowMs(Date.now());
+          setUnverifiedSignIn(false);
+          setState({
+            phase: "code_sent",
+            email: typeof data["email"] === "string" ? data["email"] : email.trim(),
+            resendAtMs: Date.now() + (Number.isFinite(wait) ? wait : RESEND_LOCK_SECONDS) * 1000,
+            purpose: "verify",
+          });
+          return;
+        }
+
         setState({ phase: "signed_in" });
         notifySessionUpdated(true);
         redirectAfterAuth();
@@ -1747,11 +2595,20 @@ export default function MemberAuth(props: MemberAuthProps) {
   // --------------------------------------------------------------------------
   // Render
   // --------------------------------------------------------------------------
-  const accent = safeColor(accentColor, CONFIG.accentColor);
-  const radius = clampRadius(borderRadius);
+  // Accent, radius, Colors, Typography, and Layout, sanitized by the shared
+  // appearance block and scoped to this instance.
   const scopedVars =
-    `[data-memberframe-auth="${scope}"] ` +
-    `{ --memberframe-auth-accent: ${accent}; --memberframe-auth-radius: ${radius}px; }`;
+    `[data-memberframe-auth="${scope}"] { ` +
+    mfAppearanceVars({
+      accent: accentColor,
+      radius: borderRadius,
+      radiusMax: 24,
+      shadowByDefault: true,
+      colors,
+      typography,
+      layout,
+    }) +
+    " }";
 
   const busy = state.phase === "sending" || state.phase === "verifying";
   const remaining =
@@ -1761,6 +2618,8 @@ export default function MemberAuth(props: MemberAuthProps) {
 
   const errorMessage = state.phase === "error" ? state.message : null;
   const awaitingCode = state.phase === "code_sent" || state.phase === "verifying";
+  /** The code step is confirming a new account rather than signing in. */
+  const confirmingEmail = awaitingCode && state.purpose === "verify";
 
   /* ---- FP-02 derived values ---- */
 
@@ -1808,22 +2667,30 @@ export default function MemberAuth(props: MemberAuthProps) {
             : null;
   const creatorWords = view === primaryView;
 
-  const viewHeadline = creatorWords
+  const viewHeadline = confirmingEmail
+    ? t("verifyTitle")
+    : creatorWords
     ? headline
     : view === "password_signup"
-      ? "Create your account"
+      ? t("signupTitle")
       : view === "forgot"
-        ? "Reset your password"
+        ? t("forgotTitle")
         : view === "reset"
-          ? "Choose a new password"
-          : headline;
+          ? t("resetTitle")
+          : view === "password_signin" && primaryView !== null
+            ? t("signInTitle")
+            : headline;
 
-  const viewWelcome = creatorWords
+  const viewWelcome = confirmingEmail
+    ? unverifiedSignIn
+      ? t("unverifiedNotice")
+      : t("verifyText")
+    : creatorWords
     ? welcomeMessage
     : view === "forgot"
-      ? "Enter your email and we will send you a reset link."
+      ? t("forgotText")
       : view === "reset"
-        ? "Pick something you have not used on another site."
+        ? t("resetText")
         : welcomeMessage;
 
   /**
@@ -1863,14 +2730,14 @@ export default function MemberAuth(props: MemberAuthProps) {
   const emailField = (
     <>
       <label className="memberframe-auth-label" htmlFor={`${scope}-email`}>
-        Email address
+        {t("emailLabel")}
       </label>
       <input
         id={`${scope}-email`}
         className={`memberframe-auth-input${emailProblem ? " is-invalid" : ""}`}
         type="email"
         autoComplete="email"
-        placeholder="you@example.com"
+        placeholder={t("emailPlaceholder")}
         value={email}
         disabled={busy}
         aria-invalid={emailProblem || undefined}
@@ -2005,7 +2872,7 @@ export default function MemberAuth(props: MemberAuthProps) {
           className={`memberframe-auth-tab${view === "password_signin" ? " is-active" : ""}`}
           onClick={() => setView("password_signin")}
         >
-          Sign in
+          {t("signInTab")}
         </button>
         <button
           type="button"
@@ -2014,7 +2881,7 @@ export default function MemberAuth(props: MemberAuthProps) {
           className={`memberframe-auth-tab${view === "password_signup" ? " is-active" : ""}`}
           onClick={() => setView("password_signup")}
         >
-          Sign up
+          {t("signUpTab")}
         </button>
       </div>
     ) : null;
@@ -2038,7 +2905,7 @@ export default function MemberAuth(props: MemberAuthProps) {
       return (
         <>
           <label className="memberframe-auth-label" htmlFor={`${scope}-code`}>
-            {`Enter the ${CODE_LENGTH} digit code sent to ${state.email}`}
+            {t("codeLabel", { length: CODE_LENGTH, email: state.email })}
           </label>
           <input
             id={`${scope}-code`}
@@ -2049,11 +2916,20 @@ export default function MemberAuth(props: MemberAuthProps) {
             maxLength={CODE_LENGTH}
             value={code}
             disabled={busy}
-            onChange={(event) => setCode(digitsOnly(event.currentTarget.value))}
+            aria-invalid={codeError !== null || undefined}
+            onChange={(event) => {
+              setCode(digitsOnly(event.currentTarget.value));
+              setCodeError(null);
+            }}
           />
+          {codeError ? (
+            <p className="memberframe-auth-error" role="alert">
+              {codeError}
+            </p>
+          ) : null}
           {submitButton(
-            "Verify code",
-            "Checking",
+            confirmingEmail ? t("verifyButton") : t("verify"),
+            t("checking"),
             <ArrowRight stroke="currentColor" aria-hidden={true} />,
             () => void verifyCode(),
             code.length !== CODE_LENGTH
@@ -2062,10 +2938,17 @@ export default function MemberAuth(props: MemberAuthProps) {
             type="button"
             className="memberframe-auth-resend"
             disabled={remaining > 0 || busy}
-            onClick={() => void sendCode()}
+            onClick={() => void sendCode(state.purpose ?? "signin", state.email)}
           >
-            {remaining > 0 ? `Resend in ${remaining}s` : "Resend code"}
+            {remaining > 0 ? t("resendIn", { seconds: remaining }) : t("resend")}
           </button>
+          {confirmingEmail ? (
+            linkRow(
+              <button type="button" className="memberframe-auth-link" disabled={busy} onClick={changeEmail}>
+                {t("changeEmail")}
+              </button>
+            )
+          ) : null}
         </>
       );
     }
@@ -2073,10 +2956,10 @@ export default function MemberAuth(props: MemberAuthProps) {
     if (view === "reset") {
       return (
         <>
-          {passwordField("New password", "new-password")}
+          {passwordField(t("newPasswordLabel"), "new-password")}
           {submitButton(
-            "Set new password",
-            "Saving",
+            t("setPassword"),
+            t("saving"),
             <ArrowRight stroke="currentColor" aria-hidden={true} />,
             completePasswordReset
           )}
@@ -2089,12 +2972,12 @@ export default function MemberAuth(props: MemberAuthProps) {
         <>
           {emailField}
           {submitButton(
-            "Send reset link",
-            "Sending",
+            t("sendReset"),
+            t("sending"),
             <Mail stroke="currentColor" aria-hidden={true} />,
             requestPasswordReset
           )}
-          {linkRow(flowLink("Back to sign in", "password_signin", loginPath))}
+          {linkRow(flowLink(t("backLink"), "password_signin", loginPath))}
         </>
       );
     }
@@ -2104,7 +2987,7 @@ export default function MemberAuth(props: MemberAuthProps) {
         <>
           {emailField}
           <label className="memberframe-auth-label" htmlFor={`${scope}-name`}>
-            Name (optional)
+            {t("nameLabel")}
           </label>
           <input
             id={`${scope}-name`}
@@ -2115,16 +2998,16 @@ export default function MemberAuth(props: MemberAuthProps) {
             disabled={busy}
             onChange={(event) => setName(event.currentTarget.value)}
           />
-          {passwordField("Password", "new-password")}
+          {passwordField(t("passwordLabel"), "new-password")}
           {submitButton(
-            "Create account",
-            "Creating",
+            t("createAccount"),
+            t("creating"),
             <UserPlus stroke="currentColor" aria-hidden={true} />,
             register
           )}
           {/* The combined component has tabs for this; a dedicated page needs a way back. */}
           {dedicated
-            ? linkRow(flowLink("Already have an account? Sign in", "password_signin", loginPath))
+            ? linkRow(flowLink(t("haveAccountLink"), "password_signin", loginPath))
             : null}
         </>
       );
@@ -2134,7 +3017,7 @@ export default function MemberAuth(props: MemberAuthProps) {
       return (
         <>
           {emailField}
-          {passwordField("Password", "current-password")}
+          {passwordField(t("passwordLabel"), "current-password")}
           <label className="memberframe-auth-remember">
             <input
               type="checkbox"
@@ -2142,18 +3025,18 @@ export default function MemberAuth(props: MemberAuthProps) {
               disabled={busy}
               onChange={(event) => setRememberMe(event.currentTarget.checked)}
             />
-            <span>Remember me for 30 days</span>
+            <span>{t("remember")}</span>
           </label>
           {submitButton(
-            "Sign in",
-            "Signing in",
+            t("signIn"),
+            t("signingIn"),
             <ArrowRight stroke="currentColor" aria-hidden={true} />,
             signInWithPassword
           )}
           {linkRow(
-            flowLink("Forgot password?", "forgot", resetPath),
-            flowLink("Email me a code instead", "otp", otpPath),
-            dedicated ? flowLink("Create an account", "password_signup", signupPath) : null
+            flowLink(t("forgotLink"), "forgot", resetPath),
+            flowLink(t("codeLink"), "otp", otpPath),
+            dedicated ? flowLink(t("createLink"), "password_signup", signupPath) : null
           )}
         </>
       );
@@ -2164,14 +3047,14 @@ export default function MemberAuth(props: MemberAuthProps) {
       <>
         {emailField}
         {submitButton(
-          "Email me a code",
-          "Sending",
+          t("sendCode"),
+          t("sending"),
           <Mail stroke="currentColor" aria-hidden={true} />,
           () => void sendCode(),
           email.trim() === ""
         )}
         {passwordPath || dedicated
-          ? linkRow(flowLink("Use a password instead", "password_signin", loginPath))
+          ? linkRow(flowLink(t("passwordLink"), "password_signin", loginPath))
           : null}
       </>
     );
@@ -2182,10 +3065,8 @@ export default function MemberAuth(props: MemberAuthProps) {
       {state.phase === "signed_in" ? (
         <div className="memberframe-auth-done">
           <ShieldCheck stroke="currentColor" aria-hidden={true} />
-          <h2 className="memberframe-auth-headline">You Are Signed In</h2>
-          <p className="memberframe-auth-welcome">
-            Protected sections unlock the next time this page checks your membership.
-          </p>
+          <h2 className="memberframe-auth-headline">{t("signedInTitle")}</h2>
+          <p className="memberframe-auth-welcome">{t("signedInText")}</p>
         </div>
       ) : state.phase === "reset_requested" ? (
         /*
@@ -2196,7 +3077,7 @@ export default function MemberAuth(props: MemberAuthProps) {
         */
         <div className="memberframe-auth-done">
           <MailCheck stroke="currentColor" aria-hidden={true} />
-          <h2 className="memberframe-auth-headline">Check Your Inbox</h2>
+          <h2 className="memberframe-auth-headline">{t("inboxTitle")}</h2>
           <p className="memberframe-auth-welcome">
             {`If ${state.email} has an account, a reset link is on its way. The link works for 15 minutes.`}
           </p>
@@ -2214,7 +3095,7 @@ export default function MemberAuth(props: MemberAuthProps) {
               }}
             >
               <ArrowLeft stroke="currentColor" aria-hidden={true} />
-              <span>Back to sign in</span>
+              <span>{t("backLink")}</span>
             </button>
           ) : null}
         </div>
@@ -2240,7 +3121,7 @@ export default function MemberAuth(props: MemberAuthProps) {
                   ) : (
                     PROVIDER_MARKS[provider]
                   )}
-                  <span>{`Continue with ${PROVIDER_LABELS[provider]}`}</span>
+                  <span>{t("continueWith", { provider: PROVIDER_LABELS[provider] })}</span>
                 </button>
               ))}
             </div>
@@ -2248,11 +3129,17 @@ export default function MemberAuth(props: MemberAuthProps) {
 
           {emailEnabled && providers.length > 0 ? (
             <div className="memberframe-auth-divider">
-              <span>or</span>
+              <span>{t("divider")}</span>
             </div>
           ) : null}
 
           {emailEnabled && passwordPath && !awaitingCode ? authTabs : null}
+
+          {notice && !awaitingCode ? (
+            <p className="memberframe-auth-success" role="status">
+              {notice}
+            </p>
+          ) : null}
 
           {emailEnabled ? (
             <div className="memberframe-auth-form">{emailBody}</div>
@@ -2299,13 +3186,14 @@ export default function MemberAuth(props: MemberAuthProps) {
 
   return (
     <div
-      className={`memberframe-auth-root${authMode === "modal" ? " is-modal" : ""}`}
+      className={`memberframe-auth-root ${mfThemeClass(theme)}${authMode === "modal" ? " is-modal" : ""}`}
       data-memberframe-auth={scope}
       role={authMode === "modal" ? "dialog" : undefined}
       aria-modal={authMode === "modal" ? true : undefined}
       aria-label={authMode === "modal" ? headline : undefined}
       onKeyDown={handleKeyDown}
     >
+      <style>{mfThemeCss(".memberframe-auth-root")}</style>
       <style>{cssContent}</style>
       <style>{scopedVars}</style>
       {card}
@@ -2451,4 +3339,9 @@ addPropertyControls(MemberAuth, {
     defaultValue: CONFIG.otpPath,
     hidden: () => CONFIG.screen !== "login",
   },
+
+  /* ---- Shared appearance: Theme, Colors, Typography, Layout, then Labels ---- */
+
+  ...mfAppearanceControls({ padding: 24, gap: 14, shadow: true }),
+  labels: mfLabelControls(AUTH_LABELS),
 });

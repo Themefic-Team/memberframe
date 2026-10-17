@@ -87,6 +87,13 @@ export interface SiteMemberRecord {
  * narrows to. Every `SiteTierRecord` is assignable to a `TierLadderEntry`, so
  * callers pass real tiers to `isEntitled` unchanged.
  */
+/** A tier price in a currency other than the tier's own. FP-16 section 6.2. */
+export interface TierExtraPrice {
+  currency: CurrencyCode;
+  interval: "month" | "year" | "lifetime";
+  amountMinor: number;
+}
+
 export interface SiteTierRecord {
   id: string;
   siteId: string;
@@ -98,6 +105,8 @@ export interface SiteTierRecord {
   annualPriceMinor: number | null;
   lifetimePriceMinor: number | null;
   currency: CurrencyCode;
+  /** FP-16. Prices in other currencies, e.g. INR for Razorpay buyers. */
+  extraPrices?: ReadonlyArray<TierExtraPrice>;
   /**
    * Unique per site, PRD section 11.2. Higher outranks lower, and this is the
    * field hierarchical entitlement compares, which is why task 2.3 validates

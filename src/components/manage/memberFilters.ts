@@ -13,7 +13,7 @@
  * and the server's answer then replaces them.
  */
 
-import { MEMBER_STATUS_LABELS, REQUIRED_TIER_LABELS, type MemberStatus, type TierKey } from "../../types/member";
+import { MEMBER_STATUS_LABELS, requiredTierLabel, type MemberStatus, type TierKey } from "../../types/member";
 import type { SiteMemberRecord } from "../../types/site";
 
 /** The tier filter pills, in ladder order, plus the unfiltered state. */
@@ -114,7 +114,7 @@ export function statusTone(status: MemberStatus): "success" | "brand" | "warning
 
 /** PRD section 7.6 rule 4. The key never reaches a screen. */
 export function tierLabel(tier: TierKey): string {
-  return REQUIRED_TIER_LABELS[tier];
+  return requiredTierLabel(tier);
 }
 
 export function statusLabel(status: MemberStatus): string {

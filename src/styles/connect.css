@@ -12,9 +12,9 @@
 
 .connect-status {
   margin: 0;
-  padding: 16px 0;
+  padding: var(--space-16) 0;
+  font: var(--text-body);
   color: var(--paragraph);
-  font-size: 13px;
 }
 
 .connect-help {
@@ -46,9 +46,10 @@
   align-items: center;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--framefic-surface-border);
-  border-radius: 10px;
-  background: var(--framefic-surface);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-14);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-card);
 }
 
 .connect-summary-icon {
@@ -58,9 +59,9 @@
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
-  border-radius: 8px;
-  background: var(--framefic-page-bg);
-  color: var(--secondary-default);
+  border-radius: var(--radius-10);
+  background: var(--px-brand-subtle);
+  color: var(--px-color-text-brand);
 }
 
 .connect-summary-icon svg {
@@ -76,8 +77,8 @@
 .connect-summary-name {
   margin: 0;
   color: var(--title);
-  font-size: 13px;
-  font-weight: 600;
+  font: var(--text-title-sm);
+  letter-spacing: var(--text-title-sm-tracking);
   /* The panel is 360px and a project name is creator supplied. */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -114,7 +115,7 @@
  * creator does with it is compare it against a request header.
  */
 .connect-value-key {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   user-select: all;
 }
@@ -137,12 +138,13 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid var(--framefic-surface-border);
-  border-radius: 8px;
-  background: var(--framefic-surface);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-10);
+  background: var(--px-color-bg-raised);
   color: var(--title);
   font-size: 12px;
   min-width: 0;
+  box-shadow: var(--px-shadow-card);
 }
 
 .connect-origin svg {

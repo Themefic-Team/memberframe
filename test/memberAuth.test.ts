@@ -79,8 +79,13 @@ describe("the postMessage handler is pinned to one origin", () => {
   });
 
   it("never posts to a wildcard target origin", () => {
-    expect(code).not.toContain('postMessage(');
     expect(code).not.toContain('"*"');
+    // The only postMessage calls are on the BroadcastChannel, which cannot
+    // leave this origin. Nothing posts to a window, where a target origin
+    // would matter.
+    const posts = code.match(/[\w.]+\.postMessage\(/g) ?? [];
+    expect(posts.length).toBeGreaterThan(0);
+    for (const call of posts) expect(call).toBe("channel.postMessage(");
   });
 
   it("also checks the message came from the window it opened", () => {
@@ -103,12 +108,32 @@ describe("the postMessage handler is pinned to one origin", () => {
   });
 });
 
+
+/**
+ * Every Web Storage access in a source, by key. The only storage these
+ * components may touch is the Route Shield's: a "1" signed-in hint, its session
+ * cache (only ever removed here), the denied-path marker, and a confirmed
+ * address handed from sign up to sign in. Never a token, never a password.
+ */
+function storageAccess(source: string): { calls: string[]; stray: boolean } {
+  const calls = source.match(/(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\([^,)]*(?:,[^)]*)?\)/g) ?? [];
+  const stray = /(?:localStorage|sessionStorage)\s*(?:\[|\.(?!getItem|setItem|removeItem))/.test(source);
+  return { calls, stray };
+}
+
 describe("the component holds no credential", () => {
   it("reads no token from browser storage", () => {
     // PRD section 14.1 S2: the session is an HTTP-only cookie, so the browser
-    // holds it and this component never sees it.
-    expect(code).not.toContain("localStorage");
-    expect(code).not.toContain("sessionStorage");
+    // holds it and this component never sees it. Storage holds only the Route
+    // Shield's keys, and the one localStorage value is the literal "1".
+    const { calls, stray } = storageAccess(code);
+    expect(stray).toBe(false);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call).toMatch(/\((HINT_KEY|SESSION_CACHE_KEY|DENIED_KEY|VERIFIED_KEY|CHECKOUT_INTENT_KEY|RETURN_KEY)[,)]/);
+      if (call.startsWith("localStorage.setItem")) expect(call).toBe('localStorage.setItem(HINT_KEY, "1")');
+      if (call.includes("SESSION_CACHE_KEY")) expect(call).toContain("removeItem");
+    }
     expect(code).not.toContain("document.cookie");
   });
 
@@ -187,12 +212,46 @@ describe("the OAuth popup", () => {
   it("handles a blocked popup with an inline error rather than silence", () => {
     // F05: "OAuth popup blocked by the browser produces an actionable inline
     // error, not a silent failure."
-    expect(code).toContain("if (!popup)");
-    expect(code).toMatch(/blocked the sign in window/i);
+    expect(code).toContain("if (!tab)");
+    expect(code).toMatch(/blocked the sign in tab/i);
   });
 
   it("tells the visitor what to do about it", () => {
     expect(source).toMatch(/Allow popups/i);
+  });
+
+  it("opens a tab, not a window", () => {
+    // Size features ("width=480,...") are what make a browser open a separate
+    // window. None means a tab, which is what the user asked for.
+    expect(code).toContain('window.open(url, "memberframe-oauth")');
+    expect(code).not.toMatch(/window\.open\([^)]*width=/);
+  });
+
+  it("finishes the sign in on the site's own page, not on the API's", () => {
+    // A cookie set while the tab is on the API's address lands in another
+    // partition, so the API sends the tab back here with a one-time code and
+    // this page exchanges it. The return address is this page, never a
+    // constant, and the API checks it against the site's allowlist.
+    expect(code).toContain('query.set("returnTo"');
+    expect(code).toContain('const OAUTH_EXCHANGE_PATH = "/api/member/oauth/exchange"');
+    expect(code).toMatch(/submitCredentials\(\s*OAUTH_EXCHANGE_PATH,/);
+    // The code leaves the address bar before anything else happens.
+    expect(code).toContain("window.history.replaceState(");
+  });
+
+  it("hands the result to the tab that started it, then goes to After sign in", () => {
+    expect(code).toContain('const OAUTH_CHANNEL = "memberframe-oauth"');
+    expect(code).toContain("announceOAuthResult(true, \"\", redirectAfterAuth)");
+    // Only the tab that started a sign in answers and navigates.
+    expect(code).toContain('data.type !== "result" || !oauthPendingRef.current');
+  });
+
+  it("never reports failure just because the tab looks closed", () => {
+    // Google's pages cut the opener link, which some browsers report as
+    // closed while the visitor is still signing in. Focus, not closed, stops
+    // the spinner, and it does so without an error.
+    expect(code).not.toContain("tab.closed");
+    expect(code).toContain('window.addEventListener("focus", onFocus)');
   });
 });
 
@@ -219,14 +278,21 @@ describe("the component is safe by construction", () => {
     // accentColor is creator data that ends in a CSS declaration, and a Framer
     // variable can set a prop the generator never saw. `red; } body { ... }`
     // would be CSS injection on the creator's own published page.
-    expect(code).toContain("function safeColor(");
-    expect(code).toContain("const accent = safeColor(accentColor, CONFIG.accentColor)");
-    expect(code).toContain("--memberframe-auth-accent: ${accent}");
+    //
+    // The sanitizer lives in the shared appearance block now, and its
+    // behaviour, injection attempts included, is executed in
+    // test/canvasAppearanceParity.test.ts. Here: this component routes the
+    // creator's accent through it and nowhere else.
+    expect(code).toContain("function mfSafeColor(");
+    expect(code).toContain("mfAppearanceVars({");
+    expect(code).toContain("accent: accentColor,");
+    expect(code).not.toContain("--memberframe-auth-accent: ${");
   });
 
   it("clamps the creator radius", () => {
-    expect(code).toContain("function clampRadius(");
-    expect(code).toContain("const radius = clampRadius(borderRadius)");
+    expect(code).toContain("radius: borderRadius,");
+    // Same bound as the Corner Radius control, asserted further down.
+    expect(code).toContain("radiusMax: 24,");
   });
 
   it("scopes its custom properties per instance", () => {
@@ -561,8 +627,12 @@ describe("FP-02: the plaintext password does not outlive its submit", () => {
   });
 
   it("never writes it anywhere that survives the page", () => {
-    for (const sink of ["localStorage", "sessionStorage", "document.cookie", "setPluginData"]) {
+    for (const sink of ["document.cookie", "setPluginData"]) {
       expect(code).not.toContain(sink);
+    }
+    // The only values written to storage are the hint and a confirmed address.
+    for (const call of storageAccess(code).calls.filter((entry) => entry.includes("setItem"))) {
+      expect(call.toLowerCase()).not.toContain("password");
     }
   });
 
@@ -627,9 +697,11 @@ describe("FP-02: the form details that only matter when they are wrong", () => {
     // which view gets which, which is the part worth asserting.
     expect(code).toContain("autoComplete={autoComplete}");
 
-    expect(code).toContain('passwordField("Password", "current-password")');
-    expect(code).toContain('passwordField("Password", "new-password")');
-    expect(code).toContain('passwordField("New password", "new-password")');
+    // The visible label comes from the Labels group; the autocomplete token
+    // does not, so a creator renaming a field cannot change which one it is.
+    expect(code).toContain('passwordField(t("passwordLabel"), "current-password")');
+    expect(code).toContain('passwordField(t("passwordLabel"), "new-password")');
+    expect(code).toContain('passwordField(t("newPasswordLabel"), "new-password")');
 
     // And the type is narrowed, so a fourth call cannot pass something else.
     expect(code).toContain('autoComplete: "current-password" | "new-password"');
@@ -741,5 +813,65 @@ describe("FP-02: the component still fits the budget it has to fit", () => {
     const gzipped = gzipSync(Buffer.from(generateMemberAuthCode(config()).code, "utf-8")).length;
 
     expect(gzipped).toBeLessThan(40 * 1024);
+  });
+});
+
+describe("email confirmation after password sign up", () => {
+  /** The body of one `useCallback` or function, from its name to the next blank-line-separated definition. */
+  const block = (start: string, length = 2400) => code.slice(code.indexOf(start), code.indexOf(start) + length);
+
+  it("opens the code step after register instead of signing the member in", () => {
+    const register = block("const register = useCallback");
+    expect(register).toContain('data["verificationRequired"] === true');
+    expect(register).toContain('purpose: "verify"');
+    // The confirmation branch returns before the signed-in path runs.
+    expect(register.indexOf("return;")).toBeLessThan(register.indexOf('setState({ phase: "signed_in" })'));
+  });
+
+  it("confirms through the verify-email route, which signs nobody in", () => {
+    expect(code).toContain('const VERIFY_EMAIL_PATH = "/api/member/verify-email";');
+    const verify = block("const verifyCode = useCallback");
+    expect(verify).toContain("confirming ? VERIFY_EMAIL_PATH : VERIFY_OTP_PATH");
+    expect(verify).toContain("emailConfirmed(pendingEmail)");
+  });
+
+  it("lands on the sign in form with a success message, never on a session", () => {
+    const confirmed = block("const emailConfirmed = useCallback");
+    expect(confirmed).toContain('setView("password_signin")');
+    expect(confirmed).toContain('t("verifiedNotice")');
+    expect(confirmed).not.toContain("notifySessionUpdated");
+    expect(confirmed).not.toContain("redirectAfterAuth");
+  });
+
+  it("goes to the configured sign in page when sign up is its own page", () => {
+    const confirmed = block("const emailConfirmed = useCallback");
+    expect(confirmed).toContain('dedicated && screen !== "login" && linkablePath(loginPath, false)');
+    expect(confirmed).toContain("goTo(loginPath)");
+    // The address rides in sessionStorage, not the URL.
+    expect(confirmed).toContain("sessionStorage.setItem(VERIFIED_KEY, address)");
+  });
+
+  it("opens the code step when a sign in is refused for an unconfirmed address", () => {
+    const submit = block("const submitCredentials = useCallback", 4000);
+    expect(submit).toContain('payload.reason === "email_not_verified"');
+    expect(submit).toContain('purpose: "verify"');
+  });
+
+  it("resends a confirmation code through its own route", () => {
+    expect(code).toContain('purpose === "verify" ? RESEND_VERIFICATION_PATH : SEND_OTP_PATH');
+    expect(code).toContain('sendCode(state.purpose ?? "signin", state.email)');
+  });
+});
+
+describe("no redirect loop with the Route Shield", () => {
+  it("does not send a signed-in member back to a page the shield just denied them", () => {
+    expect(code).toContain('if (!recentlyDenied(CONFIG.afterLoginPath || "/dashboard")) redirectAfterAuth();');
+  });
+
+  it("keeps the shield's hint in step with every sign in and sign out", () => {
+    const notify = code.slice(code.indexOf("function notifySessionUpdated"), code.indexOf("function recentlyDenied"));
+    expect(notify).toContain('localStorage.setItem(HINT_KEY, "1")');
+    expect(notify).toContain("localStorage.removeItem(HINT_KEY)");
+    expect(notify).toContain("sessionStorage.removeItem(SESSION_CACHE_KEY)");
   });
 });

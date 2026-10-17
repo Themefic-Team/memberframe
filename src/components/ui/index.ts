@@ -16,6 +16,9 @@ export type { FieldRowProps } from "./FieldRow";
 export { IconButton } from "./IconButton";
 export type { IconButtonProps, IconButtonVariant } from "./IconButton";
 
+export { InfoTip } from "./InfoTip";
+export type { InfoTipProps } from "./InfoTip";
+
 export { Segmented } from "./Segmented";
 export type { SegmentedOption, SegmentedProps } from "./Segmented";
 
@@ -33,3 +36,15 @@ export type { ToastRequest, ToastTone } from "./Toast";
 
 export { Toggle } from "./Toggle";
 export type { ToggleProps } from "./Toggle";
+
+export { Badge } from "./Badge";
+export type { BadgeProps, BadgeTone } from "./Badge";
+
+export { HeroCard } from "./HeroCard";
+export type { HeroCardProps } from "./HeroCard";
+
+export { HelpTile, HelpTileRow } from "./HelpTile";
+export type { HelpTileProps } from "./HelpTile";
+
+export { PluginCard, PluginCardList } from "./PluginCard";
+export type { PluginCardProps } from "./PluginCard";

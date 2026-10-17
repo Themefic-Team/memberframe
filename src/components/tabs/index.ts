@@ -5,5 +5,5 @@ export type { HomeTabProps } from "./HomeTab";
 export { ManageTab } from "./ManageTab";
 export { SettingsTab } from "./SettingsTab";
 export type { SettingsTabProps } from "./SettingsTab";
-export { DEFAULT_TAB, TABS, isTabId } from "./tabs";
-export type { TabId } from "./tabs";
+export { ACCOUNT_VIEW, DEFAULT_TAB, TABS, isTabId, isViewId } from "./tabs";
+export type { TabId, ViewId } from "./tabs";

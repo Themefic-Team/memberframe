@@ -1,5 +1,5 @@
 /**
- * The Connect tab's pure logic.
+ * The Connect view's pure logic (the account view behind the Account icon).
  *
  * Separated from the component for the usual reason in this repository:
  * `jsdom` is not installed (blocker B5), so no test renders a React component,

@@ -268,8 +268,11 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
               }
 
               return (
+                // Keyed by position, like openIndex and the input ids. The key
+                // follows the label while a field is new, so keying by it would
+                // remount the card on every keystroke and drop the input focus.
                 <div
-                  key={`${index}-${field.key}`}
+                  key={index}
                   className={cn("custom-field-card", open && "is-open", hasProblem && "is-invalid")}
                 >
                   <div className="custom-field-head">
@@ -334,7 +337,16 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
                           />
                         </FieldRow>
 
-                        <FieldRow label="Key" htmlFor={`${id}-key`} error={fieldProblems.key}>
+                        <FieldRow
+                          label="Key"
+                          htmlFor={`${id}-key`}
+                          error={fieldProblems.key}
+                          hint={
+                            locked
+                              ? "Locked: members' answers are stored under this key."
+                              : "Answers are stored under this key. It locks once saved."
+                          }
+                        >
                           <TextField
                             id={`${id}-key`}
                             value={field.key}
@@ -346,11 +358,6 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
                             onChange={(key) => replaceAt(index, { ...field, key: key.toLowerCase() })}
                           />
                         </FieldRow>
-                        <span className="custom-field-caption">
-                          {locked
-                            ? "Locked: members' answers are stored under this key."
-                            : "Answers are stored under this key. It locks once saved."}
-                        </span>
 
                         <FieldRow label="Type" htmlFor={`${id}-type`}>
                           <Select
@@ -362,7 +369,15 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
                           />
                         </FieldRow>
 
-                        <FieldRow label="Required" htmlFor={`${id}-required`}>
+                        <FieldRow
+                          label="Required"
+                          htmlFor={`${id}-required`}
+                          hint={
+                            field.type === "boolean"
+                              ? "A required checkbox must be ticked, like accepting terms."
+                              : "Members must answer this before they can finish signing up."
+                          }
+                        >
                           <Checkbox
                             id={`${id}-required`}
                             checked={field.required}
@@ -370,11 +385,6 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
                             onChange={(required) => replaceAt(index, { ...field, required })}
                           />
                         </FieldRow>
-                        {field.required && field.type === "boolean" ? (
-                          <span className="custom-field-caption">
-                            A required checkbox must be ticked, like accepting terms.
-                          </span>
-                        ) : null}
 
                         {field.type !== "boolean" && field.type !== "select" ? (
                           <FieldRow label="Placeholder" htmlFor={`${id}-placeholder`}>

@@ -109,7 +109,7 @@ export interface MockCanvasNode {
 interface CanvasMembers {
   getCodeFiles(): Promise<readonly MockCodeFile[]>;
   createCodeFile(name: string, code: string): Promise<MockCodeFile>;
-  addComponentInstance(options: { url: string }): Promise<MockCanvasNode>;
+  addComponentInstance(options: { url: string; attributes?: any }): Promise<MockCanvasNode>;
   setParent(nodeId: string, parentId: string, index?: number): Promise<void>;
   getNodesWithType(type: string): Promise<readonly any[]>;
 }
@@ -124,7 +124,7 @@ export interface MockCallLog {
   getCodeFiles: number;
   createCodeFile: Array<{ name: string; code: string }>;
   setFileContent: Array<{ id: string; code: string }>;
-  addComponentInstance: Array<{ url: string }>;
+  addComponentInstance: Array<{ url: string; attributes?: any }>;
   setParent: Array<{ nodeId: string; parentId: string; index?: number }>;
   getNodesWithType: Array<{ type: string }>;
   closePlugin: Array<{ message?: string }>;
@@ -354,8 +354,8 @@ export function createFramerMock(overrides: Partial<FramerMock> = {}): FramerMoc
       return file;
     },
 
-    addComponentInstance: async (options: { url: string }) => {
-      calls.addComponentInstance.push({ url: options.url });
+    addComponentInstance: async (options: { url: string; attributes?: any }) => {
+      calls.addComponentInstance.push(options);
       return { id: `node-${nextNodeId++}` };
     },
 

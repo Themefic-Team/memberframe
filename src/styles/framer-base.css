@@ -1,0 +1,18 @@
+/* ==========================================================================
+   FRAMER BASE STYLES, LAYERED
+
+   framer-plugin/framer.css styles bare elements for Framer's own properties
+   panel: every <button> gets a bg/tertiary fill, 30px height, and
+   `button:hover, button:focus { background: bg/secondary }`. Those element
+   rules carry specificity (0,1,1), which beats a single kit class (0,1,0).
+   That is how a clicked tab kept a grey pill while focused, and how a clicked
+   step row or member row turned grey.
+
+   Importing it into a cascade layer fixes the whole class of bug at once:
+   unlayered styles (every file in src/styles) always beat layered ones,
+   whatever the specificity. framer.css still applies wherever the kit says
+   nothing, so its reset, fonts, and runtime variables keep working.
+
+   Rules: .agents/rules/design-system.md section 14.
+   ========================================================================== */
+@import "framer-plugin/framer.css" layer(framer);

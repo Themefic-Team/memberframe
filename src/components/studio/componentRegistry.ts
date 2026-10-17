@@ -20,6 +20,7 @@ export type CanvasComponentId =
   | "member_password_reset"
   | "member_otp_verify"
   | "member_dashboard"
+  | "member_pricing"
   | "metered_paywall"
   | "cms_gated_template"
   | "protected_download"
@@ -134,16 +135,62 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewNote:
       "Built and ready to insert. It shows a member their email, tier, and status, and carries the sign out button. Billing and invoices arrive with payments.",
   },
-  // { id: "metered_paywall", name: "Metered Paywall", features: "F07, F08", task: "3.4", previewReady: false, deployable: false },
+  {
+    id: "member_pricing",
+    name: "Member Pricing",
+    features: "F03, FP-16",
+    task: "FP-16",
+    previewReady: false,
+    deployable: true,
+    previewNote:
+      "Built and ready to insert. It shows your tiers and their prices from Manage, Tiers, and each button starts a checkout on the gateway that suits the buyer. Put it on your pricing page.",
+  },
+  {
+    id: "metered_paywall",
+    name: "Soft Paywall",
+    features: "F07, F08",
+    task: "3.4",
+    previewReady: false,
+    deployable: true,
+    previewNote:
+      "Wraps an article. Readers get a set number of free articles each week or month, or the Read More teaser shows the opening paragraphs and frosts the rest. Members on the plan you choose read everything. Search engines still see the whole article.",
+  },
   // { id: "cms_gated_template", name: "CMS Gated Template", features: "F09", task: "5.3", previewReady: false, deployable: false },
-  // { id: "protected_download", name: "Protected Download", features: "F10", task: "5.5", previewReady: false, deployable: false },
+  {
+    id: "protected_download",
+    name: "Protected Download",
+    features: "F10",
+    task: "5.5",
+    previewReady: false,
+    deployable: true,
+    previewNote:
+      "Upgrade to Download. Upload a file in Manage, Files, choose the plan it needs, and paste its Asset ID here. Members on that plan get a download link that works for 60 seconds; everyone else is asked to sign in or upgrade.",
+  },
   // { id: "course_progress", name: "Course Progress", features: "F11", task: "4.1", previewReady: false, deployable: false },
   // { id: "lesson_checklist", name: "Lesson Checklist", features: "F11", task: "4.1", previewReady: false, deployable: false },
   // { id: "video_progress_listener", name: "Video Progress Listener", features: "F11", task: "4.1", previewReady: false, deployable: false },
   // { id: "donation_slider", name: "Donation Slider", features: "F13", task: "7.3", previewReady: false, deployable: false },
   // { id: "member_directory", name: "Member Directory", features: "F15", task: "7.2", previewReady: false, deployable: false },
-  // { id: "bookmark_button", name: "Bookmark Button", features: "F14", task: "7.1", previewReady: false, deployable: false },
-  // { id: "bookmarks_tray", name: "Bookmarks Tray", features: "F14", task: "7.1", previewReady: false, deployable: false },
+  {
+    id: "bookmark_button",
+    name: "Bookmark Button",
+    features: "F14",
+    task: "7.1",
+    previewReady: false,
+    deployable: true,
+    previewNote:
+      "Lets members save a page or a CMS item. Put it on a card and bind Item Slug to the CMS slug, or on a page to save that page. Signed out visitors are asked to sign in, and the item saves itself once they do.",
+  },
+  {
+    id: "bookmarks_tray",
+    name: "Bookmarks Tray",
+    features: "F14",
+    task: "7.1",
+    previewReady: false,
+    deployable: true,
+    previewNote:
+      "A saved items button for your navigation bar, with a count badge. It opens a drawer listing everything the member saved, with search and one click removal.",
+  },
   {
     id: "onboarding_modal",
     name: "Onboarding Modal",

@@ -7,27 +7,27 @@
    ========================================================================== */
 
 /* The reference sets .framefic-shell to height 100vh with min-height 590px.
-   Collapsed, the panel is a 48px iframe, so that floor has to come off or the
-   header is pushed out of a window it cannot scroll. */
+   Collapsed, the panel is a 36px iframe holding only the tab bar, so that
+   floor has to come off or the bar is pushed out of a window it cannot scroll. */
 .framefic-shell.is-collapsed {
-  height: 48px;
+  height: 36px;
   min-height: 0;
   overflow: hidden;
 }
 
-/* framer-plugin/framer.css ships a global `button { width: 100% }`. Any button
-   that does not set its own width inherits it, which is why all four tabs grew
-   to the full width of the tab bar and three of them overflowed out of the
-   panel: only Home was reachable.
+/* framer-plugin/framer.css ships a global `button { width: 134px; flex-shrink: 0 }`
+   sized for a properties-panel control. Any button that does not set its own
+   width inherits it: the tabs once grew past the tab bar, and the Manage filter
+   pills each rendered 134px wide.
 
-   The rest of the kit happens to be safe. .icon-button pins 30px, .primary-cta
-   and .btn-primary set width 100% on purpose, and .framefic-segment uses
-   flex: 1 so its basis wins. Only these two declare no width at all.
+   So the reset is global rather than per class. Every kit class that needs a
+   width (.icon-button 30px, .primary-cta 100%, .framefic-segment flex 1) sets
+   it with a class selector, which outranks this element selector. Everything
+   else sizes to its content, which is what a hand-written button expects.
 
    This cannot be fixed in components.css: that file is a verbatim slice of the
    reference design system and hand-editing it would break the drift check. */
-.framefic-tab,
-.btn {
+button {
   width: auto;
 }
 

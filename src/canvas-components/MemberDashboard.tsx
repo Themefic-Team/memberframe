@@ -34,9 +34,9 @@
  * billing: never" would reasonably conclude their subscription had lapsed.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
-import { LogOut, ShieldCheck, User } from "lucide-react";
+import { CreditCard, LogOut, ShieldCheck, User } from "lucide-react";
 
 // ============================================================================
 // LICENSING AND TRIAL STATE
@@ -47,6 +47,338 @@ const IS_LOCKED = false;
 const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
+
+// @memberframe-appearance-start
+// ============================================================================
+// APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
+// ============================================================================
+// Byte-identical in every canvas component: MemberAuth, MemberDashboard,
+// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
+// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// `test/canvasAppearanceParity.test.ts`, which also compiles this block and
+// runs it. A canvas component is compiled by Framer alone and cannot import
+// from this repository, so the copy is the architecture. Edit all or none.
+//
+// One vocabulary for every component. The Theme control picks a palette, the
+// creator's Colors, Typography, and Layout groups override it, and every rule
+// in a component's stylesheet reads the resolved `--mf-c-*` values.
+//
+// ## Theme is a control, not the visitor's operating system
+//
+// These components used to switch palette on `prefers-color-scheme` alone.
+// The Framer canvas renders light, but that media query follows the visitor's
+// OS, so a published page turned dark for every visitor with a dark OS while
+// the editor showed light. Theme now defaults to Light, matching the editor,
+// and "Match visitor" is still offered as an explicit choice.
+//
+// ## Every creator value is sanitized before it reaches a style block
+//
+// Colors, the font family, and the numbers below end up inside a `<style>`
+// element. A Framer variable can set a prop the code generator never saw, so
+// each value is checked here, at runtime, and anything that could close a
+// declaration is dropped in favour of the theme default.
+
+type MfThemeMode = "light" | "dark" | "auto";
+
+type MfColorKey = "onAccent" | "surface" | "text" | "muted" | "border" | "field";
+
+interface MfAppearanceProps {
+  theme?: MfThemeMode;
+  colors?: Partial<Record<MfColorKey, string>> | null;
+  typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
+  layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  labels?: Record<string, unknown> | null;
+}
+
+interface MfAppearanceInput extends MfAppearanceProps {
+  accent: unknown;
+  radius: unknown;
+  radiusMax: number;
+  /** The component's look before Layout existed: a card has a shadow, a page section does not. */
+  shadowByDefault: boolean;
+}
+
+const MF_DEFAULT_ACCENT = "#5271ff";
+
+const MF_COLOR_VARS: Record<MfColorKey, string> = {
+  onAccent: "--mf-on-accent",
+  surface: "--mf-surface",
+  text: "--mf-text",
+  muted: "--mf-muted",
+  border: "--mf-border",
+  field: "--mf-field",
+};
+
+const MF_PLAIN_COLOR =
+  /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.%\s,/]+\)|hsla?\(\s*[\d.%\s,/a-z]+\)|transparent)$/;
+
+/**
+ * A colour, and nothing but a colour, or the fallback.
+ *
+ * Accepts hex, rgb(a), hsl(a), and a Framer colour style, which arrives as
+ * `var(--token-id, rgb(...))`, sometimes followed by a name comment that is
+ * stripped first. A brace, a semicolon, an angle bracket, a backslash, or a
+ * comment anywhere else rejects the value outright.
+ */
+function mfSafeColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+
+  const colour = value.replace(/\s*\/\*[^*]*\*\/\s*$/, "").trim();
+  if (colour === "" || colour.length > 160) return fallback;
+  if (/[;{}<>\\]/.test(colour) || colour.indexOf("/*") !== -1) return fallback;
+  if (MF_PLAIN_COLOR.test(colour)) return colour;
+
+  const token = /^var\(\s*--[a-zA-Z0-9_-]+\s*(?:,\s*(.+))?\)$/.exec(colour);
+  if (token && (token[1] === undefined || MF_PLAIN_COLOR.test(token[1].trim()))) return colour;
+
+  return fallback;
+}
+
+/** A finite number inside the range, or the fallback. */
+function mfNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const number = typeof value === "number" ? value : Number(value);
+  if (typeof value === "string" && value.trim() === "") return fallback;
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+/**
+ * The family out of a Font control value, or null.
+ *
+ * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
+ * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ */
+function mfFontFamily(font: unknown): string | null {
+  let family = "";
+  if (typeof font === "string") family = font;
+  else if (font && typeof font === "object") {
+    const candidate = (font as { fontFamily?: unknown }).fontFamily;
+    if (typeof candidate === "string") family = candidate;
+  }
+
+  family = family.trim();
+  if (family === "" || family.length > 300) return null;
+  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  return family;
+}
+
+/** The root class for a theme. Anything unknown is Light, the editor's look. */
+function mfThemeClass(theme: unknown): string {
+  if (theme === "dark") return "is-dark";
+  if (theme === "auto") return "is-auto";
+  return "is-light";
+}
+
+/** `{name}` placeholders in a creator's label, filled with plain text. */
+function mfFill(template: string, values: Record<string, string | number>): string {
+  let out = template;
+  for (const key of Object.keys(values)) out = out.split(`{${key}}`).join(String(values[key]));
+  return out;
+}
+
+/**
+ * One label: the creator's text when they typed some, the default otherwise.
+ * Labels render as React text, never as markup, so they need no escaping.
+ */
+function mfLabel(
+  labels: Record<string, unknown> | null | undefined,
+  defaults: Record<string, readonly [string, string]>,
+  key: string
+): string {
+  const value = labels ? labels[key] : undefined;
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return defaults[key] ? defaults[key][1] : "";
+}
+
+/**
+ * The scoped custom properties for one instance.
+ *
+ * Every `--mf-*` is declared, set or `initial`. `initial` makes `var()` fall
+ * back to the theme default, and declaring it stops a component nested inside
+ * another from inheriting the outer one's overrides.
+ */
+function mfAppearanceVars(input: MfAppearanceInput): string {
+  const lines: string[] = [];
+  const set = (name: string, value: string | null) => {
+    lines.push(`${name}: ${value === null ? "initial" : value};`);
+  };
+
+  set("--mf-accent", mfSafeColor(input.accent, MF_DEFAULT_ACCENT));
+  set("--mf-radius", `${Math.round(mfNumber(input.radius, 0, input.radiusMax, 10))}px`);
+
+  const colors = input.colors || {};
+  for (const key of Object.keys(MF_COLOR_VARS) as MfColorKey[]) {
+    const colour = mfSafeColor(colors[key], "");
+    set(MF_COLOR_VARS[key], colour === "" ? null : colour);
+  }
+
+  const typography = input.typography || {};
+  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
+
+  const layout = input.layout || {};
+  const px = (value: unknown, max: number) =>
+    value === undefined || value === null ? null : `${Math.round(mfNumber(value, 0, max, 0))}px`;
+  set("--mf-pad", px(layout.padding, 64));
+  set("--mf-gap", px(layout.gap, 48));
+  set("--mf-border-width", px(layout.borderWidth, 4));
+  const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
+  set("--mf-card-shadow", shadow ? null : "none");
+
+  return lines.join(" ");
+}
+
+const MF_LIGHT = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #ffffff);
+  --mf-c-text: var(--mf-text, #18202b);
+  --mf-c-muted: var(--mf-muted, #5b6472);
+  --mf-c-border: var(--mf-border, rgba(16, 24, 40, 0.12));
+  --mf-c-field: var(--mf-field, #f4f5f7);
+  --mf-c-danger: #dc2626;
+  --mf-c-veil: rgba(255, 255, 255, 0.55);
+  --mf-c-backdrop: rgba(15, 17, 23, 0.55);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(16, 24, 40, 0.14));
+  color-scheme: light;`;
+
+const MF_DARK = `
+  --mf-c-accent: var(--mf-accent, #5271ff);
+  --mf-c-on-accent: var(--mf-on-accent, #ffffff);
+  --mf-c-surface: var(--mf-surface, #18191b);
+  --mf-c-text: var(--mf-text, #ffffff);
+  --mf-c-muted: var(--mf-muted, #cbcbcb);
+  --mf-c-border: var(--mf-border, rgba(255, 255, 255, 0.1));
+  --mf-c-field: var(--mf-field, #202020);
+  --mf-c-danger: #f87171;
+  --mf-c-veil: rgba(12, 14, 18, 0.55);
+  --mf-c-backdrop: rgba(0, 0, 0, 0.62);
+  --mf-c-shadow: var(--mf-card-shadow, 0 12px 32px rgba(0, 0, 0, 0.45));
+  color-scheme: dark;`;
+
+/** The palette for a component root, per theme. Emitted before the component's own CSS. */
+function mfThemeCss(root: string): string {
+  return `
+${root} {${MF_LIGHT}
+  --mf-c-radius: var(--mf-radius, 10px);
+  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  font-family: var(--mf-c-font);
+}
+${root}.is-dark {${MF_DARK}
+}
+@media (prefers-color-scheme: dark) {
+  ${root}.is-auto {${MF_DARK}
+  }
+}
+`;
+}
+
+/**
+ * The shared property controls: Theme, Colors, Typography, Layout.
+ *
+ * Return types are inferred on purpose. Framer's real `framer` module and this
+ * repo's shim name their control types differently, and this file compiles
+ * against both.
+ *
+ * Colours are optional, so an untouched one stays undefined and the theme
+ * default shows through. Layout defaults are the component's own, passed in,
+ * so a fresh instance looks exactly as it did before the group existed.
+ */
+function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
+  return {
+    theme: {
+      type: ControlType.Enum,
+      title: "Theme",
+      options: ["light", "dark", "auto"],
+      optionTitles: ["Light", "Dark", "Match visitor"],
+      defaultValue: "light",
+    },
+    colors: {
+      type: ControlType.Object,
+      title: "Colors",
+      buttonTitle: "Colors",
+      controls: {
+        surface: { type: ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+      },
+    },
+    typography: {
+      type: ControlType.Object,
+      title: "Typography",
+      buttonTitle: "Typography",
+      controls: {
+        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
+        font: {
+          type: ControlType.Font,
+          title: "Font",
+          controls: "basic" as const,
+          defaultFontType: "sans-serif" as const,
+        },
+        textScale: {
+          type: ControlType.Number,
+          title: "Text size",
+          min: 70,
+          max: 160,
+          step: 5,
+          unit: "%",
+          defaultValue: 100,
+        },
+      },
+    },
+    layout: {
+      type: ControlType.Object,
+      title: "Layout",
+      buttonTitle: "Layout",
+      controls: {
+        padding: {
+          type: ControlType.Number,
+          title: "Padding",
+          min: 0,
+          max: 64,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.padding,
+        },
+        gap: {
+          type: ControlType.Number,
+          title: "Spacing",
+          min: 0,
+          max: 48,
+          step: 1,
+          unit: "px",
+          defaultValue: defaults.gap,
+        },
+        borderWidth: {
+          type: ControlType.Number,
+          title: "Border",
+          min: 0,
+          max: 4,
+          step: 1,
+          unit: "px",
+          defaultValue: 1,
+        },
+        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+      },
+    },
+  };
+}
+
+/** The Labels group, one String control per entry: key -> [title, default text]. */
+function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
+  const controls: Record<
+    string,
+    { type: typeof ControlType.String; title: string; defaultValue: string }
+  > = {};
+  for (const key of Object.keys(defaults)) {
+    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+  }
+  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+// @memberframe-appearance-end
 
 // ============================================================================
 // CONTRACTS
@@ -71,6 +403,56 @@ interface TierLadderEntry {
   name: string;
 }
 
+/**
+ * Every visible string, as [sidebar title, default]. The Labels group edits
+ * them; an empty field falls back. Save and validation errors stay fixed: they
+ * are feedback, not design copy. The misconfigured notice is addressed to the
+ * creator and stays fixed too.
+ */
+const DASH_LABELS: Record<string, readonly [string, string]> = {
+  emailRow: ["Email row", "Email"],
+  membershipRow: ["Membership row", "Membership"],
+  statusRow: ["Status row", "Status"],
+  statusActive: ["Status: active", "Active"],
+  statusTrialing: ["Status: trial", "In trial"],
+  statusPastDue: ["Status: payment failed", "Payment failed"],
+  statusCanceled: ["Status: canceled", "Canceled"],
+  profileTitle: ["Profile title", "Profile"],
+  nameLabel: ["Name label", "Name"],
+  optional: ["Optional marker", "Optional"],
+  chooseOne: ["Select placeholder", "Choose one"],
+  saveProfile: ["Save button", "Save profile"],
+  saving: ["Saving", "Saving"],
+  saved: ["Saved message", "Profile saved."],
+  profileLoading: ["Profile loading", "Loading your profile."],
+  profileUnavailable: ["Profile failed", "Your profile could not be loaded. Refresh the page to try again."],
+  loading: ["Account loading", "Checking your account."],
+  unavailable: ["Account failed", "Your account could not be loaded. Check your connection and try again."],
+  billingTitle: ["Billing title", "Billing"],
+  renewsOn: ["Renews on", "Renews on {date}"],
+  endsOn: ["Ends on", "Your plan ends on {date}"],
+  lifetime: ["Lifetime access", "Lifetime access, no renewals"],
+  pastDue: [
+    "Payment failed",
+    "Your latest payment was unsuccessful. Update your billing details by {date} to keep your access.",
+  ],
+  manageBilling: ["Manage billing button", "Manage billing"],
+  updatePayment: ["Update payment button", "Update payment"],
+  cancelPlan: ["Cancel button", "Cancel plan"],
+  confirmCancel: ["Confirm cancel button", "Confirm cancel"],
+  resumePlan: ["Resume button", "Resume plan"],
+  noPlan: ["No paid plan", "You are on the free plan."],
+  seePlans: ["See plans button", "See plans"],
+  history: ["Payment history title", "Payment history"],
+  receipt: ["Receipt link", "Receipt"],
+  refunded: ["Refunded", "Refunded"],
+  billingFailed: ["Billing failed", "Billing details could not be loaded."],
+  testPurchase: ["Test purchase", "Test purchase"],
+  signIn: ["Sign in button", "Sign in"],
+  signOut: ["Sign out button", "Sign out"],
+  signingOut: ["Signing out", "Signing out"],
+};
+
 interface DashboardConfig {
   headline: string;
   showTier: boolean;
@@ -88,6 +470,66 @@ interface DashboardConfig {
   loginPath: string;
   /** Where signing out lands. Site-relative. */
   afterLogoutPath: string;
+}
+
+/**
+ * Display options with no field in the plugin, so they are not part of CONFIG
+ * and the generator never writes them. Their defaults live in the component
+ * and in the controls below, and match the panel as it looked before them.
+ */
+interface DashboardDisplayProps {
+  showAvatar?: boolean;
+  showEmail?: boolean;
+  showStatus?: boolean;
+  signOutStyle?: "outline" | "filled" | "text";
+  /** FP-16. The member's past payments under the plan. */
+  showPaymentHistory?: boolean;
+  /** FP-16. A member may cancel from here, at the end of the period. */
+  allowCancel?: boolean;
+}
+
+/** `GET /api/member/billing`, FP-16. */
+interface BillingSummary {
+  subscription: {
+    tierName: string;
+    interval: string;
+    status: string;
+    amountMinor: number;
+    currency: string;
+    currentPeriodEnd: string | null;
+    gracePeriodEndsAt: string | null;
+    cancelAtPeriodEnd: boolean;
+    mode: string;
+    canCancel: boolean;
+    canResume: boolean;
+    canManage: boolean;
+  } | null;
+  payments: Array<{ id: string; amountMinor: number; currency: string; status: string; receiptUrl: string | null; paidAt: string }>;
+  pricingPath: string;
+}
+
+type BillingState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "ready"; summary: BillingSummary }
+  | { phase: "failed" };
+
+const BILLING_PATH = "/api/member/billing";
+
+function formatMoney(amountMinor: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amountMinor / 100);
+  } catch {
+    return `${(amountMinor / 100).toFixed(2)} ${currency}`;
+  }
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 const ENV_API_BASE_URL =
@@ -114,6 +556,23 @@ const CONFIG: DashboardConfig = {
 
 const SESSION_PATH = "/api/member/session";
 const LOGOUT_PATH = "/api/member/logout";
+
+/**
+ * Keep the Route Shield in step with this browser's session. The hint lets
+ * the shield move a signed-in member off the sign in page before it paints;
+ * the cache is its 30 second session copy, which must not outlive a sign out.
+ * Same keys as MemberAuth and the shield script. Change them together.
+ */
+function syncShieldSession(signedIn: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(`__mf_session_${CONFIG.siteKey}`);
+    if (signedIn) window.localStorage.setItem(`memberframe:signed-in:${CONFIG.siteKey}`, "1");
+    else window.localStorage.removeItem(`memberframe:signed-in:${CONFIG.siteKey}`);
+  } catch {
+    // Storage can be blocked. The hint only saves a flash.
+  }
+}
 const PROFILE_PATH = "/api/member/profile";
 
 // ============================================================================
@@ -388,16 +847,16 @@ const PREVIEW_VALUES: MemberMetadata = {
  * `past_due` is the clearest example of why: it reads as jargon to a member and
  * as an accusation to one whose card simply expired.
  */
-function statusLabel(status: MemberStatus): string {
+function statusLabel(status: MemberStatus, labels: Record<string, unknown> | null | undefined): string {
   switch (status) {
     case "active":
-      return "Active";
+      return mfLabel(labels, DASH_LABELS, "statusActive");
     case "trialing":
-      return "In trial";
+      return mfLabel(labels, DASH_LABELS, "statusTrialing");
     case "past_due":
-      return "Payment failed";
+      return mfLabel(labels, DASH_LABELS, "statusPastDue");
     case "canceled":
-      return "Canceled";
+      return mfLabel(labels, DASH_LABELS, "statusCanceled");
     default:
       return "Unknown";
   }
@@ -465,24 +924,6 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   return headers;
 }
 
-/**
- * A CSS colour the creator picked, made safe to put in a style block.
- *
- * `ControlType.Color` hands back a string the creator controls, and it is
- * interpolated into a `<style>` element, which makes it an injection surface:
- * a value containing `}` could close the rule and open another. Only the forms
- * a colour picker actually produces are allowed through, and anything else
- * falls back to the brand colour.
- */
-function safeColor(value: string, fallback: string): string {
-  const trimmed = String(value ?? "").trim();
-
-  if (/^#[0-9a-fA-F]{3,8}$/.test(trimmed)) return trimmed;
-  if (/^rgba?\(\s*[\d.\s,%/]+\)$/.test(trimmed)) return trimmed;
-  if (/^hsla?\(\s*[\d.\s,%/degrad]+\)$/.test(trimmed)) return trimmed;
-
-  return fallback;
-}
 
 // ============================================================================
 // STATE
@@ -534,9 +975,21 @@ interface ProfileControlProps {
   error: string | undefined;
   disabled: boolean;
   onChange: (value: MetadataValue) => void;
+  /** From the Labels group. */
+  optionalLabel: string;
+  chooseLabel: string;
 }
 
-function ProfileControl({ id, field, value, error, disabled, onChange }: ProfileControlProps): React.ReactElement {
+function ProfileControl({
+  id,
+  field,
+  value,
+  error,
+  disabled,
+  onChange,
+  optionalLabel,
+  chooseLabel,
+}: ProfileControlProps): React.ReactElement {
   const errorId = `${id}-error`;
   const described = error ? errorId : undefined;
   const text = value === null || value === undefined ? "" : String(value);
@@ -592,7 +1045,7 @@ function ProfileControl({ id, field, value, error, disabled, onChange }: Profile
   } else if (field.type === "select") {
     control = (
       <select {...common} value={text} onChange={(event) => onChange(event.currentTarget.value)}>
-        <option value="">Choose one</option>
+        <option value="">{chooseLabel}</option>
         {field.options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -621,7 +1074,7 @@ function ProfileControl({ id, field, value, error, disabled, onChange }: Profile
     <div className="mf-dash-field">
       <label className="mf-dash-label" htmlFor={id}>
         {field.label}
-        {field.required ? null : <span className="mf-dash-optional">Optional</span>}
+        {field.required ? null : <span className="mf-dash-optional">{optionalLabel}</span>}
       </label>
       {control}
       {errorLine}
@@ -636,31 +1089,32 @@ function ProfileControl({ id, field, value, error, disabled, onChange }: Profile
 // consolidates its styling rather than using inline style objects, which the
 // repository's `lint:css` gate forbids everywhere.
 
-function cssContent(accent: string, radius: number): string {
-  return `
+/*
+ * The stylesheet, static. It used to be a function that interpolated the accent
+ * and radius into the text, with its own hardcoded palette and font and a
+ * prefers-color-scheme block that only touched the error colour. Now the
+ * shared appearance block (mfThemeCss) resolves Theme plus the creator's
+ * Colors, Typography, and Layout into --mf-c-* and --mf-*, and every rule
+ * reads those, the same as the other three components.
+ */
+const cssContent = `
 .mf-dash {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #16181d;
-  background: #ffffff;
-  border: 1px solid rgba(22, 24, 29, 0.1);
-  border-radius: ${radius}px;
-  padding: 24px;
-  max-width: 560px;
-  width: 100%;
   box-sizing: border-box;
-}
-@media (prefers-color-scheme: dark) {
-  .mf-dash {
-    color: #f4f5f7;
-    background: #16181d;
-    border-color: rgba(244, 245, 247, 0.12);
-  }
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--mf-pad, 24px);
+  color: var(--mf-c-text);
+  background: var(--mf-c-surface);
+  border: var(--mf-border-width, 1px) solid var(--mf-c-border);
+  border-radius: var(--mf-c-radius);
+  box-shadow: var(--mf-c-shadow);
 }
 .mf-dash-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: var(--mf-gap, 20px);
 }
 .mf-dash-avatar {
   display: inline-flex;
@@ -670,42 +1124,42 @@ function cssContent(accent: string, radius: number): string {
   height: 40px;
   flex: 0 0 40px;
   border-radius: 999px;
-  background: ${accent};
-  color: #ffffff;
+  background: var(--mf-c-accent);
+  color: var(--mf-c-on-accent);
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--mf-text-scale, 1));
 }
 .mf-dash-avatar svg { width: 20px; height: 20px; stroke: currentColor; }
-.mf-dash-title { margin: 0; font-size: 17px; font-weight: 600; }
-.mf-dash-sub { margin: 2px 0 0; font-size: 13px; opacity: 0.7; word-break: break-all; }
+.mf-dash-title { margin: 0; font-size: calc(17px * var(--mf-text-scale, 1)); font-weight: 600; }
+.mf-dash-sub { margin: 2px 0 0; font-size: calc(13px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); word-break: break-all; }
 .mf-dash-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-top: 1px solid rgba(128, 128, 128, 0.18);
-  font-size: 14px;
+  border-top: 1px solid var(--mf-c-border);
+  font-size: calc(14px * var(--mf-text-scale, 1));
 }
-.mf-dash-row-label { opacity: 0.7; }
+.mf-dash-row-label { color: var(--mf-c-muted); }
 .mf-dash-row-value { font-weight: 500; text-align: right; }
 .mf-dash-badge {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
-  background: ${accent};
-  color: #ffffff;
-  font-size: 12px;
+  background: var(--mf-c-accent);
+  color: var(--mf-c-on-accent);
+  font-size: calc(12px * var(--mf-text-scale, 1));
   font-weight: 600;
 }
 .mf-dash-note {
   margin: 16px 0 0;
   padding: 12px;
-  border-radius: ${Math.max(0, radius - 4)}px;
-  background: rgba(128, 128, 128, 0.1);
-  font-size: 13px;
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
+  background: var(--mf-c-field);
+  color: var(--mf-c-muted);
+  font-size: calc(13px * var(--mf-text-scale, 1));
   line-height: 1.5;
-  opacity: 0.85;
 }
 .mf-dash-button {
   display: inline-flex;
@@ -713,26 +1167,29 @@ function cssContent(accent: string, radius: number): string {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  margin-top: 20px;
+  margin-top: var(--mf-gap, 20px);
   padding: 11px 16px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-  border-radius: ${Math.max(0, radius - 4)}px;
+  border: 1px solid var(--mf-c-border);
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
   font-weight: 500;
   cursor: pointer;
 }
-.mf-dash-button:hover:not(:disabled) { background: rgba(128, 128, 128, 0.12); }
+.mf-dash-button:hover:not(:disabled) { background: var(--mf-c-field); }
 .mf-dash-button:disabled { opacity: 0.55; cursor: default; }
 .mf-dash-button svg { width: 16px; height: 16px; stroke: currentColor; }
+.mf-dash-button:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
 .mf-dash-button-primary {
-  background: ${accent};
-  border-color: ${accent};
-  color: #ffffff;
+  background: var(--mf-c-accent);
+  border-color: var(--mf-c-accent);
+  color: var(--mf-c-on-accent);
 }
-.mf-dash-button-primary:hover:not(:disabled) { filter: brightness(1.07); }
+.mf-dash-button-primary:hover:not(:disabled) { background: var(--mf-c-accent); filter: brightness(1.07); }
+.mf-dash-button-text { border-color: transparent; color: var(--mf-c-muted); }
+.mf-dash-button-text:hover:not(:disabled) { background: transparent; color: var(--mf-c-text); }
 .mf-dash-state {
   display: flex;
   flex-direction: column;
@@ -741,64 +1198,76 @@ function cssContent(accent: string, radius: number): string {
   gap: 8px;
   padding: 16px 0;
 }
-.mf-dash-state svg { width: 26px; height: 26px; stroke: currentColor; opacity: 0.6; }
-.mf-dash-state p { margin: 0; font-size: 14px; line-height: 1.5; opacity: 0.8; }
+.mf-dash-state svg { width: 26px; height: 26px; stroke: currentColor; color: var(--mf-c-muted); }
+.mf-dash-state p { margin: 0; font-size: calc(14px * var(--mf-text-scale, 1)); line-height: 1.5; color: var(--mf-c-muted); }
 .mf-dash-profile {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--mf-gap, 14px);
   margin-top: 4px;
   padding-top: 16px;
-  border-top: 1px solid rgba(128, 128, 128, 0.18);
+  border-top: 1px solid var(--mf-c-border);
 }
-.mf-dash-profile-title { margin: 0; font-size: 15px; font-weight: 600; }
+.mf-dash-profile-title { margin: 0; font-size: calc(15px * var(--mf-text-scale, 1)); font-weight: 600; }
 .mf-dash-field { display: flex; flex-direction: column; gap: 6px; }
-.mf-dash-label { font-size: 13px; font-weight: 500; }
-.mf-dash-optional { margin-left: 6px; font-weight: 400; opacity: 0.65; }
+.mf-dash-label { font-size: calc(13px * var(--mf-text-scale, 1)); font-weight: 500; }
+.mf-dash-optional { margin-left: 6px; font-weight: 400; color: var(--mf-c-muted); }
 .mf-dash-input {
   box-sizing: border-box;
   width: 100%;
   min-height: 40px;
   padding: 9px 12px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-  border-radius: ${Math.max(0, radius - 4)}px;
-  background: transparent;
+  border: 1px solid var(--mf-c-border);
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
+  background: var(--mf-c-field);
   color: inherit;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--mf-text-scale, 1));
 }
 textarea.mf-dash-input { min-height: 88px; resize: vertical; }
 .mf-dash-input:focus-visible {
   outline: none;
-  border-color: ${accent};
-  box-shadow: 0 0 0 3px color-mix(in srgb, ${accent} 25%, transparent);
+  border-color: var(--mf-c-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mf-c-accent) 25%, transparent);
 }
-.mf-dash-input.is-invalid { border-color: #dc2626; }
-.mf-dash-check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; cursor: pointer; }
-.mf-dash-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: ${accent}; }
-.mf-dash-check input:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
-.mf-dash-error { margin: 0; font-size: 12px; line-height: 1.4; color: #dc2626; }
-.mf-dash-saved { margin: 0; font-size: 13px; opacity: 0.8; }
-.mf-dash-button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
-@media (prefers-color-scheme: dark) {
-  .mf-dash-input.is-invalid { border-color: #f87171; }
-  .mf-dash-error { color: #f87171; }
-}
-`.trim();
-}
+.mf-dash-input.is-invalid { border-color: var(--mf-c-danger); }
+.mf-dash-check { display: flex; align-items: flex-start; gap: 10px; font-size: calc(14px * var(--mf-text-scale, 1)); cursor: pointer; }
+.mf-dash-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--mf-c-accent); }
+.mf-dash-check input:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
+.mf-dash-error { margin: 0; font-size: calc(12px * var(--mf-text-scale, 1)); line-height: 1.4; color: var(--mf-c-danger); }
+.mf-dash-saved { margin: 0; font-size: calc(13px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); }
+.mf-dash-billing { margin-top: var(--mf-gap, 20px); display: flex; flex-direction: column; gap: 10px; }
+.mf-dash-billing-plan { display: flex; flex-direction: column; gap: 10px; }
+.mf-dash-billing-plan .mf-dash-button { margin-top: 0; }
+.mf-dash-history { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.mf-dash-link { color: var(--mf-c-accent); text-decoration: underline; }
+`;
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 /**
+ * Fixed size by default, so the frame the creator draws is the panel they get.
+ * The panel fills it and scrolls if the profile form is longer than the frame.
+ *
  * @framerIntrinsicWidth 480
- * @framerIntrinsicHeight 360
+ * @framerIntrinsicHeight 560
  * @framerSupportedLayoutWidth any-prefer-fixed
- * @framerSupportedLayoutHeight auto
+ * @framerSupportedLayoutHeight any-prefer-fixed
  */
-export default function MemberDashboard(props: Partial<DashboardConfig>): React.ReactElement {
+export default function MemberDashboard(
+  props: Partial<DashboardConfig> & MfAppearanceProps & DashboardDisplayProps
+): React.ReactElement {
   const config: DashboardConfig = { ...CONFIG, ...props };
+  const { theme = "light", colors, typography, layout, labels } = props;
+  const { showAvatar = true, showEmail = true, showStatus = true, signOutStyle = "outline" } = props;
+  const { showPaymentHistory = true, allowCancel = true } = props;
+  const t = (key: string) => mfLabel(labels, DASH_LABELS, key);
+
+  /** A CSS-safe per-instance scope, as in the other three components. */
+  const rawId = useId();
+  const scope = useMemo(() => `mfd${rawId.replace(/[^a-zA-Z0-9]/g, "")}`, [rawId]);
 
   const [state, setState] = useState<DashboardState>({ phase: "loading" });
   const [busy, setBusy] = useState(false);
@@ -811,11 +1280,10 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
   const [profileNotice, setProfileNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [profileReload, setProfileReload] = useState(0);
 
-  const accent = useMemo(() => safeColor(config.accentColor, "#5271ff"), [config.accentColor]);
-  const radius = useMemo(
-    () => Math.max(0, Math.min(32, Number(config.borderRadius) || 0)),
-    [config.borderRadius]
-  );
+  const [billing, setBilling] = useState<BillingState>({ phase: "idle" });
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+
 
   const onCanvas = RenderTarget.current() === RenderTarget.canvas;
 
@@ -852,7 +1320,15 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     }
 
     let active = true;
-    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+
+    // Deployed before the project was connected. Never fall back to a local
+    // address: on a published site that asks every visitor for permission to
+    // reach their own machine.
+    if (base === "") {
+      setState({ phase: "misconfigured" });
+      return;
+    }
 
     void (async () => {
       try {
@@ -869,6 +1345,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
         // an error. Treating it as one is how a signed-out member is shown
         // "something went wrong" on a page that is working perfectly.
         if (response.status === 401) {
+          syncShieldSession(false);
           setState({ phase: "signed_out" });
           return;
         }
@@ -890,6 +1367,12 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
           return;
         }
 
+        // Signed in: keep the hint, so the sign in page can send this member on.
+        try {
+          window.localStorage.setItem(`memberframe:signed-in:${CONFIG.siteKey}`, "1");
+        } catch {
+          // Blocked storage only costs the shortcut.
+        }
         setState({ phase: "signed_in", member: body.member, tiers: body.tiers ?? [] });
       } catch {
         if (active) setState({ phase: "unavailable" });
@@ -922,7 +1405,13 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     }
 
     let active = true;
-    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+
+    // Same as the session load: no backend address, no request.
+    if (base === "") {
+      setProfile({ phase: "unavailable" });
+      return;
+    }
 
     setProfile({ phase: "loading" });
 
@@ -995,7 +1484,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     setProfileNotice(null);
 
     try {
-      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
       const response = await fetch(`${base}${PROFILE_PATH}`, {
         method: "PATCH",
         credentials: "include",
@@ -1036,7 +1525,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
       setProfileValues(readMetadata(body.metadata));
       setProfileName(body.member?.name ?? profileName.trim());
       setProfileProblems({});
-      setProfileNotice({ ok: true, text: "Profile saved." });
+      setProfileNotice({ ok: true, text: mfLabel(labels, DASH_LABELS, "saved") });
 
       // The header shows the name too, so it follows the save.
       setState((current) =>
@@ -1049,7 +1538,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     } finally {
       setProfileSaving(false);
     }
-  }, [config.apiBaseUrl, onCanvas, profile, profileName, profileValues]);
+  }, [config.apiBaseUrl, labels, onCanvas, profile, profileName, profileValues]);
 
   // ------------------------------------------------------------------------
   // Sign out
@@ -1061,7 +1550,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     setBusy(true);
 
     try {
-      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "http://127.0.0.1:4001").replace(/\/+$/, "");
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
       await fetch(`${base}${LOGOUT_PATH}`, {
         method: "POST",
         credentials: "include",
@@ -1076,6 +1565,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
 
     setBusy(false);
     setState({ phase: "signed_out" });
+    syncShieldSession(false);
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(
@@ -1087,14 +1577,133 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
   }, [config.afterLogoutPath, config.apiBaseUrl, onCanvas]);
 
   // ------------------------------------------------------------------------
+  // Billing, FP-16
+  // ------------------------------------------------------------------------
+
+  // `signedInMemberId` is declared with the profile effects above.
+
+  useEffect(() => {
+    if (!config.showBilling || signedInMemberId === null) return;
+
+    // A representative plan on the canvas, so the section can be designed.
+    if (onCanvas) {
+      setBilling({
+        phase: "ready",
+        summary: {
+          subscription: {
+            tierName: "Silver",
+            interval: "month",
+            status: "active",
+            amountMinor: 900,
+            currency: "USD",
+            currentPeriodEnd: new Date(Date.now() + 18 * 86_400_000).toISOString(),
+            gracePeriodEndsAt: null,
+            cancelAtPeriodEnd: false,
+            mode: "live",
+            canCancel: true,
+            canResume: false,
+            canManage: true,
+          },
+          payments: [
+            { id: "p1", amountMinor: 900, currency: "USD", status: "paid", receiptUrl: null, paidAt: new Date(Date.now() - 12 * 86_400_000).toISOString() },
+          ],
+          pricingPath: "/pricing",
+        },
+      });
+      return;
+    }
+
+    const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+    if (base === "") return;
+
+    let active = true;
+    setBilling({ phase: "loading" });
+
+    void fetch(`${base}${BILLING_PATH}`, { credentials: "include", headers: apiHeaders(false) })
+      .then(async (response) => {
+        if (!active) return;
+        if (!response.ok) {
+          setBilling({ phase: "failed" });
+          return;
+        }
+        setBilling({ phase: "ready", summary: (await response.json()) as BillingSummary });
+      })
+      .catch(() => {
+        if (active) setBilling({ phase: "failed" });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [config.apiBaseUrl, config.showBilling, onCanvas, signedInMemberId]);
+
+  const billingAction = useCallback(
+    async (action: "portal" | "cancel" | "resume") => {
+      if (onCanvas) return;
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+      if (base === "") return;
+
+      setBillingBusy(true);
+      try {
+        const response = await fetch(`${base}${BILLING_PATH}/${action}`, {
+          method: "POST",
+          credentials: "include",
+          headers: apiHeaders(true),
+          body: JSON.stringify({ returnPath: typeof window !== "undefined" ? window.location.pathname : "/" }),
+        });
+        if (!response.ok) {
+          setBilling({ phase: "failed" });
+          return;
+        }
+        if (action === "portal") {
+          const body = (await response.json()) as { url?: string | null };
+          if (body.url && /^https:\/\//.test(body.url)) window.location.assign(body.url);
+          return;
+        }
+        setBilling({ phase: "ready", summary: (await response.json()) as BillingSummary });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("memberframe:session-updated", { detail: { signedIn: true } }));
+        }
+      } catch {
+        setBilling({ phase: "failed" });
+      } finally {
+        setBillingBusy(false);
+        setConfirmingCancel(false);
+      }
+    },
+    [config.apiBaseUrl, onCanvas]
+  );
+
+  // ------------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------------
 
-  const style = <style>{cssContent(accent, radius)}</style>;
+  // Accent, radius, Colors, Typography, and Layout, sanitized by the shared
+  // appearance block and scoped to this instance.
+  const scopedVars =
+    `[data-mf-dash="${scope}"] { ` +
+    mfAppearanceVars({
+      accent: config.accentColor,
+      radius: config.borderRadius,
+      radiusMax: 32,
+      shadowByDefault: false,
+      colors,
+      typography,
+      layout,
+    }) +
+    " }";
+  const rootClass = `mf-dash ${mfThemeClass(theme)}`;
+  const style = (
+    <>
+      <style>{mfThemeCss(".mf-dash")}</style>
+      <style>{cssContent}</style>
+      <style>{scopedVars}</style>
+    </>
+  );
 
   if (IS_LOCKED) {
     return (
-      <div className="mf-dash">
+      <div className={rootClass} data-mf-dash={scope}>
         {style}
         <div className="mf-dash-state">
           <ShieldCheck aria-hidden={true} />
@@ -1106,10 +1715,10 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
 
   if (state.phase === "loading") {
     return (
-      <div className="mf-dash">
+      <div className={rootClass} data-mf-dash={scope}>
         {style}
         <div className="mf-dash-state">
-          <p>Checking your account.</p>
+          <p>{t("loading")}</p>
         </div>
       </div>
     );
@@ -1119,7 +1728,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
     // Addressed to the creator, not the visitor, because only a creator can
     // fix it and only a creator sees it before the site is published.
     return (
-      <div className="mf-dash">
+      <div className={rootClass} data-mf-dash={scope}>
         {style}
         <div className="mf-dash-state">
           <ShieldCheck aria-hidden={true} />
@@ -1131,10 +1740,10 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
 
   if (state.phase === "unavailable") {
     return (
-      <div className="mf-dash">
+      <div className={rootClass} data-mf-dash={scope}>
         {style}
         <div className="mf-dash-state">
-          <p>Your account could not be loaded. Check your connection and try again.</p>
+          <p>{t("unavailable")}</p>
         </div>
       </div>
     );
@@ -1142,7 +1751,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
 
   if (state.phase === "signed_out") {
     return (
-      <div className="mf-dash">
+      <div className={rootClass} data-mf-dash={scope}>
         {style}
         <div className="mf-dash-state">
           <User aria-hidden={true} />
@@ -1154,7 +1763,7 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
             className="mf-dash-button mf-dash-button-primary"
             onClick={() => navigate(config.loginPath)}
           >
-            Sign in
+            {t("signIn")}
           </button>
         ) : null}
       </div>
@@ -1166,35 +1775,39 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
   const initial = displayName.trim().charAt(0).toUpperCase() || "M";
 
   return (
-    <div className="mf-dash">
+    <div className={rootClass} data-mf-dash={scope}>
       {style}
 
       <div className="mf-dash-head">
-        <span className="mf-dash-avatar">{initial}</span>
+        {showAvatar ? <span className="mf-dash-avatar">{initial}</span> : null}
         <div>
           <p className="mf-dash-title">{config.headline}</p>
           <p className="mf-dash-sub">{displayName}</p>
         </div>
       </div>
 
-      <div className="mf-dash-row">
-        <span className="mf-dash-row-label">Email</span>
-        <span className="mf-dash-row-value">{member.email}</span>
-      </div>
+      {showEmail ? (
+        <div className="mf-dash-row">
+          <span className="mf-dash-row-label">{t("emailRow")}</span>
+          <span className="mf-dash-row-value">{member.email}</span>
+        </div>
+      ) : null}
 
       {config.showTier ? (
         <div className="mf-dash-row">
-          <span className="mf-dash-row-label">Membership</span>
+          <span className="mf-dash-row-label">{t("membershipRow")}</span>
           <span className="mf-dash-row-value">
             <span className="mf-dash-badge">{tierName(member.activeTier, tiers)}</span>
           </span>
         </div>
       ) : null}
 
-      <div className="mf-dash-row">
-        <span className="mf-dash-row-label">Status</span>
-        <span className="mf-dash-row-value">{statusLabel(member.status)}</span>
-      </div>
+      {showStatus ? (
+        <div className="mf-dash-row">
+          <span className="mf-dash-row-label">{t("statusRow")}</span>
+          <span className="mf-dash-row-value">{statusLabel(member.status, labels)}</span>
+        </div>
+      ) : null}
 
       {config.showProfile && profile.phase !== "idle" ? (
         <form
@@ -1207,18 +1820,18 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
           }}
         >
           <p className="mf-dash-profile-title" id={`mf-dash-profile-${member.memberId}`}>
-            Profile
+            {t("profileTitle")}
           </p>
 
           {profile.phase === "loading" ? (
-            <p className="mf-dash-saved">Loading your profile.</p>
+            <p className="mf-dash-saved">{t("profileLoading")}</p>
           ) : profile.phase === "unavailable" ? (
-            <p className="mf-dash-saved">Your profile could not be loaded. Refresh the page to try again.</p>
+            <p className="mf-dash-saved">{t("profileUnavailable")}</p>
           ) : (
             <>
               <div className="mf-dash-field">
                 <label className="mf-dash-label" htmlFor={`mf-dash-name-${member.memberId}`}>
-                  Name
+                  {t("nameLabel")}
                 </label>
                 <input
                   id={`mf-dash-name-${member.memberId}`}
@@ -1246,6 +1859,8 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
                     error={profileProblems[field.key]}
                     disabled={profileSaving}
                     onChange={(value) => setProfileValue(field.key, value)}
+                    optionalLabel={t("optional")}
+                    chooseLabel={t("chooseOne")}
                   />
                 ))}
 
@@ -1260,36 +1875,148 @@ export default function MemberDashboard(props: Partial<DashboardConfig>): React.
                 className="mf-dash-button mf-dash-button-primary"
                 disabled={profileSaving || onCanvas}
               >
-                {profileSaving ? "Saving" : "Save profile"}
+                {profileSaving ? t("saving") : t("saveProfile")}
               </button>
             </>
           )}
         </form>
       ) : null}
 
-      {config.showBilling ? (
-        /*
-         * Honest rather than empty. FP-08 specifies plan, renewal date, payment
-         * method, and invoices, and every one of those needs the subscriptions
-         * and invoices tables, which are backend PRD phase B3 and do not exist.
-         * Rendering zeroes would tell a paying member their subscription had
-         * lapsed.
-         */
-        <p className="mf-dash-note">
-          Billing details and invoices arrive with payments. Your membership and access are
-          shown above and are up to date.
-        </p>
+      {config.showBilling && billing.phase !== "idle" ? (
+        <section className="mf-dash-billing" aria-labelledby={`mf-dash-billing-${member.memberId}`}>
+          <p className="mf-dash-profile-title" id={`mf-dash-billing-${member.memberId}`}>
+            {t("billingTitle")}
+          </p>
+
+          {billing.phase === "loading" ? (
+            <p className="mf-dash-saved">{t("profileLoading")}</p>
+          ) : billing.phase === "failed" ? (
+            <p className="mf-dash-saved">{t("billingFailed")}</p>
+          ) : billing.summary.subscription === null ? (
+            <div className="mf-dash-billing-plan">
+              <p className="mf-dash-note">{t("noPlan")}</p>
+              {safePath(billing.summary.pricingPath) ? (
+                <button
+                  type="button"
+                  className="mf-dash-button mf-dash-button-primary"
+                  onClick={() => navigate(billing.summary.pricingPath)}
+                >
+                  {t("seePlans")}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            (() => {
+              const plan = billing.summary.subscription;
+              const pastDue = plan.status === "past_due";
+              return (
+                <div className="mf-dash-billing-plan">
+                  <div className="mf-dash-row">
+                    <span className="mf-dash-row-label">
+                      {plan.tierName}
+                      {plan.mode === "test" ? <span className="mf-dash-optional">{t("testPurchase")}</span> : null}
+                    </span>
+                    <span className="mf-dash-row-value">
+                      {formatMoney(plan.amountMinor, plan.currency)}
+                      {plan.interval === "month" ? " / month" : plan.interval === "year" ? " / year" : ""}
+                    </span>
+                  </div>
+
+                  <p className={pastDue ? "mf-dash-error" : "mf-dash-saved"} role={pastDue ? "alert" : undefined}>
+                    {pastDue
+                      ? t("pastDue").split("{date}").join(formatDate(plan.gracePeriodEndsAt))
+                      : plan.interval === "lifetime"
+                        ? t("lifetime")
+                        : plan.cancelAtPeriodEnd
+                          ? t("endsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))
+                          : t("renewsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))}
+                  </p>
+
+                  {plan.canManage ? (
+                    <button
+                      type="button"
+                      className={`mf-dash-button${pastDue ? " mf-dash-button-primary" : ""}`}
+                      disabled={billingBusy || onCanvas}
+                      onClick={() => void billingAction("portal")}
+                    >
+                      <CreditCard aria-hidden={true} />
+                      {pastDue ? t("updatePayment") : t("manageBilling")}
+                    </button>
+                  ) : null}
+
+                  {plan.canResume ? (
+                    <button
+                      type="button"
+                      className="mf-dash-button mf-dash-button-primary"
+                      disabled={billingBusy || onCanvas}
+                      onClick={() => void billingAction("resume")}
+                    >
+                      {t("resumePlan")}
+                    </button>
+                  ) : null}
+
+                  {allowCancel && plan.canCancel ? (
+                    <button
+                      type="button"
+                      className="mf-dash-button mf-dash-button-text"
+                      disabled={billingBusy || onCanvas}
+                      onClick={() => {
+                        // Cancel asks once before it acts.
+                        if (!confirmingCancel) {
+                          setConfirmingCancel(true);
+                          return;
+                        }
+                        void billingAction("cancel");
+                      }}
+                    >
+                      {confirmingCancel ? t("confirmCancel") : t("cancelPlan")}
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })()
+          )}
+
+          {showPaymentHistory && billing.phase === "ready" && billing.summary.payments.length > 0 ? (
+            <div className="mf-dash-history">
+              <p className="mf-dash-label">{t("history")}</p>
+              {billing.summary.payments.map((payment) => (
+                <div className="mf-dash-row" key={payment.id}>
+                  <span className="mf-dash-row-label">{formatDate(payment.paidAt)}</span>
+                  <span className="mf-dash-row-value">
+                    {payment.status === "refunded" ? `${t("refunded")} ` : ""}
+                    {formatMoney(payment.amountMinor, payment.currency)}
+                    {payment.receiptUrl && /^https:\/\//.test(payment.receiptUrl) ? (
+                      <>
+                        {" "}
+                        <a className="mf-dash-link" href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
+                          {t("receipt")}
+                        </a>
+                      </>
+                    ) : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       {config.showSignOut ? (
         <button
           type="button"
-          className="mf-dash-button"
+          className={
+            signOutStyle === "filled"
+              ? "mf-dash-button mf-dash-button-primary"
+              : signOutStyle === "text"
+                ? "mf-dash-button mf-dash-button-text"
+                : "mf-dash-button"
+          }
           disabled={busy}
           onClick={() => void handleSignOut()}
         >
           <LogOut aria-hidden={true} />
-          {busy ? "Signing out" : "Sign out"}
+          {busy ? t("signingOut") : t("signOut")}
         </button>
       ) : null}
     </div>
@@ -1309,56 +2036,105 @@ addPropertyControls(MemberDashboard, {
   headline: {
     type: ControlType.String,
     title: "Headline",
-    defaultValue: "Your account",
+    defaultValue: CONFIG.headline,
+  },
+  signedOutMessage: {
+    type: ControlType.String,
+    title: "Signed Out Text",
+    defaultValue: CONFIG.signedOutMessage,
+  },
+
+  /* ---- What the panel shows ---- */
+
+  showAvatar: {
+    type: ControlType.Boolean,
+    title: "Avatar",
+    defaultValue: true,
+  },
+  showEmail: {
+    type: ControlType.Boolean,
+    title: "Email Row",
+    defaultValue: true,
   },
   showTier: {
     type: ControlType.Boolean,
-    title: "Show tier",
-    defaultValue: true,
+    title: "Membership Row",
+    defaultValue: CONFIG.showTier,
   },
-  showBilling: {
+  showStatus: {
     type: ControlType.Boolean,
-    title: "Billing note",
-    defaultValue: true,
-  },
-  showSignOut: {
-    type: ControlType.Boolean,
-    title: "Sign out",
+    title: "Status Row",
     defaultValue: true,
   },
   showProfile: {
     type: ControlType.Boolean,
-    title: "Profile form",
+    title: "Profile Form",
+    defaultValue: CONFIG.showProfile,
+  },
+  showBilling: {
+    type: ControlType.Boolean,
+    title: "Billing",
+    defaultValue: CONFIG.showBilling,
+  },
+  showPaymentHistory: {
+    type: ControlType.Boolean,
+    title: "Payment History",
     defaultValue: true,
+    hidden: (props) => props.showBilling === false,
   },
-  signedOutMessage: {
-    type: ControlType.String,
-    title: "Signed out",
-    defaultValue: "Sign in to see your account.",
+  allowCancel: {
+    type: ControlType.Boolean,
+    title: "Allow Cancel",
+    defaultValue: true,
+    hidden: (props) => props.showBilling === false,
   },
+  showSignOut: {
+    type: ControlType.Boolean,
+    title: "Sign Out",
+    defaultValue: CONFIG.showSignOut,
+  },
+  signOutStyle: {
+    type: ControlType.Enum,
+    title: "Sign Out Style",
+    options: ["outline", "filled", "text"],
+    optionTitles: ["Outline", "Filled", "Text"],
+    defaultValue: "outline",
+    hidden: (props) => props.showSignOut === false,
+  },
+
+  /* ---- Navigation ---- */
+
   loginPath: {
     type: ControlType.String,
-    title: "Login path",
-    defaultValue: "/login",
+    title: "Sign In Page",
+    defaultValue: CONFIG.loginPath,
   },
   afterLogoutPath: {
     type: ControlType.String,
-    title: "After sign out",
-    defaultValue: "/",
+    title: "After Sign Out",
+    defaultValue: CONFIG.afterLogoutPath,
   },
+
+  /* ---- Style ---- */
+
   accentColor: {
     type: ControlType.Color,
-    title: "Accent",
-    defaultValue: "#5271ff",
+    title: "Accent Color",
+    defaultValue: CONFIG.accentColor,
   },
   borderRadius: {
     type: ControlType.Number,
-    title: "Corner radius",
-    defaultValue: 12,
+    title: "Corner Radius",
+    defaultValue: CONFIG.borderRadius,
     min: 0,
     max: 32,
     unit: "px",
   },
+
+  /* ---- Shared appearance: Theme, Colors, Typography, Layout, then Labels ---- */
+
+  ...mfAppearanceControls({ padding: 24, gap: 20, shadow: false }),
+  labels: mfLabelControls(DASH_LABELS),
 });
 
 void IS_TRIAL;

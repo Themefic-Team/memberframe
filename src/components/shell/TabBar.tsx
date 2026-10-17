@@ -2,52 +2,73 @@ import React from "react";
 import { UserRound } from "lucide-react";
 import { IconButton } from "../ui";
 import { cn } from "../../utils/cn";
-import type { TabId } from "../tabs/tabs";
-import { TABS } from "../tabs/tabs";
+import { ACCOUNT_VIEW, TABS, type TabId, type ViewId } from "../tabs/tabs";
 
 export interface TabBarProps {
-  activeTab: TabId;
+  activeTab: ViewId;
   onSelectTab: (tab: TabId) => void;
-  /** Opens the account sheet. Disabled until that view exists. */
-  onOpenAccount?: () => void;
+  /** Opens the account view (Connect). */
+  onOpenAccount: () => void;
+  /** While collapsed, picking a tab or Account expands the panel first. */
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 /**
- * 36px, with a 2px gradient pill under the active tab, a spacer, then the
- * account button. PRD section 7.2.
+ * 36px and the top row of the panel: tabs with a 2px gradient pill under the
+ * active one, a spacer, then Account pinned right. PRD section 7.2, Figma
+ * Navigation page.
  *
- * Five tabs since the Connect tab, which is a widening of the shell standard's
- * two-to-four and is recorded as conflict C26. What has NOT changed is why
- * there are not six: Members and Tiers stay folded into Manage behind a
- * segmented control because they share a data domain and the same backend
- * calls, which is the resolved decision in PRD section 7.3. Do not re-split
- * them to make room for anything.
+ * Four tabs, the Figma maximum. The Account icon opens the account view
+ * (Connect) and shows a pressed state while it is open; no tab is selected
+ * then. See tabs.ts for why Connect lives here rather than in the tab list.
+ *
+ * Collapse is not here: it is an item in Framer's own window-bar menu, beside
+ * Framer's close button (see App.tsx). Picking a tab or Account while
+ * collapsed expands the panel, since a tab you cannot see the content of is
+ * not a useful choice.
  */
-export const TabBar: React.FC<TabBarProps> = ({ activeTab, onSelectTab, onOpenAccount }) => (
-  <nav className="framefic-tab-bar">
-    <div className="framefic-tabs-list" role="tablist" aria-label="Plugin sections">
-      {TABS.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          id={`tab-${tab.id}`}
-          aria-selected={tab.id === activeTab}
-          aria-controls={`panel-${tab.id}`}
-          className={cn("framefic-tab", tab.id === activeTab && "active")}
-          onClick={() => onSelectTab(tab.id)}
+export const TabBar: React.FC<TabBarProps> = ({
+  activeTab,
+  onSelectTab,
+  onOpenAccount,
+  collapsed,
+  onToggleCollapse,
+}) => {
+  const expandThen = (action: () => void) => () => {
+    if (collapsed) onToggleCollapse();
+    action();
+  };
+
+  return (
+    <nav className="framefic-tab-bar">
+      <div className="framefic-tabs-list" role="tablist" aria-label="Plugin sections">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            id={`tab-${tab.id}`}
+            aria-selected={tab.id === activeTab}
+            aria-controls={collapsed ? undefined : `panel-${tab.id}`}
+            className={cn("framefic-tab", tab.id === activeTab && "active")}
+            onClick={expandThen(() => onSelectTab(tab.id))}
+          >
+            {tab.title}
+          </button>
+        ))}
+      </div>
+      <span className="framefic-tab-spacer" />
+      <div className="framefic-tab-bar-actions">
+        <IconButton
+          label="Account"
+          className={cn("framefic-account-button", activeTab === ACCOUNT_VIEW && "is-active")}
+          aria-pressed={activeTab === ACCOUNT_VIEW}
+          onClick={expandThen(onOpenAccount)}
         >
-          {tab.title}
-        </button>
-      ))}
-    </div>
-    <span className="framefic-tab-spacer" />
-    <IconButton
-      label="Account"
-      onClick={onOpenAccount}
-      disabled={!onOpenAccount}
-    >
-      <UserRound aria-hidden={true} />
-    </IconButton>
-  </nav>
-);
+          <UserRound aria-hidden={true} />
+        </IconButton>
+      </div>
+    </nav>
+  );
+};

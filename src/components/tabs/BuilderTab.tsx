@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FileStack, Plus } from "lucide-react";
 import { framer } from "framer-plugin";
 import { Banner, Button, FieldRow, FieldRows, Select, useToast } from "../ui";
@@ -9,20 +9,32 @@ import {
   generateMemberAuthCode,
   generateMemberDashboardCode,
   generateMemberGateCode,
+  generateMemberPricingCode,
   generateOnboardingModalCode,
+  generateMeteredPaywallCode,
+  generateProtectedDownloadCode,
+  generateBookmarkButtonCode,
+  generateBookmarksTrayCode,
   membershipPages,
   scaffoldMembershipPages,
   scaffoldSummary,
   type DeployContext,
   type GeneratedCanvasFile,
 } from "../../services";
+import { assetSummary, fetchAssets, type AssetList, type SiteAsset } from "../../services/assetsService";
 import { useConnection } from "../../hooks/useConnection";
+import { useSiteTiers } from "../../hooks/useSiteTiers";
 import { deployBaseUrl } from "../../config/backend";
 import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
   DEFAULT_MEMBER_GATE_CONFIG,
+  DEFAULT_MEMBER_PRICING_CONFIG,
   DEFAULT_ONBOARDING_MODAL_CONFIG,
+  DEFAULT_METERED_PAYWALL_CONFIG,
+  DEFAULT_PROTECTED_DOWNLOAD_CONFIG,
+  DEFAULT_BOOKMARK_BUTTON_CONFIG,
+  DEFAULT_BOOKMARKS_TRAY_CONFIG,
 } from "../../types/canvas";
 import {
   CANVAS_COMPONENTS,
@@ -74,19 +86,43 @@ const COMPONENT_OPTIONS = CANVAS_COMPONENTS.map((component) => ({
  */
 export const BuilderTab: React.FC = () => {
   const { connection, settings } = useConnection();
+  const siteTierList = useSiteTiers(connection?.siteId ?? null);
   const [componentId, setComponentId] = useState<CanvasComponentId>(DEFAULT_COMPONENT_ID);
+  const [assetsList, setAssetsList] = useState<AssetList | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [scaffolding, setScaffolding] = useState(false);
   const [deploying, setDeploying] = useState(false);
-  /**
-   * Title and message only, not the service's `DeployFailure`.
-   *
-   * The reason code is for a caller that branches on it, and this one does not:
-   * every failure renders the same banner. Storing the narrower shape means the
-   * catch below does not have to invent a reason code for an error that did not
-   * come from the deploy path at all.
-   */
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
   const showToast = useToast();
+
+  useEffect(() => {
+    if (!connection?.siteId) return;
+    let active = true;
+    void fetchAssets(connection.siteId).then((result) => {
+      if (active && result.kind === "ok") {
+        setAssetsList(result.data);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [connection?.siteId]);
+
+  const assetOptions = useMemo(() => {
+    const list = assetsList?.assets ?? [];
+    return [
+      { value: "", label: "Default (configure in Framer)" },
+      ...list.map((asset) => ({
+        value: asset.id,
+        label: `${asset.name} (${assetSummary(asset)})`,
+      })),
+    ];
+  }, [assetsList]);
+
+  const chosenAsset = useMemo(
+    () => (componentId === "protected_download" ? assetsList?.assets.find((a) => a.id === selectedAssetId) ?? null : null),
+    [assetsList, componentId, selectedAssetId]
+  );
 
   /**
    * What the generator bakes into every deployed component.
@@ -111,8 +147,10 @@ export const BuilderTab: React.FC = () => {
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
       signupPath: settings?.auth.signupPath ?? "",
       resetPath: settings?.auth.resetPath ?? "/reset-password",
+      // The gate's Access Tier list is written from these. Conflict C9.
+      tiers: siteTierList,
     }),
-    [connection, settings]
+    [connection, settings, siteTierList]
   );
 
   /**
@@ -182,9 +220,18 @@ export const BuilderTab: React.FC = () => {
         why it no longer is. One generator core, one deploy path, no special
         case.
       */
-      const generated = generateForComponent(entry.id, deployContext);
+      const generated = generateForComponent(entry.id, deployContext, chosenAsset);
 
-      const outcome = await deployCanvasComponent(framer, generated);
+      const outcome = await deployCanvasComponent(framer, generated, {
+        attributes: chosenAsset
+          ? {
+              controls: {
+                assetId: chosenAsset.id,
+                buttonText: `Download ${chosenAsset.name || "File"}`,
+              },
+            }
+          : undefined,
+      });
 
       if (outcome.ok) {
         showToast({
@@ -205,7 +252,7 @@ export const BuilderTab: React.FC = () => {
     } finally {
       setDeploying(false);
     }
-  }, [deployContext, entry, showToast]);
+  }, [chosenAsset, deployContext, entry, showToast]);
 
   return (
     <MemberSessionProvider>
@@ -220,6 +267,27 @@ export const BuilderTab: React.FC = () => {
               fill
             />
           </FieldRow>
+
+          {componentId === "protected_download" ? (
+            <FieldRow
+              label="Attach File"
+              htmlFor="builder-asset"
+              fill
+              hint={
+                assetsList && assetsList.assets.length > 0
+                  ? "Pre-fills this button with your uploaded file."
+                  : "Upload files in Manage > Files, or configure later on the canvas."
+              }
+            >
+              <Select
+                id="builder-asset"
+                value={selectedAssetId}
+                options={assetOptions}
+                onChange={setSelectedAssetId}
+                fill
+              />
+            </FieldRow>
+          ) : null}
         </FieldRows>
 
         {/*
@@ -297,7 +365,7 @@ export const BuilderTab: React.FC = () => {
             <Plus aria-hidden={true} />
             {deploying ? "Adding" : "Add to canvas"}
           </Button>
-          <p className="studio-cta-note">{ctaNote(entry)}</p>
+          <p className="studio-cta-note">{ctaNote(entry, Boolean(chosenAsset))}</p>
         </div>
       </div>
     </MemberSessionProvider>
@@ -306,29 +374,23 @@ export const BuilderTab: React.FC = () => {
 
 /**
  * The line under the CTA.
- *
- * Two cases now, where there were three. The third was for a deployable
- * component that had a panel customizer, and with the gate's customizer removed
- * no component has one: all three say the same thing, which is where to
- * configure what was just inserted.
- *
- * An unauthored component still names the task that will build it, so an inert
- * button reads as a schedule rather than a defect.
  */
-function ctaNote(entry: CanvasComponentEntry): string {
+function ctaNote(entry: CanvasComponentEntry, hasAsset: boolean): string {
   if (!entry.deployable) return `${entry.name} arrives with task ${entry.task}.`;
-
+  if (entry.id === "protected_download" && hasAsset) {
+    return "Inserts Protected Download pre-configured for your chosen file.";
+  }
   return `Inserts ${entry.name} with its defaults. Configure it in the Framer properties panel.`;
 }
 
 /**
  * The file to deploy for a picker entry, with its authored defaults.
- *
- * Every component is configured afterwards in Framer's properties panel, so
- * nothing here varies but the connection. The gate is the fallthrough because
- * it was the first and only component before this switch existed.
  */
-function generateForComponent(id: CanvasComponentId, context: DeployContext): GeneratedCanvasFile {
+function generateForComponent(
+  id: CanvasComponentId,
+  context: DeployContext,
+  asset?: SiteAsset | null
+): GeneratedCanvasFile {
   switch (id) {
     case "member_auth":
       return generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG, undefined, context);
@@ -341,6 +403,24 @@ function generateForComponent(id: CanvasComponentId, context: DeployContext): Ge
       return generateMemberDashboardCode(DEFAULT_MEMBER_DASHBOARD_CONFIG, undefined, context);
     case "onboarding_modal":
       return generateOnboardingModalCode(DEFAULT_ONBOARDING_MODAL_CONFIG, undefined, context);
+    case "member_pricing":
+      return generateMemberPricingCode(DEFAULT_MEMBER_PRICING_CONFIG, undefined, context);
+    case "metered_paywall":
+      return generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, context);
+    case "protected_download":
+      return generateProtectedDownloadCode(
+        {
+          ...DEFAULT_PROTECTED_DOWNLOAD_CONFIG,
+          defaultAssetId: asset?.id ?? "",
+          buttonText: asset?.name ? `Download ${asset.name}` : DEFAULT_PROTECTED_DOWNLOAD_CONFIG.buttonText,
+        },
+        undefined,
+        context
+      );
+    case "bookmark_button":
+      return generateBookmarkButtonCode(DEFAULT_BOOKMARK_BUTTON_CONFIG, undefined, context);
+    case "bookmarks_tray":
+      return generateBookmarksTrayCode(DEFAULT_BOOKMARKS_TRAY_CONFIG, undefined, context);
     default:
       return generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG, undefined, context);
   }

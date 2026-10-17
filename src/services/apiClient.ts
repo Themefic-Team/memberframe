@@ -47,7 +47,15 @@ export type ApiResult<T> =
   | { kind: "unauthorized" }
   | { kind: "forbidden" }
   | { kind: "rate_limited"; retryAfterSeconds: number | null }
-  | { kind: "unavailable"; status: number | null; detail: string };
+  | {
+      kind: "unavailable";
+      status: number | null;
+      detail: string;
+      /** The server's machine-readable reason, when it sent one. Never shown as is. */
+      reason?: string;
+      /** A message the server wrote for the creator, such as a gateway rejecting a key. */
+      message?: string;
+    };
 
 /** Every non-ok arm, for a caller that only wants to render a failure. */
 export type ApiFailure = Exclude<ApiResult<never>, { kind: "ok" }>;
@@ -165,10 +173,28 @@ export class ApiClient {
     return this.request<T>("PATCH", path, body);
   }
 
+  delete<T>(path: string, query?: Record<string, QueryValue>): Promise<ApiResult<T>> {
+    return this.request<T>("DELETE", `${path}${buildQuery(query)}`);
+  }
+
+  /**
+   * POST a file as the raw request body, FP-12. The metadata rides in the
+   * query string so the body can be the file alone, streamed to storage by the
+   * server. A file takes longer than a JSON call, so the deadline is minutes.
+   */
+  upload<T>(path: string, query: Record<string, QueryValue>, file: Blob, timeoutMs = 10 * 60 * 1000): Promise<ApiResult<T>> {
+    return this.request<T>("POST", `${path}${buildQuery(query)}`, undefined, {
+      raw: file,
+      contentType: file.type || "application/octet-stream",
+      timeoutMs,
+    });
+  }
+
   private async request<T>(
-    method: "GET" | "POST" | "PATCH" | "PUT",
+    method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
     path: string,
-    body?: unknown
+    body?: unknown,
+    raw?: { raw: Blob; contentType: string; timeoutMs: number }
   ): Promise<ApiResult<T>> {
     // Empty under `vite dev` with a local backend, which makes the request
     // same-origin for the dev server to forward. See `config/devProxy.ts`.
@@ -176,7 +202,7 @@ export class ApiClient {
     const base = rawBase.replace(/\/api\/?$/, "").replace(/\/+$/, "");
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
     const doFetch = this.deps.fetchImpl ?? globalThis.fetch;
-    const timeoutMs = this.deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = raw?.timeoutMs ?? this.deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     if (typeof doFetch !== "function") {
       return { kind: "unavailable", status: null, detail: "No fetch implementation available." };
@@ -191,7 +217,9 @@ export class ApiClient {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    if (body !== undefined) {
+    if (raw) {
+      headers["Content-Type"] = raw.contentType;
+    } else if (body !== undefined) {
       headers["Content-Type"] = "application/json";
     }
 
@@ -204,7 +232,7 @@ export class ApiClient {
       response = await doFetch(`${base}${cleanPath}`, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: raw ? raw.raw : body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
         // The creator session travels as a bearer token, not a cookie, so there
         // is no reason to attach the browser's credentials to a cross-origin
@@ -237,10 +265,18 @@ export class ApiClient {
     }
 
     if (!response.ok) {
+      // The error body, when there is one, carries a reason and sometimes a
+      // message meant for the creator. Read defensively: an error page from a
+      // proxy is HTML, and that must not turn into a second failure.
+      const errorBody = (await response.json().catch(() => null)) as
+        | { reason?: unknown; message?: unknown }
+        | null;
       return {
         kind: "unavailable",
         status: response.status,
         detail: `Server responded ${response.status}.`,
+        ...(typeof errorBody?.reason === "string" ? { reason: errorBody.reason } : {}),
+        ...(typeof errorBody?.message === "string" ? { message: errorBody.message } : {}),
       };
     }
 

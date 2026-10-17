@@ -210,6 +210,40 @@ export const DEFAULT_MEMBER_DASHBOARD_CONFIG: MemberDashboardConfig = {
 };
 
 /* ==========================================================================
+   MEMBER PRICING, feature plan FP-16
+   ========================================================================== */
+
+/**
+ * What the generator bakes into `<MemberPricing>`. Prices are not here: the
+ * component reads them live from the API, so a price edited in Manage, Tiers
+ * shows on the published site without redeploying.
+ */
+export interface MemberPricingConfig {
+  headline: string;
+  subheadline: string;
+  defaultInterval: "month" | "year";
+  showLifetime: boolean;
+  showFreeTier: boolean;
+  highlightTier: string;
+  accentColor: string;
+  borderRadius: number;
+}
+
+export const PRICING_RADIUS_MIN = 0;
+export const PRICING_RADIUS_MAX = 40;
+
+export const DEFAULT_MEMBER_PRICING_CONFIG: MemberPricingConfig = {
+  headline: "Choose your plan",
+  subheadline: "Upgrade, switch, or cancel any time.",
+  defaultInterval: "month",
+  showLifetime: true,
+  showFreeTier: true,
+  highlightTier: "",
+  accentColor: "#5271ff",
+  borderRadius: 16,
+};
+
+/* ==========================================================================
    ONBOARDING MODAL, feature plan FP-09, PRD feature F16, task 6.3
    ========================================================================== */
 
@@ -256,3 +290,97 @@ export const DEFAULT_ONBOARDING_MODAL_CONFIG: OnboardingModalConfig = {
  * `<MemberRegister>`, `<MemberPasswordReset>`, and `<MemberOtpVerify>`.
  */
 export type AuthScreen = "all" | "login" | "register" | "reset" | "otp";
+
+/* ==========================================================================
+   CONTENT COMPONENTS: FP-07 soft paywall, FP-12 downloads, FP-10 bookmarks
+   ========================================================================== */
+
+/**
+ * What the generator bakes into `<MeteredPaywall>`. The rest of its controls
+ * (paywall type, Full Access For, paragraphs, SEO markup) start from the
+ * component's own defaults and are set in Framer's properties panel.
+ */
+export interface MeteredPaywallConfig {
+  freeQuotaCount: number;
+  quotaPeriod: "weekly" | "monthly";
+  blurIntensity: number;
+  showCounterPill: boolean;
+  ctaLabel: string;
+  cardTitle: string;
+  cardDescription: string;
+  accentColor: string;
+  borderRadius: number;
+}
+
+export const METERED_QUOTA_MIN = 1;
+export const METERED_QUOTA_MAX = 10;
+export const CONTENT_RADIUS_MAX = 32;
+
+export const DEFAULT_METERED_PAYWALL_CONFIG: MeteredPaywallConfig = {
+  freeQuotaCount: 3,
+  quotaPeriod: "monthly",
+  blurIntensity: 8,
+  showCounterPill: true,
+  ctaLabel: "Subscribe to continue reading",
+  cardTitle: "Enjoying this article?",
+  cardDescription: "You have reached your free reading limit for this {period}.",
+  accentColor: "#5271ff",
+  borderRadius: 14,
+};
+
+/**
+ * `<ProtectedDownload>`. No tier here: which plan a file needs is set on the
+ * file in Manage, Files, and enforced by the server.
+ */
+export interface ProtectedDownloadConfig {
+  buttonText: string;
+  lockedButtonText: string;
+  iconType: "download" | "file" | "archive" | "code";
+  accentColor: string;
+  borderRadius: number;
+  defaultAssetId?: string;
+}
+
+export const DEFAULT_PROTECTED_DOWNLOAD_CONFIG: ProtectedDownloadConfig = {
+  buttonText: "Download Source Files",
+  lockedButtonText: "Upgrade to Download",
+  iconType: "download",
+  accentColor: "#5271ff",
+  borderRadius: 12,
+  defaultAssetId: "",
+};
+
+export interface BookmarkButtonConfig {
+  iconShape: "bookmark" | "heart" | "star";
+  activeFillColor: string;
+  showLabel: boolean;
+  labelText: string;
+}
+
+export const DEFAULT_BOOKMARK_BUTTON_CONFIG: BookmarkButtonConfig = {
+  iconShape: "bookmark",
+  activeFillColor: "#5271ff",
+  showLabel: false,
+  labelText: "Save",
+};
+
+export interface BookmarksTrayConfig {
+  drawerSide: "right" | "left";
+  emptyStateText: string;
+  maxItems: number;
+  showBadge: boolean;
+  accentColor: string;
+  borderRadius: number;
+}
+
+export const TRAY_MAX_ITEMS_MIN = 10;
+export const TRAY_MAX_ITEMS_MAX = 200;
+
+export const DEFAULT_BOOKMARKS_TRAY_CONFIG: BookmarksTrayConfig = {
+  drawerSide: "right",
+  emptyStateText: "You haven't bookmarked any items yet.",
+  maxItems: 50,
+  showBadge: true,
+  accentColor: "#5271ff",
+  borderRadius: 16,
+};

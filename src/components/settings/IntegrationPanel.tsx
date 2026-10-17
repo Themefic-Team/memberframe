@@ -52,19 +52,13 @@ export const IntegrationPanel: React.FC<IntegrationPanelProps> = ({
   return (
     <>
       {/*
-        Said once, at the top, rather than on every card that has a secret
-        field. Five copies of the same sentence is noise, and the card's own
-        disabled field says it again where it matters.
+        Payment gateways live in Manage, Payments (FP-16), with their own
+        encrypted key store and test and live modes. They are left out here
+        so there is one place to connect them.
       */}
-      {secretsSupported ? null : (
-        <Banner
-          tone="info"
-          title="Secret keys are not stored yet"
-          message="Encrypted storage arrives with payments. Everything else saves now."
-        />
-      )}
+      <p className="settings-help">Payment gateways are in Manage, Payments.</p>
 
-      {integrationsByCategory(INTEGRATIONS).map((group) => (
+      {integrationsByCategory(INTEGRATIONS.filter((entry) => entry.category !== "store")).map((group) => (
         <section key={group.category} className="section-group">
           <h2 className="section-title">{CATEGORY_LABELS[group.category]}</h2>
 

@@ -87,6 +87,19 @@ describe("the component is standalone", () => {
   });
 });
 
+
+/**
+ * Every Web Storage access in a source, by key. The only storage these
+ * components may touch is the Route Shield's: a "1" signed-in hint, its session
+ * cache (only ever removed here), the denied-path marker, and a confirmed
+ * address handed from sign up to sign in. Never a token, never a password.
+ */
+function storageAccess(source: string): { calls: string[]; stray: boolean } {
+  const calls = source.match(/(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\([^,)]*(?:,[^)]*)?\)/g) ?? [];
+  const stray = /(?:localStorage|sessionStorage)\s*(?:\[|\.(?!getItem|setItem|removeItem))/.test(source);
+  return { calls, stray };
+}
+
 describe("storage", () => {
   it("never reads or writes a credential", () => {
     // PRD section 14.1 S2. The session is an HTTP-only cookie the browser
@@ -124,7 +137,9 @@ describe("accessibility contract", () => {
   it("announces the step as Step N of M", () => {
     // PRD F16 acceptance criterion 5.
     expect(code).toContain('aria-live="polite"');
-    expect(code).toContain("`Step ${stepIndex + 1} of ${steps.length}`");
+    // The wording is a creator label now; the numbers are not.
+    expect(code).toContain('stepCounter: ["Step counter", "Step {current} of {total}"]');
+    expect(code).toContain('t("stepCounter", { current: stepIndex + 1, total: steps.length })');
   });
 
   it("is a labelled modal dialog with a focus trap when overlaid", () => {
@@ -233,8 +248,10 @@ describe("the dashboard's profile form", () => {
   it("reads and writes the profile with the cookie and no storage", () => {
     expect(dashboardCode).toContain('const PROFILE_PATH = "/api/member/profile";');
     expect(dashboardCode).toContain('method: "PATCH"');
-    expect(dashboardCode).not.toContain("localStorage");
-    expect(dashboardCode).not.toContain("sessionStorage");
+    // Only the Route Shield's hint and cache, never the profile or a token.
+    const { calls, stray } = storageAccess(dashboardCode);
+    expect(stray).toBe(false);
+    for (const call of calls) expect(call).toMatch(/\(`(memberframe:signed-in:|__mf_session_)\$\{CONFIG\.siteKey\}`/);
   });
 
   it("renders only the fields whose condition is met", () => {

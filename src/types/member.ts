@@ -29,7 +29,13 @@
  * code. `free` / `silver` / `gold` / `vip` are display names, and they live on
  * `TierLadderEntry.name`.
  */
-export type TierKey = "free_member" | "tier_1" | "tier_2" | "vip";
+export type TierKey = "free_member" | "tier_1" | "tier_2" | "vip" | (string & {});
+// The four are the built in keys and the ones the defaults use. Any other
+// lowercase key is a creator's own tier (conflict C9, resolved 2026-10-16):
+// the generator writes the site's real tiers into the gate's Access Tier list,
+// and every gate compares ranks from the site's tier table, so a custom key
+// gates exactly like a built in one. `(string & {})` keeps the four as
+// editor suggestions while allowing the rest.
 
 /**
  * What a gate can require.
@@ -119,5 +125,29 @@ export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
 };
 
 export function tierName(key: TierKey, tiers = DEFAULT_SITE_TIERS): string {
-  return tiers.find((tier) => tier.key === key)?.name ?? REQUIRED_TIER_LABELS[key];
+  return tiers.find((tier) => tier.key === key)?.name ?? REQUIRED_TIER_LABELS[key] ?? key;
+}
+
+/**
+ * The site's own tiers, for labels and pickers across the panel.
+ *
+ * Remembered by the Manage tab whenever it loads them, so a custom tier is
+ * named by its own name everywhere without threading the list through every
+ * component. Falls back to the default ladder before the first load.
+ */
+let siteTierLadder: ReadonlyArray<TierLadderEntry> = DEFAULT_SITE_TIERS;
+
+export function rememberSiteTiers(tiers: ReadonlyArray<TierLadderEntry>): void {
+  if (tiers.length === 0) return;
+  siteTierLadder = [...tiers].sort((a, b) => a.rank - b.rank);
+}
+
+export function siteTiers(): ReadonlyArray<TierLadderEntry> {
+  return siteTierLadder;
+}
+
+/** A requirement in words: the site's tier name, a built in label, or the key as a last resort. */
+export function requiredTierLabel(key: RequiredTier): string {
+  if (key === "anyone" || key === "signed_in") return REQUIRED_TIER_LABELS[key];
+  return siteTierLadder.find((tier) => tier.key === key)?.name ?? REQUIRED_TIER_LABELS[key] ?? key;
 }

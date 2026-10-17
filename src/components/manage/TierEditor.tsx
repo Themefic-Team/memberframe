@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Layers, Plus, X } from "lucide-react";
+import { Layers, Plus, Trash2, X } from "lucide-react";
 import {
   Banner,
   Button,
@@ -15,12 +15,15 @@ import {
 import { cn } from "../../utils/cn";
 import type { CurrencyCode, SiteTierRecord } from "../../types/site";
 import {
+  CUSTOM_TIER_KEY,
   EMPTY_TIER_FORM_DRAFT,
   tierEditorCta,
-  TIER_KEY_OPTIONS,
+  tierKeyOptions,
   byRankDescending,
+  resolvedTierKey,
   suggestNextRank,
   validateTierDraft,
+  type ExtraPriceDraft,
   type TierFormDraft,
 } from "./tierValidation";
 import { formatMinorPlain, formatMinorWithCurrency } from "../../utils/money";
@@ -54,7 +57,22 @@ function draftFromRecord(tier: SiteTierRecord): TierFormDraft {
     currency: tier.currency,
     rank: String(tier.rank),
     isActive: tier.isActive,
+    extraPrices: extraDraftsFrom(tier),
   };
+}
+
+/** The stored extra prices, grouped one draft per currency. */
+function extraDraftsFrom(tier: SiteTierRecord): ExtraPriceDraft[] {
+  const byCurrency = new Map<CurrencyCode, ExtraPriceDraft>();
+  for (const price of tier.extraPrices ?? []) {
+    const entry = byCurrency.get(price.currency) ?? { currency: price.currency, monthly: "", annual: "", lifetime: "" };
+    const text = formatMinorPlain(price.amountMinor);
+    if (price.interval === "month") entry.monthly = text;
+    else if (price.interval === "year") entry.annual = text;
+    else entry.lifetime = text;
+    byCurrency.set(price.currency, entry);
+  }
+  return [...byCurrency.values()];
 }
 
 /**
@@ -107,8 +125,32 @@ export const TierEditor: React.FC<TierEditorProps> = ({
 
   const startCreate = () => {
     setSubmitted(false);
-    setDraft({ ...EMPTY_TIER_FORM_DRAFT, rank: String(suggestNextRank(tiers)) });
+    // The first built in key no tier uses yet, or a custom one once all four are taken.
+    const firstKey = tierKeyOptions({ ...EMPTY_TIER_FORM_DRAFT }, tiers)[0]?.value ?? CUSTOM_TIER_KEY;
+    setDraft({ ...EMPTY_TIER_FORM_DRAFT, key: firstKey, rank: String(suggestNextRank(tiers)), extraPrices: [] });
   };
+
+  const updateExtra = (index: number, next: Partial<ExtraPriceDraft>) =>
+    setDraft((current) =>
+      current
+        ? { ...current, extraPrices: current.extraPrices.map((entry, position) => (position === index ? { ...entry, ...next } : entry)) }
+        : current
+    );
+
+  const addExtra = () =>
+    setDraft((current) => {
+      if (!current) return current;
+      const free = CURRENCY_OPTIONS.find(
+        (option) => option.value !== current.currency && !current.extraPrices.some((entry) => entry.currency === option.value)
+      );
+      if (!free) return current;
+      return { ...current, extraPrices: [...current.extraPrices, { currency: free.value, monthly: "", annual: "", lifetime: "" }] };
+    });
+
+  const removeExtra = (index: number) =>
+    setDraft((current) =>
+      current ? { ...current, extraPrices: current.extraPrices.filter((_, position) => position !== index) } : current
+    );
 
   const startEdit = (tier: SiteTierRecord) => {
     setSubmitted(false);
@@ -209,16 +251,28 @@ export const TierEditor: React.FC<TierEditorProps> = ({
               />
             </FieldRow>
 
-            <FieldRow label="Tier type" htmlFor="tier-key" error={errorFor("key")} fill>
+            <FieldRow
+              label="Tier type"
+              htmlFor="tier-key"
+              error={errorFor("key")}
+              hint="Built in types are Free, Silver, Gold, and VIP. Custom makes a key from the name, so you can have as many tiers as you like. The key cannot change once saved, because gates use it."
+              fill
+            >
               <Select
                 id="tier-key"
                 value={draft.key}
-                options={TIER_KEY_OPTIONS}
+                options={tierKeyOptions(draft, tiers)}
                 disabled={draft.id !== null}
                 onChange={(value) => patch("key", value)}
                 fill
               />
             </FieldRow>
+
+            {draft.id === null && draft.key === CUSTOM_TIER_KEY && draft.name.trim() !== "" ? (
+              <p className="settings-help">
+                Saved as <code className="code-chip">{resolvedTierKey(draft, tiers)}</code>
+              </p>
+            ) : null}
 
             <FieldRow label="Rank" htmlFor="tier-rank" error={errorFor("rank")}>
               <TextField
@@ -280,6 +334,67 @@ export const TierEditor: React.FC<TierEditorProps> = ({
               />
             </FieldRow>
 
+            {draft.extraPrices.map((extra, index) => (
+              <React.Fragment key={`${extra.currency}-${index}`}>
+                <FieldRow
+                  label="Currency"
+                  htmlFor={`tier-extra-${index}-currency`}
+                  hint="Buyers whose country uses this currency see these prices instead. India sees INR, which Razorpay needs."
+                >
+                  <div className="integration-input">
+                    <Select
+                      id={`tier-extra-${index}-currency`}
+                      value={extra.currency}
+                      options={CURRENCY_OPTIONS.filter((option) => option.value !== draft.currency)}
+                      onChange={(value) => updateExtra(index, { currency: value })}
+                    />
+                    <IconButton label={`Remove ${extra.currency} prices`} variant="ghost" onClick={() => removeExtra(index)}>
+                      <Trash2 aria-hidden={true} />
+                    </IconButton>
+                  </div>
+                </FieldRow>
+                <FieldRow label={`${extra.currency} monthly`} htmlFor={`tier-extra-${index}-monthly`}>
+                  <TextField
+                    id={`tier-extra-${index}-monthly`}
+                    value={extra.monthly}
+                    inputMode="decimal"
+                    onChange={(value) => updateExtra(index, { monthly: value })}
+                  />
+                </FieldRow>
+                <FieldRow label={`${extra.currency} annual`} htmlFor={`tier-extra-${index}-annual`}>
+                  <TextField
+                    id={`tier-extra-${index}-annual`}
+                    value={extra.annual}
+                    inputMode="decimal"
+                    onChange={(value) => updateExtra(index, { annual: value })}
+                  />
+                </FieldRow>
+                <FieldRow label={`${extra.currency} lifetime`} htmlFor={`tier-extra-${index}-lifetime`}>
+                  <TextField
+                    id={`tier-extra-${index}-lifetime`}
+                    value={extra.lifetime}
+                    inputMode="decimal"
+                    onChange={(value) => updateExtra(index, { lifetime: value })}
+                  />
+                </FieldRow>
+              </React.Fragment>
+            ))}
+
+            {errorFor("extraPrices") ? (
+              <p className="integration-field-problem" role="alert">
+                {errorFor("extraPrices")}
+              </p>
+            ) : null}
+
+            {draft.extraPrices.length < CURRENCY_OPTIONS.length - 1 ? (
+              <div className="tier-extra-add">
+                <Button variant="secondary" size="sm" onClick={addExtra}>
+                  <Plus aria-hidden={true} />
+                  Add currency
+                </Button>
+              </div>
+            ) : null}
+
             {/*
               A checkbox, not a toggle. PRD section 7.5: a toggle is for
               instant-apply only, and this change is not applied until Save.
@@ -333,6 +448,9 @@ function describePrices(tier: SiteTierRecord): string {
   if (tier.lifetimePriceMinor !== null) {
     parts.push(`${formatMinorWithCurrency(tier.lifetimePriceMinor, tier.currency)} lifetime`);
   }
+
+  const extra = [...new Set((tier.extraPrices ?? []).map((price) => price.currency))];
+  if (extra.length > 0) parts.push(`also ${extra.join(", ")}`);
 
   return parts.length === 0 ? "Free" : parts.join(". ");
 }

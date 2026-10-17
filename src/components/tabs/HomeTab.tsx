@@ -1,15 +1,28 @@
 import React from "react";
 import {
-  BookOpen,
+  ChevronRight,
   CreditCard,
+  FileText,
   Layers,
-  LifeBuoy,
+  List,
   Lock,
+  Mail,
+  PanelsTopLeft,
   Plus,
-  Sparkles,
+  Send,
+  ShieldCheck,
+  SquareSplitHorizontal,
 } from "lucide-react";
-import { Banner, Button } from "../ui";
-import { BRANDING } from "../../config/branding";
+import {
+  Banner,
+  Button,
+  HelpTile,
+  HelpTileRow,
+  HeroCard,
+  PluginCard,
+  PluginCardList,
+} from "../ui";
+import { BRANDING, HELP_LINKS, SIBLING_PLUGINS, type SiblingPluginId } from "../../config/branding";
 import { useConnection } from "../../hooks/useConnection";
 
 export interface HomeTabProps {
@@ -21,9 +34,16 @@ export interface HomeTabProps {
 
 interface QuickStep {
   label: string;
+  description: string;
   icon: React.ReactNode;
   onClick: () => void;
 }
+
+const SIBLING_LOGOS: Record<SiblingPluginId, React.ReactNode> = {
+  crestbar: <PanelsTopLeft />,
+  beaf: <SquareSplitHorizontal />,
+  formfic: <Send />,
+};
 
 /**
  * The Home tab. PRD task 2.7, layout in section 7.3.
@@ -37,7 +57,7 @@ interface QuickStep {
  * Whether the project is connected. That is the single fact the panel can
  * establish without guessing, and it is the one that matters most: every other
  * tile leads somewhere that does nothing until it is true. So an unconnected
- * project gets a banner pointing at the Connect tab, and the three tiles stay
+ * project gets a banner pointing at the account view, and the three tiles stay
  * exactly as stateless as they were.
  *
  * ## It still does not claim to know the rest
@@ -56,6 +76,14 @@ interface QuickStep {
  * making them real is a separate piece of work rather than something to sneak
  * in here.
  *
+ * ## Foundations layout
+ *
+ * Hero card, Quick start, Help, More from Pixelfic, in that order, per the
+ * Pixelfic shell Home tab and `.agents/rules/design-system.md` section 7.
+ * The routes used to sit in Help tiles, which the Content doc reserves for
+ * Guide, Contact us, and Changelog links out. They are step rows now, and
+ * the Help row carries the docs links the PRD asks for.
+ *
  * ## One primary CTA
  *
  * "Open builder", per PRD section 7.3. The other two tiles and the two footer
@@ -69,9 +97,24 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 }) => {
   const { state } = useConnection();
   const steps: ReadonlyArray<QuickStep> = [
-    { label: "Gate a frame", icon: <Lock aria-hidden={true} />, onClick: onOpenBuilder },
-    { label: "Set up tiers", icon: <Layers aria-hidden={true} />, onClick: onOpenManage },
-    { label: "Connect payments", icon: <CreditCard aria-hidden={true} />, onClick: onOpenSettings },
+    {
+      label: "Gate a frame",
+      description: "Lock content behind a member tier.",
+      icon: <Lock aria-hidden={true} />,
+      onClick: onOpenBuilder,
+    },
+    {
+      label: "Set up tiers",
+      description: "Choose what members pay for.",
+      icon: <Layers aria-hidden={true} />,
+      onClick: onOpenManage,
+    },
+    {
+      label: "Connect payments",
+      description: "Add Stripe, Lemon Squeezy, or Razorpay.",
+      icon: <CreditCard aria-hidden={true} />,
+      onClick: onOpenSettings,
+    },
   ];
 
   return (
@@ -89,90 +132,58 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         />
       ) : null}
 
-      <section className="hero-card">
-        <div className="hero-card-content">
-          <h1 className="hero-card-title">Membership, Inside Framer</h1>
-          <p className="hero-card-desc">
-            Gate any frame, sell a membership, and manage members without leaving the canvas.
-          </p>
-        </div>
-        <Button variant="primary" size="md" className="fill" onClick={onOpenBuilder}>
-          <Plus aria-hidden={true} />
-          Open builder
-        </Button>
-      </section>
+      <HeroCard
+        title="Welcome to MemberFrame"
+        description="Gate any frame, sell a membership, and manage members without leaving the canvas."
+        illustration={<ShieldCheck />}
+        action={
+          <Button variant="primary" size="md" className="fill" onClick={onOpenBuilder}>
+            <Plus aria-hidden={true} />
+            Open builder
+          </Button>
+        }
+      />
 
       <section className="section-group">
         <h2 className="section-title">Quick Start</h2>
-        <div className="help-tile-row">
+        <div className="step-list">
           {steps.map((step) => (
-            <button key={step.label} type="button" className="help-tile" onClick={step.onClick}>
-              <span className="help-tile-icon-box">{step.icon}</span>
-              <span className="help-tile-label">{step.label}</span>
+            <button key={step.label} type="button" className="step-row" onClick={step.onClick}>
+              <span className="step-row-icon" aria-hidden={true}>
+                {step.icon}
+              </span>
+              <span className="step-row-text">
+                <span className="step-row-title">{step.label}</span>
+                <span className="step-row-desc">{step.description}</span>
+              </span>
+              <ChevronRight className="step-row-chevron" aria-hidden={true} />
             </button>
           ))}
         </div>
       </section>
 
       <section className="section-group">
-        <h2 className="section-title">Learn More</h2>
-        <div className="framefic-card-list">
-          {/*
-            External links open in a new tab. The panel is an iframe inside the
-            Framer app, and navigating it away would replace the plugin with a
-            web page and no way back.
-          */}
-          <a
-            className="framefic-card"
-            href={`${BRANDING.companyUrl}/memberframe/docs`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="framefic-card-logo" aria-hidden={true}>
-              <BookOpen />
-            </span>
-            <span className="framefic-card-info">
-              <span className="framefic-card-name">Documentation</span>
-              <span className="framefic-card-desc">
-                Setup guides, gating patterns, and the component reference.
-              </span>
-            </span>
-          </a>
+        <h2 className="section-title">Help</h2>
+        <HelpTileRow>
+          <HelpTile label="Guide" icon={<FileText />} href={HELP_LINKS.guide} />
+          <HelpTile label="Contact us" icon={<Mail />} href={HELP_LINKS.contact} />
+          <HelpTile label="Changelog" icon={<List />} href={HELP_LINKS.changelog} />
+        </HelpTileRow>
+      </section>
 
-          <a
-            className="framefic-card"
-            href={`${BRANDING.companyUrl}/support`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="framefic-card-logo" aria-hidden={true}>
-              <LifeBuoy />
-            </span>
-            <span className="framefic-card-info">
-              <span className="framefic-card-name">Get Support</span>
-              <span className="framefic-card-desc">
-                Ask a question or report something that looks wrong.
-              </span>
-            </span>
-          </a>
-
-          <a
-            className="framefic-card"
-            href={BRANDING.companyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="framefic-card-logo" aria-hidden={true}>
-              <Sparkles />
-            </span>
-            <span className="framefic-card-info">
-              <span className="framefic-card-name">More From {BRANDING.companyName}</span>
-              <span className="framefic-card-desc">
-                Other plugins built to the same standard as this one.
-              </span>
-            </span>
-          </a>
-        </div>
+      <section className="section-group">
+        <h2 className="section-title">More From {BRANDING.companyName}</h2>
+        <PluginCardList>
+          {SIBLING_PLUGINS.map((plugin) => (
+            <PluginCard
+              key={plugin.id}
+              name={plugin.name}
+              description={plugin.description}
+              logo={SIBLING_LOGOS[plugin.id]}
+              href={plugin.href}
+            />
+          ))}
+        </PluginCardList>
       </section>
     </div>
   );

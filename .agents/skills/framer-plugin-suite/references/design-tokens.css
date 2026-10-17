@@ -2,20 +2,30 @@
    FRAMER framefic UNIFIED DESIGN SYSTEM TOKENS & STYLE GUIDELINE
    Standardized Company Theme & Component Design Tokens
    Dual-Theme Synchronization: Dark Mode (Default) & Light Mode
+
+   Pixelfic UI Kit Foundations v0.4.0 (2026-10-07).
+   Rules for using these tokens: .agents/rules/design-system.md
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
 /* --------------------------------------------------------------------------
    1. COLOR TOKENS: DARK THEME (DEFAULT)
-   Figma Foundations v0.3.7 · Calfic / Pixelfic UI Kit
+   Figma Foundations v0.4.0 · Calfic / Pixelfic UI Kit
+   v0.4.0: dark theme uses Framer's real runtime values (bg #101010 / #181818 /
+   #202020, text #FFF / #CBCBCB / #777777), raised cards #18191B, hairlines
+   white 4%, lit edge white 3%. Focus and info moved onto the brand scale.
+
+   The same palette is restated on body when the creator forces Dark, so a
+   light Framer workspace cannot leak light values into a forced-dark panel.
    -------------------------------------------------------------------------- */
-:root {
+:root,
+html[data-user-theme="dark"] body {
   --font-body: "DM Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
 
-  /* Brand Tokens (Pixelfic / Calfic Accent) */
+  /* Brand Tokens (Pixelfic / Calfic Accent). Brand mode, same in both themes. */
   --px-brand-primary: #5271ff;
   --px-brand-primary-hover: #4761db;
   --px-brand-primary-pressed: #3b51b8;
@@ -28,7 +38,9 @@
   --px-brand-gradient-end: #3b51b8;
   --px-brand-gradient: linear-gradient(180deg, #5271ff 0%, #3b51b8 100%);
 
-  /* Accent Blues & Legacy Mappings */
+  /* Accent Blues & Legacy Mappings.
+     --secondary-default is #5271FF: a fill and border colour only. As text it
+     is 4.07:1 on white and fails AA. Brand-coloured text is --px-color-text-brand. */
   --primary-default: var(--px-brand-primary, #5271ff);
   --primary-dark: var(--px-brand-primary-pressed, #3b51b8);
   --secondary-default: var(--px-brand-primary, #5271ff);
@@ -39,29 +51,33 @@
   --framefic-cta-gradient-border: linear-gradient(180deg, #708aff 0%, #3b51b8 100%);
   --framefic-cta-gradient-bg: linear-gradient(var(--secondary-default, #5271ff), var(--secondary-default, #5271ff));
 
-  /* Framer Runtime Theme Colours (Dark) */
-  --framer-color-bg: #201f1f;
-  --framer-color-bg-secondary: #292828;
-  --framer-color-bg-tertiary: #313030;
-  --framer-color-divider: rgba(255, 255, 255, 0.07);
-  --framer-color-text: #fcfcfd;
-  --framer-color-text-secondary: #95a3b2;
-  --framer-color-text-tertiary: #6f7b87;
-  --framer-color-text-reversed: #201f1f;
+  /* Framer Runtime Theme Colours (Dark). Framer injects these inside plugins;
+     the values here are the fallback for a browser preview outside Framer. */
+  --framer-color-bg: #101010;
+  --framer-color-bg-secondary: #181818;
+  --framer-color-bg-tertiary: #202020;
+  --framer-color-divider: rgba(255, 255, 255, 0.04);
+  --framer-color-text: #ffffff;
+  --framer-color-text-secondary: #cbcbcb;
+  --framer-color-text-tertiary: #777777;
+  --framer-color-text-reversed: #101010;
   --framer-color-tint: #0099ff;
   --framer-color-tint-dark: #0088e6;
   --framer-color-tint-extra-dark: #0077cc;
 
   /* Pixelfic Additions (Dark) */
-  --px-color-bg-raised: #292828;
+  --px-color-bg-raised: #18191b;
+  --px-color-bg-selected: #2a2a2a;
   --px-color-border-brand: rgba(82, 113, 255, 0.20);
-  --px-color-border-highlight: rgba(255, 255, 255, 0.06);
+  --px-color-border-highlight: rgba(255, 255, 255, 0.03);
+  --px-color-border-selected: rgba(255, 255, 255, 0.06);
   --px-color-border-subtle: #1b1f22;
+  --px-color-control-track: #2d2d2d;
   --px-color-glow-brand: rgba(82, 113, 255, 0.14);
   --px-color-shadow-deep: rgba(0, 0, 0, 0.18);
   --px-color-shadow-soft: rgba(0, 0, 0, 0.06);
   --px-color-focus-halo: rgba(82, 113, 255, 0.20);
-  --px-color-focus-ring: #0099ff;
+  --px-color-focus-ring: #5271ff;
   --px-color-pro-bg: rgba(139, 92, 246, 0.20);
   --px-color-pro-border: rgba(139, 92, 246, 0.30);
   --px-color-pro-text: #c4b5fd;
@@ -70,42 +86,42 @@
   --px-color-skeleton: #2d3339;
   --px-color-danger: #f87171;
   --px-color-danger-subtle: #3a1414;
-  --px-color-info: #60a5fa;
-  --px-color-info-subtle: #0f2140;
+  --px-color-info: #8fa3ff;
+  --px-color-info-subtle: #1a1f36;
   --px-color-success: #00e454;
   --px-color-success-subtle: #062e13;
   --px-color-warning: #ffc745;
   --px-color-warning-subtle: #2e2206;
   --px-color-text-brand: #8fa3ff;
-  --px-toast-bg: rgba(41, 40, 40, 0.82);
-  --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --px-toast-bg: rgba(24, 25, 27, 0.82);
+  --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 
   /* Dark Theme Surfaces & Cards */
-  --framefic-page-bg: #201f1f;
-  --framefic-page-bg2: #292828;
-  --framefic-surface: #201f1f;
-  --framefic-surface-2: #292828;
-  --framefic-surface-3: #313030;
-  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
-  --bg-panel: #1b1f22;
-  --bg-card: #201f1f;
-  --bg-card-inner: #292828;
-  --surface: #201f1f;
+  --framefic-page-bg: #101010;
+  --framefic-page-bg2: #181818;
+  --framefic-surface: #101010;
+  --framefic-surface-2: #181818;
+  --framefic-surface-3: #202020;
+  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.04));
+  --bg-panel: #101010;
+  --bg-card: #18191b;
+  --bg-card-inner: #202020;
+  --surface: #101010;
   --foreground: #1b1f22;
 
   /* Dark Theme Typography */
-  --title: #fcfcfd;
-  --framefic-heading: #fcfcfd;
-  --paragraph: #95a3b2;
-  --paragraph-faint: #6f7b87;
-  --framefic-text-muted: #95a3b2;
-  --framefic-text-soft: #6f7b87;
-  --framefic-input-text: #fcfcfd;
-  --framefic-input-option: #fcfcfd;
+  --title: #ffffff;
+  --framefic-heading: #ffffff;
+  --paragraph: #cbcbcb;
+  --paragraph-faint: #777777;
+  --framefic-text-muted: #cbcbcb;
+  --framefic-text-soft: #777777;
+  --framefic-input-text: #ffffff;
+  --framefic-input-option: #ffffff;
 
   /* Dark Theme Borders & Strokes */
-  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
-  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
+  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.04));
+  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.04));
   --stroke-faint: #1b1f22;
 
   /* Dark Theme Semantics */
@@ -119,10 +135,10 @@
   --framefic-overlay: rgba(0, 0, 0, 0.50);
   --framefic-shadow: rgba(0, 0, 0, 0.18);
   --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06));
-  --framefic-frosted-bg: rgba(32, 31, 31, 0.75);
-  --framefic-frosted-border: rgba(255, 255, 255, 0.07);
+  --framefic-frosted-bg: rgba(16, 16, 16, 0.75);
+  --framefic-frosted-border: rgba(255, 255, 255, 0.04);
 
-  /* Radius */
+  /* Radius (legacy names) */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -156,14 +172,17 @@ html[data-user-theme="light"] body {
 
   /* Pixelfic Additions (Light) */
   --px-color-bg-raised: #ffffff;
+  --px-color-bg-selected: #ffffff;
   --px-color-border-brand: rgba(82, 113, 255, 0.20);
   --px-color-border-highlight: rgba(255, 255, 255, 0);
+  --px-color-border-selected: rgba(0, 0, 0, 0.05);
   --px-color-border-subtle: #f5f5f5;
+  --px-color-control-track: #ebebeb;
   --px-color-glow-brand: rgba(82, 113, 255, 0.14);
   --px-color-shadow-deep: rgba(0, 0, 0, 0.05);
   --px-color-shadow-soft: rgba(0, 0, 0, 0.02);
   --px-color-focus-halo: rgba(82, 113, 255, 0.20);
-  --px-color-focus-ring: #0099ff;
+  --px-color-focus-ring: #5271ff;
   --px-color-pro-bg: #f5f3ff;
   --px-color-pro-border: rgba(139, 92, 246, 0.30);
   --px-color-pro-text: #6d28d9;
@@ -172,8 +191,8 @@ html[data-user-theme="light"] body {
   --px-color-skeleton: #ededed;
   --px-color-danger: #dc2626;
   --px-color-danger-subtle: #fef2f2;
-  --px-color-info: #2563eb;
-  --px-color-info-subtle: #eff6ff;
+  --px-color-info: #4761db;
+  --px-color-info-subtle: #f2f4ff;
   --px-color-success: #15803d;
   --px-color-success-subtle: #f0fdf4;
   --px-color-warning: #b45309;
@@ -230,29 +249,64 @@ html[data-user-theme="light"] body {
   --border_default: var(--border-subtle);
 }
 
-/* Force Dark Mode when user selects "Dark" in Settings (even if Framer is Light) */
-html[data-user-theme="dark"] body {
-  --framefic-page-bg: #201f1f;
-  --framefic-page-bg2: #292828;
-  --framefic-surface: #201f1f;
-  --framefic-surface-2: #292828;
-  --framefic-surface-3: #313030;
-  --framefic-surface-border: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
-  --bg-panel: #1b1f22;
-  --bg-card: #201f1f;
-  --bg-card-inner: #292828;
-  --surface: #201f1f;
-  --foreground: #1b1f22;
-  --title: #fcfcfd;
-  --framefic-heading: #fcfcfd;
-  --paragraph: #95a3b2;
-  --paragraph-faint: #6f7b87;
-  --framefic-text-muted: #95a3b2;
-  --border-subtle: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
-  --stroke: var(--framer-color-divider, rgba(255, 255, 255, 0.07));
-  --stroke-faint: #1b1f22;
-  --framefic-overlay: rgba(0, 0, 0, 0.50);
-  --framefic-card-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06)), 0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.06));
+/* --------------------------------------------------------------------------
+   2b. SCALES & COMPOSITE TOKENS (Foundations v0.4.0)
+   Spacing, Radius, Typography, Elevation & effects.
+
+   Declared on body, not :root. A custom property that references another is
+   resolved where it is declared, so a composite declared on :root would keep
+   the dark shadow colours even after the light layer redefines them on body.
+   -------------------------------------------------------------------------- */
+body {
+  /* Spacing: space/2 to space/32. Nothing else. */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  /* Radius: radius/4 to radius/20 and radius/full. */
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-10: 10px;
+  --radius-12: 12px;
+  --radius-14: 14px;
+  --radius-16: 16px;
+  --radius-20: 20px;
+  --radius-full: 999px;
+
+  /* Typography: Inter (Framer plugin font). Use with `font:` plus the paired
+     letter-spacing token where one exists. */
+  --text-title-lg: 600 20px/26px var(--font-sans);
+  --text-title-lg-tracking: -0.02em;
+  --text-title-md: 600 15px/22px var(--font-sans);
+  --text-title-md-tracking: -0.01em;
+  --text-title-sm: 600 14px/20px var(--font-sans);
+  --text-title-sm-tracking: -0.005em;
+  --text-body-lg: 400 14px/21px var(--font-sans);
+  --text-body: 500 12px/18px var(--font-sans);
+  --text-body-strong: 600 12px/18px var(--font-sans);
+  --text-body-sm: 400 11px/16px var(--font-sans);
+  --text-body-sm-strong: 600 11px/16px var(--font-sans);
+  --text-mono: 400 12px/18px var(--font-mono);
+
+  /* Elevation & effects */
+  /* Shadow/Card: 1px contact (0/1/1) + wide tucked ambient (0/4/12/-6) + lit edge. */
+  --px-shadow-card: 0 1px 1px var(--px-color-shadow-soft), 0 4px 12px -6px var(--px-color-shadow-soft), inset 0 1px 0 var(--px-color-border-highlight);
+  /* Shadow/Card hover: lifts toward Popover. */
+  --px-shadow-card-hover: 0 1px 3px var(--px-color-shadow-soft), 0 10px 28px -4px var(--px-color-shadow-deep), inset 0 1px 0 var(--px-color-border-highlight);
+  /* Shadow/Popover: toasts, menus, hover cards. Soft contact + diffused tucked ambient. */
+  --px-shadow-popover: 0 1px 3px var(--px-color-shadow-deep), 0 10px 28px -10px var(--px-color-shadow-deep), inset 0 1px 0 var(--px-color-border-highlight);
+  /* Shadow/Primary: whisper indigo glow (0/2/6/-2, 14%) + inner top highlight. */
+  --px-shadow-primary: 0 2px 6px -2px var(--px-color-glow-brand), inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  /* Focus/Halo: add to focused controls together with the 1px focus/ring stroke. */
+  --px-focus-halo: 0 0 0 3px var(--px-color-focus-halo);
 }
 
 /* --------------------------------------------------------------------------
@@ -304,7 +358,7 @@ html[data-user-theme="dark"] body {
 /* Hover State */
 .primary-cta:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #4761db 0%, #3448a6 100%) !important;
+  background: var(--px-brand-primary-hover, #4761db) !important; /* Foundations: hover is flat */
   box-shadow: 0 4px 14px rgba(82, 113, 255, 0.32),
               inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
@@ -408,7 +462,7 @@ html[data-user-theme="dark"] body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #4761db 0%, #3448a6 100%) !important;
+  background: var(--px-brand-primary-hover, #4761db) !important; /* Foundations: hover is flat */
   box-shadow: 0 4px 14px rgba(82, 113, 255, 0.32),
               inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
@@ -423,7 +477,7 @@ html[data-user-theme="dark"] body {
 
 .btn-primary:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -462,7 +516,7 @@ html[data-user-theme="dark"] body {
 .btn-secondary:focus-visible,
 .secondary-cta:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff) !important;
+  border-color: var(--px-color-focus-ring, #5271ff) !important;
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -496,7 +550,7 @@ html[data-user-theme="dark"] body {
 
 .btn-ghost:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff) !important;
+  border-color: var(--px-color-focus-ring, #5271ff) !important;
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -1000,19 +1054,8 @@ select option {
               inset 0 1px 0 var(--px-color-border-highlight, rgba(255, 255, 255, 0.06));
 }
 
-/* Soft aurora glow backdrop effect */
-.hero-card::before {
-  content: "";
-  position: absolute;
-  top: -30px;
-  right: -30px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(82, 113, 255, 0.12) 0%, rgba(139, 92, 246, 0.08) 50%, transparent 70%);
-  filter: blur(20px);
-  pointer-events: none;
-}
+/* No aurora glow: the Figma hero is a plain raised card (bg/raised, hairline,
+   Shadow/Card). Removed in Foundations v0.4.0. */
 
 .hero-card-content {
   display: flex;
@@ -1260,11 +1303,13 @@ select option {
   box-sizing: border-box;
 }
 
+/* Title/Medium 15/22, -1%: section headings such as "Help" and "More from Pixelfic". */
 .section-title {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 22px;
+  letter-spacing: -0.01em;
   color: var(--title);
   margin: 0;
 }
@@ -1368,7 +1413,7 @@ select option {
 /* Keyboard Focus Ring (Figma: 1px tint focus ring + 3px halo) */
 .icon-button:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -1478,7 +1523,8 @@ select option {
   justify-content: space-between;
   padding: 0 8px 0 16px;
   background-color: var(--framer-color-bg, #ffffff);
-  border-bottom: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
+  /* No divider: header and tab bar read as one surface in Figma. The only
+     hairline in the chrome is under the tab bar. */
   box-sizing: border-box;
   z-index: 10;
 }
@@ -1529,17 +1575,29 @@ select option {
 }
 
 /* 2. Tab Bar (Height 36px) */
+/* The panel's top row: Framer draws its own window bar above it, so the
+   plugin adds no header of its own. Tabs left, Collapse and Account right.
+   No bar gap: the spacer provides it, and four tabs plus two 30px icon
+   buttons only fit 360px without a second 20px. */
 .framefic-tab-bar {
   height: 36px;
   min-height: 36px;
   display: flex;
   align-items: center;
-  padding: 0 12px 0 16px;
+  padding: 0 8px 0 16px;
   background-color: var(--framer-color-bg, #ffffff);
   border-bottom: 1px solid var(--framer-color-divider, rgba(0, 0, 0, 0.05));
   box-sizing: border-box;
-  gap: 20px;
+  gap: 0;
   z-index: 9;
+}
+
+/* Collapse and Account, pinned right, 2px apart like icon button groups. */
+.framefic-tab-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .framefic-tabs-list {
@@ -1558,7 +1616,7 @@ select option {
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-secondary, #5c6670);
   background: transparent;
   border: none;
   padding: 0 2px;
@@ -1567,6 +1625,12 @@ select option {
   transition: color 0.15s ease;
   user-select: none;
   text-decoration: none;
+}
+
+/* Tabs are square. framer.css gives every <button> an 8px radius, which
+   rounded the tab and its active indicator. */
+.framefic-tabs-list button {
+	border-radius: 0 !important;
 }
 
 .framefic-tab:hover {
@@ -1763,7 +1827,7 @@ select option {
 .framefic-text-field:focus,
 .framefic-text-field.is-focus {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
   background-color: var(--framer-color-bg-tertiary, #ededed);
 }
@@ -1873,7 +1937,7 @@ body[data-framer-theme="light"] .framefic-select {
 .framefic-select:focus,
 .framefic-select.is-focus {
   outline: none;
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
   background-color: var(--framer-color-bg-tertiary, #ededed);
 }
@@ -1932,8 +1996,8 @@ body[data-framer-theme="light"] .framefic-select {
 .framefic-checkbox input:checked + .framefic-checkbox-box,
 .framefic-checkbox.is-checked .framefic-checkbox-box,
 .framefic-checkbox.is-indeterminate .framefic-checkbox-box {
-  background-color: var(--px-brand-primary, #5271ff);
-  border-color: var(--px-brand-primary, #5271ff);
+  background-color: var(--px-brand-action, #4761db);
+  border-color: var(--px-brand-action, #4761db);
 }
 
 .framefic-checkbox-icon {
@@ -1971,7 +2035,7 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-checkbox input:focus-visible + .framefic-checkbox-box,
 .framefic-checkbox.is-focus .framefic-checkbox-box {
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -2026,8 +2090,8 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-toggle input:checked + .framefic-toggle-track,
 .framefic-toggle.is-checked .framefic-toggle-track {
-  background-color: var(--px-brand-primary, #5271ff);
-  border-color: var(--px-brand-primary, #5271ff);
+  background-color: var(--px-brand-action, #4761db);
+  border-color: var(--px-brand-action, #4761db);
 }
 
 .framefic-toggle input:checked + .framefic-toggle-track .framefic-toggle-knob,
@@ -2038,7 +2102,7 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-toggle input:focus-visible + .framefic-toggle-track,
 .framefic-toggle.is-focus .framefic-toggle-track {
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -2091,8 +2155,8 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-radio input:checked + .framefic-radio-circle,
 .framefic-radio.is-checked .framefic-radio-circle {
-  background-color: var(--px-brand-primary, #5271ff);
-  border-color: var(--px-brand-primary, #5271ff);
+  background-color: var(--px-brand-action, #4761db);
+  border-color: var(--px-brand-action, #4761db);
 }
 
 .framefic-radio-dot {
@@ -2111,7 +2175,7 @@ body[data-framer-theme="light"] .framefic-select {
 
 .framefic-radio input:focus-visible + .framefic-radio-circle,
 .framefic-radio.is-focus .framefic-radio-circle {
-  border-color: var(--px-color-focus-ring, #0099ff);
+  border-color: var(--px-color-focus-ring, #5271ff);
   box-shadow: 0 0 0 3px var(--px-color-focus-halo, rgba(82, 113, 255, 0.20));
 }
 
@@ -2163,18 +2227,21 @@ body[data-framer-theme="light"] .framefic-select {
   color: var(--framer-color-text, #1b1f22);
 }
 
+/* v0.4.0: bg/selected, not bg/raised. In dark, bg/raised (#18191B) is darker
+   than the bg/tertiary track (#202020) and the selected segment disappeared.
+   bg/selected is always lighter than its track, with a 1px border/selected edge. */
 .framefic-segment.is-active,
 .framefic-segment[aria-selected="true"] {
-  background-color: var(--px-color-bg-raised, #ffffff);
+  background-color: var(--px-color-bg-selected, #ffffff);
   color: var(--framer-color-text, #1b1f22);
   font-weight: 600;
-  box-shadow: 0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
-              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
-              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0 0 1px var(--px-color-border-selected, rgba(0, 0, 0, 0.05)),
+              0 1px 1px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04)),
+              0 4px 12px -6px var(--px-color-shadow-soft, rgba(0, 0, 0, 0.04));
 }
 
 .framefic-segment:focus-visible {
-  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #5271ff);
 }
 
 .framefic-segment:disabled,
@@ -2393,7 +2460,7 @@ html[data-user-theme="light"] body .framefic-banner.banner-danger .banner-icon s
 }
 
 .banner-action-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #0099ff);
+  box-shadow: 0 0 0 2px var(--px-color-focus-ring, #5271ff);
 }
 
 /* --------------------------------------------------------------------------
@@ -2633,7 +2700,7 @@ html[data-user-theme="light"] body .toast-action {
 }
 
 .toast-action:focus-visible {
-  outline: 2px solid var(--px-color-focus-ring, #0099ff);
+  outline: 2px solid var(--px-color-focus-ring, #5271ff);
   border-radius: 2px;
 }
 

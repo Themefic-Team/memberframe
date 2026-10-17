@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 
 export interface SliderProps {
   id?: string;
@@ -26,6 +26,10 @@ export interface SliderProps {
  * Native `<input type="range">` on purpose: arrow keys, Home, End, and
  * `aria-valuenow` all come free, and a div-plus-drag reimplementation gets none
  * of them without deliberate work.
+ *
+ * Foundations: the filled part is brand/primary, the empty part control/track.
+ * The fill percentage reaches CSS as `--slider-fill`, written through a ref the
+ * same way PreviewStudio writes the blur radius, so no `style={{ }}` is needed.
  */
 export const Slider: React.FC<SliderProps> = ({
   id,
@@ -36,24 +40,38 @@ export const Slider: React.FC<SliderProps> = ({
   onChange,
   unit,
   label,
-}) => (
-  <span className="framefic-slider">
-    <input
-      id={id}
-      type="range"
-      className="framefic-slider-input"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      aria-label={label}
-      onChange={(event) => onChange(Number(event.currentTarget.value))}
-    />
-    {/* aria-hidden: the range input already announces its value, so reading the
-        readout too would say the number twice. */}
-    <span className="framefic-slider-value" aria-hidden={true}>
-      {value}
-      {unit}
+}) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const span = max - min;
+    const fill = span > 0 ? ((value - min) / span) * 100 : 0;
+    input.style.setProperty("--slider-fill", `${Math.min(100, Math.max(0, fill))}%`);
+  }, [value, min, max]);
+
+  return (
+    <span className="framefic-slider">
+      <input
+        ref={inputRef}
+        id={id}
+        type="range"
+        className="framefic-slider-input"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        aria-label={label}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+      />
+      {/* aria-hidden: the range input already announces its value, so reading the
+          readout too would say the number twice. */}
+      <span className="framefic-slider-value" aria-hidden={true}>
+        {value}
+        {unit ? <span className="framefic-slider-unit">{unit}</span> : null}
+      </span>
     </span>
-  </span>
-);
+  );
+};

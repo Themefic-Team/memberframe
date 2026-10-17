@@ -37,6 +37,24 @@ declare module "framer" {
     readonly Boolean: "boolean";
     readonly Link: "link";
     readonly Color: "color";
+    /**
+     * A collapsible group in the properties panel. Its value is an object
+     * keyed by the nested controls. Widened for the shared appearance block
+     * (Colors, Typography, Layout, Labels), 2026-10-15.
+     */
+    readonly Object: "object";
+    /**
+     * Framer's font picker. Its value is a style object whose `fontFamily` is
+     * a CSS font-family string; Framer loads the chosen font itself. Read
+     * defensively: the shape is documented, not compiled against.
+     */
+    readonly Font: "font";
+    /**
+     * A list the creator adds rows to. Its value is an array of whatever
+     * `control` produces. Widened for Member Pricing's per-tier feature
+     * lists, FP-16, 2026-10-16.
+     */
+    readonly Array: "array";
   };
 
   /**
@@ -55,8 +73,26 @@ declare module "framer" {
     step?: number;
     unit?: string;
     displayStepper?: boolean;
+    /** Enum only: render the options as a segmented control. */
+    displaySegmentedControl?: boolean;
+    /** Color and others: the value stays undefined until the creator sets it. */
+    optional?: boolean;
+    /** Object: the nested controls. Font: "basic" or "extended" editors. */
+    controls?: Record<string, PropertyControlDescription> | "basic" | "extended";
+    /** Font only. */
+    defaultFontType?: "sans-serif" | "serif" | "monospace";
+    /** Object only: the label on the collapsed group button. */
+    buttonTitle?: string;
+    /** String only. */
+    placeholder?: string;
+    displayTextArea?: boolean;
+    /** Array only: the control each row uses, and the most rows allowed. */
+    control?: PropertyControlDescription;
+    maxCount?: number;
     /** Framer calls this with the instance's current props on every render. */
     hidden?: (props: Record<string, unknown>) => boolean;
+    /** Help text Framer shows under the control. */
+    description?: string;
   }
 
   export function addPropertyControls(

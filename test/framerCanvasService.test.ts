@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  EXPORT_RETRY_DELAYS_MS,
   REPARENT_METHOD,
   WRITE_METHODS,
   deployCanvasComponent,
@@ -66,12 +67,12 @@ describe("deployCanvasComponent: the happy path", () => {
     expect(mock.calls.addComponentInstance[0].url).toBe(expected);
   });
 
-  it("does not reparent when the caller asked for no parent", async () => {
+  it("passes attributes to addComponentInstance when provided", async () => {
     const mock = createFramerMock();
-    const outcome = await deployCanvasComponent(deps(mock), generated);
+    const attrs = { controls: { assetId: "ast_test123", buttonText: "Download Kit" } };
+    await deployCanvasComponent(deps(mock), generated, { attributes: attrs });
 
-    expect(outcome.ok && outcome.reparented).toBe(false);
-    expect(mock.calls.setParent).toHaveLength(0);
+    expect(mock.calls.addComponentInstance[0].attributes).toEqual(attrs);
   });
 });
 
@@ -211,9 +212,34 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
     expect(mock.calls.addComponentInstance).toHaveLength(1);
   });
 
+  it("keeps re-reading while Framer compiles, then inserts", async () => {
+    const base = createFramerMock();
+    let reads = 0;
+    const mock = createFramerMock({
+      createCodeFile: async (name: string, code: string) => ({ ...(await base.createCodeFile(name, code)), exports: [] }),
+      // Two reads to find the file, then four more while it compiles.
+      getCodeFiles: async () => {
+        const files = await base.getCodeFiles();
+        reads += 1;
+        return reads >= 6 ? files : files.map((file) => ({ ...file, exports: [] }));
+      },
+    });
+
+    const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0, 0, 0, 0, 0, 0] });
+
+    expect(outcome.ok).toBe(true);
+    expect(mock.calls.addComponentInstance).toHaveLength(1);
+  });
+
+  it("waits a bounded time by default", () => {
+    const total = EXPORT_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBeGreaterThanOrEqual(10_000);
+    expect(total).toBeLessThanOrEqual(20_000);
+  });
+
   it("says the file was saved but not inserted when the export never appears", async () => {
     const mock = mockWithDelayedExports(false);
-    const outcome = await deployCanvasComponent(deps(mock), generated);
+    const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0, 0] });
 
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
@@ -240,7 +266,7 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
       getCodeFiles: async () => [],
     });
 
-    const outcome = await deployCanvasComponent(deps(mock), generated);
+    const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0, 0] });
 
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;

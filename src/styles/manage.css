@@ -54,23 +54,22 @@
 
 /* A pill is a filter, not a button, so it is quieter than .btn until active. */
 .member-pill {
+  width: auto;
   height: 24px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill, 999px);
-  border: 1px solid var(--framefic-surface-border);
-  background: var(--framefic-surface);
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--framer-color-divider);
+  background: var(--framer-color-bg-tertiary);
   color: var(--paragraph);
-  font-family: var(--font-sans);
-  font-size: 11px;
+  font: var(--text-body-sm);
   font-weight: 500;
-  line-height: 1;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .member-pill:hover {
-  border-color: var(--px-color-border-brand);
+  background: var(--framer-color-bg-secondary);
   color: var(--title);
 }
 
@@ -81,12 +80,19 @@
   font-weight: 600;
 }
 
+/* Focus: 1px focus/ring + Focus/Halo, the same pair every kit control uses. */
 .member-pill:focus-visible,
 .member-row:focus-visible,
 .tier-row:focus-visible {
   outline: none;
-  border-color: var(--px-color-focus-ring, var(--px-brand-primary));
-  box-shadow: 0 0 0 3px var(--px-brand-subtle);
+  border-color: var(--px-color-focus-ring);
+  box-shadow: var(--px-focus-halo);
+}
+
+/* Hover and selected follow the Plugin card: border/brand + lifted shadow. */
+.member-row:hover,
+.tier-row:hover {
+  box-shadow: var(--px-shadow-card-hover);
 }
 
 .members-count,
@@ -115,15 +121,17 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  height: auto;
   min-height: 52px;
   padding: 8px 10px;
   box-sizing: border-box;
   text-align: left;
-  border: 1px solid var(--framefic-surface-border);
-  border-radius: var(--radius-md, 10px);
-  background: var(--framefic-surface);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: var(--px-shadow-card);
 }
 
 .member-row:hover {
@@ -132,7 +140,7 @@
 
 .member-row.is-selected {
   border-color: var(--px-color-border-brand);
-  background: var(--framefic-surface-2);
+  background: var(--px-color-bg-raised);
 }
 
 .member-row-avatar {
@@ -143,7 +151,7 @@
   height: 28px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: var(--radius-pill, 999px);
+  border-radius: var(--radius-full);
   background: var(--framer-color-bg-tertiary);
   color: var(--framer-color-text-tertiary);
 }
@@ -189,13 +197,13 @@
 
 .member-row-email {
   font-size: 11px;
-  line-height: 14px;
+  line-height: 16px;
   color: var(--paragraph);
 }
 
 .member-row-meta {
-  font-size: 10px;
-  line-height: 14px;
+  font-size: 11px;
+  line-height: 16px;
   color: var(--framefic-text-muted);
 }
 
@@ -218,7 +226,7 @@
 .member-row-skeleton {
   width: 100%;
   min-height: 52px;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-12);
   background: var(--px-color-skeleton);
   opacity: 0.6;
 }
@@ -234,8 +242,9 @@
   padding: 12px;
   box-sizing: border-box;
   border: 1px solid var(--px-color-border-brand);
-  border-radius: var(--radius-md, 10px);
-  background: var(--framefic-surface-2);
+  border-radius: var(--radius-14);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-card);
 }
 
 .member-flyout-head {
@@ -268,7 +277,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-8);
   border: 1px solid var(--px-color-danger);
   background: var(--px-color-danger-subtle);
 }
@@ -277,7 +286,7 @@
   margin: 0;
   font-family: var(--font-sans);
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px;
   color: var(--title);
 }
 
@@ -293,8 +302,8 @@
 .member-flyout-note {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 10px;
-  line-height: 14px;
+  font-size: 11px;
+  line-height: 16px;
   color: var(--framefic-text-muted);
 }
 
@@ -324,15 +333,17 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  height: auto;
   min-height: 48px;
   padding: 8px 10px;
   box-sizing: border-box;
   text-align: left;
-  border: 1px solid var(--framefic-surface-border);
-  border-radius: var(--radius-md, 10px);
-  background: var(--framefic-surface);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
   cursor: pointer;
   transition: border-color 0.15s ease;
+  box-shadow: var(--px-shadow-card);
 }
 
 .tier-row:hover {
@@ -353,7 +364,7 @@
   width: 24px;
   height: 24px;
   flex-shrink: 0;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-8);
   background: var(--px-brand-subtle);
   color: var(--px-color-text-brand);
   font-family: var(--font-mono);
@@ -385,8 +396,8 @@
 }
 
 .tier-row-prices {
-  font-size: 10px;
-  line-height: 14px;
+  font-size: 11px;
+  line-height: 16px;
   color: var(--framefic-text-muted);
 }
 
@@ -398,8 +409,9 @@
   padding: 12px;
   box-sizing: border-box;
   border: 1px solid var(--px-color-border-brand);
-  border-radius: var(--radius-md, 10px);
-  background: var(--framefic-surface-2);
+  border-radius: var(--radius-14);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-card);
 }
 
 .tier-form-head {
@@ -443,7 +455,7 @@
   flex-direction: column;
   gap: 6px;
   padding-top: 8px;
-  border-top: 1px solid var(--framefic-surface-border);
+  border-top: 1px solid var(--framer-color-divider);
 }
 
 .member-profile-title {
@@ -468,8 +480,8 @@
 
 .member-profile-label {
   font-family: var(--font-sans);
-  font-size: 10px;
-  line-height: 14px;
+  font-size: 11px;
+  line-height: 16px;
   color: var(--paragraph);
 }
 
@@ -488,11 +500,140 @@
 }
 
 .member-profile-value a {
-  color: var(--secondary-default);
+  color: var(--px-color-text-brand);
   text-decoration: underline;
 }
 
 .member-profile-value a:focus-visible {
-  outline: 2px solid var(--px-color-border-brand);
+  outline: 1px solid var(--px-color-focus-ring);
   outline-offset: 1px;
+  border-radius: var(--radius-4);
+  box-shadow: var(--px-focus-halo);
+}
+
+/* FP-16. "Add currency" under a tier's prices: a small secondary action, left aligned. */
+.tier-extra-add {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* --------------------------------------------------------------------------
+   FILES, FP-12: the protected file vault behind Protected Download
+   -------------------------------------------------------------------------- */
+.files-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* The native picker stays in the DOM for the browser's file dialog; the kit
+   button opens it. */
+.files-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-card);
+}
+
+.file-row.is-editing {
+  flex-direction: column;
+  align-items: stretch;
+  border-color: var(--px-color-border-brand);
+}
+
+.file-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-8);
+  background: var(--framer-color-bg-tertiary);
+  color: var(--framer-color-text-tertiary);
+}
+
+.file-row-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.file-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.file-row-name,
+.file-row-meta,
+.file-row-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row-name {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--framer-color-text);
+}
+
+.file-row-meta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--framefic-text-muted);
+}
+
+.file-row-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--framer-color-text-tertiary);
+  user-select: all;
+}
+
+.file-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.file-row-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
