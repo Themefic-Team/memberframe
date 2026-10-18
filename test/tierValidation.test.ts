@@ -15,17 +15,16 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_TIER_FORM_DRAFT,
   RANK_MAX,
-  SELECTABLE_TIER_KEYS,
-  TIER_KEY_OPTIONS,
   TIER_NAME_MAX_LENGTH,
   byRankDescending,
+  keyFromName,
+  resolvedTierKey,
   suggestNextRank,
   tierEditorCta,
   validateTierDraft,
   type TierFormDraft,
 } from "../src/components/manage/tierValidation";
 import type { SiteTierRecord } from "../src/types/site";
-import type { TierKey } from "../src/types/member";
 
 function tier(overrides: Partial<SiteTierRecord> = {}): SiteTierRecord {
   return {
@@ -107,10 +106,10 @@ describe("rank format", () => {
     }
   });
 
-  it("accepts zero, because the free tier sits at the bottom of the ladder", () => {
-    expect(validateTierDraft(draft({ rank: "0", key: "free_member", monthlyPrice: "" }), []).valid).toBe(
-      true
-    );
+  it("keeps level 0 for the Free tier", () => {
+    // Rank 0 is the Free tier, where every member starts; a paid tier is 1 and up.
+    expect(validateTierDraft(draft({ rank: "0" }), []).errors.rank).toMatch(/Level 0 is the Free tier/);
+    expect(validateTierDraft(draft({ kind: "free", rank: "0", monthlyPrice: "" }), []).valid).toBe(true);
   });
 
   it("rejects a rank beyond the ceiling", () => {
@@ -145,44 +144,60 @@ describe("tier name", () => {
   });
 });
 
-describe("tier key", () => {
-  it("accepts a custom key and rejects a malformed one", () => {
-    // Conflict C9, resolved: a custom key is allowed when it is shaped like
-    // one, because the generator writes the site's tiers into the gate.
-    expect(validateTierDraft(draft({ key: "platinum" as TierKey }), []).errors.key).toBeUndefined();
-    expect(validateTierDraft(draft({ key: "Platinum Plus!" as TierKey }), []).errors.key).toBeTruthy();
+describe("tier ID", () => {
+  it("is made from the name for a new tier", () => {
+    expect(keyFromName("Gold Plus", [])).toBe("gold_plus");
+    expect(keyFromName("  Pro! 2026 ", [])).toBe("pro_2026");
+    expect(keyFromName("2026 Pass", [])).toBe("tier_2026_pass");
+    expect(resolvedTierKey(draft({ name: "Gold Plus" }), [])).toBe("gold_plus");
   });
 
-  it("rejects a key another tier already uses", () => {
-    const result = validateTierDraft(draft({ key: "tier_1" }), [tier({ key: "tier_1" })]);
-
-    expect(result.errors.key).toBeTruthy();
+  it("gets a number when the ID is taken", () => {
+    expect(keyFromName("Gold", ["gold"])).toBe("gold_2");
+    expect(keyFromName("Gold", ["gold", "gold_2"])).toBe("gold_3");
   });
 
-  it("offers exactly the four keys a gate can require", () => {
-    expect(SELECTABLE_TIER_KEYS).toEqual(["free_member", "tier_1", "tier_2", "vip"]);
-    expect(TIER_KEY_OPTIONS).toHaveLength(4);
+  it("keeps a saved tier's ID, whatever its name becomes", () => {
+    // Gates and locks name the ID, so renaming must not move it.
+    expect(resolvedTierKey(draft({ id: "t1", key: "tier_1", name: "Platinum" }), [])).toBe("tier_1");
   });
 
-  it("labels every key in words, never as the key itself", () => {
-    // PRD section 7.6 rule 4.
-    for (const option of TIER_KEY_OPTIONS) {
-      expect(option.label).not.toBe(option.value);
-      expect(option.label).not.toContain("_");
-    }
+  it("makes a valid ID even from a name of symbols", () => {
+    expect(keyFromName("!!", [])).toBe("tier");
+    expect(validateTierDraft(draft({ name: "!!" }), []).errors.key).toBeUndefined();
+  });
+});
+
+describe("Free and paid", () => {
+  it("allows one Free tier", () => {
+    const freeTier = tier({ id: "f", key: "free", name: "Free", rank: 0, monthlyPriceMinor: null });
+    const second = draft({ kind: "free", name: "Starter", rank: "0", monthlyPrice: "" });
+    expect(validateTierDraft(second, [freeTier]).errors.kind).toMatch(/already has its Free tier/);
+    expect(validateTierDraft(second, []).valid).toBe(true);
+  });
+
+  it("asks nothing of the Free tier's prices or level", () => {
+    const free = draft({ kind: "free", name: "Free", rank: "0", monthlyPrice: "", annualPrice: "abc" });
+    expect(validateTierDraft(free, []).valid).toBe(true);
   });
 });
 
 describe("prices", () => {
-  it("accepts a tier with no price only when it is the free tier", () => {
-    // PRD section 12.2 lists a free member tier, so a priceless tier is
-    // legitimate. A paid tier with every price blank is a half-filled form,
-    // and saving it produces a tier nobody can buy with no indication why.
-    const free = draft({ key: "free_member", name: "Free", rank: "0", monthlyPrice: "" });
-    expect(validateTierDraft(free, []).valid).toBe(true);
+  it("needs at least one on a paid tier", () => {
+    // A paid tier with every price blank is a half-filled form, and saving it
+    // produces a tier nobody can buy with no indication why.
+    const paid = draft({ monthlyPrice: "", annualPrice: "", lifetimePrice: "" });
+    expect(validateTierDraft(paid, []).errors.monthlyPrice).toMatch(/at least one price/);
+  });
 
-    const paid = draft({ key: "tier_2", monthlyPrice: "", annualPrice: "", lifetimePrice: "" });
-    expect(validateTierDraft(paid, []).errors.monthlyPrice).toBeTruthy();
+  it("refuses zero, which read as a price and sold nothing", () => {
+    expect(validateTierDraft(draft({ monthlyPrice: "0" }), []).errors.monthlyPrice).toMatch(/above zero/);
+    expect(validateTierDraft(draft({ monthlyPrice: "0.00" }), []).errors.monthlyPrice).toMatch(/above zero/);
+  });
+
+  it("parses in the site currency", () => {
+    expect(validateTierDraft(draft({ currency: "JPY", monthlyPrice: "1500" }), []).valid).toBe(true);
+    expect(validateTierDraft(draft({ currency: "JPY", monthlyPrice: "9.99" }), []).valid).toBe(false);
   });
 
   it("accepts any one of the three intervals on its own", () => {
@@ -224,9 +239,9 @@ describe("every message is written for a creator", () => {
     // PRD section 7.6 rules 4 and 6.
     const broken = draft({
       name: "",
-      key: "Not A Key!" as TierKey,
       rank: "x",
       monthlyPrice: "abc",
+      annualPrice: "0",
     });
 
     const { errors } = validateTierDraft(broken, []);
@@ -242,8 +257,8 @@ describe("every message is written for a creator", () => {
 });
 
 describe("suggestNextRank", () => {
-  it("starts at zero for the first tier", () => {
-    expect(suggestNextRank([])).toBe(0);
+  it("starts at level 1, above the Free tier", () => {
+    expect(suggestNextRank([])).toBe(1);
   });
 
   it("suggests one above the highest, so the common case cannot collide", () => {
@@ -253,7 +268,7 @@ describe("suggestNextRank", () => {
   it("produces a rank that actually validates", () => {
     // The property that matters: a suggestion the validator then rejects would
     // make the Create button fail on its own default.
-    const tiers = [tier({ id: "a", rank: 0, key: "free_member", name: "Free" })];
+    const tiers = [tier({ id: "a", rank: 0, key: "free", name: "Free", monthlyPriceMinor: null })];
     const suggested = suggestNextRank(tiers);
 
     const result = validateTierDraft(
@@ -270,7 +285,7 @@ describe("suggestNextRank", () => {
 });
 
 describe("byRankDescending", () => {
-  it("puts the highest tier first, so VIP reads at the top", () => {
+  it("puts the highest tier first, so the top tier reads at the top", () => {
     const ordered = byRankDescending([
       tier({ id: "a", rank: 0 }),
       tier({ id: "c", rank: 3 }),

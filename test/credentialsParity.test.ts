@@ -1,7 +1,7 @@
 /**
  * The password policy exists twice, and this is what keeps the copies honest.
  *
- * Same arrangement as `test/memberGateParity.test.ts`, and for the same
+ * Same arrangement as `test/entitlementParity.test.ts`, and for the same
  * unavoidable reason: `src/canvas-components/MemberAuth.tsx` is compiled by
  * Framer alone on a creator's published site, so it cannot import
  * `src/utils/credentials.ts`. Duplication is the architecture, not a shortcut.

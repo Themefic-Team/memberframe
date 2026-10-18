@@ -1,7 +1,7 @@
 /**
  * `<MemberAuth>`, the component and its generator. PRD task 2.5, feature F05.
  *
- * Same shape as `test/memberGateParity.test.ts`: the component is deployed into
+ * Same shape as `test/entitlementParity.test.ts`: the component is deployed into
  * a creator's Framer project and cannot be imported here, because it needs the
  * `framer` module that the Framer runtime supplies and that is deliberately not
  * installed. So its invariants are asserted against its source text.

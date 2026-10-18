@@ -21,6 +21,7 @@ export {
   BOOKMARK_BUTTON_DESCRIPTOR,
   BOOKMARKS_TRAY_DESCRIPTOR,
   generateMeteredPaywallCode,
+  METERED_PAYWALL_FILE_NAME,
   generateProtectedDownloadCode,
   generateBookmarkButtonCode,
   generateBookmarksTrayCode,
@@ -29,15 +30,11 @@ export {
   AUTH_SCREEN_DESCRIPTORS,
   generateAuthScreenCode,
   MEMBER_AUTH_FILE_NAME,
-  MEMBER_GATE_DESCRIPTOR,
-  MEMBER_GATE_FILE_NAME,
   buildConfigBlock,
   generateComponentCode,
   generateMemberAuthCode,
-  generateMemberGateCode,
   isSafeCssColor,
   normalizeAuthConfig,
-  normalizeGateConfig,
 } from "./canvasComponentCodeGenerator";
 export type {
   AuthScreenComponentId,
@@ -58,6 +55,7 @@ export type { ApiClientDeps, ApiFailure, ApiResult, QueryValue } from "./apiClie
 
 export {
   createTier,
+  deleteMember,
   fetchGatewayStatus,
   fetchMembers,
   fetchTiers,
@@ -82,14 +80,20 @@ export {
 export type { CheckoutOutcome, CheckoutRequest, CheckoutSession } from "./checkoutService";
 
 export {
+  BREAKPOINT_RETRY_DELAYS_MS,
+  SCAFFOLD_COMPONENT_SPACING,
   SCAFFOLD_METHODS,
+  findPageContentParent,
   membershipPages,
   normalizePagePath,
   scaffoldMembershipPages,
   scaffoldSummary,
 } from "./pageScaffoldService";
 export type {
+  BreakpointDeps,
   MembershipPageSpec,
+  PageChildNode,
+  PageContentParent,
   PageResult,
   ScaffoldComponent,
   ScaffoldDeps,
@@ -98,7 +102,7 @@ export type {
   ScaffoldSuccess,
 } from "./pageScaffoldService";
 
-export { REPARENT_METHOD, WRITE_METHODS, deployCanvasComponent } from "./framerCanvasService";
+export { REPARENT_METHOD, WRITE_METHODS, deployCanvasComponent, writeCodeFile } from "./framerCanvasService";
 export type {
   CanvasCodeFile,
   CanvasCodeFileExport,
@@ -109,11 +113,34 @@ export type {
   DeployOptions,
   DeployOutcome,
   DeploySuccess,
+  WriteCodeFileOutcome,
 } from "./framerCanvasService";
 
 export {
   DEFAULT_FALLBACK_PAGES,
   formatWebPagePath,
   getFramerProjectPages,
+  isCmsItemPath,
+  pageOptionLabel,
+  sortPagesByPath,
 } from "./framerPagesService";
 export type { FramerProjectPage } from "./framerPagesService";
+
+
+export {
+  MAX_SECTION_LOCKS,
+  SECTION_LOCKS_FILE_NAME,
+  SECTION_LOCK_NAME_PATTERN,
+  newSectionLock,
+  normalizeSectionLockName,
+  parseWhoSees,
+  sectionLockNameProblem,
+  sectionLockOverrideNames,
+  sectionLockSlug,
+  sectionLocksCode,
+  whoSeesOptions,
+  whoSeesValue,
+} from "./sectionLocks";
+export type { SectionLockTier, WhoSeesOption } from "./sectionLocks";
+
+export { ARTICLE_TAG_FILE_NAME, GATED_BODY_CLASS, LINKED_ARTICLE_CLASS, articleTagCode } from "./articleTag";

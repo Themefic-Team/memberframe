@@ -16,7 +16,6 @@ import { DEFAULT_METERED_PAYWALL_CONFIG } from "../src/types/canvas";
 
 const DIR = path.join(process.cwd(), "src", "canvas-components");
 const paywall = readFileSync(path.join(DIR, "MeteredPaywall.tsx"), "utf-8");
-const gate = readFileSync(path.join(DIR, "MemberGate.tsx"), "utf-8");
 
 function cut(source: string, name: string): string {
   const start = source.indexOf(`// @memberframe-${name}-start`);
@@ -206,10 +205,6 @@ describe("F08: Schema.org paywall markup", () => {
     ["mfPaywallSchema", "MF_GATED_BODY_CLASS"]
   );
 
-  it("is the same block in MemberGate and MeteredPaywall", () => {
-    expect(cut(gate, "schema")).toBe(block);
-  });
-
   it("emits valid JSON-LD that marks the gated body as not free", () => {
     const json = JSON.parse(schema.mfPaywallSchema("NewsArticle", "Scaling Framer", "https://example.com/blog/x"));
     expect(json).toEqual({
@@ -222,10 +217,9 @@ describe("F08: Schema.org paywall markup", () => {
     });
   });
 
-  it("points cssSelector at the class both components put on the gated content", () => {
+  it("points cssSelector at the class the paywall puts on the gated content", () => {
     expect(schema.MF_GATED_BODY_CLASS).toBe("memberframe-gated-body");
     expect(paywall).toContain("className={`mf-meter-body ${MF_GATED_BODY_CLASS}");
-    expect(gate).toContain("className={`memberframe-gate-content is-blurred ${MF_GATED_BODY_CLASS}`}");
   });
 
   it("cannot be broken out of its script element, and falls back to Article for an unknown type", () => {
@@ -233,10 +227,6 @@ describe("F08: Schema.org paywall markup", () => {
     expect(text).not.toContain("<");
     expect(JSON.parse(text)["@type"]).toBe("Article");
     expect(JSON.parse(schema.mfPaywallSchema("Article", "x".repeat(300), "u")).headline).toHaveLength(110);
-  });
-
-  it("is added by the gate only for Frosted Blur, never for Hide Completely", () => {
-    expect(gate).toContain('if (onCanvas || !seoMarkup || fallbackAction !== "blur" || !contentSlot) return;');
   });
 
   it("keeps the article in the page for every visitor: cut with CSS, never removed", () => {
@@ -247,7 +237,6 @@ describe("F08: Schema.org paywall markup", () => {
 
   it("keeps focus and screen readers out of the frosted text (criterion 5)", () => {
     expect(paywall).toContain('if (locked) body.setAttribute("inert", "");');
-    expect(gate).toContain('if (blurred) node.setAttribute("inert", "");');
   });
 });
 
@@ -266,12 +255,12 @@ describe("the generated paywall", () => {
   };
 
   it("bakes in the connection and the clamped config", () => {
-    const { code, config } = generateMeteredPaywallCode({ ...DEFAULT_METERED_PAYWALL_CONFIG, freeQuotaCount: 99 }, undefined, context);
-    expect(config.freeQuotaCount).toBe(10);
+    const { code, config } = generateMeteredPaywallCode({ ...DEFAULT_METERED_PAYWALL_CONFIG, freeQuotaCount: 999 }, undefined, context);
+    expect(config.freeQuotaCount).toBe(100);
     expect(code).toContain('siteKey: "site_123",');
     expect(code).toContain('apiBaseUrl: "https://api.example.com",');
     expect(code).toContain('loginPath: "/sign-in",');
-    expect(code).toContain("freeQuotaCount: 10,");
+    expect(code).toContain("freeQuotaCount: 100,");
   });
 
   it("lists the site's tiers, by rank and escaped, under Full Access For", () => {

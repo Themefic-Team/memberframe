@@ -3,6 +3,7 @@ import { ChevronRight, User } from "lucide-react";
 import { cn } from "../../utils/cn";
 import type { SiteMemberRecord } from "../../types/site";
 import { formatMinorWithCurrency } from "../../utils/money";
+import { currencyExponent } from "../../utils/currencies";
 import { formatJoinedDate, statusLabel, statusTone, tierLabel } from "./memberFilters";
 
 export interface MemberRowProps {
@@ -50,7 +51,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({ member, selected, onSelect
         {". Joined "}
         {formatJoinedDate(member.createdAt)}
         {". "}
-        {formatMinorWithCurrency(member.lifetimeSpend, member.currency)}
+        {formatMinorWithCurrency(member.lifetimeSpend, member.currency, currencyExponent(member.currency))}
         {" lifetime."}
       </span>
     </span>

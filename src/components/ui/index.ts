@@ -22,6 +22,9 @@ export type { InfoTipProps } from "./InfoTip";
 export { Segmented } from "./Segmented";
 export type { SegmentedOption, SegmentedProps } from "./Segmented";
 
+export { SearchSelect } from "./SearchSelect";
+export type { SearchSelectOption, SearchSelectProps } from "./SearchSelect";
+
 export { Select } from "./Select";
 export type { SelectOption, SelectProps } from "./Select";
 

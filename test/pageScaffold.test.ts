@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  findPageContentParent,
   membershipPages,
   normalizePagePath,
   scaffoldMembershipPages,
@@ -112,6 +113,17 @@ describe("membershipPages", () => {
   it("gives a separate sign up page when the creator asked for one", () => {
     const pages = membershipPages({ ...AUTH, signupPath: "/join" });
     expect(pages.map((page) => page.path)).toContain("/join");
+  });
+
+  it("includes a dedicated registration page when includeRegistration option is set", () => {
+    const pages = membershipPages(AUTH, { includeRegistration: true });
+    const signup = pages.find((p) => p.id === "signup");
+
+    expect(signup).toBeDefined();
+    expect(signup?.path).toBe("/signup");
+    expect(signup?.title).toBe("Sign up / Registration");
+    expect(signup?.component).toBe("member_register");
+    expect(signup?.gated).toBe(false);
   });
 
   it("never scaffolds the site root", () => {
@@ -253,6 +265,20 @@ describe("scaffoldMembershipPages", () => {
     if (outcome.ok) return;
     expect(outcome.reason).toBe("nothing_to_do");
   });
+
+  it("scaffolds pricing page when includePricing option is enabled", async () => {
+    const deps = mockDeps();
+    const pricingSpecs = membershipPages(AUTH, { includePricing: true });
+    const outcome = await scaffoldMembershipPages(deps, pricingSpecs);
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    expect(outcome.created).toBe(4);
+    expect(deps.created).toContain("/pricing");
+    const pricingResult = outcome.results.find((r) => r.id === "pricing");
+    expect(pricingResult?.component).toBe("member_pricing");
+  });
 });
 
 describe("scaffoldSummary", () => {
@@ -271,5 +297,56 @@ describe("scaffoldSummary", () => {
 
   it("says plainly when there was nothing to do", () => {
     expect(summary(0, 3, 0)).toBe("Every page already exists");
+  });
+});
+
+describe("findPageContentParent", () => {
+  const NO_WAIT = [0, 0, 0];
+
+  it("returns the primary breakpoint, never the page itself", async () => {
+    const parent = await findPageContentParent(
+      {
+        getChildren: async () => [
+          { id: "loose", isBreakpoint: false, isPrimaryBreakpoint: false },
+          { id: "phone", isBreakpoint: true, isPrimaryBreakpoint: false, layout: "stack" },
+          { id: "desktop", isBreakpoint: true, isPrimaryBreakpoint: true, layout: "stack" },
+        ],
+      },
+      "page-1",
+      NO_WAIT
+    );
+
+    expect(parent).toEqual({ id: "desktop", layout: "stack" });
+  });
+
+  it("waits for a breakpoint Framer has not built yet", async () => {
+    let reads = 0;
+    const parent = await findPageContentParent(
+      {
+        getChildren: async () => {
+          reads += 1;
+          return reads < 3 ? [] : [{ id: "desktop", isBreakpoint: true, isPrimaryBreakpoint: true, layout: null }];
+        },
+      },
+      "page-1",
+      NO_WAIT
+    );
+
+    expect(parent).toEqual({ id: "desktop", layout: null });
+    expect(reads).toBe(3);
+  });
+
+  it("returns null rather than the page when no breakpoint appears", async () => {
+    const parent = await findPageContentParent(
+      {
+        getChildren: async () => {
+          throw new Error("unreadable");
+        },
+      },
+      "page-1",
+      NO_WAIT
+    );
+
+    expect(parent).toBeNull();
   });
 });

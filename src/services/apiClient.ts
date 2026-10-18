@@ -210,6 +210,12 @@ export class ApiClient {
 
     const headers: Record<string, string> = { Accept: "application/json" };
 
+    // A free ngrok tunnel answers a browser with its own warning page instead
+    // of the API, and that page carries no CORS headers, so the panel reports
+    // the server as unreachable. Asking ngrok to skip it is the documented fix.
+    // Only sent to an ngrok address; the backend lists the header in CORS.
+    if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+
     const token = this.deps.getCreatorToken();
     if (token) {
       // Header, never a query parameter. A token in a URL lands in server logs,

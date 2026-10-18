@@ -13,6 +13,18 @@
  *
  * Members on the plan chosen in Full Access For read everything, with no pill.
  *
+ * ## Two ways to give it the article
+ *
+ *   - Slotted: the article is a frame connected to Article Body. Works on any
+ *     page whose article can be a top-level frame, /about for example.
+ *   - Linked: Article Body is left empty and the post body on the page gets
+ *     the `PaywallArticle` code override (file MemberArticle). This is the
+ *     way for a CMS post, whose body is bound to the current item inside the
+ *     page and so can never be a slot's content. The component sits below the
+ *     post, is styled in the sidebar like any component, and on the published
+ *     site cuts and frosts the tagged body with CSS and shows its own card.
+ *     The CSS is in the first render, so a locked post never flashes whole.
+ *
  * ## Where the count lives
  *
  * A signed-out visitor is metered on their device, in obfuscated storage
@@ -30,7 +42,7 @@
  * head, `isAccessibleForFree: False` with `hasPart` pointing at
  * `.memberframe-gated-body`, which is how Google recognises a legitimate
  * paywall. A determined visitor can read the text in developer tools; content
- * that must stay secret belongs behind `<MemberGate>` set to Hide Completely.
+ * that must stay secret belongs on a locked page or in a protected download.
  *
  * ## This file leaves the repository
  *
@@ -58,14 +70,14 @@ const IS_TRIAL = false;
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
-// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
 // from this repository, so the copy is the architecture. Edit all or none.
 //
 // One vocabulary for every component. The Theme control picks a palette, the
-// creator's Colors, Typography, and Layout groups override it, and every rule
+// creator's Colors, Typography, Layout, and Spacing groups override it, and every rule
 // in a component's stylesheet reads the resolved `--mf-c-*` values.
 //
 // ## Theme is a control, not the visitor's operating system
@@ -92,6 +104,7 @@ interface MfAppearanceProps {
   colors?: Partial<Record<MfColorKey, string>> | null;
   typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
   layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  spacing?: { margin?: unknown; customPadding?: boolean; padding?: unknown } | null;
   labels?: Record<string, unknown> | null;
 }
 
@@ -230,7 +243,68 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
   set("--mf-card-shadow", shadow ? null : "none");
 
+  const spacing = mfSpacingCss(input.spacing);
+  if (spacing !== "") lines.push(spacing);
+
   return lines.join(" ");
+}
+
+/**
+ * Four pixel sides out of a Padding control value, or null.
+ *
+ * Framer's Padding control produces `"24px"` or `"24px 16px 24px 16px"`, and a
+ * number is read as all four sides. One to four sides expand the way CSS
+ * shorthand does. Anything else, a negative, or a unit other than px is
+ * refused, because the result is written into a style block.
+ */
+function mfBox(value: unknown, max: number): [number, number, number, number] | null {
+  const parts: number[] = [];
+  if (typeof value === "number") {
+    parts.push(value);
+  } else if (typeof value === "string") {
+    const tokens = value.trim().split(/\s+/);
+    if (tokens[0] === "" || tokens.length > 4) return null;
+    for (const token of tokens) {
+      const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(token);
+      if (!match) return null;
+      parts.push(Number(match[1]));
+    }
+  } else {
+    return null;
+  }
+
+  if (!parts.every((part) => Number.isFinite(part) && part >= 0)) return null;
+  const [t, r = t, b = t, l = r] = parts.map((part) => Math.round(Math.min(max, part)));
+  return [t, r, b, l];
+}
+
+/**
+ * The Spacing group as declarations for the component root, or "".
+ *
+ * Emitted into the instance's scoped rule, which follows the component's own
+ * stylesheet, so a value the creator set wins and an untouched one leaves the
+ * component's own spacing alone. Top and bottom margin keep a root's own
+ * centring; a side margin replaces it, and `width: auto` lets the root fill
+ * the space between the two margins instead of overflowing at 100%.
+ */
+function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
+  const input = spacing || {};
+  const out: string[] = [];
+
+  const margin = mfBox(input.margin, 400);
+  if (margin) {
+    const [t, r, b, l] = margin;
+    if (t > 0) out.push(`margin-top: ${t}px;`);
+    if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
+  }
+
+  if (input.customPadding === true) {
+    const padding = mfBox(input.padding, 400);
+    if (padding) out.push(`padding: ${padding.map((side) => `${side}px`).join(" ")};`);
+  }
+
+  return out.join(" ");
 }
 
 const MF_LIGHT = `
@@ -279,7 +353,7 @@ ${root}.is-dark {${MF_DARK}
 }
 
 /**
- * The shared property controls: Theme, Colors, Typography, Layout.
+ * The shared property controls: Theme, Colors, Typography, Layout, Spacing.
  *
  * Return types are inferred on purpose. Framer's real `framer` module and this
  * repo's shim name their control types differently, and this file compiles
@@ -369,6 +443,21 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
         shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
       },
     },
+    spacing: {
+      type: ControlType.Object,
+      title: "Spacing",
+      buttonTitle: "Spacing",
+      controls: {
+        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        padding: {
+          type: ControlType.Padding,
+          title: "Padding",
+          defaultValue: "24px",
+          description: "Used when Custom padding is on.",
+        },
+      },
+    },
   };
 }
 
@@ -389,11 +478,12 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
 // ============================================================================
 // SCHEMA.ORG PAYWALL MARKUP, PRD F08
 // ============================================================================
-// Byte-identical in MemberGate and MeteredPaywall, held so by
-// `test/softPaywall.test.ts`. One script per page, added to the head on the
+// Held to its expected shape by `test/softPaywall.test.ts`. One script per page, added to the head on the
 // published site only: the canvas is not a page Google reads.
 
 const MF_GATED_BODY_CLASS = "memberframe-gated-body";
+/** Added by the PaywallArticle override in MemberArticle.tsx. One per page. */
+const MF_LINKED_ARTICLE_CLASS = "mf-paywall-article";
 const MF_SCHEMA_ID = "memberframe-paywall-schema";
 const MF_SCHEMA_TYPES = ["Article", "NewsArticle", "BlogPosting", "CreativeWork"];
 
@@ -455,6 +545,10 @@ interface MeterAnswer {
 
 const METER_DAY_MS = 86400000;
 const METER_MAX_SLUGS = 500;
+/** The most free articles a meter allows. The server holds the same cap. */
+const METER_MAX_QUOTA = 100;
+/** Above this the pill shows the count in words only: a row of 50 dots is noise. */
+const METER_MAX_DOTS = 10;
 
 function decideMeter(
   state: MeterState | null,
@@ -566,7 +660,7 @@ function decodeMeter(raw: string | null, seed: string): DeviceMeter | null {
 function currentDeviceReads(record: DeviceMeter | null, periodDays: number, now: number): string[] {
   if (!record || record.periodDays !== periodDays) return [];
   if (now - record.cycleStart >= periodDays * METER_DAY_MS || now < record.cycleStart) return [];
-  return record.slugs.slice(0, 10);
+  return record.slugs.slice(0, METER_MAX_QUOTA);
 }
 
 /**
@@ -683,8 +777,8 @@ const PERIOD_DAYS: Record<QuotaPeriod, number> = { weekly: 7, monthly: 30 };
 // ============================================================================
 // ENTITLEMENT
 // ============================================================================
-// `isEntitled` is the gate's resolver, verbatim, held to the plugin's copy by
-// `test/memberGateParity.test.ts`. `readsUnlimited` adds "any paid plan".
+// `isEntitled` is the plugin's resolver, verbatim, held to it by
+// `test/entitlementParity.test.ts`. `readsUnlimited` adds "any paid plan".
 
 function isEntitled(
   session: MemberSessionData | null,
@@ -751,6 +845,9 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (withBody) headers["Content-Type"] = "application/json";
   if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  // A free ngrok tunnel answers a browser with its warning page, not the API,
+  // unless the request asks it not to. Only sent to an ngrok address.
+  if (CONFIG.apiBaseUrl.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
   return headers;
 }
 
@@ -877,6 +974,11 @@ const cssContent = `
   font-size: calc(14px * var(--mf-text-scale, 1));
   line-height: 1.5;
 }
+/* On the canvas the frame always has a body to grab, even before an article is connected. */
+.mf-meter.is-canvas { min-height: 120px; }
+.mf-meter.is-linked { min-width: 0; }
+.mf-meter.is-linked .mf-meter-card { margin-top: 0; }
+.mf-meter.is-canvas.is-linked { display: flex; flex-direction: column; gap: 12px; }
 .mf-meter-body { position: relative; width: 100%; }
 .mf-meter-body.is-cut { max-height: var(--mf-meter-cut); overflow: hidden; }
 .mf-meter-fade {
@@ -1068,6 +1170,7 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
     colors,
     typography,
     layout,
+    spacing,
     labels,
   } = props;
 
@@ -1081,7 +1184,10 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
     return target === RenderTarget.canvas || target === RenderTarget.thumbnail;
   }, []);
 
-  const limit = Math.round(mfNumber(freeQuotaCount, 1, 10, 3));
+  const hasArticle = React.Children.toArray(contentSlot).length > 0;
+  // No slot: the article is a layer on the page tagged by PaywallArticle.
+  const linked = !hasArticle;
+  const limit = Math.round(mfNumber(freeQuotaCount, 1, METER_MAX_QUOTA, 3));
   const period: QuotaPeriod = quotaPeriod === "weekly" ? "weekly" : "monthly";
   const periodWord = t(period === "weekly" ? "periodWeek" : "periodMonth");
   const slug = useMemo(
@@ -1177,6 +1283,26 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
 
   // ---- Where the preview ends: after N paragraphs, or at the preview height ----
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [linkedArticle, setLinkedArticle] = useState<HTMLElement | null>(null);
+
+  // Linked: the tagged layer nearest above this component, else the first one.
+  // Framer renders the page in one pass, so it is there by the first effect.
+  useBrowserLayoutEffect(() => {
+    if (!linked || onCanvas) {
+      setLinkedArticle(null);
+      return;
+    }
+    const root = rootRef.current;
+    const tagged = Array.from(document.querySelectorAll<HTMLElement>(`.${MF_LINKED_ARTICLE_CLASS}`));
+    const above = root
+      ? tagged.filter((element) => element.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING)
+      : [];
+    setLinkedArticle(above[above.length - 1] ?? tagged[0] ?? null);
+  }, [linked, onCanvas]);
+
+  /** The element holding the article text: the slot's wrapper, or the tagged layer. */
+  const articleElement = (): HTMLElement | null => (linked ? linkedArticle : bodyRef.current);
   const [cutAt, setCutAt] = useState<number>(() => Math.round(mfNumber(previewHeight, 80, 2000, 320)));
 
   // Locked text is visible as a teaser but not reachable: `inert` keeps focus
@@ -1184,15 +1310,15 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
   // is the next thing they reach. Set on the node, which every React accepts.
   const locked = effective.phase === "locked";
   useBrowserLayoutEffect(() => {
-    const body = bodyRef.current;
+    const body = articleElement();
     if (!body) return;
     if (locked) body.setAttribute("inert", "");
     else body.removeAttribute("inert");
-  }, [locked, contentSlot]);
+  }, [locked, contentSlot, linkedArticle]);
 
   useBrowserLayoutEffect(() => {
     const fallback = Math.round(mfNumber(previewHeight, 80, 2000, 320));
-    const body = bodyRef.current;
+    const body = articleElement();
     if (!cut || !body) {
       setCutAt(fallback);
       return;
@@ -1208,7 +1334,7 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
     const bottom = last.getBoundingClientRect().bottom;
     // A little of the next paragraph shows under the frost, as a teaser should.
     setCutAt(Math.max(80, Math.round(bottom - top + 56)));
-  }, [cut, previewParagraphs, previewHeight, contentSlot]);
+  }, [cut, previewParagraphs, previewHeight, contentSlot, linkedArticle]);
 
   const blur = Math.round(mfNumber(blurIntensity, BLUR_MIN, BLUR_MAX, CONFIG.blurIntensity));
   const scopedCss =
@@ -1221,8 +1347,25 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
       colors,
       typography,
       layout,
+      spacing,
     }) +
     " }";
+
+  /*
+    Linked and not open: cut the tagged layer at the preview, fade its last
+    lines into whatever is behind it, and frost them. A mask rather than a
+    colour, so it suits any page background without a setting. In the first
+    render (phase "checking"), so a locked post is never shown whole.
+  */
+  const linkedCss =
+    linked && !onCanvas && cut
+      ? `.${MF_LINKED_ARTICLE_CLASS} { max-height: ${cutAt}px !important; overflow: hidden !important; position: relative !important; ` +
+        `-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent); ` +
+        `mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent); } ` +
+        `.${MF_LINKED_ARTICLE_CLASS}::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: min(200px, 70%); ` +
+        `pointer-events: none; backdrop-filter: blur(${blur}px); -webkit-backdrop-filter: blur(${blur}px); ` +
+        `-webkit-mask-image: linear-gradient(to bottom, transparent, #000); mask-image: linear-gradient(to bottom, transparent, #000); }`
+      : "";
 
   const goPricing = () => {
     if (onCanvas) return;
@@ -1269,14 +1412,16 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
     const keys = meterPillKeys(meter);
     const main = t(keys.main, values);
     const sub = t(keys.sub, values);
-    const dots = Array.from({ length: meter.limit }, (_, index) => index < meter.count);
+    const dots = meter.limit <= METER_MAX_DOTS ? Array.from({ length: meter.limit }, (_, index) => index < meter.count) : [];
     return (
       <div className="mf-meter-pill" role="status" aria-live="polite">
-        <span className="mf-meter-dots" aria-hidden={true}>
-          {dots.map((used, index) => (
-            <span key={index} className={`mf-meter-dot${used ? " is-used" : ""}`} />
-          ))}
-        </span>
+        {dots.length > 0 ? (
+          <span className="mf-meter-dots" aria-hidden={true}>
+            {dots.map((used, index) => (
+              <span key={index} className={`mf-meter-dot${used ? " is-used" : ""}`} />
+            ))}
+          </span>
+        ) : null}
         <span className="mf-meter-pill-text">
           <span className="mf-meter-pill-main">{main}</span>
           <span className="mf-meter-pill-sub">{sub}</span>
@@ -1295,16 +1440,35 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
   }
 
   function body(): React.ReactNode {
-    if (!contentSlot) {
-      return onCanvas ? (
-        <div className="mf-meter-placeholder">
-          <strong>Connect the article body</strong>
-          <span>
-            In the right sidebar, pick the frame or stack that holds the article in the Article Body slot. Set the
-            height to Fit so the paywall grows with the article.
-          </span>
-        </div>
-      ) : null;
+    // An unconnected slot arrives as an empty array, not undefined, so a
+    // truthiness check took it for an article and rendered a body with no
+    // height: only the absolute badge showed, outside a frame too small to grab.
+    if (linked) {
+      if (onCanvas) {
+        // The card the visitor will see, so it can be designed here with the
+        // sidebar's Theme, Colors, Typography, Layout, and Labels.
+        return (
+          <React.Fragment>
+            <div className="mf-meter-placeholder">
+              <strong>Paywall card</strong>
+              <span>
+                On a CMS page, place this below the post and give the post body the PaywallArticle override (Code
+                overrides, File MemberArticle). On any other page, connect the article in Article Body instead.
+              </span>
+            </div>
+            {lockCard(mode === "teaser" ? "teaser" : "meter", false)}
+          </React.Fragment>
+        );
+      }
+      // No tagged post body on this page: nothing to lock, so no card under a
+      // post anyone can read in full, and no pill counting it.
+      if (!linkedArticle) return null;
+      return (
+        <React.Fragment>
+          {locked ? lockCard(effective.reason, effective.signedIn) : null}
+          {effective.phase === "open" && effective.meter ? pill(effective.meter) : null}
+        </React.Fragment>
+      );
     }
 
     return (
@@ -1348,10 +1512,15 @@ export default function MeteredPaywall(props: MeteredPaywallProps) {
     ) : null;
 
   return (
-    <div className={`mf-meter ${mfThemeClass(theme)}`} data-mf-meter={scope}>
+    <div
+      ref={rootRef}
+      className={`mf-meter ${mfThemeClass(theme)}${onCanvas ? " is-canvas" : ""}${linked ? " is-linked" : ""}`}
+      data-mf-meter={scope}
+    >
       <style>{mfThemeCss(".mf-meter")}</style>
       <style>{cssContent}</style>
       <style>{scopedCss}</style>
+      {linkedCss ? <style>{linkedCss}</style> : null}
       {body()}
       {proLock}
       {watermark}
@@ -1379,7 +1548,7 @@ addPropertyControls(MeteredPaywall, {
     type: ControlType.Number,
     title: "Free Articles",
     min: 1,
-    max: 10,
+    max: 100,
     step: 1,
     displayStepper: true,
     defaultValue: CONFIG.freeQuotaCount,

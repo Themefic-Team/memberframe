@@ -20,11 +20,11 @@ import {
   deployCanvasComponent,
   type CanvasDeps,
 } from "../src/services/framerCanvasService";
-import { generateMemberGateCode } from "../src/services/canvasComponentCodeGenerator";
+import { generateMeteredPaywallCode } from "../src/services/canvasComponentCodeGenerator";
 import { createFramerMock, type FramerMock, type MockCodeFile } from "../src/utils/framerMock";
-import { DEFAULT_MEMBER_GATE_CONFIG } from "../src/types/canvas";
+import { DEFAULT_METERED_PAYWALL_CONFIG } from "../src/types/canvas";
 
-const generated = generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG);
+const generated = generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG);
 
 /**
  * The mock satisfies the narrow interface, so this is a cast-free handover and
@@ -43,7 +43,7 @@ describe("deployCanvasComponent: the happy path", () => {
     if (!outcome.ok) return;
 
     expect(outcome.action).toBe("created");
-    expect(outcome.fileName).toBe("MemberGate.tsx");
+    expect(outcome.fileName).toBe("MeteredPaywall.tsx");
     expect(outcome.nodeId).toBeTruthy();
     expect(mock.calls.createCodeFile).toHaveLength(1);
     expect(mock.calls.addComponentInstance).toHaveLength(1);
@@ -54,7 +54,7 @@ describe("deployCanvasComponent: the happy path", () => {
     await deployCanvasComponent(deps(mock), generated);
 
     expect(mock.calls.createCodeFile[0].code).toBe(generated.code);
-    expect(mock.calls.createCodeFile[0].name).toBe("MemberGate.tsx");
+    expect(mock.calls.createCodeFile[0].name).toBe("MeteredPaywall.tsx");
   });
 
   it("inserts by the component export's own URL", async () => {
@@ -81,8 +81,8 @@ describe("deployCanvasComponent: a second deploy updates rather than duplicating
     const mock = createFramerMock();
     await deployCanvasComponent(deps(mock), generated);
 
-    const second = generateMemberGateCode({
-      ...DEFAULT_MEMBER_GATE_CONFIG,
+    const second = generateMeteredPaywallCode({
+      ...DEFAULT_METERED_PAYWALL_CONFIG,
       cardTitle: "Second pass",
     });
     const outcome = await deployCanvasComponent(deps(mock), second);
@@ -95,7 +95,7 @@ describe("deployCanvasComponent: a second deploy updates rather than duplicating
     expect(mock.calls.setFileContent).toHaveLength(1);
 
     // One component file, two instances. A creator adjusting the customizer and
-    // clicking again must not end up with MemberGate.tsx and MemberGate 2.tsx.
+    // clicking again must not end up with MeteredPaywall.tsx and MeteredPaywall 2.tsx.
     const files = await mock.getCodeFiles();
     expect(files).toHaveLength(1);
     expect(files[0].content).toContain("Second pass");
@@ -246,15 +246,15 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
 
     expect(outcome.reason).toBe("no_component_export");
     // The file really is in the project, so the copy must not imply otherwise.
-    expect(outcome.message).toContain("MemberGate.tsx is in the project");
+    expect(outcome.message).toContain("MeteredPaywall.tsx is in the project");
     expect(mock.calls.addComponentInstance).toHaveLength(0);
   });
 
   it("ignores an override export, which carries no insert URL", async () => {
     const overrideOnly: MockCodeFile = {
       id: "code-file-override",
-      name: "MemberGate.tsx",
-      path: "/code/MemberGate.tsx",
+      name: "MeteredPaywall.tsx",
+      path: "/code/MeteredPaywall.tsx",
       content: generated.code,
       exports: [{ name: "withGate", isDefaultExport: false, type: "override" }],
       setFileContent: async () => overrideOnly,

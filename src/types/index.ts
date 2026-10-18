@@ -14,11 +14,4 @@ export type {
   TierKey,
 } from "./member";
 
-export {
-  BLUR_MAX,
-  BLUR_MIN,
-  DEFAULT_MEMBER_GATE_CONFIG,
-  FALLBACK_ACTION_LABELS,
-  visibleGateRows,
-} from "./canvas";
-export type { GateFallbackAction, MemberGateConfig } from "./canvas";
+export { BLUR_MAX, BLUR_MIN } from "./canvas";

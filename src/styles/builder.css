@@ -26,11 +26,8 @@
 }
 
 /* The preview surface. Renders at the panel's true width so a creator judges
-   proportions as they will appear, not as a scaled thumbnail. The default blur
-   radius is declared here and overwritten per keystroke by PreviewStudio. */
+   proportions as they will appear, not as a scaled thumbnail. */
 .studio-viewport {
-  --memberframe-preview-blur: 8px;
-
   position: relative;
   display: flex;
   align-items: center;
@@ -107,8 +104,8 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);
-  color: var(--paragraph-faint);
-  background-color: var(--framer-color-bg-tertiary);
+  color: var(--px-color-text-brand);
+  background-color: var(--px-brand-subtle);
 }
 
 .studio-pending-icon svg {
@@ -127,11 +124,11 @@
 
 .studio-pending-body {
   margin: 0;
-  max-width: 220px;
+  max-width: 240px;
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph-faint);
+  color: var(--paragraph);
 }
 
 /* --------------------------------------------------------------------------
@@ -225,187 +222,40 @@
   color: var(--paragraph-faint);
 }
 
-/* --------------------------------------------------------------------------
-   5. MEMBER GATE PREVIEW
-
-   Classes prefixed `memberframe-` per PRD section 9.3 rule 2, matching the
-   canvas component authored in task 1.7 so the preview and the published
-   component name the same parts the same way. They share names, not code.
-   -------------------------------------------------------------------------- */
-.memberframe-gate-container {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.memberframe-gate-note {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--paragraph-faint);
-  text-align: center;
-}
-
-.memberframe-gate-hidden-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  color: var(--paragraph-faint);
-  background-color: var(--framer-color-bg-tertiary);
-}
-
-.memberframe-gate-hidden-icon svg {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
-}
-
-/* Stands in for whatever the creator connects to `contentSlot`. */
-.memberframe-slot-stub {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: 100%;
-  min-height: 84px;
-  padding: 12px;
-  border-radius: var(--radius-10);
-  border: 1px dashed var(--framefic-surface-border);
-  background: var(--px-color-bg-raised);
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.memberframe-slot-stub-label {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--title);
-}
-
-.memberframe-slot-stub-hint {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--paragraph-faint);
-  max-width: 200px;
-}
-
-/* The frosted blur fallback. The radius is the only value the creator drags,
-   so it arrives as a custom property rather than a class. */
-.memberframe-blur-overlay {
-  width: 100%;
-  filter: blur(var(--memberframe-preview-blur));
-  pointer-events: none;
-  user-select: none;
-}
-
-/* Blur lifts the content, so the card sits over it rather than under it. */
-.memberframe-gate-container.is-blur-state .memberframe-lock-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: calc(100% - 24px);
-}
-
-.memberframe-lock-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: var(--space-16) var(--space-12);
-  border-radius: var(--radius-14);
-  border: 1px solid var(--framer-color-divider);
-  background-color: var(--px-color-bg-raised);
-  box-shadow: var(--px-shadow-popover);
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.memberframe-lock-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-full);
-  color: var(--px-color-text-brand);
-  background-color: var(--px-brand-subtle);
-}
-
-.memberframe-lock-icon svg {
-  width: 14px;
-  height: 14px;
-  stroke: currentColor;
-}
-
-.memberframe-lock-title {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
-  color: var(--title);
-}
-
-.memberframe-lock-description {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--paragraph);
-}
-
-.memberframe-lock-reason {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--paragraph-faint);
-}
-
-/* Looks like the canvas component's button but is a span, because a real
-   button would be a second .primary-cta in this view and PRD section 7.5
-   permits exactly one. Clicking inside a preview should not start a checkout. */
-.memberframe-lock-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 30px;
-  margin-top: var(--space-4);
-  padding: 0 var(--space-12);
-  border-radius: var(--radius-8);
-  background: var(--px-brand-gradient);
-  box-shadow: var(--px-shadow-primary);
-  color: var(--px-brand-on-primary);
-  font: var(--text-body-strong);
-  user-select: none;
-}
-
 /* ---------------------------------------------------------------------------
-   Membership page scaffolding
+   Membership page scaffolding (Predefined Pages)
    ---------------------------------------------------------------------------
-   The list of pages the button will create, shown before it is clicked. A
-   creator about to have pages added to their project should see which ones,
-   because the paths come from Settings and a wrong path there is far easier to
-   spot as a list than as a form field.
+   Predefined pages the creator can scaffold into Framer, complete with
+   their respective canvas components attached.
 */
 
-.builder-help {
+.builder-scaffold-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin-top: var(--space-12);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--framer-color-divider);
+}
+
+.builder-scaffold-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.builder-scaffold-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.builder-scaffold-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--title);
   margin: 0;
-  color: var(--paragraph);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .builder-page-list {
@@ -414,32 +264,67 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .builder-page {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-10);
   border: 1px solid var(--framer-color-divider);
-  border-radius: var(--radius-10);
+  border-radius: var(--radius-8);
   background: var(--px-color-bg-raised);
-  min-width: 0;
   box-shadow: var(--px-shadow-card);
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
-.builder-page-path {
+.builder-page:hover {
+  border-color: var(--px-color-border-brand);
+}
+
+.builder-page.is-existing {
+  opacity: 0.85;
+}
+
+.builder-page-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  flex: 1;
+}
+
+.builder-page-left .framefic-checkbox {
+  width: 100%;
+}
+
+.builder-page-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.builder-page-title {
   color: var(--title);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.builder-page-purpose {
+.builder-page-path {
   color: var(--paragraph);
+  font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

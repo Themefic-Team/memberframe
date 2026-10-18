@@ -1,26 +1,61 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FileStack, Plus } from "lucide-react";
 import { framer } from "framer-plugin";
-import { Banner, Button, FieldRow, FieldRows, Select, useToast } from "../ui";
+import { Badge, Banner, Button, Checkbox, FieldRow, FieldRows, Select, useToast } from "../ui";
+import { cn } from "../../utils/cn";
 import {
   AUTH_SCREEN_DEFAULTS,
+  ARTICLE_TAG_FILE_NAME,
+  articleTagCode,
   deployCanvasComponent,
+  writeCodeFile,
   generateAuthScreenCode,
   generateMemberAuthCode,
   generateMemberDashboardCode,
-  generateMemberGateCode,
   generateMemberPricingCode,
   generateOnboardingModalCode,
   generateMeteredPaywallCode,
   generateProtectedDownloadCode,
   generateBookmarkButtonCode,
   generateBookmarksTrayCode,
+  SCAFFOLD_COMPONENT_SPACING,
+  findPageContentParent,
   membershipPages,
+  normalizePagePath,
   scaffoldMembershipPages,
   scaffoldSummary,
   type DeployContext,
   type GeneratedCanvasFile,
+  type MembershipPageSpec,
 } from "../../services";
+
+export const COMPONENT_LAYOUT_DEFAULTS: Record<
+  string,
+  {
+    width: string;
+    height: string;
+    position: "relative" | "absolute";
+    top?: string | null;
+    centerX?: string | null;
+  }
+> = {
+  member_auth: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_login: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_register: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_password_reset: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_otp_verify: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_dashboard: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_pricing: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
+  onboarding_modal: { width: "480px", height: "fit-content", position: "relative", top: null, centerX: null },
+  // Fixed, not 100%: dropped loose on the canvas, 100% of no parent collapses
+  // the frame to a dot that cannot be dragged. Set it to Fill once it is in the article.
+  metered_paywall: { width: "640px", height: "fit-content", position: "relative", top: null, centerX: null },
+  protected_download: { width: "fit-content", height: "fit-content", position: "relative", top: null, centerX: null },
+  // An icon button, not a section: Fit both ways, so it is as big as its icon
+  // and label. At 100% it stretched across whatever stack it landed in.
+  bookmark_button: { width: "fit-content", height: "fit-content", position: "relative", top: null, centerX: null },
+  bookmarks_tray: { width: "fit-content", height: "fit-content", position: "relative", top: null, centerX: null },
+};
 import { assetSummary, fetchAssets, type AssetList, type SiteAsset } from "../../services/assetsService";
 import { useConnection } from "../../hooks/useConnection";
 import { useSiteTiers } from "../../hooks/useSiteTiers";
@@ -28,7 +63,6 @@ import { deployBaseUrl } from "../../config/backend";
 import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
-  DEFAULT_MEMBER_GATE_CONFIG,
   DEFAULT_MEMBER_PRICING_CONFIG,
   DEFAULT_ONBOARDING_MODAL_CONFIG,
   DEFAULT_METERED_PAYWALL_CONFIG,
@@ -56,33 +90,12 @@ const COMPONENT_OPTIONS = CANVAS_COMPONENTS.map((component) => ({
  *
  * Picker, preview, pages, insert. One primary CTA.
  *
- * ## The customizer was removed, deliberately
+ * Every component is inserted with its authored defaults and configured in
+ * Framer's own properties panel, which is where a creator is already working.
+ * The panel never holds a second copy of a value the sidebar also sets.
  *
- * This tab used to carry six configuration rows for `<MemberGate>`: required
- * tier, locked state, blur amount, redirect target, lock title, lock message.
- * **Every one of them is also a Framer property control on the component**, so a
- * creator configured the same value twice in two places and the panel's copy
- * was only ever the starting value.
- *
- * `<MemberAuth>` and `<MemberDashboard>` always worked the other way: inserted
- * with their defaults and configured in Framer's own sidebar, which is where a
- * creator is already working. The gate was the odd one out for the historical
- * reason that it was built first, before its property controls existed.
- *
- * So the gate is now deployed with `DEFAULT_MEMBER_GATE_CONFIG` and configured
- * on the canvas like the other two. Recorded as conflict C30: this reduces PRD
- * task 1.3's scope and the second half of feature F04.
- *
- * ## The preview stayed, and it is a different thing
- *
- * The state switcher, Guest through VIP and Failed, is feature F04's first half
- * and it answers a question Framer's canvas cannot: what a Silver member sees
- * versus a VIP. There is no other way to check that without publishing and
- * signing in as five different people.
- *
- * What it shows is now "the component you are about to insert" rather than "the
- * component as you have configured it". That is a real reduction and it is the
- * cost of the paragraph above.
+ * Locking pages and sections is not done here: page locks and section locks
+ * live in Settings, Page Locks, and the Route Shield enforces both.
  */
 export const BuilderTab: React.FC = () => {
   const { connection, settings } = useConnection();
@@ -145,9 +158,12 @@ export const BuilderTab: React.FC = () => {
       afterLoginPath: settings?.auth.afterLoginPath ?? "",
       loginPath: settings?.auth.loginPath ?? "/login",
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
-      signupPath: settings?.auth.signupPath ?? "",
+      signupPath:
+        settings?.auth.signupPath && settings?.auth.signupPath !== settings?.auth.loginPath
+          ? settings.auth.signupPath
+          : "/signup",
       resetPath: settings?.auth.resetPath ?? "/reset-password",
-      // The gate's Access Tier list is written from these. Conflict C9.
+      // Tier lists in deployed components are written from these. Conflict C9.
       tiers: siteTierList,
     }),
     [connection, settings, siteTierList]
@@ -160,33 +176,163 @@ export const BuilderTab: React.FC = () => {
    * the ones the components already point at. Additive: a page whose path
    * already exists is kept, never replaced.
    */
+  const pages = useMemo(
+    () => membershipPages(settings?.auth, { includePricing: true, includeRegistration: true }),
+    [settings?.auth]
+  );
+
+  const [existingPagePaths, setExistingPagePaths] = useState<Set<string>>(new Set());
+
+  const checkExistingPages = useCallback(async () => {
+    try {
+      if (typeof framer?.getNodesWithType === "function") {
+        const nodes = await framer.getNodesWithType("WebPageNode");
+        if (Array.isArray(nodes)) {
+          const found = new Set<string>();
+          for (const node of nodes) {
+            if (typeof node?.path === "string" && node.path.trim() !== "") {
+              found.add(normalizePagePath(node.path));
+            }
+          }
+          setExistingPagePaths(found);
+        }
+      }
+    } catch {
+      // Running outside Framer or in tests
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkExistingPages();
+  }, [checkExistingPages]);
+
+  const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(() =>
+    new Set(["login", "signup", "reset", "dashboard", "pricing"])
+  );
+
+  const handleTogglePage = useCallback((id: string) => {
+    setSelectedPageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const pendingPages = useMemo(
+    () => pages.filter((page) => !existingPagePaths.has(normalizePagePath(page.path))),
+    [pages, existingPagePaths]
+  );
+
+  const allPagesExist = pages.length > 0 && pendingPages.length === 0;
+
+  const selectedSpecs = useMemo(
+    () => pendingPages.filter((page) => selectedPageIds.has(page.id)),
+    [pendingPages, selectedPageIds]
+  );
+
+  /**
+   * Create selected pages with their corresponding canvas components automatically pre-installed.
+   */
   const handleCreatePages = useCallback(async () => {
-    if (!settings) return;
+    if (selectedSpecs.length === 0) return;
 
     setScaffolding(true);
     setFailure(null);
 
     try {
-      const outcome = await scaffoldMembershipPages(framer, membershipPages(settings.auth));
+      const outcome = await scaffoldMembershipPages(framer, selectedSpecs);
 
       if (!outcome.ok) {
         setFailure(outcome);
         return;
       }
 
-      showToast({ tone: outcome.failed > 0 ? "error" : "success", message: scaffoldSummary(outcome) });
+      let componentsDeployed = 0;
+      const componentDeployErrors: string[] = [];
 
-      // A page that Framer refused is worth keeping on screen. A toast saying
-      // "1 failed" and nothing saying which would leave the creator to compare
-      // the project against the settings by hand.
-      const failed = outcome.results.filter((result) => result.status === "failed");
+      for (const result of outcome.results) {
+        // ONLY deploy components for pages that were actually newly created in this run
+        if (result.status === "created") {
+          const spec = selectedSpecs.find((p) => p.id === result.id);
+          if (spec && spec.component !== "none") {
+            try {
+              // The page's own children are its breakpoints. Parenting to the
+              // page leaves the component floating beside the Desktop frame
+              // and absent from the published site, so it goes inside it.
+              const contentParent = await findPageContentParent(framer, result.nodeId);
+              if (!contentParent) {
+                componentDeployErrors.push(
+                  `${spec.title}: the page has no Desktop frame yet. Add the component from Components.`
+                );
+                continue;
+              }
 
-      if (failed.length > 0) {
+              const generated = generateForComponent(spec.component, deployContext);
+              const flowAttrs = COMPONENT_LAYOUT_DEFAULTS[spec.component] ?? {
+                width: "100%",
+                height: "fit-content",
+                position: "relative",
+                top: null,
+                centerX: null,
+              };
+              // A stack or grid flows the child between the layout's header and
+              // footer. A plain frame does not, so pin it to the top, centred.
+              const flows = contentParent.layout === "stack" || contentParent.layout === "grid";
+              const layoutAttrs = flows
+                ? flowAttrs
+                : { ...flowAttrs, position: "absolute" as const, top: "0px", centerX: "50%" };
+              const deployResult = await deployCanvasComponent(framer, generated, {
+                parentId: contentParent.id,
+                // Clear a header the layout template lays over the page.
+                attributes: { ...layoutAttrs, controls: { spacing: SCAFFOLD_COMPONENT_SPACING } },
+              });
+              if (deployResult.ok) {
+                componentsDeployed++;
+              } else {
+                componentDeployErrors.push(`${spec.title}: ${deployResult.message}`);
+              }
+            } catch (err) {
+              componentDeployErrors.push(
+                `${spec.title}: ${err instanceof Error ? err.message : String(err)}`
+              );
+            }
+          }
+        }
+      }
+
+      const failedPages = outcome.results.filter((result) => result.status === "failed");
+
+      if (failedPages.length > 0 || componentDeployErrors.length > 0) {
+        const errors = [
+          ...failedPages.map((r) => `${r.path}: ${r.reason}`),
+          ...componentDeployErrors,
+        ];
         setFailure({
-          title: "Some pages were not created",
-          message: failed.map((result) => `${result.path}: ${result.reason}`).join(" "),
+          title: "Some pages or components had issues",
+          message: errors.join(" "),
         });
       }
+
+      // Re-query existing pages so UI marks newly created pages as already existing
+      await checkExistingPages();
+
+      let toastMessage: string;
+      if (outcome.created === 0) {
+        toastMessage = "This page already exists";
+      } else if (componentsDeployed > 0) {
+        toastMessage = `${outcome.created} pages & ${componentsDeployed} components added`;
+      } else {
+        toastMessage = scaffoldSummary(outcome);
+      }
+
+      showToast({
+        tone: failedPages.length > 0 ? "error" : "success",
+        message: toastMessage.slice(0, 45),
+      });
     } catch (error) {
       setFailure({
         title: "Could not create the pages",
@@ -196,7 +342,7 @@ export const BuilderTab: React.FC = () => {
     } finally {
       setScaffolding(false);
     }
-  }, [settings, showToast]);
+  }, [checkExistingPages, deployContext, selectedSpecs, showToast]);
 
   const entry = findComponent(componentId);
 
@@ -214,26 +360,43 @@ export const BuilderTab: React.FC = () => {
 
     try {
       /*
-        All three are inserted with their authored defaults and configured in
-        Framer's own properties panel. The gate used to be the exception,
-        carrying values from a customizer in this tab; see the header note for
-        why it no longer is. One generator core, one deploy path, no special
-        case.
+        Every component is inserted with its authored defaults and configured
+        in Framer's own properties panel. One generator core, one deploy path,
+        no special case.
       */
       const generated = generateForComponent(entry.id, deployContext, chosenAsset);
+      const layoutAttrs = COMPONENT_LAYOUT_DEFAULTS[entry.id] ?? {
+        width: "100%",
+        height: "fit-content",
+        position: "relative",
+        top: null,
+        centerX: null,
+      };
 
       const outcome = await deployCanvasComponent(framer, generated, {
-        attributes: chosenAsset
-          ? {
-              controls: {
-                assetId: chosenAsset.id,
-                buttonText: `Download ${chosenAsset.name || "File"}`,
-              },
-            }
-          : undefined,
+        attributes: {
+          ...layoutAttrs,
+          ...(chosenAsset
+            ? {
+                controls: {
+                  assetId: chosenAsset.id,
+                  buttonText: `Download ${chosenAsset.name || "File"}`,
+                },
+              }
+            : {}),
+        },
       });
 
-      if (outcome.ok) {
+      // The Soft Paywall's linked mode needs the PaywallArticle override for a
+      // CMS post body, so it arrives with the component. Docs: 21-blog-paywalls.md
+      const tagWritten =
+        outcome.ok && entry.id === "metered_paywall"
+          ? await writeCodeFile(framer, ARTICLE_TAG_FILE_NAME, articleTagCode())
+          : null;
+
+      if (tagWritten && !tagWritten.ok) {
+        setFailure({ title: "Soft Paywall added, MemberArticle not written", message: tagWritten.message });
+      } else if (outcome.ok) {
         showToast({
           tone: "success",
           message: `${entry.name} ${outcome.action === "created" ? "added" : "updated"}`,
@@ -242,7 +405,7 @@ export const BuilderTab: React.FC = () => {
         setFailure(outcome);
       }
     } catch (error) {
-      // `generateMemberGateCode` throws only on a repo defect, and the deploy
+      // A generator throws only on a repo defect, and the deploy
       // path returns outcomes rather than throwing. Anything arriving here is
       // unexpected, so it is reported rather than swallowed.
       setFailure({
@@ -304,43 +467,7 @@ export const BuilderTab: React.FC = () => {
           />
         ) : null}
 
-        {/*
-          The authored defaults, not a draft. The switcher varies the MEMBER's
-          tier, which is what makes the preview worth having; the gate's own
-          requirement is now set on the canvas.
-        */}
-        <PreviewStudio componentId={componentId} gateConfig={DEFAULT_MEMBER_GATE_CONFIG} />
-
-        {/* {connection !== null && settings !== null ? (
-          <section className="section-group">
-            <h2 className="section-title">Membership pages</h2>
-
-            <p className="builder-help">
-              Creates the pages your membership needs, using the paths from
-              Settings. Pages that already exist are kept.
-            </p>
-
-            <ul className="builder-page-list">
-              {membershipPages(settings.auth).map((page) => (
-                <li key={page.id} className="builder-page">
-                  <span className="builder-page-path">{page.path}</span>
-                  <span className="builder-page-purpose">{page.purpose}</span>
-                </li>
-              ))}
-            </ul>
-
-            <Button
-              variant="secondary"
-              size="md"
-              className="fill"
-              disabled={scaffolding}
-              onClick={() => void handleCreatePages()}
-            >
-              <FileStack aria-hidden={true} />
-              {scaffolding ? "Creating pages" : "Create membership pages"}
-            </Button>
-          </section>
-        ) : null} */}
+        <PreviewStudio componentId={componentId} />
 
         {failure ? (
           <Banner tone="danger" title={failure.title} message={failure.message} />
@@ -367,6 +494,84 @@ export const BuilderTab: React.FC = () => {
           </Button>
           <p className="studio-cta-note">{ctaNote(entry, Boolean(chosenAsset))}</p>
         </div>
+
+        <section className="builder-scaffold-section">
+          <div className="builder-scaffold-header">
+            <div className="builder-scaffold-title-row">
+              <h2 className="builder-scaffold-heading">Predefined Pages</h2>
+              <Badge tone={allPagesExist ? "success" : "neutral"}>
+                {allPagesExist
+                  ? "All pages created"
+                  : `${selectedSpecs.length} of ${pendingPages.length} to create`}
+              </Badge>
+            </div>
+          </div>
+
+          <ul className="builder-page-list">
+            {pages.map((page) => {
+              const alreadyExists = existingPagePaths.has(normalizePagePath(page.path));
+              const isSelected = selectedPageIds.has(page.id);
+              const componentLabel =
+                page.component === "member_auth"
+                  ? "MemberAuth"
+                  : page.component === "member_dashboard"
+                    ? "MemberDashboard"
+                    : page.component === "member_pricing"
+                      ? "MemberPricing"
+                      : null;
+
+              const componentTone =
+                page.component === "member_auth"
+                  ? "brand"
+                  : page.component === "member_dashboard"
+                    ? "pro"
+                    : "new";
+
+              return (
+                <li
+                  key={page.id}
+                  className={cn("builder-page", alreadyExists && "is-existing")}
+                >
+                  <div className="builder-page-left">
+                    <Checkbox
+                      id={`page-select-${page.id}`}
+                      checked={alreadyExists ? true : isSelected}
+                      disabled={alreadyExists}
+                      onChange={() => handleTogglePage(page.id)}
+                    >
+                      <div className="builder-page-text">
+                        <span className="builder-page-title">{page.title}</span>
+                        <span className="builder-page-path">{page.path}</span>
+                      </div>
+                    </Checkbox>
+                  </div>
+                  {alreadyExists ? (
+                    <Badge tone="neutral">Already exists</Badge>
+                  ) : componentLabel ? (
+                    <Badge tone={componentTone}>{componentLabel}</Badge>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+
+          <Button
+            variant="secondary"
+            size="md"
+            className="fill"
+            disabled={scaffolding || allPagesExist || selectedSpecs.length === 0}
+            onClick={() => void handleCreatePages()}
+          >
+            <FileStack aria-hidden={true} />
+            {scaffolding
+              ? "Creating pages..."
+              : allPagesExist
+                ? "This page already exists"
+                : selectedSpecs.length > 0
+                  ? `Create ${selectedSpecs.length} ${selectedSpecs.length === 1 ? "Page" : "Pages"}`
+                  : "Create Pages"}
+          </Button>
+        </section>
       </div>
     </MemberSessionProvider>
   );
@@ -378,9 +583,9 @@ export const BuilderTab: React.FC = () => {
 function ctaNote(entry: CanvasComponentEntry, hasAsset: boolean): string {
   if (!entry.deployable) return `${entry.name} arrives with task ${entry.task}.`;
   if (entry.id === "protected_download" && hasAsset) {
-    return "Inserts Protected Download pre-configured for your chosen file.";
+    return "Adds the button for your chosen file.";
   }
-  return `Inserts ${entry.name} with its defaults. Configure it in the Framer properties panel.`;
+  return "Then style and set it up in Framer's right sidebar.";
 }
 
 /**
@@ -422,6 +627,8 @@ function generateForComponent(
     case "bookmarks_tray":
       return generateBookmarksTrayCode(DEFAULT_BOOKMARKS_TRAY_CONFIG, undefined, context);
     default:
-      return generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG, undefined, context);
+      // A planned component with no generator yet. The picker marks these as
+      // not deployable, so this is reached only through a stale selection.
+      throw new Error("This component cannot be added yet.");
   }
 }

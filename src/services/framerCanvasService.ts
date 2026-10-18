@@ -212,6 +212,75 @@ function pickComponentExport(file: CanvasCodeFile): string | null {
   return preferred?.insertURL ?? null;
 }
 
+type WriteResult =
+  | { ok: true; file: CanvasCodeFile; action: DeploySuccess["action"] }
+  | DeployFailure;
+
+/** Create the code file, or overwrite the one with the same name. */
+async function writeFile(
+  deps: CanvasDeps,
+  generated: Pick<GeneratedCanvasFile, "fileName" | "code">
+): Promise<WriteResult> {
+  try {
+    const existing = await deps.getCodeFiles();
+    const match = existing.find((candidate) => candidate.name === generated.fileName);
+
+    if (match) {
+      return { ok: true, file: await match.setFileContent(generated.code), action: "updated" };
+    }
+    return { ok: true, file: await deps.createCodeFile(generated.fileName, generated.code), action: "created" };
+  } catch {
+    return {
+      ok: false,
+      reason: "write_failed",
+      title: "Could not save the component",
+      message: "Framer refused the write. Check that the project is not read only, then try again.",
+    };
+  }
+}
+
+export type WriteCodeFileOutcome = { ok: true; action: DeploySuccess["action"] } | DeployFailure;
+
+/**
+ * Write a code file without inserting anything on the canvas.
+ *
+ * For code used through Framer's Code overrides rather than as a component:
+ * the section locks file. Same mode and permission checks as a deploy, minus
+ * the insert permission it does not need. Unchanged content is not rewritten,
+ * so saving locks without changing them does not touch the project.
+ */
+export async function writeCodeFile(deps: CanvasDeps, fileName: string, code: string): Promise<WriteCodeFileOutcome> {
+  if (!isWritableMode(deps.mode)) {
+    return {
+      ok: false,
+      reason: "unsupported_mode",
+      title: "Open the canvas first",
+      message: "Code files can only be written while a Framer canvas is open.",
+    };
+  }
+
+  if (!deps.isAllowedTo("createCodeFile", "CodeFile.setFileContent")) {
+    return {
+      ok: false,
+      reason: "permission_denied",
+      title: "Permission needed",
+      message: "This Framer project has not granted MemberFrame permission to write code files.",
+    };
+  }
+
+  try {
+    const existing = (await deps.getCodeFiles()).find((file) => file.name === fileName);
+    if (existing && "content" in existing && (existing as { content?: unknown }).content === code) {
+      return { ok: true, action: "updated" };
+    }
+  } catch {
+    // Fall through to the write, which reports its own failure.
+  }
+
+  const written = await writeFile(deps, { fileName, code });
+  return written.ok ? { ok: true, action: written.action } : written;
+}
+
 /**
  * Write the generated component into the project and insert one instance.
  *
@@ -254,28 +323,9 @@ export async function deployCanvasComponent(
     };
   }
 
-  let file: CanvasCodeFile;
-  let action: DeploySuccess["action"];
-
-  try {
-    const existing = await deps.getCodeFiles();
-    const match = existing.find((candidate) => candidate.name === generated.fileName);
-
-    if (match) {
-      file = await match.setFileContent(generated.code);
-      action = "updated";
-    } else {
-      file = await deps.createCodeFile(generated.fileName, generated.code);
-      action = "created";
-    }
-  } catch {
-    return {
-      ok: false,
-      reason: "write_failed",
-      title: "Could not save the component",
-      message: "Framer refused the write. Check that the project is not read only, then try again.",
-    };
-  }
+  const written = await writeFile(deps, generated);
+  if (!written.ok) return written;
+  const { file, action } = written;
 
   let insertUrl: string | null;
 
@@ -302,6 +352,7 @@ export async function deployCanvasComponent(
   try {
     const addOptions: Parameters<typeof deps.addComponentInstance>[0] = {
       url: insertUrl,
+      ...(options.parentId ? { parentId: options.parentId } : {}),
       ...(options.attributes ? { attributes: options.attributes as any } : {}),
     };
     node = await deps.addComponentInstance(addOptions);

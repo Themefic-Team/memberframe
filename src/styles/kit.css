@@ -324,3 +324,110 @@
 .field-row-control.fill {
   min-width: 0;
 }
+
+/* --------------------------------------------------------------------------
+   Search select: a select with a filter box, for long lists (SearchSelect).
+   The closed control is .framefic-select; the open panel is fixed, placed
+   from the trigger's rect like the InfoTip bubble, because cards clip.
+   -------------------------------------------------------------------------- */
+.search-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  text-align: left;
+}
+
+.search-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-select-panel {
+  /* Overwritten by SearchSelect from the trigger rect each time it opens. */
+  --search-select-top: 0px;
+  --search-select-left: 0px;
+  --search-select-width: 220px;
+
+  position: fixed;
+  top: var(--search-select-top);
+  left: var(--search-select-left);
+  z-index: 1000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: var(--search-select-width);
+  max-height: 280px;
+  padding: var(--space-6);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-8);
+  background: var(--px-color-bg-raised);
+  box-shadow: var(--px-shadow-popover);
+}
+
+.search-select-search {
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--space-10);
+  border: 1px solid transparent;
+  border-radius: var(--radius-8);
+  background: var(--framer-color-bg-tertiary);
+  color: var(--framer-color-text);
+  font: var(--text-body-sm);
+  outline: none;
+}
+
+.search-select-search:focus {
+  border-color: var(--px-color-focus-ring);
+}
+
+.search-select-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.search-select-option,
+.search-select-empty {
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-6);
+  font: var(--text-body-sm);
+  color: var(--framer-color-text);
+  cursor: pointer;
+}
+
+.search-select-option.is-active {
+  background: var(--framer-color-bg-tertiary);
+}
+
+.search-select-option.is-selected {
+  color: var(--px-color-text-brand);
+}
+
+.search-select-empty {
+  color: var(--paragraph-faint);
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------------
+   Tab bar: five tabs (24-reports.md). The reference spaces tabs 20px apart,
+   which fits four; five labels and the Account icon need 12px to fit 360px.
+   -------------------------------------------------------------------------- */
+.framefic-tab-bar .framefic-tabs-list {
+  gap: var(--space-12);
+}
+
+/* --------------------------------------------------------------------------
+   Segmented control: a segment may shrink. The reference sets flex: 1 with
+   nowrap and no min-width, so labels wider than the panel pushed the control
+   past its edges and clipped the end segments. Now the widest label ends in
+   an ellipsis instead; labels should still be chosen to fit.
+   -------------------------------------------------------------------------- */
+.framefic-segmented .framefic-segment {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

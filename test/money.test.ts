@@ -158,8 +158,7 @@ describe("parseMinor: refusals", () => {
 
 describe("the exponent is a parameter, not an assumption", () => {
   it("handles a zero-decimal currency", () => {
-    // JPY. Not in CurrencyCode today, which is exactly why the exponent is an
-    // argument rather than a constant: the assumption stays visible.
+    // JPY. Callers pass `currencyExponent("JPY")`, which is 0.
     const parsed = parseMinor("1500", 0);
 
     expect(parsed.ok && parsed.minor).toBe(1500);

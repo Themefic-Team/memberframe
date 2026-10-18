@@ -26,14 +26,15 @@
  *
  * ## The exponent is a parameter
  *
- * Two decimal places is correct for USD, EUR, GBP, and INR, which is the whole
- * of `CurrencyCode`. It is wrong for JPY, which has none, and KWD, which has
- * three. The exponent is therefore an argument with a default rather than a
- * constant, so the assumption is visible at the call site instead of buried
- * here. Conflict C12 in `docs/development-docs/02-member-tier-cockpit.md`.
+ * Two decimal places is correct for most currencies and wrong for JPY, which
+ * has none, and KWD, which has three. The exponent is therefore an argument,
+ * and every call site passes `currencyExponent(code)` from
+ * `utils/currencies.ts`. The default of 2 survives for callers with no
+ * currency in hand. Conflict C12 in
+ * `docs/development-docs/02-member-tier-cockpit.md`, now resolved.
  */
 
-/** Minor units per major unit for every currency this product supports. */
+/** Decimal places assumed when a caller has no currency in hand. Most currencies use two. */
 export const DEFAULT_MINOR_EXPONENT = 2;
 
 export type ParsedMoney =
@@ -170,7 +171,10 @@ export function formatMinorWithCurrency(
  * Error copy for a rejected amount, in the creator's language rather than the
  * parser's. PRD section 7.6 rule 4 and rule 6: no jargon, and a full sentence.
  */
-export function moneyErrorMessage(reason: Exclude<ParsedMoney, { ok: true }>["reason"]): string {
+export function moneyErrorMessage(
+  reason: Exclude<ParsedMoney, { ok: true }>["reason"],
+  exponent: number = DEFAULT_MINOR_EXPONENT
+): string {
   switch (reason) {
     case "empty":
       return "Enter a price.";
@@ -181,6 +185,7 @@ export function moneyErrorMessage(reason: Exclude<ParsedMoney, { ok: true }>["re
     case "too_large":
       return "That price is too high.";
     case "too_precise":
-      return "Use at most two decimal places, and no thousands separator.";
+      if (exponent === 0) return "Use a whole number, with no decimal point.";
+      return `Use at most ${exponent === 3 ? "three" : "two"} decimal places, and no thousands separator.`;
   }
 }

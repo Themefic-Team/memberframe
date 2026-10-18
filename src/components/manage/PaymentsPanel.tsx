@@ -8,6 +8,8 @@ import {
   FieldRow,
   FieldRows,
   IconButton,
+  InfoTip,
+  SearchSelect,
   Segmented,
   Select,
   TextField,
@@ -30,23 +32,17 @@ import {
   type PaymentsOverview,
 } from "../../services/paymentsService";
 import { isSafeSitePath } from "../../services/siteSettingsService";
+import { CURRENCY_OPTIONS } from "../../utils/currencies";
 
 const MODE_OPTIONS = [
   { value: "test", label: "Test" },
   { value: "live", label: "Live" },
 ] as const satisfies ReadonlyArray<{ value: PaymentMode; label: string }>;
 
-const CURRENCY_OPTIONS = [
-  { value: "USD", label: "USD, US dollar" },
-  { value: "EUR", label: "EUR, euro" },
-  { value: "GBP", label: "GBP, pound sterling" },
-  { value: "INR", label: "INR, Indian rupee" },
-];
-
 const GATEWAY_BLURB: Record<PaymentGateway, string> = {
-  stripe: "Cards, Apple Pay, and Google Pay, worldwide.",
-  lemonsqueezy: "Handles sales tax and VAT for you. Best for EU buyers.",
-  razorpay: "UPI, cards, and net banking for buyers in India.",
+  stripe: "Cards, Apple Pay, Google Pay",
+  lemonsqueezy: "Tax & VAT compliance for EU/global",
+  razorpay: "UPI, cards & net banking for India",
 };
 
 export interface PaymentsPanelProps {
@@ -189,33 +185,30 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
       {!overview.secretsAvailable ? (
         <Banner
           tone="danger"
-          title="Payments are switched off on the server"
-          message="It has no encryption key for gateway keys. Set PAYMENTS_ENCRYPTION_KEY in the API's .env and restart it."
-        />
-      ) : connected.length === 0 ? (
-        <Banner
-          tone="info"
-          title={mode === "test" ? "Start with test keys" : "Connect a gateway to sell"}
-          message="Connect a gateway below. Then set prices on your tiers and add the Member Pricing component to a page."
+          title="Payments disabled"
+          message="Set PAYMENTS_ENCRYPTION_KEY in .env to enable gateways."
         />
       ) : null}
 
       <section className="section-group">
-        <div className="section-header-row">
-          <h2 className="section-title">Mode</h2>
-          <span className="section-subtitle">
-            {mode === "test"
-              ? "Test mode: purchases use test cards and move no money."
-              : "Live mode: purchases charge real cards."}
-          </span>
+        <div className="section-header-row payments-header-row">
+          <div className="payments-header-title">
+            <h2 className="section-title">Gateways</h2>
+            {!overview.publicApi ? (
+              <InfoTip label="Webhook address">
+                Local API detected. Webhooks require a public https tunnel address to receive events during testing.
+              </InfoTip>
+            ) : null}
+          </div>
+          <div className="payments-mode-wrap">
+            <Segmented
+              label="Payment mode"
+              options={MODE_OPTIONS}
+              value={pendingLive ? "live" : mode}
+              onChange={(next) => void changeMode(next)}
+            />
+          </div>
         </div>
-
-        <Segmented
-          label="Payment mode"
-          options={MODE_OPTIONS}
-          value={pendingLive ? "live" : mode}
-          onChange={(next) => void changeMode(next)}
-        />
 
         {pendingLive ? (
           <Banner
@@ -224,26 +217,9 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
             message={
               overview.activeSubscriptions.test > 0
                 ? `Buyers will be charged for real. The ${overview.activeSubscriptions.test} test purchase(s) stop granting access.`
-                : "Buyers will be charged for real, through the live keys you connected."
+                : "Buyers will be charged for real through connected live keys."
             }
             action={{ label: "Go live", onClick: () => void changeMode("live") }}
-          />
-        ) : null}
-      </section>
-
-      <section className="section-group">
-        <div className="section-header-row">
-          <h2 className="section-title">Gateways</h2>
-          <span className="section-subtitle">
-            Money goes straight to your own account. MemberFrame adds no fee.
-          </span>
-        </div>
-
-        {!overview.publicApi ? (
-          <Banner
-            tone="info"
-            title="Webhooks need a public address"
-            message="Gateways tell MemberFrame about payments through webhooks, and cannot reach a local API. Set API_BASE_URL to your https tunnel address while testing."
           />
         ) : null}
 
@@ -263,14 +239,14 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
 
       <section className="section-group">
         <div className="section-header-row">
-          <h2 className="section-title">Checkout</h2>
+          <h2 className="section-title">Checkout Settings</h2>
         </div>
 
         <FieldRows>
           <FieldRow
             label="Default gateway"
             htmlFor="payments-default-gateway"
-            hint="Used when routing is off, when a buyer's country is unknown, and as the fallback when the routed gateway cannot sell a price."
+            hint="Fallback when location routing is disabled or unavailable."
           >
             <Select
               id="payments-default-gateway"
@@ -286,7 +262,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
           <FieldRow
             label="Route by buyer location"
             htmlFor="payments-geo"
-            hint="India goes to Razorpay, the EU and UK to Lemon Squeezy, everyone else to Stripe, when each is connected. Decided on the server."
+            hint="Routes visitors to the best gateway based on country."
           >
             <Checkbox
               id="payments-geo"
@@ -298,7 +274,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
           <FieldRow
             label="Grace period"
             htmlFor="payments-grace"
-            hint="How many days a member keeps access after a renewal payment fails, while the gateway retries."
+            hint="Days members keep access while renewal payments retry."
           >
             <TextField
               id="payments-grace"
@@ -314,7 +290,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
             label="Pricing page"
             htmlFor="payments-pricing-path"
             error={pathProblem(draft.pricingPath)}
-            hint="Where Member Pricing sits. Locked content sends members here to upgrade."
+            hint="Target path for upgrade links (e.g. /pricing)."
           >
             <TextField
               id="payments-pricing-path"
@@ -328,7 +304,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
             label="After purchase"
             htmlFor="payments-after-path"
             error={pathProblem(draft.afterPurchasePath)}
-            hint="Where a buyer lands once the payment is confirmed."
+            hint="Redirect destination after confirmed payment."
           >
             <TextField
               id="payments-after-path"
@@ -339,22 +315,31 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
           </FieldRow>
 
           <FieldRow
-            label="Default currency"
+            label="Site currency"
             htmlFor="payments-currency"
-            hint="The currency new tiers start in. Each tier keeps its own currency."
+            hint="Every tier is priced in it, so buyers always compare like with like."
           >
-            <Select
+            <SearchSelect
               id="payments-currency"
               value={draft.defaultCurrency}
               options={CURRENCY_OPTIONS}
+              searchPlaceholder="Search currencies"
               onChange={(value) => setDraft({ ...draft, defaultCurrency: value })}
             />
           </FieldRow>
         </FieldRows>
 
-        <div className="settings-cta">
+        {overview && draft.defaultCurrency !== overview.settings.defaultCurrency ? (
+          <Banner
+            tone="warning"
+            title={`Every tier moves to ${draft.defaultCurrency}`}
+            message="Prices keep their numbers, so 9.99 stays 9.99. Check them in Tiers after saving."
+          />
+        ) : null}
+
+        <div className="section-actions">
           <Button
-            variant="primary"
+            variant="secondary"
             size="md"
             className="fill"
             disabled={
@@ -443,6 +428,12 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
         ? "Waiting for the first event"
         : "Webhook not set up";
 
+  const statusSubtitle = status.connected
+    ? [status.accountName, status.maskedSuffix ? `ending ${status.maskedSuffix}` : null, webhookState]
+        .filter(Boolean)
+        .join(" · ")
+    : GATEWAY_BLURB[status.gateway];
+
   return (
     <article className={cn("integration-card", open && "is-open", status.connected && "is-configured")}>
       <div
@@ -463,29 +454,22 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
           <span className="integration-card-icon">
             {status.connected ? <Check aria-hidden={true} /> : <CreditCard aria-hidden={true} />}
           </span>
-          <span className="integration-card-title">{label}</span>
+          <div className="integration-card-text">
+            <span className="integration-card-title">{label}</span>
+            <span className="integration-card-sub">{statusSubtitle}</span>
+          </div>
+        </div>
+        <div className="integration-card-bar-right">
           {status.connected ? (
             <Badge tone="success">Connected</Badge>
           ) : (
             <Badge tone="neutral">Not connected</Badge>
           )}
-        </div>
-        <div className="integration-card-bar-right">
           <span className={cn("integration-chevron", open && "is-open")}>
             <ChevronDown aria-hidden={true} />
           </span>
         </div>
       </div>
-
-      {!open ? (
-        <p className="integration-card-desc">
-          {status.connected
-            ? [status.accountName, status.maskedSuffix ? `ending ${status.maskedSuffix}` : null, webhookState]
-                .filter(Boolean)
-                .join(". ")
-            : GATEWAY_BLURB[status.gateway]}
-        </p>
-      ) : null}
 
       {notice && !open ? <p className="integration-card-pending">{notice}</p> : null}
 
@@ -536,8 +520,8 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
               htmlFor={`${id}-webhook`}
               hint={
                 manualWebhook
-                  ? `Add this in Razorpay, Webhooks, with these events: ${status.events.join(", ")}.`
-                  : `MemberFrame registers this with ${label} when you connect. Nothing to copy.`
+                  ? `Add in Razorpay, Webhooks with: ${status.events.join(", ")}.`
+                  : `Auto-registered with ${label} on connect.`
               }
               fill
             >

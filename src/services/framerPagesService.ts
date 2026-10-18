@@ -95,3 +95,42 @@ export async function getFramerProjectPages(
 
   return [...DEFAULT_FALLBACK_PAGES];
 }
+
+/** "legal-pages" reads "Legal pages". */
+function humanizeSegment(segment: string): string {
+  const words = segment.replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : segment;
+}
+
+/** A CMS collection's item page: a path with a `:slug` style segment. */
+export function isCmsItemPath(path: string): boolean {
+  return path.split("/").some((segment) => segment.startsWith(":"));
+}
+
+/**
+ * A page as a creator reads it in a dropdown.
+ *
+ * Framer often names a page after its path, which read "/blog (/blog)". The
+ * name is used only when it says something the path does not; otherwise the
+ * last segment, humanized. A CMS item page says what it covers, because
+ * locking "/blog/:slug" locks every post: "Blog, every item (/blog/:slug)".
+ */
+export function pageOptionLabel(page: FramerProjectPage): string {
+  const path = page.path;
+  if (path === "/") return "Home (/)";
+
+  const segments = path.split("/").filter(Boolean);
+  if (isCmsItemPath(path)) {
+    const collection = segments.filter((segment) => !segment.startsWith(":")).pop();
+    return `${collection ? humanizeSegment(collection) : "CMS"}, every item (${path})`;
+  }
+
+  const name = page.name.trim();
+  const nameIsPath = name === "" || name === path || name === segments.join("/");
+  return `${nameIsPath ? humanizeSegment(segments[segments.length - 1] ?? path) : name} (${path})`;
+}
+
+/** Home first, then by path, so a CMS item page sits under its list page. */
+export function sortPagesByPath(pages: ReadonlyArray<FramerProjectPage>): FramerProjectPage[] {
+  return [...pages].sort((a, b) => (a.path === "/" ? -1 : b.path === "/" ? 1 : a.path.localeCompare(b.path)));
+}

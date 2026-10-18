@@ -1,0 +1,184 @@
+/**
+ * Section locks: rules a creator writes, picked per layer in Framer's sidebar.
+ * Development doc: `docs/development-docs/19-section-locks.md`.
+ *
+ * Saving the rules writes `MemberLocks.tsx` into the creator's project, with
+ * one code override per rule, named after it. In Framer the creator selects a
+ * layer and picks the rule under Code overrides, File MemberLocks. The override
+ * only tags the layer; the Route Shield enforces the rule from the site
+ * settings, so changing who sees a rule needs no republish.
+ */
+
+import type { SectionLockRule } from "../types/connection";
+
+/** The code file the overrides live in. Framer lists it as "MemberLocks". */
+export const SECTION_LOCKS_FILE_NAME = "MemberLocks.tsx";
+
+/**
+ * The server's rule, held to it: letters, digits, spaces, and - _ . only.
+ * The name ends up inside a CSS selector on the live site, so the character
+ * set is what keeps a quote or a backslash out of it.
+ */
+export const SECTION_LOCK_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$/;
+
+export const MAX_SECTION_LOCKS = 50;
+
+/** Trim and collapse spaces, the form a name is stored and compared in. */
+export function normalizeSectionLockName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * A rule's identity, the server's `sectionLockSlug`: lowercase, every run of
+ * other characters one dash. It is the class the override adds, so two rules
+ * may not share it.
+ */
+export function sectionLockSlug(name: string): string {
+  return normalizeSectionLockName(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Why a rule's name cannot be saved, or null. */
+export function sectionLockNameProblem(rules: ReadonlyArray<Pick<SectionLockRule, "name">>, index: number): string | null {
+  const name = normalizeSectionLockName(rules[index]?.name ?? "");
+  if (name === "") return "Give this lock a name.";
+  if (!SECTION_LOCK_NAME_PATTERN.test(name)) {
+    return "Use letters, digits, spaces, dots, dashes, or underscores, starting with a letter or digit.";
+  }
+  const slug = sectionLockSlug(name);
+  const clash = rules.findIndex((rule, other) => other !== index && sectionLockSlug(rule.name) === slug);
+  return clash !== -1 ? "Another lock has this name." : null;
+}
+
+/**
+ * The override name Framer shows for each rule, in rule order.
+ *
+ * The rule name as one word: "Gold article" becomes `GoldArticle`. A name
+ * starting with a digit gets `Lock` in front, since a function name cannot
+ * start with one, and a clash gets a number appended.
+ */
+export function sectionLockOverrideNames(rules: ReadonlyArray<Pick<SectionLockRule, "name">>): string[] {
+  const taken = new Set<string>();
+  return rules.map((rule) => {
+    const words = normalizeSectionLockName(rule.name).match(/[A-Za-z0-9]+/g) ?? [];
+    let name = words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join("") || "Lock";
+    if (/^[0-9]/.test(name)) name = `Lock${name}`;
+    let unique = name;
+    for (let n = 2; taken.has(unique); n++) unique = `${name}${n}`;
+    taken.add(unique);
+    return unique;
+  });
+}
+
+/**
+ * The whole `MemberLocks.tsx`, from the rules.
+ *
+ * Every rule gets an override, switched off or not, so a layer never loses its
+ * override because a rule was paused. Names and slugs go in through JSON, so
+ * nothing in a rule can break the file. No JSX, so the file needs nothing
+ * from Framer's compiler beyond plain TypeScript.
+ */
+export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string {
+  const valid = rules.filter((_, index) => sectionLockNameProblem(rules, index) === null);
+  const names = sectionLockOverrideNames(valid);
+
+  const overrides = valid.map((rule, index) => {
+    const ruleName = normalizeSectionLockName(rule.name);
+    return [
+      `/** ${ruleName} */`,
+      `export function ${names[index]}(Component: React.ComponentType<any>): React.ComponentType<any> {`,
+      `  return lock(Component, ${JSON.stringify(ruleName)}, ${JSON.stringify(sectionLockSlug(ruleName))})`,
+      "}",
+    ].join("\n");
+  });
+
+  return [
+    "// MemberFrame section locks.",
+    "//",
+    "// Written by the MemberFrame plugin each time you click Save locks. Edit your",
+    "// locks in the plugin (Settings, Page Locks, Section Locks), not here: this",
+    "// file is replaced on every save.",
+    "//",
+    "// To lock a layer, select it, then in the right sidebar open Code overrides,",
+    "// choose File MemberLocks and the lock by name. The override only marks the",
+    "// layer; the MemberFrame Route Shield on your published site decides who",
+    "// sees it, from the rules saved in the plugin.",
+    "",
+    'import * as React from "react"',
+    "",
+    "function lock(Component: React.ComponentType<any>, rule: string, slug: string): React.ComponentType<any> {",
+    "  function Locked(props: any) {",
+    '    const className = props && props.className ? props.className + " mf-lock-" + slug : "mf-lock-" + slug',
+    '    return React.createElement(Component, { ...props, className, "data-mf-lock": rule })',
+    "  }",
+    "  return Locked",
+    "}",
+    "",
+    ...(overrides.length > 0 ? overrides : ["// No section locks yet. Add one in the plugin, then click Save locks."]),
+    "",
+  ].join("\n");
+}
+
+export interface SectionLockTier {
+  key: string;
+  name: string;
+  rank: number;
+}
+
+/** "Who sees it", as one choice: `members:tier_gold` or `others:signed_in`. */
+export interface WhoSeesOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Every "Who sees it" choice for this site, from its own tiers.
+ *
+ * Free is left out: "Free or higher" is every member, which is "Any signed-in
+ * member" already. Each paid tier gets the pair, its members and everyone else.
+ */
+export function whoSeesOptions(tiers: ReadonlyArray<SectionLockTier>): WhoSeesOption[] {
+  const options: WhoSeesOption[] = [
+    { value: "members:signed_in", label: "Any signed-in member" },
+    { value: "others:signed_in", label: "Signed-out visitors only" },
+  ];
+
+  // The Free tier is rank 0, whatever its key (23-dynamic-tiers.md).
+  const paid = [...tiers].filter((tier) => tier.rank !== 0).sort((a, b) => a.rank - b.rank);
+  for (const tier of paid) {
+    options.push(
+      { value: `members:${tier.key}`, label: `${tier.name} members or higher` },
+      { value: `others:${tier.key}`, label: `Everyone without ${tier.name}` }
+    );
+  }
+
+  return options;
+}
+
+export function whoSeesValue(rule: Pick<SectionLockRule, "audience" | "requiredTier">): string {
+  return `${rule.audience}:${rule.requiredTier}`;
+}
+
+export function parseWhoSees(value: string): Pick<SectionLockRule, "audience" | "requiredTier"> {
+  const [audience, ...rest] = value.split(":");
+  return {
+    audience: audience === "others" ? "others" : "members",
+    requiredTier: rest.join(":") || "signed_in",
+  };
+}
+
+/** A new rule with a name no other rule has: "Section lock 1", "Section lock 2"... */
+export function newSectionLock(existing: ReadonlyArray<SectionLockRule>): SectionLockRule {
+  const taken = new Set(existing.map((rule) => sectionLockSlug(rule.name)));
+  let n = existing.length + 1;
+  while (taken.has(`section-lock-${n}`)) n++;
+  return {
+    name: `Section lock ${n}`,
+    enabled: true,
+    audience: "members",
+    requiredTier: "signed_in",
+    lockedAction: "hide",
+  };
+}

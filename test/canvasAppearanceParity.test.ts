@@ -25,7 +25,6 @@ const DIR = path.join(process.cwd(), "src", "canvas-components");
 const COMPONENTS = {
   MemberAuth: { labels: "AUTH_LABELS", root: ".memberframe-auth-root" },
   MemberDashboard: { labels: "DASH_LABELS", root: ".mf-dash" },
-  MemberGate: { labels: "GATE_LABELS", root: ".memberframe-gate-root" },
   MemberPricing: { labels: "PRICING_LABELS", root: ".mf-pricing" },
   OnboardingModal: { labels: "ONBOARDING_LABELS", root: ".memberframe-onboarding-root" },
   MeteredPaywall: { labels: "METER_LABELS", root: ".mf-meter" },
@@ -74,6 +73,8 @@ interface Block {
     Record<string, unknown>
   >;
   mfLabelControls(defaults: Record<string, readonly [string, string]>): Record<string, unknown>;
+  mfBox(value: unknown, max: number): [number, number, number, number] | null;
+  mfSpacingCss(spacing: Record<string, unknown> | null | undefined): string;
 }
 
 const ControlType = {
@@ -84,6 +85,7 @@ const ControlType = {
   Color: "color",
   Object: "object",
   Font: "font",
+  Padding: "padding",
 };
 
 function loadBlock(): Block {
@@ -102,6 +104,8 @@ function loadBlock(): Block {
     "mfThemeCss",
     "mfAppearanceControls",
     "mfLabelControls",
+    "mfBox",
+    "mfSpacingCss",
   ];
 
   // eslint-disable-next-line no-new-func
@@ -305,6 +309,66 @@ describe("mfAppearanceVars", () => {
   });
 });
 
+describe("Spacing", () => {
+  it("reads a Padding control value the way CSS shorthand does", () => {
+    expect(mf.mfBox("24px", 400)).toEqual([24, 24, 24, 24]);
+    expect(mf.mfBox("10px 20px", 400)).toEqual([10, 20, 10, 20]);
+    expect(mf.mfBox("10px 20px 30px", 400)).toEqual([10, 20, 30, 20]);
+    expect(mf.mfBox("120px 0px 80px 0px", 400)).toEqual([120, 0, 80, 0]);
+    expect(mf.mfBox(16, 400)).toEqual([16, 16, 16, 16]);
+    expect(mf.mfBox("900px", 400)).toEqual([400, 400, 400, 400]);
+  });
+
+  it("refuses anything that could leave the declaration", () => {
+    for (const attack of [
+      "10px; } body { display: none } .x {",
+      "10px 10px 10px 10px 10px",
+      "-20px",
+      "10em",
+      "calc(100vh)",
+      "",
+      "   ",
+      null,
+      undefined,
+      {},
+      Number.NaN,
+      -4,
+    ]) {
+      expect(mf.mfBox(attack, 400), String(attack)).toBeNull();
+    }
+  });
+
+  it("leaves the component's own spacing alone when untouched", () => {
+    expect(mf.mfSpacingCss(undefined)).toBe("");
+    expect(mf.mfSpacingCss({ margin: "0px", customPadding: false, padding: "24px" })).toBe("");
+    expect(mf.mfAppearanceVars({ accent: "#000", radius: 8, radiusMax: 24, shadowByDefault: true })).not.toMatch(
+      /margin|padding:/
+    );
+  });
+
+  it("keeps a root's own centring for top and bottom margin, and fills between side margins", () => {
+    expect(mf.mfSpacingCss({ margin: "120px 0px 80px 0px" })).toBe("margin-top: 120px; margin-bottom: 80px;");
+    expect(mf.mfSpacingCss({ margin: "0px 16px" })).toBe("margin-left: 16px; margin-right: 16px; width: auto;");
+  });
+
+  it("applies padding only when Custom padding is on", () => {
+    expect(mf.mfSpacingCss({ customPadding: false, padding: "8px" })).toBe("");
+    expect(mf.mfSpacingCss({ customPadding: true, padding: "8px 16px" })).toBe("padding: 8px 16px 8px 16px;");
+    expect(mf.mfSpacingCss({ customPadding: true, padding: "8px; }" })).toBe("");
+  });
+
+  it("reaches the scoped rule through mfAppearanceVars", () => {
+    const out = mf.mfAppearanceVars({
+      accent: "#000",
+      radius: 8,
+      radiusMax: 24,
+      shadowByDefault: true,
+      spacing: { margin: "40px 0px 0px 0px" },
+    });
+    expect(out.endsWith("margin-top: 40px;")).toBe(true);
+  });
+});
+
 describe("mfThemeCss", () => {
   const css = mf.mfThemeCss(".x-root");
 
@@ -330,8 +394,12 @@ describe("the shared controls", () => {
     expect(controls.theme.options).toEqual(["light", "dark", "auto"]);
   });
 
-  it("groups Colors, Typography, and Layout, with optional colours", () => {
-    for (const group of ["colors", "typography", "layout"]) expect(controls[group].type).toBe("object");
+  it("groups Colors, Typography, Layout, and Spacing, with optional colours", () => {
+    for (const group of ["colors", "typography", "layout", "spacing"]) expect(controls[group].type).toBe("object");
+    const spacing = controls.spacing.controls as Record<string, Record<string, unknown>>;
+    expect(spacing.margin).toMatchObject({ type: "padding", defaultValue: "0px" });
+    expect(spacing.customPadding).toMatchObject({ type: "boolean", defaultValue: false });
+    expect(spacing.padding.type).toBe("padding");
     const colours = controls.colors.controls as Record<string, Record<string, unknown>>;
     for (const key of ["surface", "text", "muted", "border", "field", "onAccent"]) {
       expect(colours[key].optional, key).toBe(true);
@@ -374,6 +442,7 @@ describe.each(NAMES)("%s", (name) => {
 
   it("routes its accent and radius through the shared sanitizer", () => {
     expect(rest).toContain("mfAppearanceVars({");
+    expect(rest).toMatch(/mfAppearanceVars\(\{[^}]*\blayout,\s*spacing,/);
     expect(rest).not.toMatch(/function safeColor\(/);
   });
 

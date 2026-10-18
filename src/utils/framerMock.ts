@@ -354,7 +354,7 @@ export function createFramerMock(overrides: Partial<FramerMock> = {}): FramerMoc
       return file;
     },
 
-    addComponentInstance: async (options: { url: string; attributes?: any }) => {
+    addComponentInstance: async (options: { url: string; attributes?: any; parentId?: string }) => {
       calls.addComponentInstance.push(options);
       return { id: `node-${nextNodeId++}` };
     },

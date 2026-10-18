@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Crown, Link2, ShieldOff, X } from "lucide-react";
+import { Link2, ShieldOff, Trash2, X } from "lucide-react";
 import { Button, FieldRow, FieldRows, IconButton, Select } from "../ui";
 import type { SiteMemberRecord } from "../../types/site";
 import { siteTiers, type TierKey } from "../../types/member";
@@ -15,8 +15,8 @@ import { cn } from "../../utils/cn";
 
 export type MemberAction =
   | { kind: "change_tier"; tier: TierKey }
-  | { kind: "grant_vip" }
   | { kind: "revoke" }
+  | { kind: "delete" }
   | { kind: "magic_link" };
 
 export interface MemberFlyoutProps {
@@ -91,12 +91,16 @@ function tierOptions(): ReadonlyArray<{ value: TierKey; label: string }> {
 /**
  * The row action flyout. PRD task 2.2, feature F02.
  *
- * F02 names four actions: change tier, grant VIP, revoke access, send magic
- * link. Revoke is the only destructive one, so it is the only one with a
+ * Change tier, send magic link, revoke access, and delete member. Revoke and
+ * delete are the destructive ones, so they are the only ones with a
  * confirmation step, which F02 requires. Adding a confirmation to the other
- * three would teach the creator to dismiss the one that matters.
+ * two would teach the creator to dismiss the ones that matter.
  *
- * The confirm step replaces the revoke button in place rather than opening a
+ * Grant VIP was removed: a site has only the tiers its creator made, so a
+ * fixed VIP shortcut pointed at a tier most sites do not have. Moving a member
+ * to any tier is the Tier picker's job.
+ *
+ * Each confirm step replaces its button in place rather than opening a
  * second layer. A dialog over a flyout in a 360px panel leaves nowhere to
  * read the thing being confirmed.
  *
@@ -111,7 +115,7 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
   onClose,
   profileFields = [],
 }) => {
-  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const [confirming, setConfirming] = useState<"revoke" | "delete" | null>(null);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -123,7 +127,6 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
     [onClose]
   );
 
-  const alreadyVip = member.tier === "vip";
   const alreadyRevoked = member.status === "canceled";
 
   return (
@@ -158,17 +161,6 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
           variant="secondary"
           size="md"
           className="fill"
-          disabled={busy || alreadyVip}
-          onClick={() => onAction({ kind: "grant_vip" })}
-        >
-          <Crown aria-hidden={true} />
-          {alreadyVip ? "Already VIP" : "Grant VIP"}
-        </Button>
-
-        <Button
-          variant="secondary"
-          size="md"
-          className="fill"
           disabled={busy}
           onClick={() => onAction({ kind: "magic_link" })}
         >
@@ -176,7 +168,7 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
           Send magic link
         </Button>
 
-        {confirmingRevoke ? (
+        {confirming === "revoke" ? (
           <div className="member-flyout-confirm" role="alert">
             <p className="member-flyout-confirm-text">
               Revoke access for this member? They keep their invoice history.
@@ -186,7 +178,7 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
                 variant="ghost"
                 size="md"
                 disabled={busy}
-                onClick={() => setConfirmingRevoke(false)}
+                onClick={() => setConfirming(null)}
               >
                 Keep access
               </Button>
@@ -206,10 +198,44 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
             size="md"
             className="fill"
             disabled={busy || alreadyRevoked}
-            onClick={() => setConfirmingRevoke(true)}
+            onClick={() => setConfirming("revoke")}
           >
             <ShieldOff aria-hidden={true} />
             {alreadyRevoked ? `Access ${statusLabel(member.status).toLowerCase()}` : "Revoke access"}
+          </Button>
+        )}
+
+        {confirming === "delete" ? (
+          <div className="member-flyout-confirm" role="alert">
+            <p className="member-flyout-confirm-text">
+              Delete this member for good? Their account, sessions, and bookmarks are removed and they
+              can sign up again as new. Payment records are kept. A subscription at your payment
+              provider is not cancelled.
+            </p>
+            <div className="member-flyout-confirm-buttons">
+              <Button variant="ghost" size="md" disabled={busy} onClick={() => setConfirming(null)}>
+                Keep member
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                disabled={busy}
+                onClick={() => onAction({ kind: "delete" })}
+              >
+                Delete member
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            variant="secondary"
+            size="md"
+            className="fill"
+            disabled={busy}
+            onClick={() => setConfirming("delete")}
+          >
+            <Trash2 aria-hidden={true} />
+            Delete member
           </Button>
         )}
       </div>

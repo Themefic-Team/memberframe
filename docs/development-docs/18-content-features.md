@@ -104,7 +104,7 @@ Technical development specification, user flow, architectural wiring, and testin
 
 ## 4. Framer Property Controls Specification
 
-**`<MeteredPaywall>`**: `contentSlot` Article Body; `mode` Paywall Type; `freeQuotaCount` Free Articles (1 to 10, stepper); `quotaPeriod` Reset Window (Every 7 Days, Every 30 Days); `unlimitedTier` Full Access For (site tiers); `articleId` Article ID; `previewParagraphs` Free Paragraphs; `previewHeight` Preview Height; `blurIntensity` Blur Amount (2 to 20 px); `showCounterPill` Show Counter; `cardTitle` Lock Title; `cardDescription` Lock Message; `ctaLabel` Unlock Button; `showSignInLink` Sign In Link; `pricingPath`; `loginPath`; `seoMarkup` SEO Paywall Markup; `schemaType` Content Type; `canvasPreview`; style, Theme, Colors, Typography, Layout, Labels.
+**`<MeteredPaywall>`**: `contentSlot` Article Body; `mode` Paywall Type; `freeQuotaCount` Free Articles (1 to 100, stepper); `quotaPeriod` Reset Window (Every 7 Days, Every 30 Days); `unlimitedTier` Full Access For (site tiers); `articleId` Article ID; `previewParagraphs` Free Paragraphs; `previewHeight` Preview Height; `blurIntensity` Blur Amount (2 to 20 px); `showCounterPill` Show Counter; `cardTitle` Lock Title; `cardDescription` Lock Message; `ctaLabel` Unlock Button; `showSignInLink` Sign In Link; `pricingPath`; `loginPath`; `seoMarkup` SEO Paywall Markup; `schemaType` Content Type; `canvasPreview`; style, Theme, Colors, Typography, Layout, Labels.
 
 **`<ProtectedDownload>`**: `assetId` Asset ID; `buttonText` Download Text; `lockedButtonText` Locked Text; `showFileMeta`; `fileMetaLabel` File Meta; `showNote` Plan Note; `iconType` Icon (Download Arrow, Document, ZIP Archive, Code); `buttonStyle`; `loginPath`; `pricingPath`; `canvasPreview`; `accentColor` Button Color; `borderRadius`; shared appearance and Labels.
 
@@ -177,3 +177,32 @@ Session storage keys shared between components: `memberframe:return-to:<site>` (
 2. Read More: every signed-out visit shows the teaser. View the page source: the whole article is there, and the JSON-LD script is in the head. Run the URL through Google's Rich Results Test.
 3. Download as a guest, as Free, as Silver: sign in, upgrade, download. In the network tab, the signed URL is MemberFrame's own; open it again after 61 seconds and it says the link expired.
 4. Bookmark a card, watch the badge, open the tray, remove the item, and check the card's ribbon empties. Press Escape with the tray open. Click a bookmark while signed out, sign in, and come back: it is saved.
+
+---
+
+## Bookmark Design Controls, 2026-10-18
+
+Added on request so the button and the tray can match a site's design. Every default is the look a placed instance already had, so nothing on a published site changes until a creator touches a control.
+
+**`<BookmarkButton>`**
+
+| Control | Type | Default | Effect |
+| :--- | :--- | :--- | :--- |
+| Button Style | Enum: Outline, Soft, Icon Only | Outline | Soft is a tint of Filled Color with no border; Icon Only drops background, border, shadow, and padding |
+| Icon Size | Number 12 to 48 px | 20 | The icon, through `--mf-bookmark-icon` |
+| Icon Position | Segmented: Left, Right | Left | Shown only with Show Label |
+| Save Animation | Boolean | On | The pulse on save |
+
+**`<BookmarksTray>`**
+
+| Control | Type | Default | Effect |
+| :--- | :--- | :--- | :--- |
+| Drawer Width | Number 280 to 640 px | 400 | Never wider than the screen |
+| Backdrop | Segmented: Dim, Blur, None | Dim | Blur adds a 6px backdrop blur over the dim |
+| Badge Color | Optional colour | unset, the accent | Sanitized by `mfSafeColor` |
+| Saved Date | Boolean | On | The "Saved 3 days ago" line under each item |
+| Button Style | Enum: Outline, Soft, Icon Only | Outline | The same three as the button |
+| Icon | Enum: Bookmark Ribbon, Heart, Star | Bookmark Ribbon | The button's three shapes, so the two match |
+| Icon Size | Number 12 to 48 px | 18 | Through `--mf-tray-icon` |
+
+Tests: `test/bookmarkCustomization.test.ts`. Needs human verification: each style in both themes, and the drawer at 280px and 640px.

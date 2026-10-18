@@ -16,14 +16,22 @@
  * profile. It used to be a fifth tab (conflict C26), which pushed the Account
  * icon out of the 360px panel; the user chose the Figma layout on 2026-10-15.
  *
- * So the content area shows a `ViewId`: one of the four tabs, or the account
+ * So the content area shows a `ViewId`: one of the tabs, or the account
  * view. Only `TABS` appear in the tab bar.
+ *
+ * ## Five, since 2026-10-18
+ *
+ * Reports is a fifth tab. Asked between a chart icon beside Account (inside
+ * the four-tab rule) and a fifth text tab, the creator chose the tab. The gap
+ * between tabs is 12px instead of the reference's 20px (kit.css) so five
+ * labels and the Account icon fit in 360px. Development doc: 24-reports.md.
  */
 export const TABS = [
   { id: "home", title: "Home" },
   { id: "builder", title: "Builder" },
   { id: "manage", title: "Manage" },
   { id: "settings", title: "Settings" },
+  { id: "reports", title: "Reports" },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];

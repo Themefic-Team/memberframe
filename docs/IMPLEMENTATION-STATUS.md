@@ -314,6 +314,19 @@ the user commits it.
 | FP-00 | Connect, Creator Identity, And Membership Pages | F02, F05, F06 | `components/tabs/ConnectTab.tsx`, `services/connectService.ts`, `services/connectionStore.ts`, `services/pageScaffoldService.ts`, `backend/src/routes/connect.ts`, `backend/src/routes/site.ts` | awaiting review | |
 | FP-15 | Backend Architecture, Node and Prisma | sections 6, 10, 11, 14 | `backend/` in this repo. Specified in [`memberframe-backend-prd.md`](memberframe-backend-prd.md) | awaiting review, partial | |
 
+**Blog paywalls and every currency, added 2026-10-18 on request, awaiting review and unstaged, in
+both repositories.** The Soft Paywall gained a linked mode for CMS posts: placed below the post with
+Article Body empty, styled in Framer's sidebar, and finding the post body tagged by the new
+`PaywallArticle` override (`MemberArticle.tsx`). Page Locks and Section Locks needed only setup
+guidance. An interim Article Paywall (plugin rules, `MemberPaywalls.tsx`) was built, seen working on a
+published site, and removed the same day as a duplicate: [`21-blog-paywalls.md`](development-docs/21-blog-paywalls.md).
+Tiers can now be priced in every circulating currency with its own decimal places
+(`utils/currencies.ts`, conflict C12 resolved). **Linked mode is not yet seen in Framer.**
+
+**Reports, added 2026-10-18 on request, awaiting review and unstaged, in both repositories.** A fifth tab: Overview (members, paying, MRR, net revenue, subscriptions, members by tier, sign ups by month, most saved, most downloaded), Revenue (by month chart and table, by tier, by gateway, payment history with CSV), Subscriptions (by status, interval, tier, list with CSV), Members (by tier, a tier's members, a member's full history). Live or Test, and a period. [`24-reports.md`](development-docs/24-reports.md). Queries run against the development database; **not yet seen in Framer**.
+
+**Dynamic tiers and one site currency, added 2026-10-18 on request, awaiting review and unstaged, in both repositories.** No built in tier types: one Free tier (rank 0, no prices) and paid tiers (rank 1 and up), each with an ID made from its name; one site currency in Payments, searchable (`ui/SearchSelect`), with every tier following a change; per-tier currency and extra prices removed. [`23-dynamic-tiers.md`](development-docs/23-dynamic-tiers.md). **Not yet seen in Framer.**
+
 **Dedicated auth screens, added 2026-10-15 on request, awaiting review and unstaged.** The Builder
 now offers Member Login, Member Registration, Password Reset, and OTP Verification beside Member
 Auth, which is unchanged. All five deploy from the one `MemberAuth.tsx`: the generator bakes a

@@ -259,3 +259,16 @@ The agent cannot see rendered pixels in the Framer desktop app, and cannot exerc
 6. **"Add to canvas" is disabled, not hidden.** The deploy path needs permissions that `framer.json` will not declare until task 1.6. A hidden CTA would leave the Builder tab with no primary action and make the tab look unfinished rather than staged.
 7. **Three controls were added to the UI kit rather than written inline.** Text field, select, and slider. The first two already had kit CSS classes with nothing rendering them. The slider had no class at all, so its CSS is new and lives in `builder.css`.
 8. **The state caption is prose, not an enum.** PRD section 7.6 rule 4 forbids surfacing raw values like `past_due`. The switcher reads "Failed" and the caption underneath explains the consequence in a sentence.
+
+---
+
+## Builder Card Copy, 2026-10-18
+
+The card under Component spoke to the team, not the creator: "Built and ready to insert ... a panel preview is not scheduled yet", the PRD feature code (F05) as a badge, and a hammer icon on every component.
+
+- Each `previewNote` in `componentRegistry.ts` is now one or two plain sentences on what the component does, with no build status.
+- A new `placement` field says where it usually goes (`/login`, `Navigation bar`, `Articles and posts`) and replaces the feature-code badge. `features` and `task` stay in the registry for traceability; the card no longer shows them.
+- `PendingPreview` picks a Lucide icon per component, in the brand subtle circle the help tiles use; the body text moved from faint to paragraph colour, since it is now the description, not a placeholder.
+- The note under Add to canvas is one line: "Then style and set it up in Framer's right sidebar."
+
+Needs human verification: the card at 360px in both themes.

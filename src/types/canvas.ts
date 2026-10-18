@@ -4,75 +4,11 @@
  * One interface per insertable component, holding exactly what the Builder tab
  * customizer can edit. These are the inputs to the code generator in task 1.4,
  * so a field here becomes a property control default in generated canvas code.
- *
- * `contentSlot` is absent on purpose. It is a `ControlType.ComponentInstance`
- * bound on the canvas after insertion, so there is nothing for the panel to
- * edit and nothing for the generator to emit.
  */
 
-import type { RequiredTier } from "./member";
-
-/** The four locked-state behaviours from PRD section 8 F01. */
-export type GateFallbackAction = "blur" | "hide" | "redirect" | "custom_card";
-
-export interface MemberGateConfig {
-  requiredTier: RequiredTier;
-  fallbackAction: GateFallbackAction;
-  /** Only meaningful when `fallbackAction` is "redirect". */
-  redirectUrl: string;
-  /** Only meaningful when `fallbackAction` is "custom_card". */
-  cardTitle: string;
-  /** Only meaningful when `fallbackAction` is "custom_card". */
-  cardDescription: string;
-  /** Pixels. Only meaningful when `fallbackAction` is "blur". */
-  blurIntensity: number;
-}
-
-/** Bounds from the F01 `blurIntensity` property control. */
+/** Bounds for a blur radius control, the metered paywall's. */
 export const BLUR_MIN = 2;
 export const BLUR_MAX = 20;
-
-/**
- * Defaults copied from F01's property controls so the panel and the Framer
- * sidebar open on the same values. A creator who customizes nothing and a
- * creator who drops the component straight onto the canvas must get the same
- * component.
- */
-export const DEFAULT_MEMBER_GATE_CONFIG: MemberGateConfig = {
-  requiredTier: "signed_in",
-  fallbackAction: "blur",
-  redirectUrl: "",
-  cardTitle: "Members Only Content",
-  cardDescription: "Join or sign in to read this full guide.",
-  blurIntensity: 8,
-};
-
-/** Friendly labels. PRD section 7.6 rule 4: never surface the raw value. */
-export const FALLBACK_ACTION_LABELS: Record<GateFallbackAction, string> = {
-  blur: "Frosted blur",
-  hide: "Hide completely",
-  redirect: "Page redirect",
-  custom_card: "Lock card",
-};
-
-/**
- * Which customizer rows a given fallback action should show.
- *
- * Mirrors the `hidden` predicates on F01's property controls, so the panel
- * offers exactly what the canvas sidebar will offer. Showing all five rows at
- * once would promise controls the sidebar then hides.
- */
-export function visibleGateRows(action: GateFallbackAction): {
-  blur: boolean;
-  redirect: boolean;
-  card: boolean;
-} {
-  return {
-    blur: action === "blur",
-    redirect: action === "redirect",
-    card: action === "custom_card",
-  };
-}
 
 /* ==========================================================================
    MEMBER AUTH, PRD task 2.5, feature F05
@@ -178,7 +114,7 @@ export const AUTH_PROVIDER_LABELS: Record<AuthProvider, string> = {
  * component: the first two come from the connected site and the last two from
  * the settings document, and the generator bakes all four in at deploy time.
  * Offering them in the customizer would invite a creator to set a login path
- * here that disagrees with the one `<MemberGate>` redirects to, which is a
+ * here that disagrees with the one page locks redirect to, which is a
  * dead end nobody would think to look for.
  */
 export interface MemberDashboardConfig {
@@ -313,7 +249,7 @@ export interface MeteredPaywallConfig {
 }
 
 export const METERED_QUOTA_MIN = 1;
-export const METERED_QUOTA_MAX = 10;
+export const METERED_QUOTA_MAX = 100;
 export const CONTENT_RADIUS_MAX = 32;
 
 export const DEFAULT_METERED_PAYWALL_CONFIG: MeteredPaywallConfig = {

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { Check, ChevronDown, Copy, CreditCard, Eye, EyeOff, Globe, Key, Plug, X } from "lucide-react";
-import { Button, FieldRow, FieldRows, IconButton, TextField, Toggle } from "../ui";
+import { Banner, Button, FieldRow, FieldRows, IconButton, TextField, Toggle } from "../ui";
 import { cn } from "../../utils/cn";
 import { API_BASE_URL } from "../../config/backend";
 import { checkKey, keyProblemMessage } from "./gatewayKeys";
@@ -93,17 +93,31 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
     return `${API_BASE_URL}/api/member/oauth/${definition.id.replace("_oauth", "")}/callback`;
   }, [definition.id]);
 
+  /**
+   * The Redirect URL is derived, never stored state the creator edits.
+   *
+   * It is the API's own callback, so it follows `VITE_API_BASE_URL`. Reading
+   * the stored copy instead froze it at whatever address the API had on the
+   * first save, and a dev tunnel such as ngrok changes address on every
+   * restart: the field is read only, so the creator had no way to correct it
+   * and the provider was sent to a dead callback.
+   */
+  const hasRedirect = definition.fields.some((field) => field.key === "redirect_url");
+  const storedRedirect = stored.values["redirect_url"];
+  const redirectStale =
+    hasRedirect && typeof storedRedirect === "string" && storedRedirect !== "" && storedRedirect !== defaultRedirectUrl;
+
   const createInitialDraft = useCallback((): IntegrationDraft => {
     const base = draftFor(definition, stored);
     for (const field of definition.fields) {
-      if (stored.values[field.key]) {
+      if (field.key === "redirect_url") {
+        base[field.key] = defaultRedirectUrl;
+      } else if (stored.values[field.key]) {
         base[field.key] = stored.values[field.key];
-      } else if (field.key === "redirect_url") {
-        base[field.key] = `${API_BASE_URL}/api/member/oauth/${definition.id.replace("_oauth", "")}/callback`;
       }
     }
     return base;
-  }, [definition, stored]);
+  }, [defaultRedirectUrl, definition, stored]);
 
   const [draft, setDraft] = useState<IntegrationDraft>(createInitialDraft);
   const [problems, setProblems] = useState<FieldProblem[]>([]);
@@ -136,10 +150,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
     };
 
     for (const field of definition.fields) {
-      let val = (draft[field.key] ?? "").trim();
-      if (field.key === "redirect_url" && val === "") {
-        val = defaultRedirectUrl;
-      }
+      const val = field.key === "redirect_url" ? defaultRedirectUrl : (draft[field.key] ?? "").trim();
       if (val !== "" && (!field.secret || definition.category === "auth")) {
         valuesToSave[field.key] = val;
       }
@@ -184,7 +195,9 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
             {configured ? <Check aria-hidden={true} /> : getIntegrationIcon(definition.id)}
           </span>
           <span className="integration-card-title">{definition.name}</span>
-          {configured ? (
+          {redirectStale ? (
+            <span className="badge badge-warning">Update needed</span>
+          ) : configured ? (
             <span className="badge badge-success">Connected</span>
           ) : (
             <span className="badge badge-neutral">Not connected</span>
@@ -220,12 +233,20 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
             </IconButton>
           </div>
 
+          {redirectStale ? (
+            <Banner
+              tone="warning"
+              title="Redirect URL changed"
+              message={`The API address changed. Save to update it, and add ${defaultRedirectUrl} to the authorized redirect URIs in your ${definition.name} app.`}
+            />
+          ) : null}
+
           <FieldRows>
             {definition.fields.map((field) => {
               const locked = field.secret && !secretsSupported && isGatewayIntegration(definition);
               const isRedirect = field.key === "redirect_url";
               const rawValue = draft[field.key] ?? "";
-              const value = isRedirect ? (rawValue || defaultRedirectUrl) : rawValue;
+              const value = isRedirect ? defaultRedirectUrl : rawValue;
               const isReadOnly = Boolean(field.readOnly) || isRedirect;
               const isDisabled =
                 locked ||

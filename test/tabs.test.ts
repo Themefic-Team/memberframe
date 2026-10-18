@@ -10,8 +10,10 @@ import { describe, expect, it } from "vitest";
 import { ACCOUNT_VIEW, DEFAULT_TAB, TABS, isTabId, isViewId } from "../src/components/tabs/tabs";
 
 describe("TABS", () => {
-  it("has no more than four tabs, the Figma maximum", () => {
-    expect(TABS.length).toBeLessThanOrEqual(4);
+  it("has five tabs at most: the four plus Reports, the creator's choice on 2026-10-18", () => {
+    // The Figma maximum is four; Reports is a fifth by request (24-reports.md),
+    // with the tab gap narrowed so the Account icon still fits in 360px.
+    expect(TABS.length).toBeLessThanOrEqual(5);
   });
 
   it("starts with Home, which is also the default", () => {

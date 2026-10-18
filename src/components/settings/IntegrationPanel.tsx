@@ -31,6 +31,11 @@ export interface IntegrationPanelProps {
  * full-width web page; this panel is 360 pixels and a three-column grid there
  * is three unreadable cards.
  */
+/** One line under each group's title. Payments are not here, so Sign in points to them. */
+const CATEGORY_SUBTITLES: Partial<Record<keyof typeof CATEGORY_LABELS, string>> = {
+  auth: "Members sign in with an account they already have. Payments are in Manage, Payments.",
+};
+
 export const IntegrationPanel: React.FC<IntegrationPanelProps> = ({
   state,
   secretsSupported,
@@ -54,13 +59,16 @@ export const IntegrationPanel: React.FC<IntegrationPanelProps> = ({
       {/*
         Payment gateways live in Manage, Payments (FP-16), with their own
         encrypted key store and test and live modes. They are left out here
-        so there is one place to connect them.
+        so there is one place to connect them, and the Sign in subtitle says so.
       */}
-      <p className="settings-help">Payment gateways are in Manage, Payments.</p>
-
       {integrationsByCategory(INTEGRATIONS.filter((entry) => entry.category !== "store")).map((group) => (
         <section key={group.category} className="section-group">
-          <h2 className="section-title">{CATEGORY_LABELS[group.category]}</h2>
+          <div className="section-header">
+            <h2 className="section-title">{CATEGORY_LABELS[group.category]}</h2>
+            {CATEGORY_SUBTITLES[group.category] ? (
+              <p className="section-subtitle">{CATEGORY_SUBTITLES[group.category]}</p>
+            ) : null}
+          </div>
 
           <div className="integration-grid">
             {group.integrations.map((definition) => (

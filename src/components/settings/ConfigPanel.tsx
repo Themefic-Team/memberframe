@@ -55,6 +55,6 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
     ) : null}
 
     {/* Currency, routing, and gateways moved to Manage, Payments, FP-16. */}
-    <p className="settings-help">Payments, currency, and gateway routing are in Manage, Payments.</p>
+    {/* <p className="settings-help">Payments, currency, and gateway routing are in Manage, Payments.</p> */}
   </>
 );

@@ -30,7 +30,6 @@ import type {
   GatewayVaultDraft,
   MemberPage,
   SiteGatewayStatus,
-  TierExtraPrice,
   SiteTierRecord,
 } from "../types/site";
 import { MEMBER_PAGE_SIZE } from "../types/site";
@@ -59,13 +58,11 @@ export function fetchMembers(
 }
 
 /**
- * The four row actions, all three write ones through one endpoint.
+ * Tier changes and revocation, through one endpoint.
  *
  * PRD section 10.3 has `PATCH /api/site/members/:id` for "change tier, grant, or
- * revoke" and no separate grant or revoke route. "Grant VIP" is therefore a
- * tier change with a fixed argument, and "Revoke access" is a status change.
- * Inventing routes for the two shortcut buttons would be a contract change made
- * for the convenience of a menu.
+ * revoke" and no separate grant or revoke route, so "Revoke access" is a status
+ * change. Deleting a member is not a patch and has its own route below.
  */
 export interface MemberPatch {
   /**
@@ -88,6 +85,30 @@ export function patchMember(
   client: ApiClient = apiClient
 ): Promise<ApiResult<{ member: unknown }>> {
   return client.patch(`/api/site/members/${encodeURIComponent(memberId)}`, patch);
+}
+
+/**
+ * `DELETE /api/site/members/:id`. Removes the member for good.
+ *
+ * The site id travels in the query, because a DELETE body is not reliably
+ * forwarded, and the server scopes the lookup by both ids for the same reason
+ * `patchMember` does.
+ */
+/** Delete a paid tier. Refused for the Free tier, and while any member holds the tier. */
+export function deleteTier(
+  tierId: string,
+  siteId: string,
+  client: ApiClient = apiClient
+): Promise<ApiResult<{ deleted: true; id: string }>> {
+  return client.delete(`/api/site/tiers/${encodeURIComponent(tierId)}`, { siteId });
+}
+
+export function deleteMember(
+  memberId: string,
+  siteId: string,
+  client: ApiClient = apiClient
+): Promise<ApiResult<{ deleted: true; id: string }>> {
+  return client.delete(`/api/site/members/${encodeURIComponent(memberId)}`, { siteId });
 }
 
 /**
@@ -127,11 +148,8 @@ export interface TierDraft {
   monthlyPriceMinor: number | null;
   annualPriceMinor: number | null;
   lifetimePriceMinor: number | null;
-  currency: CurrencyCode;
   rank: number;
   isActive: boolean;
-  /** FP-16. Replaces the tier's extra currency prices when present. */
-  extraPrices?: ReadonlyArray<TierExtraPrice>;
 }
 
 export function createTier(

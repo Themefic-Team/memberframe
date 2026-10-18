@@ -7,9 +7,8 @@
  *
  * ## It rewrites one marked block, it does not template
  *
- * The component is authored as a real file,
- * `src/canvas-components/MemberGate.tsx`, and imported here as raw text. This
- * generator finds its `@memberframe-config-start` / `@memberframe-config-end`
+ * Each component is authored as a real file in `src/canvas-components/` and
+ * imported here as raw text. This generator finds its `@memberframe-config-start` / `@memberframe-config-end`
  * pair and replaces what sits between them. Everything else is byte-identical
  * between the repo and the deployed file.
  *
@@ -29,7 +28,6 @@
  * against its own allowed values first.
  */
 
-import memberGateSource from "../canvas-components/MemberGate.tsx?raw";
 import memberAuthSource from "../canvas-components/MemberAuth.tsx?raw";
 import memberDashboardSource from "../canvas-components/MemberDashboard.tsx?raw";
 import onboardingModalSource from "../canvas-components/OnboardingModal.tsx?raw";
@@ -49,7 +47,6 @@ import {
   DASHBOARD_RADIUS_MIN,
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
-  DEFAULT_MEMBER_GATE_CONFIG,
   DEFAULT_ONBOARDING_MODAL_CONFIG,
   DEFAULT_MEMBER_PRICING_CONFIG,
   PRICING_RADIUS_MAX,
@@ -59,10 +56,8 @@ import {
   ONBOARDING_RADIUS_MIN,
   type OnboardingModalConfig,
   type AuthScreen,
-  type GateFallbackAction,
   type MemberAuthConfig,
   type MemberDashboardConfig,
-  type MemberGateConfig,
   CONTENT_RADIUS_MAX,
   DEFAULT_BOOKMARK_BUTTON_CONFIG,
   DEFAULT_BOOKMARKS_TRAY_CONFIG,
@@ -92,36 +87,6 @@ export const CONFIG_END_MARKER = "// @memberframe-config-end";
 export const LOCK_STATE_SIGNATURE = ["const IS_LOCKED = false;", "// @plugin-lock-state: unlocked"];
 
 /**
- * One file per project, named for the component. Framer requires the extension,
- * and `.tsx` specifically: the docs on `createCodeFile` note that any other
- * extension rejects JSX syntax.
- */
-export const MEMBER_GATE_FILE_NAME = "MemberGate.tsx";
-
-/**
- * The `requiredTier` values F01's property control actually offers.
- *
- * `anyone` is a legal `RequiredTier` and is deliberately absent. A gate set to
- * "Anyone" is entitled by definition, so it gates nothing, and emitting it as
- * the `defaultValue` of an Enum whose `options` do not list it would leave the
- * Framer sidebar showing a selection it cannot represent.
- */
-const ALLOWED_REQUIRED_TIERS: ReadonlyArray<RequiredTier> = [
-  "signed_in",
-  "free_member",
-  "tier_1",
-  "tier_2",
-  "vip",
-];
-
-const ALLOWED_FALLBACK_ACTIONS: ReadonlyArray<GateFallbackAction> = [
-  "blur",
-  "hide",
-  "redirect",
-  "custom_card",
-];
-
-/**
  * Caps on the two free-text fields.
  *
  * Both are `ControlType.String`, a single-line input, and both end up in the
@@ -130,32 +95,6 @@ const ALLOWED_FALLBACK_ACTIONS: ReadonlyArray<GateFallbackAction> = [
  */
 const MAX_CARD_TITLE = 200;
 const MAX_CARD_DESCRIPTION = 500;
-
-/**
- * Schemes a redirect target may use.
- *
- * `javascript:` is the reason this list exists. `window.location.assign` will
- * execute such a URL in some browsers, and `redirectUrl` is a value a creator
- * may well paste from somewhere else. A relative path, a fragment, or an
- * explicit http(s) URL covers every legitimate use of a redirect gate.
- */
-function sanitizeRedirectUrl(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-
-  if (
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("./") ||
-    trimmed.startsWith("../") ||
-    trimmed.startsWith("#") ||
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://")
-  ) {
-    return trimmed;
-  }
-
-  return "";
-}
 
 /**
  * Characters collapsed to a single space in a single-line field.
@@ -177,43 +116,9 @@ function sanitizeText(value: string, maxLength: number): string {
   return value.replace(COLLAPSIBLE_WHITESPACE, " ").trim().slice(0, maxLength);
 }
 
-/**
- * Bring a config into the range the generated component can represent.
- *
- * Exported because the Builder tab holds a draft that may predate a later
- * change to the allowed values, and because the tests assert each clamp.
- * Anything unrecognised falls back to F01's own default rather than throwing:
- * the creator's other five fields are still worth deploying.
- */
 /** A custom tier key, as the API accepts it. Conflict C9, resolved. */
 const CUSTOM_TIER_KEY_PATTERN = /^[a-z][a-z0-9_]{1,49}$/;
 
-export function normalizeGateConfig(config: MemberGateConfig): MemberGateConfig {
-  const requiredTier =
-    ALLOWED_REQUIRED_TIERS.includes(config.requiredTier) ||
-    // "anyone" is shaped like a key and gates nothing, so it is never accepted.
-    (config.requiredTier !== "anyone" && CUSTOM_TIER_KEY_PATTERN.test(String(config.requiredTier)))
-      ? config.requiredTier
-      : DEFAULT_MEMBER_GATE_CONFIG.requiredTier;
-
-  const fallbackAction = ALLOWED_FALLBACK_ACTIONS.includes(config.fallbackAction)
-    ? config.fallbackAction
-    : DEFAULT_MEMBER_GATE_CONFIG.fallbackAction;
-
-  const rawBlur = Number(config.blurIntensity);
-  const blurIntensity = Number.isFinite(rawBlur)
-    ? Math.min(BLUR_MAX, Math.max(BLUR_MIN, Math.round(rawBlur)))
-    : DEFAULT_MEMBER_GATE_CONFIG.blurIntensity;
-
-  return {
-    requiredTier,
-    fallbackAction,
-    redirectUrl: sanitizeRedirectUrl(String(config.redirectUrl ?? "")),
-    cardTitle: sanitizeText(String(config.cardTitle ?? ""), MAX_CARD_TITLE),
-    cardDescription: sanitizeText(String(config.cardDescription ?? ""), MAX_CARD_DESCRIPTION),
-    blurIntensity,
-  };
-}
 
 /**
  * A string as a JavaScript string literal.
@@ -437,28 +342,6 @@ function replaceConfigBlock(source: string, block: string): string {
   return code;
 }
 
-/* ==========================================================================
-   MEMBER GATE, PRD task 1.7, feature F01
-   ========================================================================== */
-
-const GATE_TIER_OPTIONS_LINE = `    options: ["signed_in", "free_member", "tier_1", "tier_2", "vip"],`;
-const GATE_TIER_TITLES_LINE = `    optionTitles: ["Any Signed In", "Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],`;
-
-/**
- * Write the site's tiers into the gate's Access Tier control: "Any Signed In"
- * first, then every tier by rank, named as the creator named it. Keys and
- * names go through `encodeLiteral`, so a tier name cannot break out of the
- * string it is written into.
- */
-export function withSiteTiers(code: string, context: DeployContext): string {
-  return rewriteTierOptions(code, context, {
-    optionsLine: GATE_TIER_OPTIONS_LINE,
-    titlesLine: GATE_TIER_TITLES_LINE,
-    leading: [["signed_in", "Any Signed In"]],
-    what: "The gate's Access Tier options",
-  });
-}
-
 /**
  * Swap one tier Enum's two lines for the site's own tiers, by rank, after the
  * fixed leading entries. Shared by the gate and the paywall.
@@ -487,35 +370,6 @@ function rewriteTierOptions(
   return code
     .replace(spec.optionsLine, `    options: [${keys.map(encodeLiteral).join(", ")}],`)
     .replace(spec.titlesLine, `    optionTitles: [${titles.map(encodeLiteral).join(", ")}],`);
-}
-
-export const MEMBER_GATE_DESCRIPTOR: CanvasComponentDescriptor<MemberGateConfig> = {
-  id: "member_gate",
-  fileName: MEMBER_GATE_FILE_NAME,
-  source: memberGateSource,
-  configTypeName: "GateConfig",
-  normalize: normalizeGateConfig,
-  transform: withSiteTiers,
-  serializeFields: (config, context) => [
-    `  requiredTier: ${encodeLiteral(config.requiredTier)},`,
-    `  fallbackAction: ${encodeLiteral(config.fallbackAction)},`,
-    `  redirectUrl: ${encodeLiteral(config.redirectUrl)},`,
-    `  cardTitle: ${encodeLiteral(config.cardTitle)},`,
-    `  cardDescription: ${encodeLiteral(config.cardDescription)},`,
-    `  blurIntensity: ${config.blurIntensity},`,
-    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
-    `  sessionTtlMs: ${SESSION_CACHE_TTL_MS},`,
-    `  siteKey: ${encodeLiteral(context.siteKey)},`,
-    `  loginPath: ${encodeLiteral(context.loginPath || "/login")},`,
-  ],
-};
-
-export function generateMemberGateCode(
-  config: MemberGateConfig,
-  source?: string,
-  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
-): GeneratedCanvasFile<MemberGateConfig> {
-  return generateComponentCode(MEMBER_GATE_DESCRIPTOR, config, source, context);
 }
 
 /* ==========================================================================

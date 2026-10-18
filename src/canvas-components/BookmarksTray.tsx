@@ -38,14 +38,14 @@ const IS_TRIAL = false;
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
-// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
 // from this repository, so the copy is the architecture. Edit all or none.
 //
 // One vocabulary for every component. The Theme control picks a palette, the
-// creator's Colors, Typography, and Layout groups override it, and every rule
+// creator's Colors, Typography, Layout, and Spacing groups override it, and every rule
 // in a component's stylesheet reads the resolved `--mf-c-*` values.
 //
 // ## Theme is a control, not the visitor's operating system
@@ -72,6 +72,7 @@ interface MfAppearanceProps {
   colors?: Partial<Record<MfColorKey, string>> | null;
   typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
   layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  spacing?: { margin?: unknown; customPadding?: boolean; padding?: unknown } | null;
   labels?: Record<string, unknown> | null;
 }
 
@@ -210,7 +211,68 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
   set("--mf-card-shadow", shadow ? null : "none");
 
+  const spacing = mfSpacingCss(input.spacing);
+  if (spacing !== "") lines.push(spacing);
+
   return lines.join(" ");
+}
+
+/**
+ * Four pixel sides out of a Padding control value, or null.
+ *
+ * Framer's Padding control produces `"24px"` or `"24px 16px 24px 16px"`, and a
+ * number is read as all four sides. One to four sides expand the way CSS
+ * shorthand does. Anything else, a negative, or a unit other than px is
+ * refused, because the result is written into a style block.
+ */
+function mfBox(value: unknown, max: number): [number, number, number, number] | null {
+  const parts: number[] = [];
+  if (typeof value === "number") {
+    parts.push(value);
+  } else if (typeof value === "string") {
+    const tokens = value.trim().split(/\s+/);
+    if (tokens[0] === "" || tokens.length > 4) return null;
+    for (const token of tokens) {
+      const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(token);
+      if (!match) return null;
+      parts.push(Number(match[1]));
+    }
+  } else {
+    return null;
+  }
+
+  if (!parts.every((part) => Number.isFinite(part) && part >= 0)) return null;
+  const [t, r = t, b = t, l = r] = parts.map((part) => Math.round(Math.min(max, part)));
+  return [t, r, b, l];
+}
+
+/**
+ * The Spacing group as declarations for the component root, or "".
+ *
+ * Emitted into the instance's scoped rule, which follows the component's own
+ * stylesheet, so a value the creator set wins and an untouched one leaves the
+ * component's own spacing alone. Top and bottom margin keep a root's own
+ * centring; a side margin replaces it, and `width: auto` lets the root fill
+ * the space between the two margins instead of overflowing at 100%.
+ */
+function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
+  const input = spacing || {};
+  const out: string[] = [];
+
+  const margin = mfBox(input.margin, 400);
+  if (margin) {
+    const [t, r, b, l] = margin;
+    if (t > 0) out.push(`margin-top: ${t}px;`);
+    if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
+  }
+
+  if (input.customPadding === true) {
+    const padding = mfBox(input.padding, 400);
+    if (padding) out.push(`padding: ${padding.map((side) => `${side}px`).join(" ")};`);
+  }
+
+  return out.join(" ");
 }
 
 const MF_LIGHT = `
@@ -259,7 +321,7 @@ ${root}.is-dark {${MF_DARK}
 }
 
 /**
- * The shared property controls: Theme, Colors, Typography, Layout.
+ * The shared property controls: Theme, Colors, Typography, Layout, Spacing.
  *
  * Return types are inferred on purpose. Framer's real `framer` module and this
  * repo's shim name their control types differently, and this file compiles
@@ -349,6 +411,21 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
         shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
       },
     },
+    spacing: {
+      type: ControlType.Object,
+      title: "Spacing",
+      buttonTitle: "Spacing",
+      controls: {
+        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        padding: {
+          type: ControlType.Padding,
+          title: "Padding",
+          defaultValue: "24px",
+          description: "Used when Custom padding is on.",
+        },
+      },
+    },
   };
 }
 
@@ -436,6 +513,9 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (withBody) headers["Content-Type"] = "application/json";
   if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  // A free ngrok tunnel answers a browser with its warning page, not the API,
+  // unless the request asks it not to. Only sent to an ngrok address.
+  if (CONFIG.apiBaseUrl.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
   return headers;
 }
 
@@ -512,6 +592,27 @@ function RibbonIcon() {
   );
 }
 
+type TrayIconShape = "bookmark" | "heart" | "star";
+
+/** The Bookmark Button's three shapes, so the tray's icon can match it. */
+function TriggerIcon({ shape }: { shape: TrayIconShape }) {
+  if (shape === "heart") {
+    return (
+      <svg {...ICON}>
+        <path d="M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" />
+      </svg>
+    );
+  }
+  if (shape === "star") {
+    return (
+      <svg {...ICON}>
+        <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
+      </svg>
+    );
+  }
+  return <RibbonIcon />;
+}
+
 function CloseIcon() {
   return (
     <svg {...ICON}>
@@ -550,17 +651,23 @@ const cssContent = `
 .mf-tray-trigger {
   appearance: none; box-sizing: border-box; position: relative;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  width: 100%; height: 100%; margin: 0; padding: 0 12px;
+  width: 100%; height: 100%; min-width: 36px; min-height: 36px; margin: 0; padding: 0 12px;
+  white-space: nowrap;
   border: var(--mf-border-width, 1px) solid var(--mf-c-border); border-radius: 999px;
   background: var(--mf-c-surface); color: var(--mf-c-text); font: inherit; font-weight: 600; cursor: pointer;
 }
 .mf-tray-trigger:hover { border-color: var(--mf-c-accent); }
 .mf-tray-trigger:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
-.mf-tray-trigger svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.mf-tray-trigger svg { width: var(--mf-tray-icon, 18px); height: var(--mf-tray-icon, 18px); flex: 0 0 auto; }
+/* Button Style, the same three as the Bookmark Button. */
+.mf-tray-trigger.is-soft { border-color: transparent; background: color-mix(in srgb, var(--mf-c-accent) 10%, var(--mf-c-surface)); }
+.mf-tray-trigger.is-soft:hover { border-color: transparent; background: color-mix(in srgb, var(--mf-c-accent) 18%, var(--mf-c-surface)); }
+.mf-tray-trigger.is-ghost { border-color: transparent; background: transparent; padding: 0 4px; }
+.mf-tray-trigger.is-ghost:hover { border-color: transparent; color: var(--mf-c-accent); }
 .mf-tray-badge {
   position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;
-  background: var(--mf-c-accent); color: var(--mf-c-on-accent); font-size: calc(11px * var(--mf-text-scale, 1)); font-weight: 700;
+  background: var(--mf-tray-badge, var(--mf-c-accent)); color: var(--mf-c-on-accent); font-size: calc(11px * var(--mf-text-scale, 1)); font-weight: 700;
   box-shadow: 0 0 0 2px var(--mf-c-surface);
 }
 /* The drawer's own wrapper carries the theme and takes no space. */
@@ -571,9 +678,11 @@ const cssContent = `
 .mf-tray-layer.is-right { justify-content: flex-end; }
 .mf-tray-layer.is-inline { position: absolute; inset: auto; top: calc(100% + 8px); right: 0; height: 420px; width: 340px; z-index: 50; }
 .mf-tray-backdrop { position: absolute; inset: 0; background: var(--mf-c-backdrop); animation: mf-tray-fade 0.2s ease-out; }
+.mf-tray-backdrop.is-blur { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.mf-tray-backdrop.is-none { background: transparent; }
 .mf-tray-panel {
   position: relative; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--mf-gap, 12px);
-  width: min(400px, 100vw); height: 100%; padding: var(--mf-pad, 20px);
+  width: min(var(--mf-tray-width, 400px), 100vw); height: 100%; padding: var(--mf-pad, 20px);
   background: var(--mf-c-surface); color: var(--mf-c-text); box-shadow: var(--mf-c-shadow);
   font-family: var(--mf-c-font); font-size: calc(14px * var(--mf-text-scale, 1)); line-height: 1.45;
   animation: mf-tray-in-right 0.24s ease-out;
@@ -673,6 +782,13 @@ export interface BookmarksTrayProps extends MfAppearanceProps {
   canvasPreview?: "closed" | "open";
   accentColor?: string;
   borderRadius?: number;
+  buttonStyle?: "outline" | "soft" | "ghost";
+  iconShape?: TrayIconShape;
+  iconSize?: number;
+  badgeColor?: string;
+  drawerWidth?: number;
+  showDates?: boolean;
+  backdrop?: "dim" | "blur" | "none";
 }
 
 /**
@@ -694,10 +810,18 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
     canvasPreview = "closed",
     accentColor = CONFIG.accentColor,
     borderRadius = CONFIG.borderRadius,
+    buttonStyle = "outline",
+    iconShape = "bookmark",
+    iconSize = 18,
+    badgeColor,
+    drawerWidth = 400,
+    showDates = true,
+    backdrop = "dim",
     theme = "light",
     colors,
     typography,
     layout,
+    spacing,
     labels,
   } = props;
 
@@ -863,7 +987,9 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
   const visible = matches.slice(0, limit);
 
   const scopedCss =
-    `[data-mf-tray="${scope}"] { ` +
+    `[data-mf-tray="${scope}"] { --mf-tray-icon: ${Math.round(mfNumber(iconSize, 12, 48, 18))}px; ` +
+    `--mf-tray-width: ${Math.round(mfNumber(drawerWidth, 280, 640, 400))}px; ` +
+    (badgeColor && mfSafeColor(badgeColor, "") ? `--mf-tray-badge: ${mfSafeColor(badgeColor, "")}; ` : "") +
     mfAppearanceVars({
       accent: accentColor,
       radius: borderRadius,
@@ -872,10 +998,13 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
       colors,
       typography,
       layout,
+      spacing,
     }) +
     " }";
 
   const side = drawerSide === "left" ? "left" : "right";
+  const triggerStyle = buttonStyle === "soft" || buttonStyle === "ghost" ? buttonStyle : "outline";
+  const shade = backdrop === "blur" || backdrop === "none" ? backdrop : "dim";
   const showDrawer = onCanvas ? canvasPreview === "open" : open;
 
   function panelBody(): React.ReactNode {
@@ -953,12 +1082,12 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
                   {href ? (
                     <a className="mf-tray-link" href={onCanvas ? undefined : href} onClick={() => !onCanvas && setOpen(false)}>
                       <span className="mf-tray-item-title">{item.title}</span>
-                      <span className="mf-tray-item-meta">{when}</span>
+                      {showDates ? <span className="mf-tray-item-meta">{when}</span> : null}
                     </a>
                   ) : (
                     <span className="mf-tray-link">
                       <span className="mf-tray-item-title">{item.title}</span>
-                      <span className="mf-tray-item-meta">{when}</span>
+                      {showDates ? <span className="mf-tray-item-meta">{when}</span> : null}
                     </span>
                   )}
                   <button
@@ -984,7 +1113,7 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
   const drawer = showDrawer ? (
     <div className={`mf-tray is-drawer ${mfThemeClass(theme)}`} data-mf-tray={scope}>
       <div className={`mf-tray-layer is-${side}${onCanvas ? " is-inline" : ""}`}>
-        {onCanvas ? null : <div className="mf-tray-backdrop" aria-hidden={true} onClick={close} />}
+        {onCanvas ? null : <div className={`mf-tray-backdrop is-${shade}`} aria-hidden={true} onClick={close} />}
         <div
           ref={panelRef}
           className="mf-tray-panel"
@@ -1014,13 +1143,13 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
       <button
         ref={triggerRef}
         type="button"
-        className="mf-tray-trigger"
+        className={`mf-tray-trigger is-${triggerStyle}`}
         aria-haspopup="dialog"
         aria-expanded={showDrawer}
         aria-label={showLabel ? undefined : t("open", { count })}
         onClick={() => !onCanvas && setOpen(true)}
       >
-        <RibbonIcon />
+        <TriggerIcon shape={iconShape === "heart" || iconShape === "star" ? iconShape : "bookmark"} />
         {showLabel ? <span>{triggerLabel}</span> : null}
         {showBadge && count > 0 ? (
           <span className="mf-tray-badge" aria-hidden={true}>
@@ -1064,6 +1193,23 @@ addPropertyControls(BookmarksTray, {
     optionTitles: ["Right Slide-Out", "Left Slide-Out"],
     defaultValue: CONFIG.drawerSide,
   },
+  drawerWidth: {
+    type: ControlType.Number,
+    title: "Drawer Width",
+    min: 280,
+    max: 640,
+    step: 10,
+    unit: "px",
+    defaultValue: 400,
+  },
+  backdrop: {
+    type: ControlType.Enum,
+    title: "Backdrop",
+    options: ["dim", "blur", "none"],
+    optionTitles: ["Dim", "Blur", "None"],
+    displaySegmentedControl: true,
+    defaultValue: "dim",
+  },
   emptyStateText: {
     type: ControlType.String,
     title: "Empty Message",
@@ -1082,10 +1228,44 @@ addPropertyControls(BookmarksTray, {
     title: "Count Badge",
     defaultValue: CONFIG.showBadge,
   },
+  badgeColor: {
+    type: ControlType.Color,
+    title: "Badge Color",
+    optional: true,
+    hidden: (props) => props.showBadge === false,
+  },
   showSearch: {
     type: ControlType.Boolean,
     title: "Search",
     defaultValue: true,
+  },
+  showDates: {
+    type: ControlType.Boolean,
+    title: "Saved Date",
+    defaultValue: true,
+  },
+  buttonStyle: {
+    type: ControlType.Enum,
+    title: "Button Style",
+    options: ["outline", "soft", "ghost"],
+    optionTitles: ["Outline", "Soft", "Icon Only"],
+    defaultValue: "outline",
+  },
+  iconShape: {
+    type: ControlType.Enum,
+    title: "Icon",
+    options: ["bookmark", "heart", "star"],
+    optionTitles: ["Bookmark Ribbon", "Heart", "Star"],
+    defaultValue: "bookmark",
+  },
+  iconSize: {
+    type: ControlType.Number,
+    title: "Icon Size",
+    min: 12,
+    max: 48,
+    step: 1,
+    unit: "px",
+    defaultValue: 18,
   },
   showLabel: {
     type: ControlType.Boolean,

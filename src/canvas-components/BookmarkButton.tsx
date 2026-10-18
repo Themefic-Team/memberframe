@@ -46,14 +46,14 @@ const IS_TRIAL = false;
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
-// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
 // from this repository, so the copy is the architecture. Edit all or none.
 //
 // One vocabulary for every component. The Theme control picks a palette, the
-// creator's Colors, Typography, and Layout groups override it, and every rule
+// creator's Colors, Typography, Layout, and Spacing groups override it, and every rule
 // in a component's stylesheet reads the resolved `--mf-c-*` values.
 //
 // ## Theme is a control, not the visitor's operating system
@@ -80,6 +80,7 @@ interface MfAppearanceProps {
   colors?: Partial<Record<MfColorKey, string>> | null;
   typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
   layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  spacing?: { margin?: unknown; customPadding?: boolean; padding?: unknown } | null;
   labels?: Record<string, unknown> | null;
 }
 
@@ -218,7 +219,68 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
   set("--mf-card-shadow", shadow ? null : "none");
 
+  const spacing = mfSpacingCss(input.spacing);
+  if (spacing !== "") lines.push(spacing);
+
   return lines.join(" ");
+}
+
+/**
+ * Four pixel sides out of a Padding control value, or null.
+ *
+ * Framer's Padding control produces `"24px"` or `"24px 16px 24px 16px"`, and a
+ * number is read as all four sides. One to four sides expand the way CSS
+ * shorthand does. Anything else, a negative, or a unit other than px is
+ * refused, because the result is written into a style block.
+ */
+function mfBox(value: unknown, max: number): [number, number, number, number] | null {
+  const parts: number[] = [];
+  if (typeof value === "number") {
+    parts.push(value);
+  } else if (typeof value === "string") {
+    const tokens = value.trim().split(/\s+/);
+    if (tokens[0] === "" || tokens.length > 4) return null;
+    for (const token of tokens) {
+      const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(token);
+      if (!match) return null;
+      parts.push(Number(match[1]));
+    }
+  } else {
+    return null;
+  }
+
+  if (!parts.every((part) => Number.isFinite(part) && part >= 0)) return null;
+  const [t, r = t, b = t, l = r] = parts.map((part) => Math.round(Math.min(max, part)));
+  return [t, r, b, l];
+}
+
+/**
+ * The Spacing group as declarations for the component root, or "".
+ *
+ * Emitted into the instance's scoped rule, which follows the component's own
+ * stylesheet, so a value the creator set wins and an untouched one leaves the
+ * component's own spacing alone. Top and bottom margin keep a root's own
+ * centring; a side margin replaces it, and `width: auto` lets the root fill
+ * the space between the two margins instead of overflowing at 100%.
+ */
+function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
+  const input = spacing || {};
+  const out: string[] = [];
+
+  const margin = mfBox(input.margin, 400);
+  if (margin) {
+    const [t, r, b, l] = margin;
+    if (t > 0) out.push(`margin-top: ${t}px;`);
+    if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
+  }
+
+  if (input.customPadding === true) {
+    const padding = mfBox(input.padding, 400);
+    if (padding) out.push(`padding: ${padding.map((side) => `${side}px`).join(" ")};`);
+  }
+
+  return out.join(" ");
 }
 
 const MF_LIGHT = `
@@ -267,7 +329,7 @@ ${root}.is-dark {${MF_DARK}
 }
 
 /**
- * The shared property controls: Theme, Colors, Typography, Layout.
+ * The shared property controls: Theme, Colors, Typography, Layout, Spacing.
  *
  * Return types are inferred on purpose. Framer's real `framer` module and this
  * repo's shim name their control types differently, and this file compiles
@@ -355,6 +417,21 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: 1,
         },
         shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+      },
+    },
+    spacing: {
+      type: ControlType.Object,
+      title: "Spacing",
+      buttonTitle: "Spacing",
+      controls: {
+        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        padding: {
+          type: ControlType.Padding,
+          title: "Padding",
+          defaultValue: "24px",
+          description: "Used when Custom padding is on.",
+        },
       },
     },
   };
@@ -494,6 +571,9 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (withBody) headers["Content-Type"] = "application/json";
   if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  // A free ngrok tunnel answers a browser with its warning page, not the API,
+  // unless the request asks it not to. Only sent to an ngrok address.
+  if (CONFIG.apiBaseUrl.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
   return headers;
 }
 
@@ -768,7 +848,8 @@ const cssContent = `
 .mf-bookmark-button {
   appearance: none; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center; gap: var(--mf-gap, 6px);
-  width: 100%; height: 100%; margin: 0; padding: 0 var(--mf-pad, 10px);
+  width: 100%; height: 100%; min-width: 36px; min-height: 36px; margin: 0; padding: 0 var(--mf-pad, 10px);
+  white-space: nowrap;
   border: var(--mf-border-width, 1px) solid var(--mf-c-border); border-radius: var(--mf-c-radius);
   background: var(--mf-c-surface); color: var(--mf-c-text); box-shadow: var(--mf-c-shadow);
   font: inherit; font-weight: 600; cursor: pointer;
@@ -777,7 +858,14 @@ const cssContent = `
 .mf-bookmark-button:hover { border-color: var(--mf-bookmark-fill); }
 .mf-bookmark-button:focus-visible { outline: 2px solid var(--mf-bookmark-fill); outline-offset: 2px; }
 .mf-bookmark-button.is-saved { color: var(--mf-bookmark-fill); border-color: color-mix(in srgb, var(--mf-bookmark-fill) 45%, transparent); }
-.mf-bookmark-button svg { flex: 0 0 auto; width: 20px; height: 20px; }
+.mf-bookmark-button svg { flex: 0 0 auto; width: var(--mf-bookmark-icon, 20px); height: var(--mf-bookmark-icon, 20px); }
+/* Button Style: Outline is the base above. Soft is a tint with no border; Icon Only is the bare icon. */
+.mf-bookmark-button.is-soft { border-color: transparent; box-shadow: none; background: color-mix(in srgb, var(--mf-bookmark-fill) 10%, var(--mf-c-surface)); }
+.mf-bookmark-button.is-soft:hover { border-color: transparent; background: color-mix(in srgb, var(--mf-bookmark-fill) 18%, var(--mf-c-surface)); }
+.mf-bookmark-button.is-ghost { border-color: transparent; box-shadow: none; background: transparent; padding: 0; }
+.mf-bookmark-button.is-ghost:hover { border-color: transparent; color: var(--mf-bookmark-fill); }
+.mf-bookmark-button.is-saved.is-soft, .mf-bookmark-button.is-saved.is-ghost { border-color: transparent; }
+.mf-bookmark-button.is-icon-right { flex-direction: row-reverse; }
 .mf-bookmark-button.is-pulse svg { animation: mf-bookmark-pulse 0.32s ease-out; }
 @keyframes mf-bookmark-pulse { 0% { transform: scale(1); } 45% { transform: scale(1.2); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .mf-bookmark-button.is-pulse svg { animation: none; } }
@@ -836,7 +924,14 @@ export interface BookmarkButtonProps extends MfAppearanceProps {
   canvasPreview?: "unsaved" | "saved";
   accentColor?: string;
   borderRadius?: number;
+  buttonStyle?: ButtonStyle;
+  iconSize?: number;
+  iconPosition?: "left" | "right";
+  animateSave?: boolean;
 }
+
+type ButtonStyle = "outline" | "soft" | "ghost";
+const BUTTON_STYLES: ReadonlyArray<ButtonStyle> = ["outline", "soft", "ghost"];
 
 /**
  * @framerIntrinsicWidth 44
@@ -857,10 +952,15 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
     canvasPreview = "unsaved",
     accentColor = "#5271ff",
     borderRadius = 999,
+    buttonStyle = "outline",
+    iconSize = 20,
+    iconPosition = "left",
+    animateSave = true,
     theme = "light",
     colors,
     typography,
     layout,
+    spacing,
     labels,
   } = props;
 
@@ -916,7 +1016,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
     const willSave = !isSaved(item.itemSlug);
     toggle(item);
     if (store.status !== "guest") {
-      if (willSave) {
+      if (willSave && animateSave) {
         // Restart the pulse without remounting the button, which would drop
         // keyboard focus: off, then on in the next frame.
         setPulsing(false);
@@ -942,7 +1042,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
 
   const fill = mfSafeColor(activeFillColor, CONFIG.activeFillColor);
   const scopedCss =
-    `[data-mf-bookmark="${scope}"] { --mf-bookmark-fill: ${fill}; ` +
+    `[data-mf-bookmark="${scope}"] { --mf-bookmark-fill: ${fill}; --mf-bookmark-icon: ${Math.round(mfNumber(iconSize, 12, 48, 20))}px; ` +
     mfAppearanceVars({
       accent: accentColor,
       radius: borderRadius,
@@ -951,10 +1051,15 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
       colors,
       typography,
       layout,
+      spacing,
     }) +
     " }";
 
   const label = saved ? t("savedLabel") : labelText || CONFIG.labelText;
+  const style: ButtonStyle = BUTTON_STYLES.indexOf(buttonStyle) === -1 ? "outline" : buttonStyle;
+  const buttonClass =
+    `mf-bookmark-button is-${style}${saved ? " is-saved" : ""}${pulsing ? " is-pulse" : ""}` +
+    (showLabel && iconPosition === "right" ? " is-icon-right" : "");
 
   return (
     <div className={`mf-bookmark ${mfThemeClass(theme)}`} data-mf-bookmark={scope}>
@@ -963,7 +1068,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
       <style>{scopedCss}</style>
       <button
         type="button"
-        className={`mf-bookmark-button${saved ? " is-saved" : ""}${pulsing ? " is-pulse" : ""}`}
+        className={buttonClass}
         aria-pressed={saved}
         aria-label={showLabel ? undefined : t(saved ? "removeAria" : "saveAria", { title: item.title })}
         onClick={onClick}
@@ -1037,6 +1142,22 @@ addPropertyControls(BookmarkButton, {
     title: "Filled Color",
     defaultValue: CONFIG.activeFillColor,
   },
+  buttonStyle: {
+    type: ControlType.Enum,
+    title: "Button Style",
+    options: ["outline", "soft", "ghost"],
+    optionTitles: ["Outline", "Soft", "Icon Only"],
+    defaultValue: "outline",
+  },
+  iconSize: {
+    type: ControlType.Number,
+    title: "Icon Size",
+    min: 12,
+    max: 48,
+    step: 1,
+    unit: "px",
+    defaultValue: 20,
+  },
   showLabel: {
     type: ControlType.Boolean,
     title: "Show Label",
@@ -1047,6 +1168,20 @@ addPropertyControls(BookmarkButton, {
     title: "Button Label",
     defaultValue: CONFIG.labelText,
     hidden: (props) => !props.showLabel,
+  },
+  iconPosition: {
+    type: ControlType.Enum,
+    title: "Icon Position",
+    options: ["left", "right"],
+    optionTitles: ["Left", "Right"],
+    displaySegmentedControl: true,
+    defaultValue: "left",
+    hidden: (props) => !props.showLabel,
+  },
+  animateSave: {
+    type: ControlType.Boolean,
+    title: "Save Animation",
+    defaultValue: true,
   },
   loginPath: {
     type: ControlType.String,

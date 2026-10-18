@@ -3,6 +3,7 @@ import { Save } from "lucide-react";
 import { Banner, Button, Segmented, useToast } from "../ui";
 import { ConfigPanel } from "../settings/ConfigPanel";
 import { IntegrationPanel } from "../settings/IntegrationPanel";
+import { WebhooksPanel } from "../settings/WebhooksPanel";
 import { PageLocksPanel } from "../settings/PageLocksPanel";
 import { CustomFieldsPanel } from "../settings/CustomFieldsPanel";
 import {
@@ -20,9 +21,16 @@ import { failureMessage } from "../../services/apiClient";
 import { isSafeSitePath, saveSiteSettings } from "../../services/siteSettingsService";
 import { useConnection } from "../../hooks/useConnection";
 import { useSiteTiers } from "../../hooks/useSiteTiers";
-import type { AuthSettings, GatedPageRule } from "../../types/connection";
+import type { AuthSettings, GatedPageRule, SectionLockRule } from "../../types/connection";
 import { deployBaseUrl } from "../../config/backend";
-import type { DeployContext } from "../../services";
+import { framer } from "framer-plugin";
+import {
+  SECTION_LOCKS_FILE_NAME,
+  normalizeSectionLockName,
+  sectionLocksCode,
+  writeCodeFile,
+  type DeployContext,
+} from "../../services";
 
 export interface SettingsTabProps {
   themePreference: ThemePreference;
@@ -120,6 +128,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       ]
   );
 
+  /** Section locks being edited. Saved with the page locks, by the same button. */
+  const [sectionLocks, setSectionLocks] = useState<SectionLockRule[]>(() => settings?.sectionLocks ?? []);
+
   /**
    * The profile field definitions being edited, FP-09. Same draft-until-save
    * model as `auth`, reset whenever the stored document changes.
@@ -146,6 +157,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setAuth(settings ? { ...settings.auth } : null);
     if (settings && Array.isArray(settings.gatedPages)) {
       setGatedPages(settings.gatedPages);
+    }
+    if (settings) {
+      setSectionLocks(Array.isArray(settings.sectionLocks) ? settings.sectionLocks : []);
     }
   }, [settings]);
 
@@ -312,22 +326,44 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
 
     setSaving(true);
-    const result = await saveSiteSettings(siteId, settingsVersion, { gatedPages });
-    setSaving(false);
+    const savedLocks = sectionLocks.map((rule) => ({ ...rule, name: normalizeSectionLockName(rule.name) }));
+    const savedPages = gatedPages.map((rule) => ({ ...rule, fallbackAction: "redirect" as const }));
+    const result = await saveSiteSettings(siteId, settingsVersion, { gatedPages: savedPages, sectionLocks: savedLocks });
 
     if (result.kind === "ok") {
       applySettings(result.data.settings, result.data.version);
       setFailure(null);
-      showToast({ tone: "success", message: "Page locks saved successfully" });
+
+      // Keep Framer's Code overrides list in step with the locks: one override
+      // per lock in MemberLocks. Written when there are locks, or when the file
+      // is already there and a lock was removed. Never created for nothing.
+      const fileNames = await framer
+        .getCodeFiles()
+        .then((files) => files.map((file) => file.name))
+        .catch((): string[] => []);
+      if (savedLocks.length > 0 || fileNames.includes(SECTION_LOCKS_FILE_NAME)) {
+        const written = await writeCodeFile(framer, SECTION_LOCKS_FILE_NAME, sectionLocksCode(savedLocks));
+        if (!written.ok) {
+          setSaving(false);
+          setFailure({ title: "Locks saved, MemberLocks not updated", message: written.message });
+          showToast({ tone: "error", message: "Locks saved, MemberLocks not updated" });
+          return;
+        }
+      }
+
+      setSaving(false);
+      showToast({ tone: "success", message: "Locks saved" });
       return;
     }
+
+    setSaving(false);
 
     setFailure(failureMessage(result));
     showToast({
       tone: "error",
       message: failureMessage(result).message || "Could not save page locks",
     });
-  }, [applySettings, gatedPages, settingsVersion, showToast, siteId]);
+  }, [applySettings, gatedPages, sectionLocks, settingsVersion, showToast, siteId]);
 
   /**
    * Save the field list, FP-09.
@@ -411,6 +447,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <PageLocksPanel
           rules={gatedPages}
           onChangeRules={setGatedPages}
+          sectionLocks={sectionLocks}
+          onChangeSectionLocks={setSectionLocks}
           saving={saving}
           onSave={() => void handleSavePageLocks()}
           deployContext={deployContext}
@@ -430,6 +468,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             onSave={(id, values) => void handleSaveIntegration(id, values)}
             onToggleEnabled={(id, enabled) => void handleToggleIntegration(id, enabled)}
             connected={siteId !== null}
+          />
+
+          <WebhooksPanel
+            siteId={siteId}
+            tiers={siteTierList}
+            profileFields={storedFields}
+            siteName={connection?.siteName ?? "Your site"}
           />
         </>
       )}

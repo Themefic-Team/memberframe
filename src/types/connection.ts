@@ -85,6 +85,22 @@ export interface GatedPageRule {
   redirectPath?: string;
 }
 
+/**
+ * A section lock: a layer named "Lock: <name>" follows this rule on the live
+ * site. Development doc: docs/development-docs/19-section-locks.md
+ */
+export interface SectionLockRule {
+  /** Unique per site, ignoring case. Letters, digits, spaces, and - _ . only. */
+  name: string;
+  enabled: boolean;
+  /** "members": shown to those with access. "others": shown to everyone without it. */
+  audience: "members" | "others";
+  /** "signed_in" or a tier key, the same as a page lock. */
+  requiredTier: GatedPageTier;
+  /** What the people the rule does not show the layer to get instead. */
+  lockedAction: "hide" | "blur";
+}
+
 export interface SiteSettingsDocument {
   version: number;
   auth: AuthSettings;
@@ -93,6 +109,8 @@ export interface SiteSettingsDocument {
   /** Keyed by integration id. See `components/settings/integrationRegistry.ts`. */
   integrations: Record<string, StoredIntegrationSettings>;
   gatedPages?: GatedPageRule[];
+  /** Optional: a backend older than section locks omits it. */
+  sectionLocks?: SectionLockRule[];
   /**
    * FP-09. Ordered, and the order is what members' forms render in. Optional
    * because a backend older than FP-09 omits it, and read through
@@ -107,6 +125,8 @@ export interface SiteSettingsPatch {
   branding?: Partial<BrandingSettings>;
   canvas?: Partial<CanvasSettings>;
   gatedPages?: GatedPageRule[];
+  /** Replaced wholesale, like gatedPages. */
+  sectionLocks?: SectionLockRule[];
   /**
    * Replaced wholesale, unlike every other section. The list is the
    * configuration: deleting a field has to be expressible, and a per-key merge

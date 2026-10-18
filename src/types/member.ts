@@ -133,13 +133,23 @@ export function tierName(key: TierKey, tiers = DEFAULT_SITE_TIERS): string {
  *
  * Remembered by the Manage tab whenever it loads them, so a custom tier is
  * named by its own name everywhere without threading the list through every
- * component. Falls back to the default ladder before the first load.
+ * component.
+ *
+ * Free is the only tier a site has until the creator creates another, so it is
+ * the fallback before the first load and it is always on the ladder: a member
+ * with no paid tier is a Free member, and a picker without Free could not move
+ * one back. The built in Silver, Gold, and VIP are never offered unless the
+ * site actually has them.
  */
-let siteTierLadder: ReadonlyArray<TierLadderEntry> = DEFAULT_SITE_TIERS;
+export const FREE_TIER: TierLadderEntry = { key: "free_member", rank: 0, name: "Free" };
+
+let siteTierLadder: ReadonlyArray<TierLadderEntry> = [FREE_TIER];
 
 export function rememberSiteTiers(tiers: ReadonlyArray<TierLadderEntry>): void {
-  if (tiers.length === 0) return;
-  siteTierLadder = [...tiers].sort((a, b) => a.rank - b.rank);
+  // The Free tier is the rank 0 tier, whatever its key: `free_member` on older
+  // sites, `free` on new ones (23-dynamic-tiers.md). Added only if missing.
+  const withFree = tiers.some((tier) => tier.rank === FREE_TIER.rank) ? tiers : [FREE_TIER, ...tiers];
+  siteTierLadder = [...withFree].sort((a, b) => a.rank - b.rank);
 }
 
 export function siteTiers(): ReadonlyArray<TierLadderEntry> {

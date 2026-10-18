@@ -23,6 +23,7 @@ import "./styles/builder.css";
 import "./styles/manage.css";
 import "./styles/settings.css";
 import "./styles/connect.css";
+import "./styles/reports.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

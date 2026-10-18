@@ -315,16 +315,12 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({ siteId }) => {
           <h2 className="section-title">Files</h2>
           <span className="section-subtitle">
             {list.assets.length === 0
-              ? "Nothing yet."
+              ? "Nothing yet. Upload one above."
               : `${list.assets.length} file${list.assets.length === 1 ? "" : "s"}. Download links work for 60 seconds.`}
           </span>
         </div>
 
-        {list.assets.length === 0 ? (
-          <p className="settings-help">
-            Add a file above, then click &quot;Add button to canvas&quot; on its row or copy its Asset ID into Protected Download.
-          </p>
-        ) : (
+        {list.assets.length === 0 ? null : (
           <ul className="files-list">
             {list.assets.map((asset) =>
               editingId === asset.id ? (
@@ -388,12 +384,11 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({ siteId }) => {
           </ul>
         )}
 
-        {list.storage === "local" ? (
-          <p className="settings-help">
-            Uploads are kept on the API server&apos;s disk. For more than one server, set ASSET_STORAGE=s3 to use S3 or
-            Cloudflare R2.
-          </p>
-        ) : null}
+        {/*
+          Where uploads are stored (the API server's disk, or S3 and R2 with
+          ASSET_STORAGE=s3) is a deployment setting for whoever runs the API, not
+          something a creator can act on, so the panel does not show it.
+        */}
       </section>
     </div>
   );

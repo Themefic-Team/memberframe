@@ -48,14 +48,14 @@ const IS_TRIAL = false;
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberGate, MemberPricing, OnboardingModal, MeteredPaywall,
-// ProtectedDownload, BookmarkButton, and BookmarksTray. Held so by
+// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
 // from this repository, so the copy is the architecture. Edit all or none.
 //
 // One vocabulary for every component. The Theme control picks a palette, the
-// creator's Colors, Typography, and Layout groups override it, and every rule
+// creator's Colors, Typography, Layout, and Spacing groups override it, and every rule
 // in a component's stylesheet reads the resolved `--mf-c-*` values.
 //
 // ## Theme is a control, not the visitor's operating system
@@ -82,6 +82,7 @@ interface MfAppearanceProps {
   colors?: Partial<Record<MfColorKey, string>> | null;
   typography?: { customFont?: boolean; font?: unknown; textScale?: number } | null;
   layout?: { padding?: number; gap?: number; borderWidth?: number; shadow?: boolean } | null;
+  spacing?: { margin?: unknown; customPadding?: boolean; padding?: unknown } | null;
   labels?: Record<string, unknown> | null;
 }
 
@@ -220,7 +221,68 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   const shadow = typeof layout.shadow === "boolean" ? layout.shadow : input.shadowByDefault;
   set("--mf-card-shadow", shadow ? null : "none");
 
+  const spacing = mfSpacingCss(input.spacing);
+  if (spacing !== "") lines.push(spacing);
+
   return lines.join(" ");
+}
+
+/**
+ * Four pixel sides out of a Padding control value, or null.
+ *
+ * Framer's Padding control produces `"24px"` or `"24px 16px 24px 16px"`, and a
+ * number is read as all four sides. One to four sides expand the way CSS
+ * shorthand does. Anything else, a negative, or a unit other than px is
+ * refused, because the result is written into a style block.
+ */
+function mfBox(value: unknown, max: number): [number, number, number, number] | null {
+  const parts: number[] = [];
+  if (typeof value === "number") {
+    parts.push(value);
+  } else if (typeof value === "string") {
+    const tokens = value.trim().split(/\s+/);
+    if (tokens[0] === "" || tokens.length > 4) return null;
+    for (const token of tokens) {
+      const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(token);
+      if (!match) return null;
+      parts.push(Number(match[1]));
+    }
+  } else {
+    return null;
+  }
+
+  if (!parts.every((part) => Number.isFinite(part) && part >= 0)) return null;
+  const [t, r = t, b = t, l = r] = parts.map((part) => Math.round(Math.min(max, part)));
+  return [t, r, b, l];
+}
+
+/**
+ * The Spacing group as declarations for the component root, or "".
+ *
+ * Emitted into the instance's scoped rule, which follows the component's own
+ * stylesheet, so a value the creator set wins and an untouched one leaves the
+ * component's own spacing alone. Top and bottom margin keep a root's own
+ * centring; a side margin replaces it, and `width: auto` lets the root fill
+ * the space between the two margins instead of overflowing at 100%.
+ */
+function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
+  const input = spacing || {};
+  const out: string[] = [];
+
+  const margin = mfBox(input.margin, 400);
+  if (margin) {
+    const [t, r, b, l] = margin;
+    if (t > 0) out.push(`margin-top: ${t}px;`);
+    if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
+  }
+
+  if (input.customPadding === true) {
+    const padding = mfBox(input.padding, 400);
+    if (padding) out.push(`padding: ${padding.map((side) => `${side}px`).join(" ")};`);
+  }
+
+  return out.join(" ");
 }
 
 const MF_LIGHT = `
@@ -269,7 +331,7 @@ ${root}.is-dark {${MF_DARK}
 }
 
 /**
- * The shared property controls: Theme, Colors, Typography, Layout.
+ * The shared property controls: Theme, Colors, Typography, Layout, Spacing.
  *
  * Return types are inferred on purpose. Framer's real `framer` module and this
  * repo's shim name their control types differently, and this file compiles
@@ -359,6 +421,21 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
         shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
       },
     },
+    spacing: {
+      type: ControlType.Object,
+      title: "Spacing",
+      buttonTitle: "Spacing",
+      controls: {
+        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        padding: {
+          type: ControlType.Padding,
+          title: "Padding",
+          defaultValue: "24px",
+          description: "Used when Custom padding is on.",
+        },
+      },
+    },
   };
 }
 
@@ -374,6 +451,42 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
 // @memberframe-appearance-end
+
+// @memberframe-canvas-preview-start
+// ============================================================================
+// REAL DATA ON THE CANVAS
+// ============================================================================
+// Byte-identical in MemberPricing, MemberDashboard, OnboardingModal, and
+// ProtectedDownload, held so by `test/canvasRealData.test.ts`.
+//
+// On the canvas there is no visitor, but there is a site: the creator's own
+// tiers, profile questions, and files. `GET /api/preview` answers with what
+// the published site shows any visitor, so a creator designs against their
+// real plans rather than samples. One request per address per 15 seconds,
+// shared by every component on the canvas. Any failure answers null, and the
+// component keeps its sample.
+
+const MF_PREVIEW_TTL_MS = 15000;
+
+type MfPreviewCache = Record<string, { at: number; promise: Promise<Record<string, unknown> | null> }>;
+
+function mfCanvasPreview(apiBaseUrl: string, siteKey: string, assetId: string = ""): Promise<Record<string, unknown> | null> {
+  const base = String(apiBaseUrl || "").replace(/\/+$/, "");
+  if (base === "" || !siteKey || typeof window === "undefined" || typeof fetch !== "function") return Promise.resolve(null);
+  const url = base + "/api/preview?site=" + encodeURIComponent(siteKey) + (assetId ? "&asset=" + encodeURIComponent(assetId) : "");
+  const holder = window as unknown as { __mfCanvasPreview?: MfPreviewCache };
+  const cache = holder.__mfCanvasPreview || (holder.__mfCanvasPreview = {});
+  const hit = cache[url];
+  if (hit && Date.now() - hit.at < MF_PREVIEW_TTL_MS) return hit.promise;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  const promise = fetch(url, { headers })
+    .then((response) => (response.ok ? (response.json() as Promise<Record<string, unknown>>) : null))
+    .catch(() => null);
+  cache[url] = { at: Date.now(), promise };
+  return promise;
+}
+// @memberframe-canvas-preview-end
 
 // ============================================================================
 // CONFIGURATION
@@ -571,6 +684,9 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (withBody) headers["Content-Type"] = "application/json";
   if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  // A free ngrok tunnel answers a browser with its warning page, not the API,
+  // unless the request asks it not to. Only sent to an ngrok address.
+  if (CONFIG.apiBaseUrl.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
   const country = testCountry();
   if (country) headers["X-MemberFrame-Test-Country"] = country;
   return headers;
@@ -627,15 +743,33 @@ interface LemonSqueezyGlobal {
 
 type RazorpayConstructor = new (options: Record<string, unknown>) => { open(): void };
 
+/*
+  Decimal places per currency, so an amount in minor units reads right: 1500
+  is 1,500 yen but 15.00 dollars. A copy of the exponents in the plugin's
+  utils/currencies.ts, because this file may import nothing from it; a test
+  holds the two lists equal.
+*/
+const ZERO_DECIMAL_CURRENCIES = new Set([
+  "BIF", "CLP", "DJF", "GNF", "ISK", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV",
+  "XAF", "XOF", "XPF",
+]);
+const THREE_DECIMAL_CURRENCIES = new Set(["BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"]);
+
+function currencyExponent(currency: string): number {
+  const code = currency.toUpperCase();
+  return ZERO_DECIMAL_CURRENCIES.has(code) ? 0 : THREE_DECIMAL_CURRENCIES.has(code) ? 3 : 2;
+}
+
 function formatPrice(amountMinor: number, currency: string): string {
-  const amount = amountMinor / 100;
+  const exponent = currencyExponent(currency);
+  const amount = amountMinor / 10 ** exponent;
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency,
       // Whole amounts read cleaner on a pricing card: $19, not $19.00.
-      minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: Number.isInteger(amount) ? 0 : exponent,
+      maximumFractionDigits: exponent,
     }).format(amount);
   } catch {
     return `${amount} ${currency}`;
@@ -742,7 +876,10 @@ const cssContent = `
 .mf-pricing {
   box-sizing: border-box;
   width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
   height: 100%;
+  min-height: min-content;
   overflow-y: auto;
   padding: var(--mf-pad, 24px);
   color: var(--mf-c-text);
@@ -754,6 +891,8 @@ const cssContent = `
   line-height: 1.5;
 }
 .mf-pricing-head { text-align: center; margin-bottom: var(--mf-gap, 20px); }
+/* Canvas only: says the plans are samples, so a creator never mistakes them for theirs. */
+.mf-pricing-sample { display: block; margin: 0 auto 8px; color: var(--mf-c-muted); font-size: calc(11px * var(--mf-text-scale, 1)); }
 .mf-pricing-title { margin: 0; font-size: calc(26px * var(--mf-text-scale, 1)); font-weight: 700; letter-spacing: -0.01em; }
 .mf-pricing-sub { margin: 6px 0 0; color: var(--mf-c-muted); }
 .mf-pricing-pill {
@@ -854,7 +993,7 @@ export default function MemberPricing(
   props: Partial<PricingConfig> & MfAppearanceProps & PricingDisplayProps
 ): React.ReactElement {
   const config: PricingConfig = { ...CONFIG, ...props };
-  const { theme = "light", colors, typography, layout, labels } = props;
+  const { theme = "light", colors, typography, layout, spacing, labels } = props;
   const features = Array.isArray(props.features) ? props.features : DEFAULT_FEATURES;
   const t = (key: string, values?: Record<string, string | number>) => {
     const text = mfLabel(labels, PRICING_LABELS, key);
@@ -884,6 +1023,22 @@ export default function MemberPricing(
   // ------------------------------------------------------------------------
   // Load the plans and who is looking
   // ------------------------------------------------------------------------
+
+  // On the canvas: the site's real plans once they arrive, the samples until
+  // then, and the samples for good if the site has none or is not connected.
+  useEffect(() => {
+    if (!onCanvas) return;
+    let active = true;
+    void mfCanvasPreview(base, CONFIG.siteKey).then((data) => {
+      const pricing = data ? (data["pricing"] as PublicPricing | undefined) : undefined;
+      if (active && pricing && Array.isArray(pricing.tiers) && pricing.tiers.length > 0) {
+        setLoad({ phase: "ready", pricing });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [base, onCanvas]);
 
   useEffect(() => {
     if (onCanvas) return;
@@ -1146,6 +1301,7 @@ export default function MemberPricing(
       colors,
       typography,
       layout,
+      spacing,
     }) +
     " }";
   const rootClass = `mf-pricing ${mfThemeClass(theme)}`;
@@ -1322,6 +1478,11 @@ export default function MemberPricing(
   return shell(
     <>
       <div className="mf-pricing-head">
+        {onCanvas && pricing === PREVIEW_PRICING ? (
+          <span className="mf-pricing-sample">
+            Sample plans. Your own appear here when this project is connected and the MemberFrame API is reachable.
+          </span>
+        ) : null}
         {pricing.mode === "test" ? (
           <span className="mf-pricing-pill">
             {t("testMode")}

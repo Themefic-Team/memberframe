@@ -12,15 +12,14 @@
 
 import type { MemberStatus, TierKey, TierLadderEntry } from "./member";
 import type { MemberMetadata } from "../utils/customFields";
+import type { CurrencyCode } from "../utils/currencies";
 
 /**
- * The currencies PRD section 8 F03 names on `SiteGatewayConfig.defaultCurrency`.
- *
- * All four have two-decimal minor units, which is why `utils/money.ts` can
- * default its exponent to 2. Adding JPY, which has none, or KWD, which has
- * three, means revisiting every call site that relies on that default.
+ * An ISO 4217 code from `utils/currencies.ts`. PRD section 8 F03 named four;
+ * the list now holds every circulating currency, so the decimal places vary
+ * (JPY has none, KWD three) and every money call passes `currencyExponent`.
  */
-export type CurrencyCode = "USD" | "EUR" | "GBP" | "INR";
+export type { CurrencyCode };
 
 /** PRD section 8 F03. The three gateways, and the only three. */
 export type GatewayId = "stripe" | "lemonsqueezy" | "razorpay";
@@ -87,13 +86,6 @@ export interface SiteMemberRecord {
  * narrows to. Every `SiteTierRecord` is assignable to a `TierLadderEntry`, so
  * callers pass real tiers to `isEntitled` unchanged.
  */
-/** A tier price in a currency other than the tier's own. FP-16 section 6.2. */
-export interface TierExtraPrice {
-  currency: CurrencyCode;
-  interval: "month" | "year" | "lifetime";
-  amountMinor: number;
-}
-
 export interface SiteTierRecord {
   id: string;
   siteId: string;
@@ -105,8 +97,6 @@ export interface SiteTierRecord {
   annualPriceMinor: number | null;
   lifetimePriceMinor: number | null;
   currency: CurrencyCode;
-  /** FP-16. Prices in other currencies, e.g. INR for Razorpay buyers. */
-  extraPrices?: ReadonlyArray<TierExtraPrice>;
   /**
    * Unique per site, PRD section 11.2. Higher outranks lower, and this is the
    * field hierarchical entitlement compares, which is why task 2.3 validates

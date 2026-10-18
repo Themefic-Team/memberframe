@@ -7,16 +7,17 @@ import { MemberFlyout, type MemberAction } from "./MemberFlyout";
 import {
   NO_MEMBER_FILTERS,
   STATUS_FILTERS,
-  TIER_FILTERS,
   filterMembers,
   hasActiveFilters,
   memberCountLabel,
   pageCount,
+  tierFilters,
   type MemberFilters,
   type StatusFilter,
   type TierFilter,
 } from "./memberFilters";
 import { MEMBER_PAGE_SIZE, type MemberPage, type SiteMemberRecord } from "../../types/site";
+import { siteTiers } from "../../types/member";
 import type { CustomFieldDefinition } from "../../utils/customFields";
 
 export interface MembersTableProps {
@@ -95,7 +96,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         <Select
           label="Filter by tier"
           value={filters.tier}
-          options={TIER_FILTERS}
+          options={tierFilters(siteTiers())}
           onChange={(tier) => patchFilters({ tier: tier as TierFilter })}
         />
 

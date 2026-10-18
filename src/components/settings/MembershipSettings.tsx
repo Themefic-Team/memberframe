@@ -1,5 +1,5 @@
 import React from "react";
-import { Checkbox, FieldRow, FieldRows, Segmented, TextField } from "../ui";
+import { Checkbox, FieldRow, FieldRows, TextField } from "../ui";
 import { AUTH_PATH_FIELDS, isSafeSitePath } from "../../services/siteSettingsService";
 import type { AuthSettings } from "../../types/connection";
 
@@ -9,17 +9,12 @@ export interface MembershipSettingsProps {
   disabled?: boolean;
 }
 
-const METHOD_OPTIONS = [
-  { value: "password", label: "Password" },
-  { value: "otp", label: "Email code" },
-] as const satisfies ReadonlyArray<{ value: AuthSettings["defaultMethod"]; label: string }>;
-
 /**
  * The membership paths and policy. Feature plan FP-02, FP-08.
  *
  * ## Why these five fields matter more than they look
  *
- * They are the only place that says where a membership lives. `<MemberGate>`
+ * They are the only place that says where a membership lives. A page lock
  * redirects a signed-out visitor to `loginPath`, the password reset email links
  * to `resetPath`, `<MemberAuth>` sends a member to `afterLoginPath` once signed
  * in, and the Builder tab creates exactly these pages. Every one of those is
@@ -37,6 +32,15 @@ const METHOD_OPTIONS = [
  * protocol-relative and leaves the site, so a value like it turns every
  * component that redirects into an open redirect. The server refuses it too.
  * This copy exists so the creator is told before they submit.
+ *
+ * ## Only what the server enforces lives here
+ *
+ * "Sign in opens with" and "Require a strong password" were removed: nothing
+ * read them. Each `<MemberAuth>` instance has its own Default Method and
+ * Password Strength controls in the Framer properties panel, and those are
+ * what a visitor actually gets. "Allow new sign ups" stays because the server
+ * enforces it, so it closes registration for every sign in component on the
+ * site and for anyone calling the API directly, which no canvas control can.
  */
 export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
   value,
@@ -82,35 +86,9 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
         <p className="settings-help settings-help-problem">
           Each path starts with one slash and stays on this site, for example /login.
         </p>
-      ) : (
-        <p className="settings-help">
-          The Builder tab creates these pages for you, and gates and emails point at them.
-        </p>
-      )}
+      ) : null}
 
       <FieldRows>
-        <FieldRow
-          label="Sign in opens with"
-          fill
-          hint={
-            value.defaultMethod === "otp"
-              ? "Email codes are not built yet, so visitors see the password form until they are."
-              : "The form visitors see first. They can switch to the other method."
-          }
-        >
-          {/*
-            A segmented control rather than a select: two options, and the
-            choice is visible without opening anything. It still only takes
-            effect on save, which is why the group below it is checkboxes.
-          */}
-          <Segmented
-            label="Sign in opens with"
-            options={METHOD_OPTIONS}
-            value={value.defaultMethod}
-            onChange={(next) => set("defaultMethod", next)}
-          />
-        </FieldRow>
-
         {/*
           A checkbox, not a toggle. PRD section 7.5 reserves the toggle for
           instant-apply controls, and nothing here applies until Save.
@@ -120,8 +98,8 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
           htmlFor="settings-allow-registration"
           hint={
             value.allowRegistration
-              ? "Visitors can create an account from the sign in page."
-              : "Only members you add can sign in. The sign up form is hidden."
+              ? "Visitors can create an account. Applies to every sign in component on the site."
+              : "The server refuses new accounts. Existing members can still sign in."
           }
         >
           <Checkbox
@@ -129,15 +107,6 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
             checked={value.allowRegistration}
             disabled={disabled}
             onChange={(checked) => set("allowRegistration", checked)}
-          />
-        </FieldRow>
-
-        <FieldRow label="Require a strong password" htmlFor="settings-strong-password">
-          <Checkbox
-            id="settings-strong-password"
-            checked={value.requirePasswordStrength}
-            disabled={disabled}
-            onChange={(checked) => set("requirePasswordStrength", checked)}
           />
         </FieldRow>
       </FieldRows>

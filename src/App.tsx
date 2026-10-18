@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { framer } from "framer-plugin";
 import { PluginShell } from "./components/shell";
 import { ConnectionProvider } from "./components/ConnectionProvider";
-import { ACCOUNT_VIEW, BuilderTab, ConnectTab, HomeTab, ManageTab, SettingsTab } from "./components/tabs";
+import { ACCOUNT_VIEW, BuilderTab, ConnectTab, HomeTab, ManageTab, ReportsTab, SettingsTab } from "./components/tabs";
 import { ToastProvider } from "./components/ui";
 import { useActiveTab } from "./hooks/useActiveTab";
 import { useFramerTheme } from "./hooks/useFramerTheme";
@@ -89,6 +89,7 @@ export const App: React.FC = () => {
           {activeTab === "settings" ? (
             <SettingsTab themePreference={preference} onChangeThemePreference={setPreference} />
           ) : null}
+          {activeTab === "reports" ? <ReportsTab /> : null}
           {activeTab === ACCOUNT_VIEW ? <ConnectTab /> : null}
         </PluginShell>
       </ConnectionProvider>

@@ -125,13 +125,13 @@ describe("code files", () => {
 
     expect(await framer.getCodeFiles()).toEqual([]);
 
-    await framer.createCodeFile("MemberGate.tsx", "export default function MemberGate() {}");
+    await framer.createCodeFile("MemberAuth.tsx", "export default function MemberAuth() {}");
     const files = await framer.getCodeFiles();
 
     expect(files).toHaveLength(1);
-    expect(files[0]?.name).toBe("MemberGate.tsx");
+    expect(files[0]?.name).toBe("MemberAuth.tsx");
     expect(framer.calls.createCodeFile).toEqual([
-      { name: "MemberGate.tsx", code: "export default function MemberGate() {}" },
+      { name: "MemberAuth.tsx", code: "export default function MemberAuth() {}" },
     ]);
   });
 

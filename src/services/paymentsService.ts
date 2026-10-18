@@ -225,6 +225,6 @@ export function paymentsFailure(result: Exclude<ApiResult<unknown>, { kind: "ok"
     case "unsafe_path":
       return "Use a page path that starts with a slash, like /pricing.";
     default:
-      return "Could not save. Check your connection and try again.";
+      return "The server did not respond. Check your connection and try again.";
   }
 }

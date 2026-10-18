@@ -1,0 +1,213 @@
+/* ==========================================================================
+   REPORTS TAB (docs/development-docs/24-reports.md)
+
+   KPI tiles, tables, one column chart, and history lists. Surfaces follow the
+   Foundations model: tiles and tables on bg/raised with a hairline, radius 14
+   for cards, 8 for inner wells. Text wears text tokens; only the chart's
+   columns carry the brand colour. Every value is a token.
+   ========================================================================== */
+
+.report-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.report-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* --------------------------------------------------------------------------
+   KPI tiles: two columns at 360px
+   -------------------------------------------------------------------------- */
+.report-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.report-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
+}
+
+.report-kpi-label {
+  font: var(--text-body-sm);
+  color: var(--paragraph-faint);
+}
+
+.report-kpi-value {
+  font: var(--text-title-md);
+  letter-spacing: var(--text-title-md-tracking);
+  color: var(--title);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-kpi-sub {
+  font: var(--text-body-sm);
+  color: var(--paragraph);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Tables: a card of rows, label left, figures right
+   -------------------------------------------------------------------------- */
+.report-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
+  overflow: hidden;
+}
+
+.report-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 36px;
+  padding: var(--space-6) var(--space-12);
+  border-top: 1px solid var(--framer-color-divider);
+  font: var(--text-body-sm);
+  color: var(--paragraph);
+  text-align: left;
+}
+
+.report-row:first-child {
+  border-top: 0;
+}
+
+.report-row.is-head {
+  min-height: 30px;
+  color: var(--paragraph-faint);
+}
+
+button.report-row {
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.report-row:hover {
+  background: var(--framer-color-bg-tertiary);
+}
+
+.report-cell-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.report-cell-title {
+  color: var(--title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-cell-sub {
+  color: var(--paragraph-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-cell-figure {
+  flex: 0 0 auto;
+  color: var(--title);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.report-empty {
+  margin: 0;
+  padding: var(--space-12);
+  font: var(--text-body-sm);
+  color: var(--paragraph-faint);
+}
+
+/* --------------------------------------------------------------------------
+   Column chart: one series, brand hue, 4px rounded caps, square base
+   -------------------------------------------------------------------------- */
+.report-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-12);
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-12);
+  background: var(--px-color-bg-raised);
+}
+
+.report-chart-readout {
+  min-height: 18px;
+  font: var(--text-body-sm);
+  color: var(--paragraph);
+  font-variant-numeric: tabular-nums;
+}
+
+.report-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.report-chart-bar {
+  fill: var(--px-brand-primary);
+}
+
+.report-chart-bar.is-dim {
+  fill: var(--px-brand-subtle);
+}
+
+.report-chart-hit {
+  fill: transparent;
+  cursor: default;
+}
+
+.report-chart-axis {
+  stroke: var(--framer-color-divider);
+  stroke-width: 1;
+}
+
+.report-chart-tick {
+  fill: var(--paragraph-faint);
+  font-size: 11px;
+}
+
+/* --------------------------------------------------------------------------
+   A drill-down's title row: back arrow, then the section title
+   -------------------------------------------------------------------------- */
+.report-back {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-left: calc(var(--space-6) * -1);
+}
+
+.report-back .section-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

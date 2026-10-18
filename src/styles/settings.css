@@ -221,6 +221,14 @@
   stroke: currentColor;
 }
 
+.integration-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
 .integration-card-title {
   margin: 0;
   color: var(--title);
@@ -231,6 +239,35 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.integration-card-sub {
+  margin: 0;
+  color: var(--paragraph);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payments-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.payments-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.payments-mode-wrap {
+  flex-shrink: 0;
 }
 
 .integration-card-bar-right {
@@ -314,6 +351,7 @@
  */
 .integration-card-pending {
   margin: 0;
+  padding: 0 12px 10px;
   color: var(--paragraph);
   font-size: 11px;
   line-height: 1.45;
@@ -434,40 +472,10 @@
   box-sizing: border-box;
 }
 
-/* Title and badge on one line inside the shared .section-header. */
-.section-title-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-}
 
 /* ---------------------------------------------------------------------------
-   Route Shield card
+   Route Shield script: an inner well, bg/secondary, radius 8
    --------------------------------------------------------------------------- */
-.shield-code-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
-  border-radius: var(--radius-14);
-  border: 1px solid var(--framer-color-divider);
-  background: var(--px-color-bg-raised);
-  box-shadow: var(--px-shadow-card);
-  box-sizing: border-box;
-}
-
-.shield-code-desc p {
-  margin: 0;
-  font: var(--text-body-sm);
-  color: var(--paragraph);
-}
-
-.shield-code-desc strong {
-  font-weight: 600;
-  color: var(--title);
-}
-
-/* An inner well: bg/secondary inside a raised card, radius 8. */
 .shield-snippet-box {
   display: flex;
   align-items: center;
@@ -497,34 +505,6 @@
   flex-shrink: 0;
 }
 
-.shield-quick-steps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  padding-top: var(--space-12);
-  border-top: 1px solid var(--framer-color-divider);
-}
-
-/* Body/Small Strong, sentence case. No uppercase micro labels in the kit. */
-.shield-steps-title {
-  font: var(--text-body-sm-strong);
-  color: var(--title);
-}
-
-.shield-steps-list {
-  margin: 0;
-  padding-left: var(--space-16);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  font: var(--text-body-sm);
-  color: var(--paragraph);
-}
-
-.shield-steps-list strong {
-  font-weight: 600;
-  color: var(--title);
-}
 
 /* ---------------------------------------------------------------------------
    Rule cards
@@ -656,83 +636,9 @@
 }
 
 /* Hint under a field row: Body/Small, text/tertiary. */
-/* A dashed inner well, the Empty state's border language at small scale. */
-.page-rule-deploy-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-10);
-  padding: var(--space-10) var(--space-12);
-  background: var(--framer-color-bg-secondary);
-  border: 1px dashed var(--framer-color-divider);
-  border-radius: var(--radius-10);
-}
-
-.page-rule-deploy-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.page-rule-deploy-title {
-  font: var(--text-body-sm-strong);
-  color: var(--title);
-}
-
-.page-rule-deploy-text {
-  margin: 0;
-  font: var(--text-body-sm);
-  color: var(--paragraph-faint);
-}
-
 .page-locks-btn-row {
   display: flex;
   align-items: center;
-}
-
-/* ---------------------------------------------------------------------------
-   On-page gating guide
-   --------------------------------------------------------------------------- */
-.onpage-guide-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
-  border-radius: var(--radius-14);
-  border: 1px solid var(--framer-color-divider);
-  background: var(--px-color-bg-raised);
-  box-shadow: var(--px-shadow-card);
-  box-sizing: border-box;
-}
-
-/* Title/Small 14/20. */
-.onpage-guide-title {
-  margin: 0;
-  font: var(--text-title-sm);
-  letter-spacing: var(--text-title-sm-tracking);
-  color: var(--title);
-}
-
-.onpage-guide-text {
-  margin: 0;
-  font: var(--text-body-sm);
-  color: var(--paragraph);
-}
-
-.onpage-guide-steps {
-  margin: 0;
-  padding-left: var(--space-16);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  font: var(--text-body-sm);
-  color: var(--paragraph);
-}
-
-.onpage-guide-steps strong {
-  font-weight: 600;
-  color: var(--title);
 }
 
 .onpage-tier-table-wrap {
@@ -986,4 +892,76 @@
   align-items: flex-start;
   gap: 6px;
   margin-top: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Webhooks, docs/development-docs/20-webhooks.md
+   --------------------------------------------------------------------------- */
+.webhook-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-8) 0;
+}
+
+.webhook-checks-title {
+  font: var(--text-body-sm-strong);
+  color: var(--title);
+}
+
+.webhook-secret {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webhook-deliveries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--framer-color-divider);
+}
+
+.webhook-delivery-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+}
+
+.webhook-delivery-text {
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--framefic-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.webhook-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.webhook-map-arrow {
+  display: inline-flex;
+  color: var(--framefic-text-muted);
+}
+
+.webhook-preview {
+  margin: 0;
+  padding: var(--space-8) var(--space-10);
+  max-height: 200px;
+  overflow: auto;
+  border-radius: var(--radius-8);
+  background: var(--framer-color-bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--paragraph);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

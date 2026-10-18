@@ -13,7 +13,6 @@
  */
 
 export type CanvasComponentId =
-  | "member_gate"
   | "member_auth"
   | "member_login"
   | "member_register"
@@ -64,6 +63,8 @@ export interface CanvasComponentEntry {
    * 2.5" after task 2.5 shipped would be false.
    */
   previewNote?: string;
+  /** Where it usually goes, shown as a badge: a page path or a place. */
+  placement?: string;
 }
 
 export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
@@ -75,7 +76,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Built and ready to insert. Configure it in the Framer properties panel: a panel preview is not scheduled yet.",
+      "Sign in, sign up, password reset, and email code in one form. Visitors switch between them in place.",
+    placement: "Login page",
   },
   /*
     The four dedicated screens. Same engine as Member Auth, deployed as
@@ -91,7 +93,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Sign in only, for your login page. Links to your sign up, reset, and code pages when you set them in the properties panel.",
+      "A sign in form. Links to your sign up and reset pages.",
+    placement: "/login",
   },
   {
     id: "member_register",
@@ -101,7 +104,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Sign up only, for your registration page. Links back to your login page.",
+      "A sign up form for new members. Links back to sign in.",
+    placement: "/signup",
   },
   {
     id: "member_password_reset",
@@ -111,7 +115,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "For your reset page. Asks for an email, and shows the new password form when a visitor opens the emailed link.",
+      "Asks for an email, then sets a new password from the emailed link.",
+    placement: "/reset-password",
   },
   {
     id: "member_otp_verify",
@@ -121,9 +126,9 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Passwordless sign in: emails a six digit code and verifies it. Links back to your login page.",
+      "Passwordless sign in with a six digit code sent by email.",
+    placement: "Login page",
   },
-  // { id: "member_gate", name: "Member Gate", features: "F01, F22", task: "1.7", previewReady: true, deployable: true },
  
   {
     id: "member_dashboard",
@@ -133,7 +138,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Built and ready to insert. It shows a member their email, tier, and status, and carries the sign out button. Billing and invoices arrive with payments.",
+      "A member's account: profile, plan, billing, and sign out.",
+    placement: "/dashboard",
   },
   {
     id: "member_pricing",
@@ -143,7 +149,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Built and ready to insert. It shows your tiers and their prices from Manage, Tiers, and each button starts a checkout on the gateway that suits the buyer. Put it on your pricing page.",
+      "Your tiers and prices from Manage, Tiers. Each button starts a checkout.",
+    placement: "/pricing",
   },
   {
     id: "metered_paywall",
@@ -153,7 +160,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Wraps an article. Readers get a set number of free articles each week or month, or the Read More teaser shows the opening paragraphs and frosts the rest. Members on the plan you choose read everything. Search engines still see the whole article.",
+      "Free articles each week or month, or a Read more teaser. On a CMS post, give the post body the PaywallArticle override.",
+    placement: "Articles and posts",
   },
   // { id: "cms_gated_template", name: "CMS Gated Template", features: "F09", task: "5.3", previewReady: false, deployable: false },
   {
@@ -164,7 +172,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Upgrade to Download. Upload a file in Manage, Files, choose the plan it needs, and paste its Asset ID here. Members on that plan get a download link that works for 60 seconds; everyone else is asked to sign in or upgrade.",
+      "A download button for a file in Manage, Files. Only the plan you choose can download it.",
+    placement: "Any page",
   },
   // { id: "course_progress", name: "Course Progress", features: "F11", task: "4.1", previewReady: false, deployable: false },
   // { id: "lesson_checklist", name: "Lesson Checklist", features: "F11", task: "4.1", previewReady: false, deployable: false },
@@ -179,7 +188,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Lets members save a page or a CMS item. Put it on a card and bind Item Slug to the CMS slug, or on a page to save that page. Signed out visitors are asked to sign in, and the item saves itself once they do.",
+      "Lets members save a page or a CMS item. On a CMS card, bind Item Slug.",
+    placement: "Cards and pages",
   },
   {
     id: "bookmarks_tray",
@@ -189,7 +199,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "A saved items button for your navigation bar, with a count badge. It opens a drawer listing everything the member saved, with search and one click removal.",
+      "A saved items button that opens a drawer of everything a member saved.",
+    placement: "Navigation bar",
   },
   {
     id: "onboarding_modal",
@@ -199,7 +210,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Built and ready to insert. It asks the questions you define in Settings, Fields, and opens only for members with a required answer missing.",
+      "Asks the questions from Settings, Fields, only while a required answer is missing.",
+    placement: "Dashboard",
   },
   // { id: "member_announcement_bar", name: "Announcement Bar", features: "F17", task: "7.4", previewReady: false, deployable: false },
 ];

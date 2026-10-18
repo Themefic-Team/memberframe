@@ -1,5 +1,7 @@
 # Feature: Zero-Code Visual Canvas Gating and Page Locking
 
+> **Removed 2026-10-17.** The `<MemberGate>` component, its generator, preview, and tests were deleted. Whole pages are locked by Page Locks and sections by Section Locks, both enforced by the Route Shield: see [19-section-locks.md](19-section-locks.md). This document is kept as history only; nothing below describes current code.
+
 Technical development specification, user flow, architectural wiring, and testing checklist for `<MemberGate>`, the component that gates Framer frames without code overrides, along with full page route locking and seamless session lifecycle integration.
 
 **PRD Reference**: F01, F04, F05, F06  

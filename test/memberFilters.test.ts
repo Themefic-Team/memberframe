@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import {
   NO_MEMBER_FILTERS,
   STATUS_FILTERS,
-  TIER_FILTERS,
   filterMembers,
   formatJoinedDate,
   hasActiveFilters,
@@ -22,6 +21,7 @@ import {
   pluralize,
   statusLabel,
   statusTone,
+  tierFilters,
   tierLabel,
 } from "../src/components/manage/memberFilters";
 import {
@@ -30,7 +30,7 @@ import {
   shouldSettle,
 } from "../src/hooks/useDebouncedValue";
 import { MEMBER_PAGE_SIZE, type SiteMemberRecord } from "../src/types/site";
-import type { MemberStatus, TierKey } from "../src/types/member";
+import { FREE_TIER, rememberSiteTiers, siteTiers, type MemberStatus, type TierKey } from "../src/types/member";
 
 function member(overrides: Partial<SiteMemberRecord> = {}): SiteMemberRecord {
   return {
@@ -147,10 +147,26 @@ describe("labels never leak a raw value", () => {
   });
 
   it("labels every filter option without a raw value", () => {
-    for (const option of [...TIER_FILTERS, ...STATUS_FILTERS]) {
+    const tiers = [FREE_TIER, { key: "tier_1", rank: 1, name: "Silver" }];
+    for (const option of [...tierFilters(tiers), ...STATUS_FILTERS]) {
       expect(option.label).not.toContain("_");
       expect(option.label.length).toBeGreaterThan(0);
     }
+  });
+
+  it("offers only the site's own tiers, so a new site filters on Free alone", () => {
+    expect(tierFilters([FREE_TIER]).map((option) => option.value)).toEqual(["all", "free_member"]);
+    expect(tierFilters([FREE_TIER]).map((option) => option.label)).not.toContain("VIP");
+  });
+});
+
+describe("site tier ladder", () => {
+  it("always keeps Free, and adds only the tiers the site has", () => {
+    rememberSiteTiers([{ key: "tier_gold", rank: 2, name: "Gold" }]);
+    expect(siteTiers().map((tier) => tier.key)).toEqual(["free_member", "tier_gold"]);
+
+    rememberSiteTiers([]);
+    expect(siteTiers()).toEqual([FREE_TIER]);
   });
 });
 

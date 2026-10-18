@@ -7,13 +7,15 @@ import { PaymentsPanel } from "../manage/PaymentsPanel";
 import { FilesPanel } from "../manage/FilesPanel";
 import type { MemberAction } from "../manage/MemberFlyout";
 import { NO_MEMBER_FILTERS, type MemberFilters } from "../manage/memberFilters";
-import type { TierFormDraft } from "../manage/tierValidation";
+import { FREE_TIER_RANK, type TierFormDraft } from "../manage/tierValidation";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { failureMessage, type ApiFailure } from "../../services/apiClient";
 import {
   createTier,
+  deleteTier,
   fetchMembers,
   fetchTiers,
+  deleteMember,
   patchMember,
   sendMagicLink,
   updateTier,
@@ -21,6 +23,8 @@ import {
 } from "../../services/siteService";
 import type { MemberPage, SiteMemberRecord, SiteTierRecord } from "../../types/site";
 import { parseMinor } from "../../utils/money";
+import { currencyExponent, type CurrencyCode } from "../../utils/currencies";
+import { fetchPayments } from "../../services/paymentsService";
 import { useConnection } from "../../hooks/useConnection";
 import { readDefinitions } from "../../utils/customFields";
 import { rememberSiteTiers } from "../../types/member";
@@ -85,6 +89,8 @@ export const ManageTab: React.FC = () => {
   const [tierFailure, setTierFailure] = useState<ApiFailure | null>(null);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [savingTier, setSavingTier] = useState(false);
+  /** The site currency from Payments: every tier is priced in it (23-dynamic-tiers.md). */
+  const [siteCurrency, setSiteCurrency] = useState<CurrencyCode>("USD");
 
   const [reloadToken, setReloadToken] = useState(0);
   const showToast = useToast();
@@ -164,6 +170,19 @@ export const ManageTab: React.FC = () => {
     };
   }, [reloadToken, siteId]);
 
+  useEffect(() => {
+    if (!siteId) return;
+    let active = true;
+    void fetchPayments(siteId).then((result) => {
+      if (active && result.kind === "ok" && result.data.settings.defaultCurrency) {
+        setSiteCurrency(result.data.settings.defaultCurrency);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken, siteId, segment]);
+
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
   const handleFiltersChange = useCallback((next: MemberFilters) => {
@@ -197,13 +216,13 @@ export const ManageTab: React.FC = () => {
     [reload, showToast, siteId]
   );
 
+  /** True when saved, so the editor can close the card; false keeps it open. */
   const handleSaveTier = useCallback(
-    async (draft: TierFormDraft) => {
+    async (draft: TierFormDraft): Promise<boolean> => {
+      if (!siteId) return false;
       setSavingTier(true);
 
-      if (!siteId) return;
-
-      const wire = toTierDraft(draft, tiers);
+      const wire = toTierDraft(draft, tiers, siteCurrency);
       const result =
         draft.id === null
           ? await createTier(siteId, wire)
@@ -217,13 +236,36 @@ export const ManageTab: React.FC = () => {
           message: draft.id === null ? "Tier created" : "Tier saved",
         });
         reload();
-        return;
+        return true;
       }
 
-      const { message } = failureMessage(result);
+      const reason = result.kind === "unavailable" ? result.reason : undefined;
+      const message = (reason && TIER_SAVE_REASONS[reason]) || failureMessage(result).message;
       showToast({ tone: "error", message: shorten(message) });
+      return false;
     },
-    [reload, showToast, siteId, tiers]
+    [reload, showToast, siteCurrency, siteId, tiers]
+  );
+
+  const handleDeleteTier = useCallback(
+    async (tier: SiteTierRecord): Promise<boolean> => {
+      if (!siteId) return false;
+      setSavingTier(true);
+      const result = await deleteTier(tier.id, siteId);
+      setSavingTier(false);
+
+      if (result.kind === "ok") {
+        showToast({ tone: "success", message: "Tier deleted" });
+        reload();
+        return true;
+      }
+
+      const reason = result.kind === "unavailable" ? result.reason : undefined;
+      const message = (reason && TIER_SAVE_REASONS[reason]) || failureMessage(result).message;
+      showToast({ tone: "error", message: shorten(message) });
+      return false;
+    },
+    [reload, showToast, siteId]
   );
 
   if (!siteId) {
@@ -267,11 +309,13 @@ export const ManageTab: React.FC = () => {
       ) : (
         <TierEditor
           tiers={tiers}
+          currency={siteCurrency}
           loading={tiersLoading}
           saving={savingTier}
           failure={tierFailure ? failureMessage(tierFailure) : null}
           onRetry={reload}
-          onSave={(draft) => void handleSaveTier(draft)}
+          onSave={handleSaveTier}
+          onDelete={handleDeleteTier}
         />
       )}
     </div>
@@ -279,20 +323,20 @@ export const ManageTab: React.FC = () => {
 };
 
 /**
- * One endpoint for three of the four actions.
+ * One endpoint per kind of change.
  *
  * PRD section 10.3 has `PATCH /api/site/members/:id` for "change tier, grant,
- * or revoke" and no separate grant or revoke route, so Grant VIP is a tier
- * change with a fixed argument and Revoke is a status change.
+ * or revoke" and no separate revoke route, so Revoke is a status change.
+ * Delete removes the member and has its own route.
  */
 function runMemberAction(member: SiteMemberRecord, action: MemberAction, siteId: string) {
   switch (action.kind) {
     case "change_tier":
       return patchMember(member.id, { siteId, tier: action.tier });
-    case "grant_vip":
-      return patchMember(member.id, { siteId, tier: "vip" });
     case "revoke":
       return patchMember(member.id, { siteId, status: "canceled" });
+    case "delete":
+      return deleteMember(member.id, siteId);
     case "magic_link":
       return sendMagicLink(member.id, siteId);
   }
@@ -303,10 +347,10 @@ function toastForAction(action: MemberAction): string {
   switch (action.kind) {
     case "change_tier":
       return "Tier updated";
-    case "grant_vip":
-      return "VIP access granted";
     case "revoke":
       return "Access revoked";
+    case "delete":
+      return "Member deleted";
     case "magic_link":
       return "Magic link sent";
   }
@@ -333,35 +377,33 @@ function shorten(message: string, limit = 45): string {
  * rounding errors". A blank price is null, meaning the tier is not sold on that
  * interval, which is different from zero.
  */
-function toTierDraft(draft: TierFormDraft, tiers: ReadonlyArray<SiteTierRecord>): TierDraft {
+function toTierDraft(draft: TierFormDraft, tiers: ReadonlyArray<SiteTierRecord>, currency: CurrencyCode): TierDraft {
   const price = (value: string): number | null => {
-    const parsed = parseMinor(value);
-    return parsed.ok ? parsed.minor : null;
+    const parsed = parseMinor(value, currencyExponent(currency));
+    return parsed.ok && parsed.minor > 0 ? parsed.minor : null;
   };
-
-  // FP-16: one row per currency and interval that has a price.
-  const extraPrices = draft.extraPrices.flatMap((extra) =>
-    (
-      [
-        ["month", extra.monthly],
-        ["year", extra.annual],
-        ["lifetime", extra.lifetime],
-      ] as const
-    ).flatMap(([interval, value]) => {
-      const amountMinor = price(value);
-      return amountMinor !== null && amountMinor > 0 ? [{ currency: extra.currency, interval, amountMinor }] : [];
-    })
-  );
+  // The Free tier is rank 0 and has no prices; the server holds the same rule.
+  const free = draft.kind === "free";
 
   return {
     key: resolvedTierKey(draft, tiers),
-    extraPrices,
     name: draft.name.trim(),
-    monthlyPriceMinor: price(draft.monthlyPrice),
-    annualPriceMinor: price(draft.annualPrice),
-    lifetimePriceMinor: price(draft.lifetimePrice),
-    currency: draft.currency,
-    rank: Number.parseInt(draft.rank, 10),
+    monthlyPriceMinor: free ? null : price(draft.monthlyPrice),
+    annualPriceMinor: free ? null : price(draft.annualPrice),
+    lifetimePriceMinor: free ? null : price(draft.lifetimePrice),
+    rank: free ? FREE_TIER_RANK : Number.parseInt(draft.rank, 10),
     isActive: draft.isActive,
   };
 }
+
+/** The server's tier refusals, in words a creator can act on. */
+const TIER_SAVE_REASONS: Record<string, string> = {
+  tier_key_taken: "Another tier has this ID. Change the name.",
+  tier_rank_taken: "Another tier has this level.",
+  free_tier_exists: "This site already has its Free tier.",
+  free_tier_is_fixed: "The Free tier stays free.",
+  free_tier_has_no_prices: "The Free tier has no prices.",
+  paid_tier_needs_a_price: "Set at least one price.",
+  tier_in_use: "Members are on this tier. Hide it instead.",
+  tier_not_found: "That tier is already gone.",
+};

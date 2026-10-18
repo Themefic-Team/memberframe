@@ -13,7 +13,13 @@
  * and the server's answer then replaces them.
  */
 
-import { MEMBER_STATUS_LABELS, requiredTierLabel, type MemberStatus, type TierKey } from "../../types/member";
+import {
+  MEMBER_STATUS_LABELS,
+  requiredTierLabel,
+  type MemberStatus,
+  type TierKey,
+  type TierLadderEntry,
+} from "../../types/member";
 import type { SiteMemberRecord } from "../../types/site";
 
 /** The tier filter pills, in ladder order, plus the unfiltered state. */
@@ -22,13 +28,17 @@ export type TierFilter = "all" | TierKey;
 /** The status filter, same shape. */
 export type StatusFilter = "all" | MemberStatus;
 
-export const TIER_FILTERS: ReadonlyArray<{ value: TierFilter; label: string }> = [
-  { value: "all", label: "Any tier" },
-  { value: "free_member", label: "Free" },
-  { value: "tier_1", label: "Silver" },
-  { value: "tier_2", label: "Gold" },
-  { value: "vip", label: "VIP" },
-];
+/**
+ * The tier filter options: the site's own tiers, in ladder order.
+ *
+ * Built from the site rather than a fixed list, so a site with only Free
+ * offers only Free, and a custom tier can be filtered on by its own name.
+ */
+export function tierFilters(
+  tiers: ReadonlyArray<TierLadderEntry>
+): ReadonlyArray<{ value: TierFilter; label: string }> {
+  return [{ value: "all", label: "Any tier" }, ...tiers.map((tier) => ({ value: tier.key, label: tier.name }))];
+}
 
 export const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
   { value: "all", label: "Any status" },

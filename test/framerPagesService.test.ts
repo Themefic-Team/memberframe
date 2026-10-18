@@ -3,6 +3,9 @@ import {
   DEFAULT_FALLBACK_PAGES,
   formatWebPagePath,
   getFramerProjectPages,
+  isCmsItemPath,
+  pageOptionLabel,
+  sortPagesByPath,
 } from "../src/services/framerPagesService";
 import { createFramerMock } from "../src/utils/framerMock";
 
@@ -67,5 +70,31 @@ describe("framerPagesService", () => {
       const pages = await getFramerProjectPages(brokenMock);
       expect(pages).toEqual(DEFAULT_FALLBACK_PAGES);
     });
+  });
+});
+
+describe("page labels in the lock pickers", () => {
+  const page = (path: string, name = path) => ({ id: path, name, path });
+
+  it("does not repeat a path Framer used as the page name", () => {
+    expect(pageOptionLabel(page("/blog"))).toBe("Blog (/blog)");
+    expect(pageOptionLabel(page("/reset-password"))).toBe("Reset password (/reset-password)");
+    expect(pageOptionLabel(page("/"))).toBe("Home (/)");
+  });
+
+  it("keeps a real page name", () => {
+    expect(pageOptionLabel(page("/case-studies", "Case Studies"))).toBe("Case Studies (/case-studies)");
+  });
+
+  it("says a CMS item page covers every item", () => {
+    expect(isCmsItemPath("/blog/:slug")).toBe(true);
+    expect(isCmsItemPath("/blog")).toBe(false);
+    expect(pageOptionLabel(page("/blog/:slug"))).toBe("Blog, every item (/blog/:slug)");
+    expect(pageOptionLabel(page("/legal-pages/:slug"))).toBe("Legal pages, every item (/legal-pages/:slug)");
+  });
+
+  it("puts Home first and each item page under its list page", () => {
+    const sorted = sortPagesByPath([page("/podcast/:slug"), page("/blog"), page("/"), page("/blog/:slug"), page("/about")]);
+    expect(sorted.map((p) => p.path)).toEqual(["/", "/about", "/blog", "/blog/:slug", "/podcast/:slug"]);
   });
 });

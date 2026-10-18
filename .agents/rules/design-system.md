@@ -218,6 +218,7 @@ Never restyle a kit class from a feature stylesheet, and never rebuild a kit com
 | Explain what a field is for | Kit extension | `<FieldRow hint="...">`: an info icon beside the label with a tooltip (`<InfoTip>`) | A help paragraph under the field. That slot is for errors only |
 | Text input | Inputs | `<TextField>` | A styled `<input>` |
 | Dropdown | Inputs | `<Select>` | A custom menu |
+| Dropdown with a long list (currencies, countries) | Kit extension | `<SearchSelect>`: the kit select that opens a filter box and listbox (kit.css `.search-select-*`) | A native select of 150 options, or a one-off searchable menu |
 | On or off, applies instantly | Inputs | `<Toggle>` | A checkbox |
 | On or off, needs Save | Inputs | `<Checkbox>` | A toggle |
 | Pick one of 2 to 3 views | Inputs | `<Segmented>` | A hand-built tab bar (this happened, see changelog) |
@@ -352,3 +353,4 @@ Then self-review against this list, and say in your report which items you check
 - v0.4.2 · 2026-10-15 · Collapse moved out of the tab bar into Framer's window-bar menu (`framer.setMenu`), beside Framer's close button, at the user's request.
 - v0.4.1 · 2026-10-15 · Shell: no plugin header (Framer's window bar carries name and close); Collapse and Account in the tab bar; 4 tabs, Connect behind Account; collapsed height 36. Header divider removed, inactive tabs text/secondary, footer arrow after the handle, hero aurora glow removed (plain raised card). framer.css layered; atomic token sync.
 - v0.4.0 · 2026-10-15 · Rule created from the Foundations, Actions, Inputs, Navigation, Content, and Feedback pages. Reference tokens moved from v0.3.7 to v0.4.0: dark theme to Framer's real values (#101010 / #181818 / #202020, text #FFF / #CBCBCB / #777777), bg/raised #18191B, hairlines white 4%, lit edge white 3%; focus/ring and info moved to the brand scale; new bg/selected, border/selected, control/track; spacing, radius, type, and shadow tokens added. Checked controls use brand/action. Active segment uses bg/selected. Section title is Title/Medium 15/22. Values sampled from Figma screenshots: confirm against Dev Mode.
+- v0.4.2 · 2026-10-18 · Shell: five tabs (Reports added at the creator's request, chosen over an icon beside Account). Tab gap 12px in kit.css so five labels and the Account icon fit 360px. Kit: `SearchSelect` for long lists. See docs/development-docs/24-reports.md and 23-dynamic-tiers.md.

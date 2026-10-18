@@ -55,6 +55,13 @@ declare module "framer" {
      * lists, FP-16, 2026-10-16.
      */
     readonly Array: "array";
+    /**
+     * Framer's four-sided spacing editor. Its value is a px shorthand,
+     * `"24px"` or `"24px 16px 24px 16px"`, and `framer-plugin` 3.10 lists it
+     * as `PaddingControl`. Widened for the shared Spacing group (Margin and
+     * Padding), 2026-10-17.
+     */
+    readonly Padding: "padding";
   };
 
   /**

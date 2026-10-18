@@ -24,14 +24,12 @@ import {
   DISCONNECTED_DEPLOY_CONTEXT,
   generateMemberAuthCode,
   generateMemberDashboardCode,
-  generateMemberGateCode,
   type DeployContext,
 } from "../src/services/canvasComponentCodeGenerator";
 import { DEFAULT_API_BASE_URL, deployBaseUrl, isLoopbackUrl } from "../src/config/backend";
 import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
-  DEFAULT_MEMBER_GATE_CONFIG,
 } from "../src/types/canvas";
 
 const CONNECTED: DeployContext = {
@@ -110,15 +108,6 @@ describe("generateMemberAuthCode", () => {
     // `CONFIG.siteKey !== ""` guard would not catch it.
     const { code } = generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG);
     expect(configValue(code, "siteKey")).toBe('""');
-  });
-});
-
-describe("generateMemberGateCode", () => {
-  it("bakes the site key", () => {
-    const { code } = generateMemberGateCode(DEFAULT_MEMBER_GATE_CONFIG, undefined, CONNECTED);
-
-    expect(configValue(code, "siteKey")).toBe(`"${CONNECTED.siteKey}"`);
-    expect(code).toContain("X-MemberFrame-Site");
   });
 });
 
