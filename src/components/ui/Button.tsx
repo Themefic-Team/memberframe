@@ -18,22 +18,18 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
  * `.btn` is declared later in components.css, so adding it would win the cascade
  * and shrink the medium CTA from 36px to 30px.
  */
-export const Button: React.FC<ButtonProps> = ({
-  variant = "secondary",
-  size = "sm",
-  className,
-  type = "button",
-  children,
-  ...rest
-}) => {
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "secondary", size = "sm", className, type = "button", children, ...rest },
+  ref
+) {
   const classes =
     variant === "primary"
       ? cn("primary-cta", size === "sm" && "btn-sm", className)
       : cn("btn", `btn-${variant}`, `btn-${size}`, className);
 
   return (
-    <button type={type} className={classes} {...rest}>
+    <button ref={ref} type={type} className={classes} {...rest}>
       {children}
     </button>
   );
-};
+});

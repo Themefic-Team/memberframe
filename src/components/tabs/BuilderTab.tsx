@@ -30,6 +30,35 @@ import {
   type MembershipPageSpec,
 } from "../../services";
 
+/**
+ * The components that carry the license block, and so a seal from the server
+ * (27-instance-seal.md). The bookmark pair has neither, by the F19 decision.
+ */
+const SEALED_COMPONENTS = new Set([
+  "member_auth",
+  "member_login",
+  "member_register",
+  "member_password_reset",
+  "member_otp_verify",
+  "member_dashboard",
+  "member_pricing",
+  "metered_paywall",
+  "protected_download",
+]);
+
+/**
+ * A fresh seal for one insert, or null when the component carries none.
+ * Throws when the server cannot be reached: an unsealed component would lock
+ * itself a moment later, so the insert stops and says why.
+ */
+async function sealForInsert(componentId: string, siteId: string | undefined): Promise<string | null> {
+  if (!SEALED_COMPONENTS.has(componentId)) return null;
+  if (!siteId) throw new Error("Sign in to MemberFrame before adding components.");
+  const result = await requestSeal(siteId);
+  if (result.kind !== "ok") throw new Error("Could not reach MemberFrame to add this component. Check your connection and try again.");
+  return result.data.seal;
+}
+
 export const COMPONENT_LAYOUT_DEFAULTS: Record<
   string,
   {
@@ -40,24 +69,34 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
     centerX?: string | null;
   }
 > = {
-  member_auth: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  member_login: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  member_register: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  member_password_reset: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  member_otp_verify: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  member_dashboard: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  member_pricing: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  // Fixed, not 100%: dropped loose on the canvas, 100% of no parent collapses
-  // the frame to a dot that cannot be dragged. Set it to Fill once it is in the article.
+  /*
+    Fixed width and fixed height by default, for every component (product
+    owner, 2026-10-19), so what lands on the canvas is a known size the
+    creator can see in the sidebar and change. The auth card fills its frame,
+    centres its form when there is room to spare, and scrolls if a site turns
+    on more sign in buttons than the height allows.
+  */
+  member_auth: { width: "400px", height: "620px", position: "relative", top: null, centerX: null },
+  member_login: { width: "400px", height: "600px", position: "relative", top: null, centerX: null },
+  member_register: { width: "400px", height: "680px", position: "relative", top: null, centerX: null },
+  member_password_reset: { width: "400px", height: "440px", position: "relative", top: null, centerX: null },
+  member_otp_verify: { width: "400px", height: "420px", position: "relative", top: null, centerX: null },
+  member_dashboard: { width: "480px", height: "560px", position: "relative", top: null, centerX: null },
+  member_pricing: { width: "960px", height: "600px", position: "relative", top: null, centerX: null },
+  // The one exception to a fixed height: the paywall wraps the article, so its
+  // height is the article's. A fixed height would cut the article off or let
+  // it run over whatever comes next. Width is fixed, since 100% of no parent
+  // collapses a loose frame to a dot that cannot be dragged.
   metered_paywall: { width: "640px", height: "fit-content", position: "relative", top: null, centerX: null },
-  protected_download: { width: "fit-content", height: "fit-content", position: "relative", top: null, centerX: null },
-  // An icon button, not a section: Fit both ways, so it is as big as its icon
-  // and label. At 100% it stretched across whatever stack it landed in.
-  bookmark_button: { width: "fit-content", height: "fit-content", position: "relative", top: null, centerX: null },
-  bookmarks_tray: { width: "fit-content", height: "fit-content", position: "relative", top: null, centerX: null },
+  protected_download: { width: "340px", height: "88px", position: "relative", top: null, centerX: null },
+  // Icon buttons by default (no label), so a fixed 44 square.
+  bookmark_button: { width: "44px", height: "44px", position: "relative", top: null, centerX: null },
+  bookmarks_tray: { width: "44px", height: "44px", position: "relative", top: null, centerX: null },
 };
 import { assetSummary, fetchAssets, type AssetList, type SiteAsset } from "../../services/assetsService";
 import { useConnection } from "../../hooks/useConnection";
+import { recordSeal } from "../../hooks/useSealGuard";
+import { SEAL_CONTROL, requestSeal } from "../../services/instanceSealService";
 import { useSiteTiers } from "../../hooks/useSiteTiers";
 import { deployBaseUrl } from "../../config/backend";
 import {
@@ -287,12 +326,17 @@ export const BuilderTab: React.FC = () => {
               const layoutAttrs = flows
                 ? flowAttrs
                 : { ...flowAttrs, position: "absolute" as const, top: "0px", centerX: "50%" };
+              const seal = await sealForInsert(spec.component, connection?.siteId);
               const deployResult = await deployCanvasComponent(framer, generated, {
                 parentId: contentParent.id,
                 // Clear a header the layout template lays over the page.
-                attributes: { ...layoutAttrs, controls: { spacing: SCAFFOLD_COMPONENT_SPACING } },
+                attributes: {
+                  ...layoutAttrs,
+                  controls: { spacing: SCAFFOLD_COMPONENT_SPACING, ...(seal ? { [SEAL_CONTROL]: seal } : {}) },
+                },
               });
               if (deployResult.ok) {
+                if (seal) await recordSeal(seal, deployResult.nodeId);
                 componentsDeployed++;
               } else {
                 componentDeployErrors.push(`${spec.title}: ${deployResult.message}`);
@@ -344,7 +388,7 @@ export const BuilderTab: React.FC = () => {
     } finally {
       setScaffolding(false);
     }
-  }, [checkExistingPages, deployContext, selectedSpecs, showToast]);
+  }, [checkExistingPages, connection?.siteId, deployContext, selectedSpecs, showToast]);
 
   const entry = findComponent(componentId);
 
@@ -375,19 +419,18 @@ export const BuilderTab: React.FC = () => {
         centerX: null,
       };
 
+      const seal = await sealForInsert(entry.id, connection?.siteId);
+      const controls: Record<string, unknown> = {
+        ...(chosenAsset ? { assetId: chosenAsset.id, buttonText: `Download ${chosenAsset.name || "File"}` } : {}),
+        ...(seal ? { [SEAL_CONTROL]: seal } : {}),
+      };
       const outcome = await deployCanvasComponent(framer, generated, {
         attributes: {
           ...layoutAttrs,
-          ...(chosenAsset
-            ? {
-                controls: {
-                  assetId: chosenAsset.id,
-                  buttonText: `Download ${chosenAsset.name || "File"}`,
-                },
-              }
-            : {}),
+          ...(Object.keys(controls).length > 0 ? { controls } : {}),
         },
       });
+      if (outcome.ok && seal) await recordSeal(seal, outcome.nodeId);
 
       // The Soft Paywall's linked mode needs the PaywallArticle override for a
       // CMS post body, so it arrives with the component. Docs: 21-blog-paywalls.md
@@ -407,9 +450,9 @@ export const BuilderTab: React.FC = () => {
         setFailure(outcome);
       }
     } catch (error) {
-      // A generator throws only on a repo defect, and the deploy
-      // path returns outcomes rather than throwing. Anything arriving here is
-      // unexpected, so it is reported rather than swallowed.
+      // The seal request throws when MemberFrame cannot be reached, with a
+      // message for the creator. Otherwise a generator throws only on a repo
+      // defect, and the deploy path returns outcomes rather than throwing.
       setFailure({
         title: "Could not add the component",
         message: error instanceof Error ? error.message : "An unexpected error stopped the insert.",
@@ -417,7 +460,7 @@ export const BuilderTab: React.FC = () => {
     } finally {
       setDeploying(false);
     }
-  }, [chosenAsset, deployContext, entry, showToast]);
+  }, [chosenAsset, connection?.siteId, deployContext, entry, showToast]);
 
   return (
     <MemberSessionProvider>
@@ -435,7 +478,7 @@ export const BuilderTab: React.FC = () => {
 
           {componentId === "protected_download" ? (
             <FieldRow
-              label="Attach File"
+              label="Attach file"
               htmlFor="builder-asset"
               fill
               hint={

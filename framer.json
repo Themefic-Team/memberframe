@@ -13,6 +13,7 @@
     "createCodeFile",
     "createWebPage",
     "setCodeFileContent",
+    "setAttributes",
     "setParent",
     "setPluginData"
   ]

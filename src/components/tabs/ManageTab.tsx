@@ -18,6 +18,8 @@ import {
   deleteMember,
   patchMember,
   sendMagicLink,
+  revokeMember,
+  restoreMember,
   updateTier,
   type TierDraft,
 } from "../../services/siteService";
@@ -210,7 +212,9 @@ export const ManageTab: React.FC = () => {
         return;
       }
 
-      const { message } = failureMessage(result);
+      // A message the server wrote for the creator (doc 26: "Publish the site,
+      // or add its domain.") beats the generic copy for its status.
+      const message = result.kind === "unavailable" && result.message ? result.message : failureMessage(result).message;
       showToast({ tone: "error", message: shorten(message) });
     },
     [reload, showToast, siteId]
@@ -325,16 +329,19 @@ export const ManageTab: React.FC = () => {
 /**
  * One endpoint per kind of change.
  *
- * PRD section 10.3 has `PATCH /api/site/members/:id` for "change tier, grant,
- * or revoke" and no separate revoke route, so Revoke is a status change.
- * Delete removes the member and has its own route.
+ * Tier changes use PRD section 10.3's `PATCH /api/site/members/:id`. Revoke,
+ * restore, and the magic link have their own routes (doc 26), because revoke
+ * also cancels the member's subscription at the payment provider. Delete
+ * removes the member and has its own route.
  */
 function runMemberAction(member: SiteMemberRecord, action: MemberAction, siteId: string) {
   switch (action.kind) {
     case "change_tier":
       return patchMember(member.id, { siteId, tier: action.tier });
     case "revoke":
-      return patchMember(member.id, { siteId, status: "canceled" });
+      return revokeMember(member.id, siteId);
+    case "restore":
+      return restoreMember(member.id, siteId);
     case "delete":
       return deleteMember(member.id, siteId);
     case "magic_link":
@@ -349,6 +356,8 @@ function toastForAction(action: MemberAction): string {
       return "Tier updated";
     case "revoke":
       return "Access revoked";
+    case "restore":
+      return "Access restored";
     case "delete":
       return "Member deleted";
     case "magic_link":

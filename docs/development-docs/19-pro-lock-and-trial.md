@@ -182,3 +182,18 @@ The product owner asked for BEAF's billing and registration screens and flow to 
 - **Plugin**: signed out, the panel shows Home, and Home works. Every other tab, the account icon, and Home's shortcuts open "You Get 7-Day Free Trial" instead of navigating. This replaces the catch-every-click capture. Home's banner now reads "Try MemberFrame free for 7 days" with a **Start free trial** action. The stored tab is kept, so signing in returns the creator to where they were.
 - **Backend**: `/auth` shows **Sign up with Google** / **Continue with Google** whenever Google can be used. With `CREATOR_GOOGLE_CLIENT_ID` and `_SECRET` set, the button runs real Google OAuth (redirect URI `{API_BASE_URL}/api/account/google/callback`). Without them, a development server opens BEAF's "Simulate Google Sign In" form, which posts to `POST /api/account/google/mock`. That form signs in as any address typed, so it never runs in production; production without keys hides the button. Real and simulated sign-ins share `finishGoogleSignIn`. A simulated one never sets a Google id.
 - **Verified**: plugin lint:css, lint:design, tsc, 884 tests, build; backend tsc, 452 tests.
+
+### 2026-10-19: BEAF's .env names, Stripe price setup, trial testing
+
+- **Env**: every F19 setting also reads the BEAF backend's name: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`, `GOOGLE_CLIENT_*`, `LIFETIME_DEAL_MAX_USERS`. Our own `PLATFORM_` / `CREATOR_` names win when both are set. Example values (`your-...`, `..._here`) count as unset. The `.env` reader now strips an inline ` # comment` from unquoted values; before, `TRIAL_DURATION_MINUTES=10 # testing` made the server refuse to start.
+- **`npm run stripe:prices -- --write`**: creates the "MemberFrame Pro" product with three prices (monthly 499, yearly 4999, lifetime 9999, in USD minor units) in the Stripe account behind the key, and writes their ids to `.env`. It is idempotent through lookup keys `memberframe_pro_monthly`, `memberframe_pro_yearly`, `memberframe_lifetime`. It refuses a live key without `--live`.
+- **`npm run trial:reset -- <email> [--expire]` / `-- --all`**: forgets a trial, so the next project open starts a fresh one, or ends it now. It refuses in production.
+- **Testing the trial end, step by step**:
+  1. Set `TRIAL_DURATION_MINUTES=10` and `LICENSE_JOB_SECONDS=60`, and restart the backend.
+  2. `npm run trial:reset -- you@example.com`, then open the plugin in a project and sign in. The trial starts at 10 minutes.
+  3. Wait, or run `npm run trial:reset -- you@example.com --expire`. Then:
+     - The panel shows "Your trial has ended".
+     - Components blur within 60 seconds.
+     - Member sign in answers 402.
+     - Within a minute, the job sends "trial ended" and the team notice.
+- **Verified**: backend tsc, 462 tests (new `envBilling.test.ts`). `pluginTrialHandoff.test.ts` now pins the 7-day default, since it read the developer's `.env`.

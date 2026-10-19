@@ -272,33 +272,6 @@
   gap: 6px;
 }
 
-.member-flyout-confirm {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: var(--radius-8);
-  border: 1px solid var(--px-color-danger);
-  background: var(--px-color-danger-subtle);
-}
-
-.member-flyout-confirm-text {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--title);
-}
-
-.member-flyout-confirm-buttons {
-  display: flex;
-  gap: 6px;
-}
-
-.member-flyout-confirm-buttons .btn {
-  flex: 1;
-}
-
 .member-flyout-note {
   margin: 0;
   font-family: var(--font-sans);

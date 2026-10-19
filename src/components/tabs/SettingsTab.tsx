@@ -42,7 +42,7 @@ type SettingsView = "config" | "locks" | "fields" | "integration";
 
 const VIEWS = [
   { value: "config", label: "Config" },
-  { value: "locks", label: "Page Locks" },
+  { value: "locks", label: "Page locks" },
   { value: "fields", label: "Fields" },
   { value: "integration", label: "Integration" },
 ] as const satisfies ReadonlyArray<{ value: SettingsView; label: string }>;

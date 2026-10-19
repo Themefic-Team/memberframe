@@ -5,6 +5,7 @@ import {
   Banner,
   Button,
   Checkbox,
+  ConfirmDialog,
   FieldRow,
   FieldRows,
   IconButton,
@@ -553,17 +554,10 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
                 variant="danger"
                 size="sm"
                 disabled={busy}
-                onClick={() => {
-                  if (!confirmRemove) {
-                    setConfirmRemove(true);
-                    return;
-                  }
-                  setConfirmRemove(false);
-                  onDisconnect();
-                }}
+                onClick={() => setConfirmRemove(true)}
               >
                 <Unplug aria-hidden={true} />
-                {confirmRemove ? "Confirm remove" : "Remove"}
+                Remove
               </Button>
             ) : null}
             <Button variant="secondary" size="sm" disabled={busy || disabled} onClick={() => void submit()}>
@@ -571,6 +565,27 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
             </Button>
           </div>
         </div>
+      ) : null}
+
+      {confirmRemove ? (
+        <ConfirmDialog
+          title={`Remove ${label}?`}
+          message={
+            <>
+              <p>Its saved keys and webhook are deleted, and checkout stops offering {label}.</p>
+              <p>You cannot remove it while members still have subscriptions renewing through it.</p>
+            </>
+          }
+          confirmLabel={`Remove ${label}`}
+          cancelLabel={`Keep ${label}`}
+          icon={<Unplug aria-hidden={true} />}
+          busy={busy}
+          onCancel={() => setConfirmRemove(false)}
+          onConfirm={() => {
+            setConfirmRemove(false);
+            onDisconnect();
+          }}
+        />
       ) : null}
     </article>
   );

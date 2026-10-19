@@ -94,6 +94,10 @@ export const cancelPlan = (
 export const resumePlan = (siteId: string, client: ApiClient = apiClient): Promise<ApiResult<{ license: LicenseView }>> =>
   client.post("/api/plugin/resume", { siteId });
 
+/** Profile's "Start Free Trial": starts the 7-day trial when this account, Framer user, and project never had one. */
+export const startTrial = (siteId: string, client: ApiClient = apiClient): Promise<ApiResult<{ started: boolean; license: LicenseView }>> =>
+  client.post("/api/plugin/start-trial", { siteId });
+
 export const fetchBillingPortal = (siteId: string, client: ApiClient = apiClient): Promise<ApiResult<{ url: string }>> =>
   client.get("/api/plugin/billing-portal", { siteId });
 

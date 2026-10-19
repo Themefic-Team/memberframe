@@ -8,7 +8,7 @@
    src/styles/components.css and the per-component CSS files, not here.
    See PRD section 6.3. This file holds variables only.
 
-   Recopied 2026-10-15 for Foundations v0.4.0 (was v0.3.7),
+   Recopied 2026-10-19 for Foundations v0.4.0 (was v0.3.7),
    reference lines 1 to 311.
    Check for drift:
      diff <(tail -n +17 src/styles/design-tokens.css) \

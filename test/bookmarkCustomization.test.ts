@@ -91,9 +91,9 @@ describe("Bookmarks Tray", () => {
 describe("sizing on the canvas", () => {
   const builder = readFileSync(path.join(process.cwd(), "src", "components", "tabs", "BuilderTab.tsx"), "utf-8");
 
-  it("inserts both at Fit, not stretched to the stack they land in", () => {
+  it("inserts both at a fixed 44 square, not stretched to the stack they land in", () => {
     for (const id of ["bookmark_button", "bookmarks_tray"]) {
-      expect(builder).toContain(`${id}: { width: "fit-content", height: "fit-content",`);
+      expect(builder).toContain(`${id}: { width: "44px", height: "44px",`);
     }
   });
 

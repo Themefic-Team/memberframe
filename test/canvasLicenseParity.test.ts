@@ -39,10 +39,16 @@ describe("the shared license block", () => {
     for (const name of [...LICENSED, ...UNLICENSED]) expect(reference).not.toContain(name);
   });
 
-  it("is drawn last in each licensed component, from the server's answer", () => {
+  it("is drawn last in each licensed component, from the server's answer for this sealed instance", () => {
     for (const name of LICENSED) {
       const source = read(name);
-      expect(source, name).toContain("const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey);");
+      expect(source, name).toContain("const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey, props.mfSeal);");
+      // A site this server does not know locks, rather than trusting the baked state.
+      expect(source, name).toContain('body.reason === "site_not_found" ? { state: "copied" } : null');
+      // Re-checked while open, so an ended trial locks without a reload.
+      expect(source, name).toContain("window.setInterval(check, MF_LICENSE_RECHECK_MS)");
+      // 27-instance-seal.md: the Builder's seal travels in a hidden control.
+      expect(source, name).toContain('mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },');
       expect(source, name).toContain("<MfLicenseLayer license={license} />");
       // The drafts it replaced are gone.
       expect(source, name).not.toMatch(/prolock|Trial Version|Component Locked/);

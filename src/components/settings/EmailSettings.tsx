@@ -223,7 +223,7 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
           <div className="tier-form-cta">
             <Button variant="secondary" size="md" className="fill" disabled={busy} onClick={() => void handleSave()}>
               <Save aria-hidden={true} />
-              {saving ? "Saving..." : enabled ? "Save" : "Save and turn on"}
+              {saving ? "Saving" : enabled ? "Save SMTP settings" : "Save and turn on"}
             </Button>
           </div>
 
@@ -237,7 +237,7 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
               <div className="tier-form-cta">
                 <Button variant="secondary" size="md" className="fill" disabled={testing || !EMAIL.test(testTo.trim())} onClick={() => void handleTest()}>
                   <Send aria-hidden={true} />
-                  {testing ? "Sending..." : "Send test email"}
+                  {testing ? "Sending" : "Send test email"}
                 </Button>
               </div>
             </>

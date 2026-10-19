@@ -355,6 +355,17 @@ body {
               transform 0.1s ease;
 }
 
+/* Gradient edge (product owner, 2026-10-19): a 2px gradient border instead of
+   the white 12% hairline, so the fill and its edge read as one gradient.
+   #5271FF is --px-brand-primary, #3B51B8 is --px-brand-primary-pressed. */
+.primary-cta {
+  background:
+    linear-gradient(var(--px-brand-primary, #5271ff), var(--px-brand-primary-pressed, #3b51b8)) padding-box,
+    linear-gradient(180deg, var(--px-brand-primary, #5271ff) 0%, var(--px-brand-primary-pressed, #3b51b8) 100%) border-box !important;
+  cursor: pointer;
+  border: 2px solid transparent !important;
+}
+
 /* Hover State */
 .primary-cta:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {

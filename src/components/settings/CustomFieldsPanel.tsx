@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ListPlus, Plus, Save, Trash2, X } from
 import {
   Button,
   Checkbox,
+  ConfirmDialog,
   EmptyState,
   FieldRow,
   FieldRows,
@@ -95,6 +96,8 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
   dirty,
 }) => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  /** The field waiting on the delete popup. */
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
 
   const problems = useMemo(() => definitionProblems(fields), [fields]);
   const blocked = hasDefinitionProblems(problems);
@@ -314,7 +317,7 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
                       </IconButton>
                       <IconButton
                         label={`Remove ${field.label || "field"}`}
-                        onClick={() => handleRemove(index)}
+                        onClick={() => setRemovingIndex(index)}
                         disabled={saving}
                       >
                         <Trash2 aria-hidden={true} />
@@ -498,6 +501,25 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
           <p className="settings-cta-note">Fix the highlighted field before saving.</p>
         ) : null}
       </div>
+
+      {removingIndex !== null && fields[removingIndex] ? (
+        <ConfirmDialog
+          title={`Delete ${fields[removingIndex]!.label.trim() || "this field"}?`}
+          message={
+            <>
+              <p>Sign up and member profiles stop asking for it.</p>
+              <p>It is removed when you press Save fields, and nothing changes on your site before that.</p>
+            </>
+          }
+          confirmLabel="Delete field"
+          cancelLabel="Keep field"
+          onCancel={() => setRemovingIndex(null)}
+          onConfirm={() => {
+            handleRemove(removingIndex);
+            setRemovingIndex(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 };

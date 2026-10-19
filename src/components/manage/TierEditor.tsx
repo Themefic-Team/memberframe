@@ -4,7 +4,7 @@ import {
   Badge,
   Banner,
   Button,
-  Checkbox,
+  Checkbox, ConfirmDialog,
   EmptyState,
   FieldRow,
   FieldRows,
@@ -328,7 +328,7 @@ const TierForm: React.FC<{
   onDelete: (() => void) | null;
 }> = ({ draft, tiers, currency, hasFreeTier, errors, saving, onPatch, onKind, onCancel, onSubmit, onDelete }) => {
   const exponent = currencyExponent(currency);
-  // Two presses, as removing a gateway: the first asks, the second deletes.
+  // Deleting asks first, in a popup (2026-10-19: nothing deletes on one click).
   const [confirmDelete, setConfirmDelete] = useState(false);
   const idPreview = draft.id !== null || draft.name.trim() !== "" ? resolvedTierKey(draft, tiers) : "";
   const describedBy = (field: keyof TierFormDraft, inputId: string) => (errors[field] ? fieldErrorId(inputId) : undefined);
@@ -420,29 +420,16 @@ const TierForm: React.FC<{
         </FieldRow>
       </FieldRows>
 
-      {confirmDelete ? (
-        <p className="integration-field-problem" role="alert">
-          Pages, sections, and paywalls set to this tier lock for everyone until you choose another tier for them.
-        </p>
-      ) : null}
-
       <div className="integration-card-actions">
         {onDelete ? (
           <Button
             variant="danger"
             size="sm"
             disabled={saving}
-            onClick={() => {
-              if (!confirmDelete) {
-                setConfirmDelete(true);
-                return;
-              }
-              setConfirmDelete(false);
-              onDelete();
-            }}
+            onClick={() => setConfirmDelete(true)}
           >
             <Trash2 aria-hidden={true} />
-            {confirmDelete ? "Confirm delete" : "Delete tier"}
+            Delete tier
           </Button>
         ) : null}
         <Button variant="ghost" size="sm" disabled={saving} onClick={onCancel}>
@@ -460,6 +447,26 @@ const TierForm: React.FC<{
           {saving ? "Saving" : draft.id === null ? "Create tier" : "Save tier"}
         </Button>
       </div>
+
+      {confirmDelete && onDelete ? (
+        <ConfirmDialog
+          title={draft.name.trim() ? `Delete the ${draft.name.trim()} tier?` : "Delete this tier?"}
+          message={
+            <>
+              <p>Pages, sections, and paywalls set to this tier lock for everyone until you choose another tier for them.</p>
+              <p>A tier members still hold cannot be deleted. This cannot be undone.</p>
+            </>
+          }
+          confirmLabel="Delete tier"
+          cancelLabel="Keep tier"
+          busy={saving}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete();
+          }}
+        />
+      ) : null}
     </>
   );
 };

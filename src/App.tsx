@@ -14,6 +14,7 @@ import type { AccountView } from "./components/tabs/ConnectTab";
 import type { ViewId } from "./components/tabs/tabs";
 import { useConnection } from "./hooks/useConnection";
 import { useLicense } from "./hooks/useLicense";
+import { useSealGuard } from "./hooks/useSealGuard";
 import { useActiveTab } from "./hooks/useActiveTab";
 import { useFramerTheme } from "./hooks/useFramerTheme";
 
@@ -99,6 +100,8 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
   const { preference, setPreference } = useFramerTheme();
   const { state, disconnect } = useConnection();
   const { view, unlocked } = useLicense();
+  // Locks pasted copies of MemberFrame components while the panel is open (27-instance-seal.md).
+  useSealGuard();
 
   const signedOut = state.status === "disconnected";
   // Signed out, only Home is shown. The stored tab is kept, so signing in

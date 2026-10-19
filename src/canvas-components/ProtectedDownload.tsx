@@ -55,29 +55,50 @@ const IS_TRIAL = false;
 // copied from the BEAF slider; an ended plan blurs the component behind an
 // Upgrade card. The server refuses an unlicensed site's member requests on its
 // own, so removing these lines unlocks nothing.
+//
+// The server is asked again every half minute and when the tab regains focus,
+// so a trial that ends while a page is open locks it. Each instance also sends
+// the seal the Builder gave it (27-instance-seal.md): a pasted copy, or one
+// that never came from the Builder, is answered "copied" and shows an insert
+// card instead. An instance from before seals sends none and is held to the
+// license alone.
 
-type MfLicense = "trial" | "active" | "locked";
+type MfLicense = "trial" | "active" | "locked" | "copied";
 
 const MF_LICENSE_CACHE_MS = 60000;
+const MF_LICENSE_RECHECK_MS = 30000;
 
 function mfBakedLicense(): MfLicense {
   return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
 }
 
-function mfFetchLicense(apiBaseUrl: string, siteKey: string): Promise<MfLicense | null> {
+function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | undefined): Promise<MfLicense | null> {
   if (typeof window === "undefined" || !apiBaseUrl || !siteKey) return Promise.resolve(null);
   const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
   const cache = (host.__mfLicense = host.__mfLicense || {});
   const base = String(apiBaseUrl).replace(/\/+$/, "");
-  const key = base + "|" + siteKey;
+  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal);
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
   if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
-  const answer = fetch(base + "/api/license?site=" + encodeURIComponent(siteKey), { credentials: "omit", headers })
-    .then((response) => (response.ok ? response.json() : null))
+  const query = "?site=" + encodeURIComponent(siteKey) + (seal === undefined ? "" : "&seal=" + encodeURIComponent(seal));
+  const answer = fetch(base + "/api/license" + query, { credentials: "omit", headers, cache: "no-store" })
+    .then((response) => {
+      // No such site on this server: built against another server, or the
+      // site is gone. Lock it rather than trust the state baked into the file.
+      // Only the server's own answer counts: a proxy's 404 page says nothing.
+      if (response.status === 404) {
+        return response
+          .json()
+          .then((body: { reason?: unknown } | null) => (body && body.reason === "site_not_found" ? { state: "copied" } : null))
+          .catch(() => null);
+      }
+      return response.ok ? response.json() : null;
+    })
     .then((data: { state?: unknown } | null): MfLicense | null => {
       const state = data ? data.state : null;
+      if (state === "copied" || state === "foreign") return "copied";
       return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
     })
     .catch(() => null);
@@ -85,17 +106,32 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string): Promise<MfLicense 
   return answer;
 }
 
-function useMfLicense(apiBaseUrl: string, siteKey: string): MfLicense {
+function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLicense {
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
-    void mfFetchLicense(apiBaseUrl, siteKey).then((answer) => {
-      if (live && answer) setLicense(answer);
-    });
+    const check = () => {
+      void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
+        if (live && answer) setLicense(answer);
+      });
+    };
+    check();
+    if (typeof window === "undefined") return () => undefined;
+    // Instances on one page share the cached answer, so this is one request a
+    // minute per page, not one per component.
+    const timer = window.setInterval(check, MF_LICENSE_RECHECK_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       live = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [apiBaseUrl, siteKey]);
+  }, [apiBaseUrl, siteKey, seal]);
   return license;
 }
 
@@ -133,9 +169,9 @@ function MfWatermark(): React.ReactElement {
   );
 }
 
-function MfLockOverlay(): React.ReactElement {
+function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
   return (
-    <div className="mf-lock" role="note" aria-label="Upgrade to Pro">
+    <div className="mf-lock" role="note" aria-label={props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -143,8 +179,12 @@ function MfLockOverlay(): React.ReactElement {
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
         </span>
-        <p className="mf-lock-title">Upgrade to Pro</p>
-        <p className="mf-lock-text">This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it.</p>
+        <p className="mf-lock-title">{props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}</p>
+        <p className="mf-lock-text">
+          {props.copied
+            ? "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin."
+            : "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it."}
+        </p>
       </div>
     </div>
   );
@@ -156,7 +196,7 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay />}
+      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay copied={props.license === "copied"} />}
     </>
   );
 }
@@ -883,13 +923,18 @@ export interface ProtectedDownloadProps extends MfAppearanceProps {
   borderRadius?: number;
 }
 
+/** Set by the MemberFrame Builder on insert, never by hand (27-instance-seal.md). */
+interface MfSealProps {
+  mfSeal?: string;
+}
+
 /**
  * @framerIntrinsicWidth 340
  * @framerIntrinsicHeight 88
  * @framerSupportedLayoutWidth any-prefer-fixed
  * @framerSupportedLayoutHeight any-prefer-fixed
  */
-export default function ProtectedDownload(props: ProtectedDownloadProps) {
+export default function ProtectedDownload(props: ProtectedDownloadProps & MfSealProps) {
   const {
     assetId = "",
     buttonText = CONFIG.buttonText,
@@ -917,7 +962,7 @@ export default function ProtectedDownload(props: ProtectedDownloadProps) {
 
   const rawId = useId();
   const scope = useMemo(() => `mfd${rawId.replace(/[^a-zA-Z0-9]/g, "")}`, [rawId]);
-  const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey);
+  const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey, props.mfSeal);
   const onCanvas = useMemo(() => {
     const target = RenderTarget.current();
     return target === RenderTarget.canvas || target === RenderTarget.thumbnail;
@@ -1162,6 +1207,9 @@ export default function ProtectedDownload(props: ProtectedDownloadProps) {
 // ============================================================================
 
 addPropertyControls(ProtectedDownload, {
+  // The Builder's seal for this instance (27-instance-seal.md). Hidden: it is
+  // set on insert and a pasted copy loses it.
+  mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },
   assetId: {
     type: ControlType.String,
     title: "Asset ID",

@@ -495,3 +495,26 @@
   flex-direction: column;
   gap: var(--space-12);
 }
+
+/* ConfirmDialog: the popup in front of every delete (section 8). */
+.kit-confirm-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  font: var(--text-body);
+  color: var(--paragraph);
+}
+
+.kit-confirm-message p {
+  margin: 0;
+}
+
+.kit-confirm-actions {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.kit-confirm-actions .btn {
+  flex: 1;
+  min-width: 0;
+}

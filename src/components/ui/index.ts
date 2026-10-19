@@ -54,3 +54,6 @@ export type { PluginCardProps } from "./PluginCard";
 
 export { Modal } from "./Modal";
 export type { ModalProps } from "./Modal";
+
+export { ConfirmDialog } from "./ConfirmDialog";
+export type { ConfirmDialogProps } from "./ConfirmDialog";

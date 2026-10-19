@@ -5,17 +5,17 @@
      .agents/skills/framer-plugin-suite/references/design-tokens.css
 
    Two slices, concatenated in order:
-     reference lines  312 to  607   sections 3 and 4, buttons
-     reference lines  634 to 2709   sections 6 to 20, every other component
+     reference lines  312 to  618   sections 3 and 4, buttons
+     reference lines  645 to 2720   sections 6 to 20, every other component
 
-   The gap is deliberate. Reference section 5 (lines 608 to 633) is the base
+   The gap is deliberate. Reference section 5 (lines 619 to 644) is the base
    reset and app container, which PRD section 6.3 assigns to src/App.css.
    The variable layers (reference lines 1 to 311) live in design-tokens.css.
 
-   Recopied 2026-10-15 for Foundations v0.4.0.
+   Recopied 2026-10-19 for Foundations v0.4.0.
    Check for drift:
      diff <(tail -n +21 src/styles/components.css) \
-          <(sed -n '312,607p;634,2709p' \
+          <(sed -n '312,618p;645,2720p' \
             .agents/skills/framer-plugin-suite/references/design-tokens.css)
    ========================================================================== */
 /* --------------------------------------------------------------------------
@@ -62,6 +62,17 @@
               box-shadow 0.2s ease,
               background 0.2s ease,
               transform 0.1s ease;
+}
+
+/* Gradient edge (product owner, 2026-10-19): a 2px gradient border instead of
+   the white 12% hairline, so the fill and its edge read as one gradient.
+   #5271FF is --px-brand-primary, #3B51B8 is --px-brand-primary-pressed. */
+.primary-cta {
+  background:
+    linear-gradient(var(--px-brand-primary, #5271ff), var(--px-brand-primary-pressed, #3b51b8)) padding-box,
+    linear-gradient(180deg, var(--px-brand-primary, #5271ff) 0%, var(--px-brand-primary-pressed, #3b51b8) 100%) border-box !important;
+  cursor: pointer;
+  border: 2px solid transparent !important;
 }
 
 /* Hover State */

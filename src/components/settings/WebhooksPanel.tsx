@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, ChevronDown, Copy, Eye, EyeOff, Plus, Send, Trash2, Webhook, X } from "lucide-react";
-import { Banner, Button, Checkbox, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, Toggle, useToast } from "../ui";
+import { Banner, Button, Checkbox, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, Toggle, useToast } from "../ui";
 import { failureMessage } from "../../services/apiClient";
 import {
   FIELD_KEY_PATTERN,
@@ -146,7 +146,7 @@ export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, pro
               <FormProblem draft={adding} />
               <div className="onpage-guide-actions">
                 <Button variant="secondary" size="sm" disabled={busy || webhookDraftProblem(adding) !== null} onClick={() => void handleCreate()}>
-                  <span>{busy ? "Saving..." : "Save webhook"}</span>
+                  <span>{busy ? "Saving" : "Save webhook"}</span>
                 </Button>
                 <Button variant="ghost" size="sm" disabled={busy} onClick={() => setAdding(null)}>
                   <span>Cancel</span>
@@ -174,7 +174,7 @@ export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, pro
       {!adding && count > 0 ? (
         <div className="page-locks-btn-row">
           <Button variant="secondary" onClick={() => setAdding(emptyWebhookDraft())} disabled={count >= MAX_WEBHOOKS}>
-            <Plus size={14} stroke="currentColor" aria-hidden={true} />
+            <Plus aria-hidden={true} />
             <span>Add webhook</span>
           </Button>
         </div>
@@ -344,7 +344,7 @@ const FieldMapEditor: React.FC<{
                 fill
               />
               <span className="webhook-map-arrow" aria-hidden={true}>
-                <ArrowRight size={12} stroke="currentColor" />
+                <ArrowRight aria-hidden={true} />
               </span>
               <TextField
                 id={`${idPrefix}-key-${index}`}
@@ -356,7 +356,7 @@ const FieldMapEditor: React.FC<{
                 fill
               />
               <IconButton label="Remove field" variant="ghost" disabled={disabled} onClick={() => setMap(map.filter((_, i) => i !== index))}>
-                <X size={13} stroke="currentColor" aria-hidden={true} />
+                <X aria-hidden={true} />
               </IconButton>
             </div>
           ))}
@@ -367,7 +367,7 @@ const FieldMapEditor: React.FC<{
               disabled={disabled || map.length >= MAX_FIELD_MAP}
               onClick={() => setMap([...map, { source: "member.name", key: "" }])}
             >
-              <Plus size={13} stroke="currentColor" aria-hidden={true} />
+              <Plus aria-hidden={true} />
               <span>Add field</span>
             </Button>
             <Button variant="ghost" size="sm" disabled={disabled} onClick={() => setMap([...ZOHO_CRM_PRESET])}>
@@ -448,6 +448,7 @@ const WebhookCard: React.FC<{
     setBusy(true);
     const result = await deleteWebhook(siteId, hook.id);
     setBusy(false);
+    setConfirmingDelete(false);
     if (result.kind === "ok") {
       onDelete();
       showToast({ tone: "success", message: "Webhook deleted" });
@@ -493,26 +494,24 @@ const WebhookCard: React.FC<{
             onChange={(enabled) => void save({ enabled }, enabled ? "Webhook on" : "Webhook off")}
           />
           <IconButton label="Delete webhook" variant="ghost" disabled={busy} onClick={() => setConfirmingDelete(true)}>
-            <Trash2 size={14} stroke="currentColor" aria-hidden={true} />
+            <Trash2 aria-hidden={true} />
           </IconButton>
           <span className={cn("page-rule-chevron", open && "is-open")}>
-            <ChevronDown size={14} stroke="currentColor" aria-hidden={true} />
+            <ChevronDown aria-hidden={true} />
           </span>
         </div>
       </div>
 
       {confirmingDelete ? (
-        <div className="page-rule-card-body">
-          <p className="settings-help">Delete this webhook? Events stop going to this address at once.</p>
-          <div className="onpage-guide-actions">
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmingDelete(false)}>
-              <span>Keep webhook</span>
-            </Button>
-            <Button variant="danger" size="sm" disabled={busy} onClick={() => void remove()}>
-              <span>Delete webhook</span>
-            </Button>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Delete ${hook.name || "this webhook"}?`}
+          message={<p>Events stop going to this address at once, and its delivery history is removed. This cannot be undone.</p>}
+          confirmLabel="Delete webhook"
+          cancelLabel="Keep webhook"
+          busy={busy}
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={() => void remove()}
+        />
       ) : null}
 
       {open ? (
@@ -533,14 +532,14 @@ const WebhookCard: React.FC<{
               disabled={busy || !dirty || webhookDraftProblem(draft) !== null}
               onClick={() => void save(draft, "Webhook saved")}
             >
-              <span>{busy ? "Saving..." : "Save changes"}</span>
+              <span>{busy ? "Saving" : "Save changes"}</span>
             </Button>
             <Button variant="secondary" size="sm" disabled={busy || dirty} onClick={() => void sendTest()}>
-              <Send size={13} stroke="currentColor" aria-hidden={true} />
+              <Send aria-hidden={true} />
               <span>Send test</span>
             </Button>
             <IconButton label={revealed ? "Hide secret" : "Show secret"} variant="ghost" onClick={() => setRevealed((value) => !value)}>
-              {revealed ? <EyeOff size={14} stroke="currentColor" aria-hidden={true} /> : <Eye size={14} stroke="currentColor" aria-hidden={true} />}
+              {revealed ? <EyeOff aria-hidden={true} /> : <Eye aria-hidden={true} />}
             </IconButton>
             <IconButton
               label="Copy secret"
@@ -550,7 +549,7 @@ const WebhookCard: React.FC<{
                 showToast({ tone: "success", message: "Secret copied" });
               }}
             >
-              <Copy size={14} stroke="currentColor" aria-hidden={true} />
+              <Copy aria-hidden={true} />
             </IconButton>
           </div>
 

@@ -58,11 +58,12 @@ export function fetchMembers(
 }
 
 /**
- * Tier changes and revocation, through one endpoint.
+ * Tier changes, through PRD section 10.3's `PATCH /api/site/members/:id`.
  *
- * PRD section 10.3 has `PATCH /api/site/members/:id` for "change tier, grant, or
- * revoke" and no separate grant or revoke route, so "Revoke access" is a status
- * change. Deleting a member is not a patch and has its own route below.
+ * Revoke access is no longer a status patch: a status change only touched
+ * MemberFrame's record while the member's gateway subscription kept charging
+ * them. It has its own route, `revokeMember` below (doc 26). Deleting a member
+ * is not a patch either and has its own route.
  */
 export interface MemberPatch {
   /**
@@ -112,18 +113,38 @@ export function deleteMember(
 }
 
 /**
- * NOT BUILT on the server. PRD section 10.3 lists it and no route answers it,
- * so this resolves `unavailable` today and the Manage tab shows a failure
- * toast. Left in place rather than removed because the panel's action menu is
- * written against it and the endpoint is a few lines once the OTP flow exists,
- * which is backend PRD phase B2 item 11 and conflict C24.
+ * Email the member a one-click sign in to the site's login page (doc 26).
+ * Refused for a revoked member (409 `member_revoked`) and before the site has
+ * an address (409 `no_site_url`); 502 `mail_failed` when the email did not go.
  */
 export function sendMagicLink(
   memberId: string,
   siteId: string,
   client: ApiClient = apiClient
-): Promise<ApiResult<{ ok: true }>> {
+): Promise<ApiResult<{ sent: true; expiresInMinutes: number }>> {
   return client.post(`/api/site/members/${encodeURIComponent(memberId)}/magic-link`, { siteId });
+}
+
+/**
+ * Revoke access for good (doc 26): the member's subscriptions are cancelled
+ * at the payment provider now, with no refund, they move to Free with status
+ * canceled, and they are signed out. 502 `gateway_cancel_failed` changes nothing.
+ */
+export function revokeMember(
+  memberId: string,
+  siteId: string,
+  client: ApiClient = apiClient
+): Promise<ApiResult<{ member: unknown; canceledSubscriptions: number }>> {
+  return client.post(`/api/site/members/${encodeURIComponent(memberId)}/revoke`, { siteId });
+}
+
+/** Undo a revoke: active again, on Free. Nothing paid comes back. */
+export function restoreMember(
+  memberId: string,
+  siteId: string,
+  client: ApiClient = apiClient
+): Promise<ApiResult<{ member: unknown }>> {
+  return client.post(`/api/site/members/${encodeURIComponent(memberId)}/restore`, { siteId });
 }
 
 /** PRD section 10.3: `GET /api/site/tiers`. */

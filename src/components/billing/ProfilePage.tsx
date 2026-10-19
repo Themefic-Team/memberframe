@@ -6,6 +6,7 @@ import { failureMessage } from "../../services/apiClient";
 import { addAllowedOrigins } from "../../services/siteSettingsService";
 import { describeOrigin, looksLikeOrigin } from "../connect/connectValidation";
 import { getPlanName, getStatusLabel, notify } from "./billingHelpers";
+import { startTrial } from "../../services/licenseService";
 
 export interface ProfilePageProps {
   onManageSubscription: () => void;
@@ -40,8 +41,9 @@ const GLOBE_ICON = (
  */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, onSignUp, onSignIn }) => {
   const { state, applyConnection, disconnect } = useConnection();
-  const { view } = useLicense();
+  const { view, apply } = useLicense();
   const [avatarError, setAvatarError] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [newOrigin, setNewOrigin] = useState("");
   const [originProblem, setOriginProblem] = useState<string | null>(null);
   const [savingOrigin, setSavingOrigin] = useState(false);
@@ -180,7 +182,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
         </button>
       </div>
 
-      {!hasSubscription ? (
+      {/* No card until the license is known: a failed read is not a used trial. */}
+      {view && !hasSubscription ? (
         <div className="beaf-profile-trial-card">
           <h4 className="beaf-profile-trial-title">Try Pro Free for 7 Days</h4>
           <p className="beaf-profile-trial-desc">
@@ -188,9 +191,38 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
               ? `Your free trial is running on ${view.claimedProjectName ?? "another project"}. Upgrade to activate this project.`
               : "Unlock every membership component, payments, and content locks. No credit card required."}
           </p>
-          <button type="button" disabled className="beaf-profile-trial-btn-claimed">
-            Trial already claimed
-          </button>
+          {view.state === "none" ? (
+            // BEAF: eligible, so offer it. Attaching a project normally starts
+            // the trial already; this covers one attached without it.
+            <button
+              type="button"
+              className="beaf-profile-trial-btn beaf-primary-cta"
+              disabled={isStartingTrial || !connection}
+              onClick={() => {
+                if (!connection) return;
+                setIsStartingTrial(true);
+                void startTrial(connection.siteId).then((result) => {
+                  setIsStartingTrial(false);
+                  if (result.kind !== "ok") {
+                    void notify({ type: "Error", message: "Could not start the trial. Try again." });
+                    return;
+                  }
+                  apply(result.data.license);
+                  void notify(
+                    result.data.started
+                      ? { type: "Success", message: "Your 7-day free trial has started." }
+                      : { type: "Error", message: "This account, Framer user, or project already had a trial." }
+                  );
+                });
+              }}
+            >
+              {isStartingTrial ? "Activating..." : "Start Free Trial"}
+            </button>
+          ) : (
+            <button type="button" disabled className="beaf-profile-trial-btn-claimed">
+              Trial already claimed
+            </button>
+          )}
         </div>
       ) : null}
 

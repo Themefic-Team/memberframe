@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Banner } from "../ui";
 import { IntegrationCard } from "./IntegrationCard";
 import {
@@ -44,6 +44,9 @@ export const IntegrationPanel: React.FC<IntegrationPanelProps> = ({
   onToggleEnabled,
   connected,
 }) => {
+  /** One card open at a time: each open form has the view's primary Save. */
+  const [openId, setOpenId] = useState<string | null>(null);
+
   if (!connected) {
     return (
       <Banner
@@ -80,6 +83,8 @@ export const IntegrationPanel: React.FC<IntegrationPanelProps> = ({
                 saving={savingId === definition.id}
                 onSave={(values) => onSave(definition.id, values)}
                 onToggleEnabled={(enabled) => onToggleEnabled(definition.id, enabled)}
+                open={openId === definition.id}
+                onOpenChange={(open) => setOpenId(open ? definition.id : null)}
               />
             ))}
           </div>

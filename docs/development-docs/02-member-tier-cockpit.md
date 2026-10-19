@@ -180,8 +180,9 @@ export interface SiteMemberRecord {
 | :--- | :--- | :--- |
 | Change tier | `PATCH /api/site/members/:id` with `{ tier }` | None |
 | Grant VIP | `PATCH /api/site/members/:id` with `{ tier: "vip" }` | None |
-| Revoke access | `PATCH /api/site/members/:id` with `{ status: "canceled" }` | **Yes, in the flyout** |
-| Send magic link | `POST /api/site/members/:id/magic-link` | None |
+| Revoke access | `POST /api/site/members/:id/revoke` (doc 26: also cancels the gateway subscription) | **Yes, in the flyout** |
+| Restore access | `POST /api/site/members/:id/restore` | None |
+| Send magic link | `POST /api/site/members/:id/magic-link` (doc 26) | None |
 
 Grant VIP is a change tier with a fixed argument rather than its own endpoint, because PRD section 10.3
 has no grant route and inventing one would be a contract change for a shortcut button.

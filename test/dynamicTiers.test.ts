@@ -67,9 +67,10 @@ describe("one site currency in the panel", () => {
     expect(editor).toContain("if (!draft || !validation?.valid || saving) return;");
   });
 
-  it("deletes a saved paid tier in two presses, and never the Free tier", () => {
+  it("deletes a saved paid tier only after the popup, and never the Free tier", () => {
     expect(editor).toContain('open.id !== null && open.kind === "paid"');
-    expect(editor).toContain('{confirmDelete ? "Confirm delete" : "Delete tier"}');
+    expect(editor).toContain("onClick={() => setConfirmDelete(true)}");
+    expect(editor).toContain("<ConfirmDialog");
   });
 
   it("keeps the full-width save on its own row, so Delete and Cancel stay visible", () => {

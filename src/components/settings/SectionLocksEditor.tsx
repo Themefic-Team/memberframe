@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { ChevronDown, Layers, Plus, Trash2 } from "lucide-react";
-import { Banner, Button, EmptyState, FieldRow, FieldRows, IconButton, Select, TextField, Toggle } from "../ui";
+import { Banner, Button, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Select, TextField, Toggle } from "../ui";
 import type { SectionLockRule } from "../../types/connection";
 import type { TierLadderEntry } from "../../types/member";
 import {
@@ -54,6 +54,9 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
   const update = (index: number, patch: Partial<SectionLockRule>) => {
     onChange(rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
   };
+
+  /** The lock waiting on the delete popup. */
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
 
   const remove = (index: number) => {
     onChange(rules.filter((_, i) => i !== index));
@@ -123,11 +126,11 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
                     label={`Enable ${rule.name || "this lock"}`}
                     disabled={saving}
                   />
-                  <IconButton label="Remove section lock" variant="ghost" onClick={() => remove(index)} disabled={saving}>
-                    <Trash2 size={14} stroke="currentColor" aria-hidden={true} />
+                  <IconButton label="Remove section lock" variant="ghost" onClick={() => setRemovingIndex(index)} disabled={saving}>
+                    <Trash2 aria-hidden={true} />
                   </IconButton>
                   <span className={cn("page-rule-chevron", isOpen && "is-open")}>
-                    <ChevronDown size={14} stroke="currentColor" aria-hidden={true} />
+                    <ChevronDown aria-hidden={true} />
                   </span>
                 </div>
               </div>
@@ -203,11 +206,30 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
       ) : (
         <div className="page-locks-btn-row">
           <Button variant="secondary" onClick={add} disabled={saving || rules.length >= MAX_SECTION_LOCKS}>
-            <Plus size={14} stroke="currentColor" aria-hidden={true} />
+            <Plus aria-hidden={true} />
             <span>Add section lock</span>
           </Button>
         </div>
       )}
+
+      {removingIndex !== null && rules[removingIndex] ? (
+        <ConfirmDialog
+          title={`Delete ${rules[removingIndex]!.name.trim() || "this section lock"}?`}
+          message={
+            <>
+              <p>Sections tagged with its code override are no longer hidden from anyone.</p>
+              <p>It is removed when you press Save locks, and nothing changes on your site before that.</p>
+            </>
+          }
+          confirmLabel="Delete section lock"
+          cancelLabel="Keep lock"
+          onCancel={() => setRemovingIndex(null)}
+          onConfirm={() => {
+            remove(removingIndex);
+            setRemovingIndex(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 };

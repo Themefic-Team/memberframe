@@ -951,6 +951,11 @@
   color: var(--framefic-text-muted);
 }
 
+.webhook-map-arrow svg {
+  width: 14px;
+  height: 14px;
+}
+
 .webhook-preview {
   margin: 0;
   padding: var(--space-8) var(--space-10);

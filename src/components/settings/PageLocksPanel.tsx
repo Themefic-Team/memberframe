@@ -3,6 +3,7 @@ import { Check, ChevronDown, Copy, Plus, Save, Trash2 } from "lucide-react";
 import {
   Banner,
   Button,
+  ConfirmDialog,
   FieldRow,
   FieldRows,
   IconButton,
@@ -70,6 +71,8 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
 }) => {
   const showToast = useToast();
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+  /** The rule waiting on the delete popup. */
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
   const [projectPages, setProjectPages] = useState<FramerProjectPage[]>([]);
   const [customPathActive, setCustomPathActive] = useState<Record<number, boolean>>({});
   const [customRedirectActive, setCustomRedirectActive] = useState<Record<number, boolean>>({});
@@ -227,9 +230,9 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
           <code className="shield-snippet-text">{shieldSnippet}</code>
           <Button variant="secondary" size="sm" onClick={handleCopySnippet} className="shield-copy-btn">
             {copiedSnippet ? (
-              <Check size={13} stroke="currentColor" aria-hidden={true} />
+              <Check aria-hidden={true} />
             ) : (
-              <Copy size={13} stroke="currentColor" aria-hidden={true} />
+              <Copy aria-hidden={true} />
             )}
             <span>{copiedSnippet ? "Copied" : "Copy script"}</span>
           </Button>
@@ -296,13 +299,13 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                     <IconButton
                       label="Remove page lock"
                       variant="ghost"
-                      onClick={() => handleRemove(index)}
+                      onClick={() => setRemovingIndex(index)}
                       disabled={saving}
                     >
-                      <Trash2 size={14} stroke="currentColor" aria-hidden={true} />
+                      <Trash2 aria-hidden={true} />
                     </IconButton>
                     <span className={cn("page-rule-chevron", isExpanded && "is-open")}>
-                      <ChevronDown size={14} stroke="currentColor" aria-hidden={true} />
+                      <ChevronDown aria-hidden={true} />
                     </span>
                   </div>
                 </div>
@@ -399,7 +402,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
 
         <div className="page-locks-btn-row">
           <Button variant="secondary" onClick={handleAdd} disabled={saving}>
-            <Plus size={14} stroke="currentColor" aria-hidden={true} />
+            <Plus aria-hidden={true} />
             <span>Add locked page</span>
           </Button>
         </div>
@@ -416,7 +419,7 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
           onClick={onSave}
         >
           <Save aria-hidden={true} />
-          <span>{saving ? "Saving..." : "Save locks"}</span>
+          <span>{saving ? "Saving" : "Save locks"}</span>
         </Button>
         {siteConnected === false ? (
           <p className="settings-cta-note">Connect this project before saving locks.</p>
@@ -426,6 +429,25 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
           <p className="settings-cta-note">Fix the highlighted lock name before saving.</p>
         ) : null}
       </div>
+
+      {removingIndex !== null && rules[removingIndex] ? (
+        <ConfirmDialog
+          title={`Delete the lock on ${rules[removingIndex]!.path || "/"}?`}
+          message={
+            <>
+              <p>Anyone can open that page again once it is gone.</p>
+              <p>It is removed when you press Save locks, and nothing changes on your site before that.</p>
+            </>
+          }
+          confirmLabel="Delete page lock"
+          cancelLabel="Keep lock"
+          onCancel={() => setRemovingIndex(null)}
+          onConfirm={() => {
+            handleRemove(removingIndex);
+            setRemovingIndex(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 };

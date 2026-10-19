@@ -219,6 +219,7 @@ Never restyle a kit class from a feature stylesheet, and never rebuild a kit com
 | Text input | Inputs | `<TextField>` | A styled `<input>` |
 | Dropdown | Inputs | `<Select>` | A custom menu |
 | Dropdown with a long list (currencies, countries) | Kit extension | `<SearchSelect>`: the kit select that opens a filter box and listbox (kit.css `.search-select-*`) | A native select of 150 options, or a one-off searchable menu |
+| Confirm a delete, remove, revoke, or disconnect | Kit extension | `<ConfirmDialog title message confirmLabel cancelLabel>` on `<Modal>`: danger confirm button, focus starts on the keep button (kit.css `.kit-confirm-*`). **Every** destructive action opens it; nothing deletes on the first click | An inline "Are you sure" block, a two-press "Confirm delete" button, or deleting straight from a trash icon |
 | A dialog over the panel (payment, plan notices) | Kit extension | `<Modal title onClose>`: bg/raised, radius 16, overlay token, Escape and backdrop close; omit `onClose` for a dialog only its own buttons can leave (kit.css `.kit-modal-*`) | A one-off fixed overlay or a hand-built dialog |
 | On or off, applies instantly | Inputs | `<Toggle>` | A checkbox |
 | On or off, needs Save | Inputs | `<Checkbox>` | A toggle |
@@ -255,8 +256,8 @@ Figma components not yet in the kit: Radio (CSS exists, no React wrapper), AI fi
 ### Actions (Button And Icon Button)
 
 - Sizes: Small 30px radius 8, Medium 36px radius 10. Use Medium for the primary CTA of a view. Label Body/Strong, sentence case.
-- Primary: brand gradient + `--px-shadow-primary`. Hover flat brand/primary-hover, pressed brand/primary-pressed. Exactly one per view.
-- Secondary: bg/tertiary + hairline. Ghost: transparent, hover bg/tertiary. Danger: status/danger-subtle fill, status/danger text, destructive only, confirm first.
+- Primary: brand gradient fill with a 2px gradient border (`padding-box` and `border-box` gradients, product owner 2026-10-19) + `--px-shadow-primary`. Hover flat brand/primary-hover, pressed brand/primary-pressed. Exactly one per view. Where several cards each hold a primary (Settings, Integration), only one card is open at a time.
+- Secondary: bg/tertiary + hairline. Ghost: transparent, hover bg/tertiary. Danger: status/danger-subtle fill, status/danger text, destructive only, confirm first in `<ConfirmDialog>` (`test/deleteConfirm.test.ts` guards every delete).
 - Icon button: 30 by 30, radius 8, 16px icon, `aria-label` and `title`.
 - Disabled: 50% opacity, `aria-disabled`, not reachable by Tab.
 - Don't: two primaries in a view; generic labels (OK, Submit, Click here); flat #5271FF fill; an icon button for an unclear action.
@@ -309,7 +310,8 @@ Don't: toast for errors that need a decision; more than 2 banners; blank areas; 
 - Labels, badges, tabs, table headers: sentence case. Never uppercase.
 - No emoji, no typed bullets or arrows as icons (use a list or a Lucide icon), no en-dash or em-dash anywhere.
 - Never show raw enum values (`past_due` becomes "Payment failed").
-- Icons: Lucide React or Framer SVG only, `stroke="currentColor"`, sized by CSS (16px in buttons, 14 to 16 elsewhere).
+- Icons: Lucide React or Framer SVG only, `stroke="currentColor"`, sized by CSS (16px in buttons, 14 to 16 elsewhere). No `size={13}` props.
+- Busy labels have no trailing ellipsis: "Saving", "Sending", "Adding".
 
 ---
 
@@ -358,3 +360,4 @@ Then self-review against this list, and say in your report which items you check
 - v0.4.2 · 2026-10-18 · Shell: five tabs (Reports added at the creator's request, chosen over an icon beside Account). Tab gap 12px in kit.css so five labels and the Account icon fit 360px. Kit: `SearchSelect` for long lists. See docs/development-docs/24-reports.md and 23-dynamic-tiers.md.
 - v0.4.3 · 2026-10-18 · Kit: `Modal` for dialogs over the panel, added for F19 (plugin billing): the Stripe payment form, the upgrade confirmation, and the cancel steps. See docs/development-docs/19-pro-lock-and-trial.md.
 - v0.4.4 · 2026-10-18 · Billing exemption: the F19 billing screens are a copy of the BEAF plugin's (company-wide billing standard, the user's decision), in `components/billing` and `styles/billing`, exempt from `lint:design`. See section 14. `Modal` stays in the kit, but billing no longer uses it.
+- v0.4.5 · 2026-10-19 · `.primary-cta` gets the product owner's 2px gradient border (reference CSS, synced). Kit: `ConfirmDialog`, and every delete, remove, revoke, and disconnect in the panel now asks in it first (members, files, tiers, gateways, webhooks, fields, page and section locks). Review fixes: Integration cards open one at a time (one primary per view), icons sized by CSS, busy labels without ellipses, verb plus object Save labels, sentence-case "Page locks", "Attach file", "Copy asset ID". Canvas: the auth card fills its frame (fixed 400px width, no padding band) and the trial mark sits inside it.

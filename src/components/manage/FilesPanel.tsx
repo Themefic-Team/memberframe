@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, FileArchive, Link2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { framer } from "framer-plugin";
-import { Badge, Banner, Button, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, useToast } from "../ui";
+import { Badge, Banner, Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, useToast } from "../ui";
 import {
   assetSummary,
   assetsFailure,
@@ -352,41 +352,51 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({ siteId }) => {
                   </span>
                   <Badge tone={asset.requiredTier === "signed_in" ? "neutral" : "brand"}>{tierLabel(asset.requiredTier, tiers)}</Badge>
                   <span className="file-row-actions">
-                    {confirmDeleteId === asset.id ? (
-                      <>
-                        <Button variant="danger" size="sm" disabled={busyId === asset.id} onClick={() => void remove(asset)}>
-                          Delete
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
-                          Keep
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <IconButton
-                          label={insertingId === asset.id ? "Adding..." : "Add button to canvas"}
-                          disabled={insertingId === asset.id || busyId === asset.id}
-                          onClick={() => void insertAssetButton(asset)}
-                        >
-                          <Plus aria-hidden={true} />
-                        </IconButton>
-                        <IconButton label={copiedId === asset.id ? "Copied" : "Copy Asset ID"} onClick={() => copyId(asset)}>
-                          {copiedId === asset.id ? <Check aria-hidden={true} /> : <Copy aria-hidden={true} />}
-                        </IconButton>
-                        <IconButton label="Edit file" onClick={() => setEditingId(asset.id)}>
-                          <Pencil aria-hidden={true} />
-                        </IconButton>
-                        <IconButton label="Delete file" onClick={() => setConfirmDeleteId(asset.id)}>
-                          <Trash2 aria-hidden={true} />
-                        </IconButton>
-                      </>
-                    )}
+                    <IconButton
+                      label={insertingId === asset.id ? "Adding" : "Add button to canvas"}
+                      disabled={insertingId === asset.id || busyId === asset.id}
+                      onClick={() => void insertAssetButton(asset)}
+                    >
+                      <Plus aria-hidden={true} />
+                    </IconButton>
+                    <IconButton label={copiedId === asset.id ? "Copied" : "Copy asset ID"} onClick={() => copyId(asset)}>
+                      {copiedId === asset.id ? <Check aria-hidden={true} /> : <Copy aria-hidden={true} />}
+                    </IconButton>
+                    <IconButton label="Edit file" onClick={() => setEditingId(asset.id)}>
+                      <Pencil aria-hidden={true} />
+                    </IconButton>
+                    <IconButton label="Delete file" onClick={() => setConfirmDeleteId(asset.id)}>
+                      <Trash2 aria-hidden={true} />
+                    </IconButton>
                   </span>
                 </li>
               )
             )}
           </ul>
         )}
+
+        {confirmDeleteId
+          ? (() => {
+              const asset = list.assets.find((entry) => entry.id === confirmDeleteId);
+              if (!asset) return null;
+              return (
+                <ConfirmDialog
+                  title="Delete this file?"
+                  message={
+                    <p>
+                      {asset.name} is removed, and its download buttons on your site stop working. This cannot be
+                      undone.
+                    </p>
+                  }
+                  confirmLabel="Delete file"
+                  cancelLabel="Keep file"
+                  busy={busyId === asset.id}
+                  onCancel={() => setConfirmDeleteId(null)}
+                  onConfirm={() => void remove(asset)}
+                />
+              );
+            })()
+          : null}
 
         {/*
           Where uploads are stored (the API server's disk, or S3 and R2 with
@@ -444,7 +454,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ asset, tierOptions, busy, onCan
           disabled={busy || name.trim() === "" || fileName.trim() === ""}
           onClick={() => onSave({ name: name.trim(), requiredTier, fileName: fileName.trim(), url: url.trim() })}
         >
-          {busy ? "Saving" : "Save"}
+          {busy ? "Saving" : "Save file"}
         </Button>
       </div>
     </li>

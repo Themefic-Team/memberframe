@@ -25,6 +25,12 @@ export interface IntegrationCardProps {
   onSave: (values: Record<string, string>) => void;
   /** Instant apply, per the toggle's own contract. */
   onToggleEnabled: (enabled: boolean) => void;
+  /**
+   * Whether this card's form is open. Held by IntegrationPanel so only one is
+   * open at a time: each form carries a primary Save, and a view has one.
+   */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 function getIntegrationIcon(id: string) {
@@ -85,8 +91,9 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
   saving,
   onSave,
   onToggleEnabled,
+  open,
+  onOpenChange,
 }) => {
-  const [open, setOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const defaultRedirectUrl = useMemo(() => {
@@ -128,16 +135,14 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
   const configured = status === "connected" || status === "partial" || Object.keys(stored.values).length > 0;
 
   const handleToggleOpen = useCallback(() => {
-    setOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setDraft(createInitialDraft());
-        setProblems([]);
-        setRevealed([]);
-      }
-      return next;
-    });
-  }, [createInitialDraft]);
+    const next = !open;
+    if (next) {
+      setDraft(createInitialDraft());
+      setProblems([]);
+      setRevealed([]);
+    }
+    onOpenChange(next);
+  }, [createInitialDraft, onOpenChange, open]);
 
   const handleSave = useCallback(() => {
     const found = validateDraft(definition, draft, stored, secretsSupported);
@@ -163,8 +168,8 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
     // creator's Save was lost behind a success toast.
     onSave(valuesToSave);
     setRevealed([]);
-    setOpen(false);
-  }, [defaultRedirectUrl, definition, draft, onSave, secretsSupported, stored]);
+    onOpenChange(false);
+  }, [defaultRedirectUrl, definition, draft, onOpenChange, onSave, secretsSupported, stored]);
 
   const toggleReveal = useCallback((key: string) => {
     setRevealed((current) =>
@@ -213,7 +218,10 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
             onChange={(enabled) => {
               onToggleEnabled(enabled);
               if (enabled && !open) {
-                setOpen(true);
+                setDraft(createInitialDraft());
+                setProblems([]);
+                setRevealed([]);
+                onOpenChange(true);
               }
             }}
           />
@@ -228,7 +236,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
         <div className="integration-tier-form" role="group" aria-label={`${definition.name} details`}>
           <div className="tier-form-head">
             <span className="tier-form-title">Edit {definition.name}</span>
-            <IconButton label="Close" variant="ghost" onClick={() => setOpen(false)}>
+            <IconButton label="Close" variant="ghost" onClick={() => onOpenChange(false)}>
               <X aria-hidden={true} />
             </IconButton>
           </div>
@@ -333,7 +341,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
               disabled={saving}
               onClick={handleSave}
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Saving" : "Save settings"}
             </Button>
           </div>
         </div>

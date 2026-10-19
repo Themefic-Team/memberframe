@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from "react";
-import { Link2, ShieldOff, Trash2, X } from "lucide-react";
-import { Button, FieldRow, FieldRows, IconButton, Select } from "../ui";
+import { Link2, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import { Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Select } from "../ui";
 import type { SiteMemberRecord } from "../../types/site";
 import { siteTiers, type TierKey } from "../../types/member";
-import { statusLabel, tierLabel } from "./memberFilters";
+import { tierLabel } from "./memberFilters";
 import {
   displayValue,
   isFieldVisible,
@@ -16,6 +16,7 @@ import { cn } from "../../utils/cn";
 export type MemberAction =
   | { kind: "change_tier"; tier: TierKey }
   | { kind: "revoke" }
+  | { kind: "restore" }
   | { kind: "delete" }
   | { kind: "magic_link" };
 
@@ -100,9 +101,14 @@ function tierOptions(): ReadonlyArray<{ value: TierKey; label: string }> {
  * fixed VIP shortcut pointed at a tier most sites do not have. Moving a member
  * to any tier is the Tier picker's job.
  *
- * Each confirm step replaces its button in place rather than opening a
- * second layer. A dialog over a flyout in a 360px panel leaves nowhere to
- * read the thing being confirmed.
+ * Revoke also cancels the member's subscription at the payment provider, at
+ * once and with no refund, and signs them out (doc 26). Once revoked, the
+ * button is Restore access, which needs no confirmation: it only lets the
+ * member back in on Free.
+ *
+ * Revoke and delete confirm in a `<ConfirmDialog>` popup (2026-10-19, the
+ * product owner: nothing in the panel deletes on the first click). The dialog
+ * names the member, so it still says what is being confirmed.
  *
  * No `.primary-cta` here. The Manage tab's single primary action belongs to the
  * Tiers segment, per PRD section 7.3, so every control in this flyout is a
@@ -161,84 +167,93 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
           variant="secondary"
           size="md"
           className="fill"
-          disabled={busy}
+          // The server refuses a link for a revoked member: restore first.
+          disabled={busy || alreadyRevoked}
           onClick={() => onAction({ kind: "magic_link" })}
         >
           <Link2 aria-hidden={true} />
           Send magic link
         </Button>
 
-        {confirming === "revoke" ? (
-          <div className="member-flyout-confirm" role="alert">
-            <p className="member-flyout-confirm-text">
-              Revoke access for this member? They keep their invoice history.
-            </p>
-            <div className="member-flyout-confirm-buttons">
-              <Button
-                variant="ghost"
-                size="md"
-                disabled={busy}
-                onClick={() => setConfirming(null)}
-              >
-                Keep access
-              </Button>
-              <Button
-                variant="danger"
-                size="md"
-                disabled={busy}
-                onClick={() => onAction({ kind: "revoke" })}
-              >
-                Revoke access
-              </Button>
-            </div>
-          </div>
-        ) : (
+        {alreadyRevoked ? (
           <Button
             variant="secondary"
             size="md"
             className="fill"
-            disabled={busy || alreadyRevoked}
-            onClick={() => setConfirming("revoke")}
+            disabled={busy}
+            onClick={() => onAction({ kind: "restore" })}
           >
-            <ShieldOff aria-hidden={true} />
-            {alreadyRevoked ? `Access ${statusLabel(member.status).toLowerCase()}` : "Revoke access"}
+            <ShieldCheck aria-hidden={true} />
+            Restore access
           </Button>
-        )}
-
-        {confirming === "delete" ? (
-          <div className="member-flyout-confirm" role="alert">
-            <p className="member-flyout-confirm-text">
-              Delete this member for good? Their account, sessions, and bookmarks are removed and they
-              can sign up again as new. Payment records are kept. A subscription at your payment
-              provider is not cancelled.
-            </p>
-            <div className="member-flyout-confirm-buttons">
-              <Button variant="ghost" size="md" disabled={busy} onClick={() => setConfirming(null)}>
-                Keep member
-              </Button>
-              <Button
-                variant="danger"
-                size="md"
-                disabled={busy}
-                onClick={() => onAction({ kind: "delete" })}
-              >
-                Delete member
-              </Button>
-            </div>
-          </div>
         ) : (
           <Button
             variant="secondary"
             size="md"
             className="fill"
             disabled={busy}
-            onClick={() => setConfirming("delete")}
+            onClick={() => setConfirming("revoke")}
           >
-            <Trash2 aria-hidden={true} />
-            Delete member
+            <ShieldOff aria-hidden={true} />
+            Revoke access
           </Button>
         )}
+
+        <Button
+          variant="secondary"
+          size="md"
+          className="fill"
+          disabled={busy}
+          onClick={() => setConfirming("delete")}
+        >
+          <Trash2 aria-hidden={true} />
+          Delete member
+        </Button>
       </div>
+
+      {confirming === "revoke" ? (
+        <ConfirmDialog
+          title="Revoke this member's access?"
+          message={
+            <p>
+              {member.email} is signed out and moved to Free. Their subscription at your payment provider is
+              cancelled now, with no refund. Their invoice history is kept.
+            </p>
+          }
+          confirmLabel="Revoke access"
+          cancelLabel="Keep access"
+          icon={<ShieldOff aria-hidden={true} />}
+          busy={busy}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            setConfirming(null);
+            onAction({ kind: "revoke" });
+          }}
+        />
+      ) : null}
+
+      {confirming === "delete" ? (
+        <ConfirmDialog
+          title="Delete this member?"
+          message={
+            <>
+              <p>
+                {member.email} is removed for good, with their sessions and bookmarks. They can sign up again as
+                a new member. This cannot be undone.
+              </p>
+              <p>Payment records are kept. A subscription at your payment provider is not cancelled.</p>
+            </>
+          }
+          confirmLabel="Delete member"
+          cancelLabel="Keep member"
+          busy={busy}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            setConfirming(null);
+            onAction({ kind: "delete" });
+          }}
+        />
+      ) : null}
 
       {profileFields.length > 0 ? (
         <MemberProfileValues fields={profileFields} metadata={member.metadata} />
