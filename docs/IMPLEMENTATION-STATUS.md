@@ -202,11 +202,11 @@ PRD section 15.5. **Goal**: all three gateways live, metering and SEO shipped, l
 | :--- | :---------------------------------------------------------------- | :------ | :----------------------------------------------------------------------- | :----- | :----- |
 | 4.1  | Author the LMS trio                                               | F11     | `CourseProgress.tsx`, `LessonChecklist.tsx`, `VideoProgressListener.tsx` | todo   |        |
 | 4.2  | Add origin-validated `postMessage` handlers for all three players | F11     | `utils/playerBridge.ts`                                                  | todo   |        |
-| 4.3  | Implement the Pro-Lock engine and `enforceLockState`              | F19     | `hooks/useProLock.ts`, `utils/lockPatcher.ts`                            | todo   |        |
-| 4.4  | Implement the trial ticker banner and eligibility flow            | F19     | `components/account/TrialBanner.tsx`                                     | todo   |        |
-| 4.5  | Implement the 1-instance limit and duplicate protection           | F19     | `services/instanceGuard.ts`                                              | todo   |        |
-| 4.6  | Implement the trial watermark in every canvas component           | F19     | all canvas components                                                    | todo   |        |
-| 4.7  | Build the account sheet with checkout for the three plans         | F19     | `components/account/AccountSheet.tsx`                                    | todo   |        |
+| 4.3  | Implement the Pro-Lock engine and `enforceLockState`              | F19     | `hooks/useLicense.ts`, `utils/lockPatcher.ts`, backend `services/license/`, `middleware/license.ts` | awaiting review |        |
+| 4.4  | Implement the trial ticker banner and eligibility flow            | F19     | `components/billing/TrialStickyBanner.tsx`, `TrialStatusModal.tsx`, backend `services/license/trialService.ts` | awaiting review |        |
+| 4.5  | Implement the 1-instance limit and duplicate protection           | F19     | not built, by decision: 19-pro-lock-and-trial.md 1.4                     | skipped |        |
+| 4.6  | Implement the trial watermark in every canvas component           | F19     | the license block in five canvas components, `routes/license.ts`        | awaiting review |        |
+| 4.7  | Build the account sheet with checkout for the three plans         | F19     | `components/billing/*` (BEAF clone), backend `billingService.ts`, `platformWebhook.ts` | awaiting review |        |
 | 4.8  | Implement telemetry sync with the mode guardrail                  | F20     | `hooks/useSiteTelemetry.ts`                                              | todo   |        |
 | 4.9  | Implement 2kB differential compression                            | F20     | `utils/compression.ts`, `services/storageService.ts`                     | todo   |        |
 | 4.10 | Implement bot defense on the auth surface                         | F21     | `canvas-components/MemberAuth.tsx`, Settings                             | todo   |        |
@@ -237,7 +237,7 @@ PRD section 15.6.
 | :-- | :-------------------------------------------------------- | :------ | :-------------------------------------- | :----- | :----- |
 | 6.1 | Author `<TeamManagement>` embedded in the dashboard       | F12     | `canvas-components/TeamManagement.tsx`  | todo   |        |
 | 6.2 | Implement seat allocation, invites, and revocation limits | F12     | `services/orgService.ts`                | todo   |        |
-| 6.3 | Author `<OnboardingModal>` with conditional steps         | F16     | `canvas-components/OnboardingModal.tsx` | awaiting review |        |
+| 6.3 | Author `<OnboardingModal>` with conditional steps         | F16     | removed 2026-10-18 at the product owner's request | removed |        |
 | 6.4 | Implement shared password gating mode                     | F22     | `MemberGate.tsx`, Settings              | todo   |        |
 | 6.5 | Write development docs for F06, F09, F10, F12, F16, F22   | Rule    | `docs/development-docs/*`               | todo   |        |
 
@@ -332,6 +332,28 @@ now offers Member Login, Member Registration, Password Reset, and OTP Verificati
 Auth, which is unchanged. All five deploy from the one `MemberAuth.tsx`: the generator bakes a
 `screen` in and renames the export, so each lands as its own file and component. Recorded in
 [`05-member-auth.md`](development-docs/05-member-auth.md) section 10. 34 tests; none rendered.
+
+**F19 plugin billing, added 2026-10-18 on request, awaiting review and unstaged, both repositories.**
+BEAF's model for MemberFrame itself: an account made in a browser tab, a 7-day trial per account,
+Framer user, and project, the Made with Framefic mark during the trial, the blur and a 402 server
+block once it ends, Stripe plans (monthly, yearly, lifetime) with prorated upgrades, renewal
+reminders, and customer emails. Recorded in [`19-pro-lock-and-trial.md`](development-docs/19-pro-lock-and-trial.md).
+Plugin 19 new tests, backend 37; nothing paid through real Stripe yet and nothing seen rendered in Framer.
+The billing and registration screens, the hosted `/auth` page, and every billing email were then rebuilt
+as an exact copy of BEAF's, the company-wide standard (`components/billing`, `styles/billing`, exempt
+from `lint:design`, design-system.md v0.4.4). Gates: plugin 884 tests, backend 451.
+
+**Custom SMTP per site (SMTP-1), added 2026-10-18 on request, awaiting review and unstaged.**
+Settings, Config, Email sending: each site can send member emails through its own SMTP server,
+falling back to the platform sender when it is off or fails. Password sealed in
+`integration_secrets`; host checked against private ranges in production. Recorded in
+[`25-custom-smtp.md`](development-docs/25-custom-smtp.md). Plugin 12 tests, backend 11; no send
+through a real provider yet.
+
+**Onboarding Modal removed 2026-10-18 at the product owner's request, unstaged.** The canvas
+component, its Builder entry, generator descriptor, config type, and the onboarding-only helpers
+are gone; profile fields stay, answered on `<MemberDashboard>`. Recorded at the top of
+[`16-onboarding-modal.md`](development-docs/16-onboarding-modal.md). The paragraph below is history.
 
 **FP-09 is `awaiting review` and the work is unstaged, in both repositories.** Recorded in
 [`16-onboarding-modal.md`](development-docs/16-onboarding-modal.md), which also closes task 6.3.

@@ -51,3 +51,6 @@ export type { HelpTileProps } from "./HelpTile";
 
 export { PluginCard, PluginCardList } from "./PluginCard";
 export type { PluginCardProps } from "./PluginCard";
+
+export { Modal } from "./Modal";
+export type { ModalProps } from "./Modal";

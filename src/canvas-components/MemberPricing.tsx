@@ -43,12 +43,133 @@ const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
 
+// @memberframe-license-start
+// ============================================================================
+// LICENSE: THE TRIAL WATERMARK AND THE LOCK
+// ============================================================================
+// Byte-identical in every licensed component, held so by
+// `test/canvasLicenseParity.test.ts`. F19, 19-pro-lock-and-trial.md.
+//
+// The four lines above are this file's state when it was written, and they are
+// rewritten in place by the plugin whenever the license changes. On the canvas
+// and the published site the component also asks the server, and its answer
+// wins: trial shows the "Made with Framefic" mark, the bottom right corner
+// copied from the BEAF slider; an ended plan blurs the component behind an
+// Upgrade card. The server refuses an unlicensed site's member requests on its
+// own, so removing these lines unlocks nothing.
+
+type MfLicense = "trial" | "active" | "locked";
+
+const MF_LICENSE_CACHE_MS = 60000;
+
+function mfBakedLicense(): MfLicense {
+  return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
+}
+
+function mfFetchLicense(apiBaseUrl: string, siteKey: string): Promise<MfLicense | null> {
+  if (typeof window === "undefined" || !apiBaseUrl || !siteKey) return Promise.resolve(null);
+  const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
+  const cache = (host.__mfLicense = host.__mfLicense || {});
+  const base = String(apiBaseUrl).replace(/\/+$/, "");
+  const key = base + "|" + siteKey;
+  const hit = cache[key];
+  if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
+  const headers: Record<string, string> = {};
+  if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  const answer = fetch(base + "/api/license?site=" + encodeURIComponent(siteKey), { credentials: "omit", headers })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data: { state?: unknown } | null): MfLicense | null => {
+      const state = data ? data.state : null;
+      return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
+    })
+    .catch(() => null);
+  cache[key] = { at: Date.now(), answer };
+  return answer;
+}
+
+function useMfLicense(apiBaseUrl: string, siteKey: string): MfLicense {
+  const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
+  useEffect(() => {
+    let live = true;
+    void mfFetchLicense(apiBaseUrl, siteKey).then((answer) => {
+      if (live && answer) setLicense(answer);
+    });
+    return () => {
+      live = false;
+    };
+  }, [apiBaseUrl, siteKey]);
+  return license;
+}
+
+const MF_LICENSE_CSS = `
+.mf-wm { position: absolute; bottom: 10px; right: 12px; z-index: 30; display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 5px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(17, 17, 20, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; font-size: 11px; line-height: 1; cursor: pointer; user-select: none; pointer-events: auto; transform: translateY(0) scale(1); transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.mf-wm:hover { transform: translateY(-1px) scale(1.02); border-color: rgba(82, 113, 255, 0.45); }
+.mf-wm-icon { width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(135deg, #5271ff 0%, #3557ff 100%); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 3px rgba(82, 113, 255, 0.35), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.4); transition: transform 0.22s ease, box-shadow 0.22s ease; }
+.mf-wm:hover .mf-wm-icon { transform: scale(1.06); box-shadow: 0 2px 6px rgba(82, 113, 255, 0.55), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.6); }
+.mf-wm-text { color: #94a3b8; font-weight: 500; letter-spacing: 0.1px; transition: color 0.2s ease; }
+.mf-wm:hover .mf-wm-text { color: rgba(255, 255, 255, 0.85); }
+.mf-wm-brand { color: #ffffff; font-weight: 600; letter-spacing: 0.2px; }
+.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: inherit; container-type: size; }
+.mf-lock-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
+.mf-lock-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
+.mf-lock-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.mf-lock-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
+@container (max-height: 150px) { .mf-lock-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lock-icon { width: 24px; height: 24px; } .mf-lock-icon svg { width: 14px; height: 14px; } .mf-lock-text { display: none; } .mf-lock-title { font-size: 12px; } }
+`;
+
+function MfWatermark(): React.ReactElement {
+  return (
+    <a className="mf-wm" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
+      <span className="mf-wm-icon" aria-hidden={true}>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.2 5V3.4C2.2 2.74 2.74 2.2 3.4 2.2H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M11 2.2H12.6C13.26 2.2 13.8 2.74 13.8 3.4V5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2.2 11V12.6C2.2 13.26 2.74 13.8 3.4 13.8H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M11 13.8H12.6C13.26 13.8 13.8 13.26 13.8 12.6V11" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="4.4" y="4.6" width="7.2" height="6.8" rx="1.6" fill="#ffffff" />
+        </svg>
+      </span>
+      <span className="mf-wm-text">Made with</span>
+      <span className="mf-wm-brand">Framefic</span>
+    </a>
+  );
+}
+
+function MfLockOverlay(): React.ReactElement {
+  return (
+    <div className="mf-lock" role="note" aria-label="Upgrade to Pro">
+      <div className="mf-lock-card">
+        <span className="mf-lock-icon" aria-hidden={true}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="11" width="16" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+        </span>
+        <p className="mf-lock-title">Upgrade to Pro</p>
+        <p className="mf-lock-text">This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it.</p>
+      </div>
+    </div>
+  );
+}
+
+/** What a licensed component renders last inside its root: the mark, the lock, or nothing. */
+function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | null {
+  if (props.license === "active") return null;
+  return (
+    <>
+      <style>{MF_LICENSE_CSS}</style>
+      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay />}
+    </>
+  );
+}
+// @memberframe-license-end
+
 // @memberframe-appearance-start
 // ============================================================================
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// MemberPricing, MeteredPaywall, ProtectedDownload,
 // BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
@@ -456,8 +577,8 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
 // ============================================================================
 // REAL DATA ON THE CANVAS
 // ============================================================================
-// Byte-identical in MemberPricing, MemberDashboard, OnboardingModal, and
-// ProtectedDownload, held so by `test/canvasRealData.test.ts`.
+// Byte-identical in MemberPricing, MemberDashboard, and ProtectedDownload,
+// held so by `test/canvasRealData.test.ts`.
 //
 // On the canvas there is no visitor, but there is a site: the creator's own
 // tiers, profile questions, and files. `GET /api/preview` answers with what
@@ -874,6 +995,7 @@ function announcePurchase(): void {
 
 const cssContent = `
 .mf-pricing {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   max-width: 1120px;
@@ -967,9 +1089,6 @@ const cssContent = `
 .mf-pricing-spin { animation: mf-pricing-spin 0.9s linear infinite; }
 @keyframes mf-pricing-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .mf-pricing-spin { animation: none; } }
-.mf-pricing-watermark {
-  display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: calc(11px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); text-decoration: none;
-}
 `;
 
 // ============================================================================
@@ -1002,6 +1121,7 @@ export default function MemberPricing(
 
   const rawId = useId();
   const scope = useMemo(() => `mfp${rawId.replace(/[^a-zA-Z0-9]/g, "")}`, [rawId]);
+  const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey);
   const onCanvas = RenderTarget.current() === RenderTarget.canvas;
   const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
 
@@ -1317,23 +1437,9 @@ export default function MemberPricing(
     <div className={rootClass} data-mf-pricing={scope}>
       {style}
       {body}
-      {IS_TRIAL && !IS_LOCKED ? (
-        <a className="mf-pricing-watermark" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
-          <ShieldCheck aria-hidden={true} />
-          <span>Trial Version</span>
-        </a>
-      ) : null}
+      <MfLicenseLayer license={license} />
     </div>
   );
-
-  if (IS_LOCKED) {
-    return shell(
-      <div className="mf-pricing-state">
-        <ShieldCheck aria-hidden={true} />
-        <p>This component needs a MemberFrame license.</p>
-      </div>
-    );
-  }
 
   if (load.phase === "misconfigured") {
     return shell(

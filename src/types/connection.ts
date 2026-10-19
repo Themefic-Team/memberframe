@@ -157,6 +157,8 @@ export interface SiteConnection {
   framerProjectId: string;
   creatorEmail: string;
   creatorName: string;
+  /** From Google sign in on the account page (F19). Absent shows initials. */
+  creatorAvatarUrl?: string;
   allowedOrigins: string[];
 }
 
@@ -172,6 +174,11 @@ export interface FramerProjectContext {
   projectId: string;
   projectName: string;
   creatorName: string | null;
+  /**
+   * `getCurrentUser().id`: Framer's id for whoever has the project open. F19
+   * uses it, with the account and the project, to allow one trial per person.
+   */
+  framerUserId?: string | null;
   /** From `getPublishInfo()`. Production and staging, whichever exist. */
   publishedOrigins: string[];
   /** True when the SDK could not be reached, for example in a browser preview. */

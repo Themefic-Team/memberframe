@@ -98,7 +98,7 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
           htmlFor="settings-allow-registration"
           hint={
             value.allowRegistration
-              ? "Visitors can create an account. Applies to every sign in component on the site."
+              ? "Visitors can create an account with a password or Google and the like. Email code sign in is for existing members only."
               : "The server refuses new accounts. Existing members can still sign in."
           }
         >

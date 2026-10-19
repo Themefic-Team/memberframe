@@ -2,7 +2,7 @@
  * Custom profile fields. Feature plan FP-09, PRD feature F16.
  *
  * A creator defines a handful of member attributes, "Company", "Portfolio URL",
- * "Experience level", and members fill them in, during onboarding or later on
+ * "Experience level", and members fill them in on
  * their dashboard. The DEFINITIONS live in the site settings document; the
  * VALUES live in `Member.metadata`, a JSON column on the member's own row. The
  * reasoning is in `docs/development-docs/06-connect-and-pages.md` section 3.
@@ -11,7 +11,7 @@
  *
  * The backend's `lib/memberMetadata.ts` and `lib/siteSettings.ts` are the rule.
  * This file is the plugin's copy, which the field editor and the tests read.
- * `<MemberDashboard>` and `<OnboardingModal>` each carry a third and fourth,
+ * `<MemberDashboard>` carries a third,
  * because a canvas component is compiled by Framer alone and cannot import
  * from this repository.
  *
@@ -509,8 +509,8 @@ export interface ProfileValidation {
  *
  * Only the visible fields are checked and only they are sent. A hidden field's
  * value is the server's to drop, and sending it would only invite a problem
- * report about a control the member cannot see. `keys` limits the check to one
- * step of the onboarding flow; omitted, every visible field is checked.
+ * report about a control the member cannot see. `keys` limits the check to those
+ * fields; omitted, every visible field is checked.
  */
 export function validateProfile(
   fields: ReadonlyArray<CustomFieldDefinition>,
@@ -535,65 +535,6 @@ export function validateProfile(
   }
 
   return { metadata, problems };
-}
-
-/**
- * Does this member still owe the creator an answer?
- *
- * True when a visible required field is empty. That is the only thing that
- * opens `<OnboardingModal>`: FP-09 section 3 sends a member with nothing
- * required straight into the site, and an optional field never traps anyone.
- */
-export function needsOnboarding(
-  fields: ReadonlyArray<CustomFieldDefinition>,
-  values: Readonly<Record<string, MetadataValue | undefined>>
-): boolean {
-  return fields.some((field) => {
-    if (!field.required || !isFieldVisible(field, values)) return false;
-    const value = values[field.key];
-    if (value === null || value === undefined) return true;
-    if (field.type === "boolean") return value !== true;
-    return String(value).trim() === "";
-  });
-}
-
-export interface OnboardingSteps {
-  /** Fields a member must answer before continuing. Never skippable. */
-  required: string[];
-  /** Fields a member may skip. Skipping sends none of them. */
-  optional: string[];
-}
-
-/**
- * Split the fields into the two question steps of `<OnboardingModal>`.
- *
- * A required field goes in the first, an optional one in the second, and a
- * conditional field goes wherever its parent went, whatever its own flag says.
- * Following the parent is the only placement that works: a child placed in an
- * earlier step than its parent could never be shown, because the answer that
- * shows it has not been asked yet.
- */
-export function planSteps(fields: ReadonlyArray<CustomFieldDefinition>): OnboardingSteps {
-  const required: string[] = [];
-  const optional: string[] = [];
-
-  for (const field of fields) {
-    if (field.showWhen) continue;
-    (field.required ? required : optional).push(field.key);
-  }
-
-  for (const field of fields) {
-    if (!field.showWhen) continue;
-    const parentKey = field.showWhen.key;
-    if (required.includes(parentKey)) required.push(field.key);
-    else if (optional.includes(parentKey)) optional.push(field.key);
-  }
-
-  const position = (key: string) => fields.findIndex((field) => field.key === key);
-  required.sort((left, right) => position(left) - position(right));
-  optional.sort((left, right) => position(left) - position(right));
-
-  return { required, optional };
 }
 
 /**

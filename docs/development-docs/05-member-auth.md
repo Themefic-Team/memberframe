@@ -566,3 +566,27 @@ landing on the right page; the reset screen switching to the new password form f
 link; the OTP screen against a running backend. The send and verify endpoints are now built in
 `memberframe-backend/src/routes/member.ts`, so conflict C24's 501 no longer describes the code, but
 no code has been emailed and verified end to end from a published page.
+
+---
+
+## Passwordless On Member Login, 2026-10-18
+
+Requested: Member Login should offer the email code like Member Auth. Before, the dedicated login screen fixed Password Auth on and showed "Sign in with a code" only when a Code Sign In Page was set, which defaulted empty, so it never appeared.
+
+- Member Login now reads **Password Auth** and **Default Method** from the sidebar, the same two controls as Member Auth (`passwordless = screen === "all" || screen === "login"`). Password Auth off is a code-only login page.
+- It starts on its Default Method. On the canvas the form follows Default Method as it is changed.
+- **Sign in with a code** switches the form in place when Code Sign In Page is empty, and still goes to that page when one is set. The code form has **Sign in with password** (when Password Auth is on) and Create an account.
+- `flowLink` gained an `inline` flag for this; every other dedicated link is unchanged. Tests: `test/authScreens.test.ts`, `test/memberAuth.test.ts`.
+
+Needs human verification: the code arrives and signs in from a published Member Login page.
+
+---
+
+## Code Sign In Is For Registered Members Only, 2026-10-18
+
+Requested: passwordless (email code) sign in must not create accounts. Before, `verifyMemberOtp` created a member for any address with a correct code when Allow new sign ups was on.
+
+- **Backend** (`memberAuthService.ts`). `sendMemberOtp` for sign in looks the address up first; with no member it writes nothing, sends nothing, and returns the same `{ resendAfterSeconds, expiresInSeconds }` as a real send, so the form cannot reveal who is a member (the password reset's rule). Email confirmation codes (`purpose: "verify"`) are unaffected: they are for a member being created by password sign up. `verifyMemberOtp` no longer creates: an address with no member is refused `invalid_code`, the wrong-code answer. A correct code still confirms an unconfirmed member's address.
+- **Copy**. The code screen says "If {email} has an account, we sent it a 6 digit code", not "sent to". The Allow new sign ups hint says code sign in is for existing members. Builder descriptions for Member Login and OTP Verification say so.
+- **Unchanged**: password sign up, and Google, Apple, GitHub, Discord, which still create an account when Allow new sign ups is on.
+- Tests: backend `test/memberOtp.test.ts` (no code and the same answer for an unknown address; confirmation codes still sent; a registered member signs in and is confirmed; an unknown address is refused and nothing is created).

@@ -1,6 +1,7 @@
 import React from "react";
 import { Banner } from "../ui";
 import { MembershipSettings } from "./MembershipSettings";
+import { EmailSettings, type EmailSettingsProps } from "./EmailSettings";
 import type { ThemePreference } from "../../hooks/useFramerTheme";
 import type { AuthSettings } from "../../types/connection";
 
@@ -11,6 +12,8 @@ export interface ConfigPanelProps {
   onChangeAuth: (next: AuthSettings) => void;
   failure: { title: string; message: string } | null;
   saving: boolean;
+  /** The Email sending card, 25-custom-smtp.md. */
+  email: EmailSettingsProps;
 }
 
 /**
@@ -43,6 +46,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   onChangeAuth,
   failure,
   saving,
+  email,
 }) => (
   <>
     {failure ? <Banner tone="warning" title={failure.title} message={failure.message} /> : null}
@@ -53,6 +57,14 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         <MembershipSettings value={auth} onChange={onChangeAuth} disabled={saving} />
       </section>
     ) : null}
+
+    <section className="section-group">
+      <div className="section-header">
+        <h2 className="section-title">Email</h2>
+        <p className="section-subtitle">Send members' codes and reset links from your own address. Off, MemberFrame sends them.</p>
+      </div>
+      <EmailSettings {...email} />
+    </section>
 
     {/* Currency, routing, and gateways moved to Manage, Payments, FP-16. */}
     {/* <p className="settings-help">Payments, currency, and gateway routing are in Manage, Payments.</p> */}

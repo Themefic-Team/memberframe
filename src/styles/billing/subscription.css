@@ -1,0 +1,258 @@
+/**
+ * Framefic billing UI, copied from the BEAF plugin (features/slider/components/SubscriptionPage.css) so every
+ * Framefic plugin shows the same account, trial, and subscription screens.
+ * Company standard, decided 2026-10-18: this folder follows BEAF, not the
+ * Pixelfic kit, and the design lint skips it (design-system.md section 15).
+ * Edit it only to stay in step with BEAF.
+ */
+
+.beaf-subscription-page {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.beaf-subpage-back-button-wide {
+  height: 32px;
+  border-radius: 6px;
+  padding: 0;
+  background-color: transparent !important;
+  color: var(--beaf-text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.beaf-subpage-back-button-wide:hover {
+  background: transparent !important;
+  color: var(--beaf-heading);
+}
+
+.beaf-subpage-title-left {
+  color: var(--beaf-heading);
+  font-size: 16px;
+  font-weight: 700;
+  font-family: "Inter", sans-serif;
+  margin-bottom: 10px;
+}
+
+.beaf-subscription-card {
+  border: 1px solid var(--beaf-surface-border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--beaf-page-bg2);
+
+
+}
+
+.beaf-subscription-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.beaf-subscription-label {
+  color: var(--beaf-text-soft);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.beaf-subscription-value {
+  color: var(--beaf-heading);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+}
+
+.beaf-subscription-status {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+}
+
+.beaf-subscription-divider {
+  height: 1px;
+  background: var(--beaf-surface-border);
+  opacity: 0.5;
+  width: 100%;
+}
+
+.beaf-subscription-cancel-btn {
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(180deg, #d60c0c 0%, #500202 100%);
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 32px;
+  color: #FFF;
+}
+
+.beaf-subscription-cancel-btn:hover {
+  background: linear-gradient(180deg, #d60c0c 0%, #500202 100%);
+}
+
+.beaf-subscription-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.beaf-subscription-secondary-btn,
+.beaf-subscription-upgrade-btn {
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 32px;
+  color: #fff;
+  /* Body/Small/Semi Bold */
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400 !important;
+  width: 100%;
+  letter-spacing: 0.22px;
+  position: relative;
+  z-index: 0;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--Secondary-Default, #5271FF), var(--Secondary-Default, #5271FF)) padding-box,
+    linear-gradient(180deg, #708AFF 0%, #3358FF 100%) border-box;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+
+
+
+.beaf-subscription-upgrade-btn {
+  background: var(--beaf-success-btn);
+  background:
+    linear-gradient(var(--Secondary-Default, #038f3d), var(--Secondary-Default, #00421c)) padding-box,
+    linear-gradient(180deg, #038f3d 0%, #00421c 100%) border-box;
+  border-radius: 10px;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.beaf-subscription-upgrade-btn:hover {
+  color: #fff;
+  filter: brightness(1.15);
+}
+
+.beaf-subscription-downgrade-btn {
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 32px;
+  background: linear-gradient(180deg, #a16207 0%, #713f12 100%);
+  color: #fff;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.beaf-subscription-downgrade-btn:hover {
+  filter: brightness(1.15);
+}
+
+.beaf-subscription-secondary-btn:disabled,
+.beaf-subscription-upgrade-btn:disabled,
+.beaf-subscription-downgrade-btn:disabled,
+.beaf-subscription-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.beaf-subscription-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 32px 16px;
+  background: var(--beaf-surface);
+  border: 1px dashed var(--beaf-surface-border);
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.beaf-subscription-empty h4 {
+  margin: 0;
+  color: var(--beaf-heading);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+}
+
+.beaf-subscription-empty p {
+  margin: 0;
+  color: var(--beaf-text-muted);
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+}
+
+.beaf-primary-cta {
+  color: #fff;
+  /* Body/Small/Semi Bold */
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400 !important;
+  width: 100%;
+  margin-top: 8px;
+  letter-spacing: 0.22px;
+  position: relative;
+  z-index: 0;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--Secondary-Default, #5271FF), var(--Secondary-Default, #5271FF)) padding-box,
+    linear-gradient(180deg, #708AFF 0%, #3358FF 100%) border-box;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  border-radius: 10px;
+}

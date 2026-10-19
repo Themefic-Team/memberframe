@@ -7,6 +7,8 @@ Technical development specification, user flow, architectural wiring, and testin
 **Status**: in progress
 **Tasks**: 6.3, and FP-09 in the feature plan track (see [`../IMPLEMENTATION-STATUS.md`](../IMPLEMENTATION-STATUS.md))
 
+> **Onboarding Modal removed (2026-10-18):** at the product owner's request, `<OnboardingModal>` is gone: its canvas component (`OnboardingModal.tsx`), Builder entry, generator descriptor, config type, and the onboarding-only helpers `needsOnboarding` and `planSteps` with their tests. Profile fields stay: creators define them in Settings, Fields, members answer them in the Member Dashboard's Profile Form, and creators read them in the Manage flyout. Nothing on the server changed. A project that added the modal keeps its `OnboardingModal` file, which the plugin no longer updates; delete the instance from the page and the file from Assets. Sections below that describe the modal are history.
+>
 > **Appearance and sizing (2026-10-15):** Theme (Light by default), Colors, Typography, Layout, and Labels controls, fixed default size, and the shared colour sanitizer are documented once in [`00-canvas-appearance.md`](00-canvas-appearance.md). Redeploy from the Builder to update an existing file.
 
 ---

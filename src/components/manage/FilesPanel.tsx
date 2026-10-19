@@ -14,6 +14,8 @@ import {
   type AssetList,
   type SiteAsset,
 } from "../../services/assetsService";
+import { useLicense } from "../../hooks/useLicense";
+import { canvasLicense } from "../../services/licenseService";
 import { useConnection } from "../../hooks/useConnection";
 import { useSiteTiers } from "../../hooks/useSiteTiers";
 import {
@@ -71,6 +73,7 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({ siteId }) => {
   const { connection, settings } = useConnection();
   const tiers = useSiteTiers(siteId);
   const tierOptions = useMemo(() => fileTierOptions(tiers), [tiers]);
+  const { view: licenseView } = useLicense();
 
   const deployContext = useMemo<DeployContext>(
     () => ({
@@ -82,8 +85,9 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({ siteId }) => {
       signupPath: settings?.auth.signupPath ?? "",
       resetPath: settings?.auth.resetPath ?? "/reset-password",
       tiers,
+      license: canvasLicense(licenseView?.state),
     }),
-    [connection, settings, tiers]
+    [connection, settings, tiers, licenseView]
   );
 
   const [list, setList] = useState<AssetList | null>(null);

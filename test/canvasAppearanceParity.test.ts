@@ -26,7 +26,6 @@ const COMPONENTS = {
   MemberAuth: { labels: "AUTH_LABELS", root: ".memberframe-auth-root" },
   MemberDashboard: { labels: "DASH_LABELS", root: ".mf-dash" },
   MemberPricing: { labels: "PRICING_LABELS", root: ".mf-pricing" },
-  OnboardingModal: { labels: "ONBOARDING_LABELS", root: ".memberframe-onboarding-root" },
   MeteredPaywall: { labels: "METER_LABELS", root: ".mf-meter" },
   ProtectedDownload: { labels: "DOWNLOAD_LABELS", root: ".mf-download" },
   BookmarkButton: { labels: "BOOKMARK_LABELS", root: ".mf-bookmark" },

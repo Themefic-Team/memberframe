@@ -219,6 +219,7 @@ Never restyle a kit class from a feature stylesheet, and never rebuild a kit com
 | Text input | Inputs | `<TextField>` | A styled `<input>` |
 | Dropdown | Inputs | `<Select>` | A custom menu |
 | Dropdown with a long list (currencies, countries) | Kit extension | `<SearchSelect>`: the kit select that opens a filter box and listbox (kit.css `.search-select-*`) | A native select of 150 options, or a one-off searchable menu |
+| A dialog over the panel (payment, plan notices) | Kit extension | `<Modal title onClose>`: bg/raised, radius 16, overlay token, Escape and backdrop close; omit `onClose` for a dialog only its own buttons can leave (kit.css `.kit-modal-*`) | A one-off fixed overlay or a hand-built dialog |
 | On or off, applies instantly | Inputs | `<Toggle>` | A checkbox |
 | On or off, needs Save | Inputs | `<Checkbox>` | A toggle |
 | Pick one of 2 to 3 views | Inputs | `<Segmented>` | A hand-built tab bar (this happened, see changelog) |
@@ -344,6 +345,7 @@ Then self-review against this list, and say in your report which items you check
 - **Write CSS files atomically.** A truncate-then-write (`> file`) lets a running Vite dev server cache an empty stylesheet; every token vanishes until the file changes again. The sync script renames from a `.tmp` file. Symptom to recognise: components look right (they have fallbacks) but every kit.css surface is unstyled.
 - **Resolved: tabs.** Was conflict C26 (five tabs). The user chose 4 tabs with Connect behind the Account icon on 2026-10-15. Never re-split Manage.
 - **Resolved: header.** The Figma Plugin header is not built (see section 7).
+- **Resolved: billing screens follow BEAF, not this kit.** The user chose on 2026-10-18 that every Framefic plugin bills the same way, so the F19 screens (sign in modal, trial modals and sticky bar, Profile, Manage Subscription, plans, payment, cancel) are a copy of the BEAF plugin's. They live only in `src/components/billing/` and `src/styles/billing/`, use their own `--beaf-*` tokens keyed by `data-framer-theme`, and are skipped by `lint:design` (`BILLING_DIRS` in `lint-design-system.js`). `lint:css` still applies: no inline styles. Everything else in the panel stays on this kit. Change the billing screens only to follow BEAF.
 - **Open: heading case.** Figma section headings are sentence case ("More from Pixelfic"); `instruction/INSTRUCTION.md` says Title Case for headings. The code follows the writing rule until the user decides.
 
 ---
@@ -354,3 +356,5 @@ Then self-review against this list, and say in your report which items you check
 - v0.4.1 · 2026-10-15 · Shell: no plugin header (Framer's window bar carries name and close); Collapse and Account in the tab bar; 4 tabs, Connect behind Account; collapsed height 36. Header divider removed, inactive tabs text/secondary, footer arrow after the handle, hero aurora glow removed (plain raised card). framer.css layered; atomic token sync.
 - v0.4.0 · 2026-10-15 · Rule created from the Foundations, Actions, Inputs, Navigation, Content, and Feedback pages. Reference tokens moved from v0.3.7 to v0.4.0: dark theme to Framer's real values (#101010 / #181818 / #202020, text #FFF / #CBCBCB / #777777), bg/raised #18191B, hairlines white 4%, lit edge white 3%; focus/ring and info moved to the brand scale; new bg/selected, border/selected, control/track; spacing, radius, type, and shadow tokens added. Checked controls use brand/action. Active segment uses bg/selected. Section title is Title/Medium 15/22. Values sampled from Figma screenshots: confirm against Dev Mode.
 - v0.4.2 · 2026-10-18 · Shell: five tabs (Reports added at the creator's request, chosen over an icon beside Account). Tab gap 12px in kit.css so five labels and the Account icon fit 360px. Kit: `SearchSelect` for long lists. See docs/development-docs/24-reports.md and 23-dynamic-tiers.md.
+- v0.4.3 · 2026-10-18 · Kit: `Modal` for dialogs over the panel, added for F19 (plugin billing): the Stripe payment form, the upgrade confirmation, and the cancel steps. See docs/development-docs/19-pro-lock-and-trial.md.
+- v0.4.4 · 2026-10-18 · Billing exemption: the F19 billing screens are a copy of the BEAF plugin's (company-wide billing standard, the user's decision), in `components/billing` and `styles/billing`, exempt from `lint:design`. See section 14. `Modal` stays in the kit, but billing no longer uses it.

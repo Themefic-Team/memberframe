@@ -28,7 +28,7 @@ On the published site each component reads from routes behind `resolveSite`, whi
 | Component | Real on the canvas | Still a sample |
 | :--- | :--- | :--- |
 | Member Pricing | Tiers, names, prices, currencies, test or live badge | Nothing |
-| Onboarding Modal | The questions from Settings, Fields | The answers (none) |
+| ~~Onboarding Modal~~ | Removed 2026-10-18 | |
 | Member Dashboard | The site's tiers, with the preview member on the top one; the profile questions | The member's name and email, billing |
 | Protected Download | The chosen file's type, size, and required plan | Nothing, once an Asset ID is set |
 | Bookmarks Tray, Bookmark Button | Nothing | Saved items: they belong to a member, and there is none on the canvas |
@@ -55,7 +55,7 @@ Unchanged. The published site never calls `/api/preview`.
 ## 3. Architecture and File Inventory
 
 - **Backend**: `src/routes/preview.ts`, mounted in `src/app.ts`.
-- **Canvas components**: `MemberPricing.tsx`, `MemberDashboard.tsx`, `OnboardingModal.tsx`, `ProtectedDownload.tsx`.
+- **Canvas components**: `MemberPricing.tsx`, `MemberDashboard.tsx`, `ProtectedDownload.tsx` (`OnboardingModal.tsx` until its removal on 2026-10-18).
 - **Tests**: backend `test/preview.test.ts` (key lookup, response shape and nothing private, file label, unknown file, unknown or missing key); plugin `test/canvasRealData.test.ts` (copies identical, the helper compiled and run against a fake fetch: address, caching, no credentials, null on failure; each component's fallback).
 
 ---

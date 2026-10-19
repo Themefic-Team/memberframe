@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { ChevronRight, User } from "lucide-react";
 import { cn } from "../../utils/cn";
 import type { SiteMemberRecord } from "../../types/site";
@@ -23,6 +23,24 @@ export interface MemberRowProps {
  * comes from a third-party provider, and a broken image with alt text is worse
  * than a neutral glyph in a 28px circle.
  */
+const MemberAvatar: React.FC<{ url: string | null }> = ({ url }) => {
+  // The URL that failed, so a new URL for the same row is tried again.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (!url || failedUrl === url) return <User aria-hidden={true} />;
+  return (
+    <img
+      src={url}
+      alt=""
+      className="member-row-avatar-img"
+      // Google and GitHub avatar hosts often refuse a request that carries the
+      // plugin frame as its referrer, which left an empty dark circle.
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      onError={() => setFailedUrl(url)}
+    />
+  );
+};
+
 export const MemberRow: React.FC<MemberRowProps> = ({ member, selected, onSelect }) => (
   <button
     type="button"
@@ -31,11 +49,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({ member, selected, onSelect
     aria-expanded={selected}
   >
     <span className="member-row-avatar">
-      {member.avatarUrl ? (
-        <img src={member.avatarUrl} alt="" className="member-row-avatar-img" />
-      ) : (
-        <User aria-hidden={true} />
-      )}
+      <MemberAvatar url={member.avatarUrl} />
     </span>
 
     <span className="member-row-identity">

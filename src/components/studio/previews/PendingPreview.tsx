@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Bookmark,
-  ClipboardList,
   CreditCard,
   Download,
   Hammer,
@@ -34,7 +33,6 @@ const ICONS: Partial<Record<CanvasComponentId, React.ReactNode>> = {
   protected_download: <Download aria-hidden={true} />,
   bookmark_button: <Bookmark aria-hidden={true} />,
   bookmarks_tray: <Library aria-hidden={true} />,
-  onboarding_modal: <ClipboardList aria-hidden={true} />,
 };
 
 /**

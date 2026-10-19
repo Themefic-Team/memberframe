@@ -224,7 +224,7 @@ export const CustomFieldsPanel: React.FC<CustomFieldsPanelProps> = ({
           <EmptyState
             icon={<ListPlus aria-hidden={true} />}
             title="No profile fields yet"
-            description="Add a field such as Company or Portfolio URL. Required fields open the onboarding modal for members who have not answered."
+            description="Add a field such as Company or Portfolio URL. Members answer them in the Profile Form on the Member Dashboard."
             action={
               <Button variant="secondary" onClick={handleAdd} disabled={saving}>
                 <Plus aria-hidden={true} />

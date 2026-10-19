@@ -30,12 +30,13 @@
 
 import memberAuthSource from "../canvas-components/MemberAuth.tsx?raw";
 import memberDashboardSource from "../canvas-components/MemberDashboard.tsx?raw";
-import onboardingModalSource from "../canvas-components/OnboardingModal.tsx?raw";
 import memberPricingSource from "../canvas-components/MemberPricing.tsx?raw";
 import meteredPaywallSource from "../canvas-components/MeteredPaywall.tsx?raw";
 import protectedDownloadSource from "../canvas-components/ProtectedDownload.tsx?raw";
 import bookmarkButtonSource from "../canvas-components/BookmarkButton.tsx?raw";
 import bookmarksTraySource from "../canvas-components/BookmarksTray.tsx?raw";
+import { LICENSED_FILE_NAMES, patchLockState } from "../utils/lockPatcher";
+import type { CanvasLicense } from "./licenseService";
 import { isSafeSitePath } from "./siteSettingsService";
 import { SESSION_CACHE_TTL_MS, deployBaseUrl } from "../config/backend";
 import {
@@ -47,14 +48,10 @@ import {
   DASHBOARD_RADIUS_MIN,
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
-  DEFAULT_ONBOARDING_MODAL_CONFIG,
   DEFAULT_MEMBER_PRICING_CONFIG,
   PRICING_RADIUS_MAX,
   PRICING_RADIUS_MIN,
   type MemberPricingConfig,
-  ONBOARDING_RADIUS_MAX,
-  ONBOARDING_RADIUS_MIN,
-  type OnboardingModalConfig,
   type AuthScreen,
   type MemberAuthConfig,
   type MemberDashboardConfig,
@@ -189,6 +186,12 @@ export interface DeployContext {
    * Absent or empty keeps the built in four.
    */
   tiers?: ReadonlyArray<{ key: string; name: string; rank: number }>;
+  /**
+   * F19: the project's license, baked into the four lock lines of a licensed
+   * component as it is written, so a fresh file shows the trial mark or the
+   * lock at once. Absent leaves the authored lines (unlocked), as for tests.
+   */
+  license?: CanvasLicense;
 }
 
 /**
@@ -295,7 +298,12 @@ export function generateComponentCode<Config>(
   const source = sourceOverride ?? descriptor.source;
   const normalized = descriptor.normalize(config);
   const replaced = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized, context));
-  const code = descriptor.transform ? descriptor.transform(replaced, context) : replaced;
+  const transformed = descriptor.transform ? descriptor.transform(replaced, context) : replaced;
+  // After the signature check in replaceConfigBlock, which reads the authored lines.
+  const code =
+    context.license && LICENSED_FILE_NAMES.includes(descriptor.fileName)
+      ? patchLockState(transformed, context.license) ?? transformed
+      : transformed;
 
   return { fileName: descriptor.fileName, code, config: normalized };
 }
@@ -714,65 +722,6 @@ export function generateMemberPricingCode(
   context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
 ): GeneratedCanvasFile<MemberPricingConfig> {
   return generateComponentCode(MEMBER_PRICING_DESCRIPTOR, config, source, context);
-}
-
-/* ==========================================================================
-   ONBOARDING MODAL, feature plan FP-09, PRD feature F16, task 6.3
-   ========================================================================== */
-
-export const ONBOARDING_MODAL_FILE_NAME = "OnboardingModal.tsx";
-
-/**
- * Clamp and whitelist before emission, same contract as the other three.
- *
- * `completionRedirect` is dropped to empty unless it is a site-relative path.
- * The component checks again at runtime, and checking here as well means an
- * off-site address never reaches the creator's project file at all.
- */
-export function normalizeOnboardingConfig(config: OnboardingModalConfig): OnboardingModalConfig {
-  const redirect = String(config.completionRedirect ?? "").trim();
-
-  return {
-    welcomeTitle: sanitizeText(String(config.welcomeTitle ?? ""), MAX_CARD_TITLE),
-    welcomeMessage: sanitizeText(String(config.welcomeMessage ?? ""), MAX_CARD_DESCRIPTION),
-    showStepIndicator: config.showStepIndicator !== false,
-    allowSkip: config.allowSkip !== false,
-    completionRedirect: redirect !== "" && isSafeSitePath(redirect) ? redirect : "",
-    accentColor: isSafeCssColor(config.accentColor)
-      ? config.accentColor
-      : DEFAULT_ONBOARDING_MODAL_CONFIG.accentColor,
-    borderRadius: Math.max(
-      ONBOARDING_RADIUS_MIN,
-      Math.min(ONBOARDING_RADIUS_MAX, Math.round(Number(config.borderRadius) || 0))
-    ),
-  };
-}
-
-export const ONBOARDING_MODAL_DESCRIPTOR: CanvasComponentDescriptor<OnboardingModalConfig> = {
-  id: "onboarding_modal",
-  fileName: ONBOARDING_MODAL_FILE_NAME,
-  source: onboardingModalSource,
-  configTypeName: "OnboardingConfig",
-  normalize: normalizeOnboardingConfig,
-  serializeFields: (config, context) => [
-    `  welcomeTitle: ${encodeLiteral(config.welcomeTitle)},`,
-    `  welcomeMessage: ${encodeLiteral(config.welcomeMessage)},`,
-    `  showStepIndicator: ${config.showStepIndicator},`,
-    `  allowSkip: ${config.allowSkip},`,
-    `  completionRedirect: ${encodeLiteral(config.completionRedirect)},`,
-    `  accentColor: ${encodeLiteral(config.accentColor)},`,
-    `  borderRadius: ${config.borderRadius},`,
-    `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
-    `  siteKey: ${encodeLiteral(context.siteKey)},`,
-  ],
-};
-
-export function generateOnboardingModalCode(
-  config: OnboardingModalConfig,
-  source?: string,
-  context: DeployContext = DISCONNECTED_DEPLOY_CONTEXT
-): GeneratedCanvasFile<OnboardingModalConfig> {
-  return generateComponentCode(ONBOARDING_MODAL_DESCRIPTOR, config, source, context);
 }
 
 /* ==========================================================================

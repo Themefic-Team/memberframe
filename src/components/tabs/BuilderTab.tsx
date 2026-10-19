@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FileStack, Plus } from "lucide-react";
 import { framer } from "framer-plugin";
 import { Badge, Banner, Button, Checkbox, FieldRow, FieldRows, Select, useToast } from "../ui";
+import { useLicense } from "../../hooks/useLicense";
+import { canvasLicense } from "../../services/licenseService";
 import { cn } from "../../utils/cn";
 import {
   AUTH_SCREEN_DEFAULTS,
@@ -13,7 +15,6 @@ import {
   generateMemberAuthCode,
   generateMemberDashboardCode,
   generateMemberPricingCode,
-  generateOnboardingModalCode,
   generateMeteredPaywallCode,
   generateProtectedDownloadCode,
   generateBookmarkButtonCode,
@@ -46,7 +47,6 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   member_otp_verify: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
   member_dashboard: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
   member_pricing: { width: "100%", height: "fit-content", position: "relative", top: null, centerX: null },
-  onboarding_modal: { width: "480px", height: "fit-content", position: "relative", top: null, centerX: null },
   // Fixed, not 100%: dropped loose on the canvas, 100% of no parent collapses
   // the frame to a dot that cannot be dragged. Set it to Fill once it is in the article.
   metered_paywall: { width: "640px", height: "fit-content", position: "relative", top: null, centerX: null },
@@ -64,7 +64,6 @@ import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
   DEFAULT_MEMBER_PRICING_CONFIG,
-  DEFAULT_ONBOARDING_MODAL_CONFIG,
   DEFAULT_METERED_PAYWALL_CONFIG,
   DEFAULT_PROTECTED_DOWNLOAD_CONFIG,
   DEFAULT_BOOKMARK_BUTTON_CONFIG,
@@ -151,6 +150,7 @@ export const BuilderTab: React.FC = () => {
    * and baking `127.0.0.1` in produces a membership that works in the panel
    * and silently fails everywhere else.
    */
+  const { view: licenseView } = useLicense();
   const deployContext = useMemo<DeployContext>(
     () => ({
       apiBaseUrl: deployBaseUrl(),
@@ -165,8 +165,10 @@ export const BuilderTab: React.FC = () => {
       resetPath: settings?.auth.resetPath ?? "/reset-password",
       // Tier lists in deployed components are written from these. Conflict C9.
       tiers: siteTierList,
+      // F19: a new file shows the trial mark or the lock from its first render.
+      license: canvasLicense(licenseView?.state),
     }),
-    [connection, settings, siteTierList]
+    [connection, settings, siteTierList, licenseView]
   );
 
   /**
@@ -606,8 +608,6 @@ function generateForComponent(
       return generateAuthScreenCode(id, AUTH_SCREEN_DEFAULTS[id], undefined, context);
     case "member_dashboard":
       return generateMemberDashboardCode(DEFAULT_MEMBER_DASHBOARD_CONFIG, undefined, context);
-    case "onboarding_modal":
-      return generateOnboardingModalCode(DEFAULT_ONBOARDING_MODAL_CONFIG, undefined, context);
     case "member_pricing":
       return generateMemberPricingCode(DEFAULT_MEMBER_PRICING_CONFIG, undefined, context);
     case "metered_paywall":

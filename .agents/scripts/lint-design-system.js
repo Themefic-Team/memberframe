@@ -47,6 +47,13 @@ const VERBATIM_SLICES = new Set([
 
 const ignoreDirs = new Set(["node_modules", "dist", ".git", "build"]);
 
+/* Framefic billing UI (F19): a copy of the BEAF plugin's account, trial, and
+   subscription screens, shared by every Framefic plugin and kept in step with
+   BEAF rather than with this kit. Company standard, 2026-10-18; see
+   .agents/rules/design-system.md, the v0.4.4 changelog entry. */
+const BILLING_DIRS = [path.join("styles", "billing"), path.join("components", "billing")];
+const inBilling = (rel) => BILLING_DIRS.some((dir) => rel === dir || rel.startsWith(dir + path.sep));
+
 const FONT_SIZES = new Set([11, 12, 14, 15, 20]);
 const FONT_WEIGHTS = new Set(["400", "500", "600", "inherit"]);
 const RADII = new Set([0, 4, 6, 8, 10, 12, 14, 16, 20, 999]);
@@ -94,7 +101,7 @@ for (const file of cssFiles) {
 // Pass 2: CSS rules.
 for (const file of cssFiles) {
   const rel = path.relative(targetDir, file);
-  if (VERBATIM_SLICES.has(rel)) continue;
+  if (VERBATIM_SLICES.has(rel) || inBilling(rel)) continue;
 
   const lines = stripCssComments(fs.readFileSync(file, "utf8")).split("\n");
 
@@ -157,6 +164,7 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}]/u;
 const DASHES = /[–—]/;
 
 for (const file of codeFiles) {
+  if (inBilling(path.relative(targetDir, file))) continue;
   const lines = fs.readFileSync(file, "utf8").split("\n");
   lines.forEach((line, index) => {
     if (EMOJI.test(line)) report(file, index + 1, "unicode emoji, use a Lucide icon", line);

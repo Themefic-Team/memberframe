@@ -126,9 +126,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       {state.status === "disconnected" ? (
         <Banner
           tone="warning"
-          title="Not connected yet"
-          message="Connect this Framer project to start storing members."
-          action={{ label: "Connect", onClick: onOpenConnect }}
+          title="Try MemberFrame free for 7 days"
+          message="Sign up to unlock the builder, members, and payments. No card needed."
+          action={{ label: "Start free trial", onClick: onOpenConnect }}
         />
       ) : null}
 

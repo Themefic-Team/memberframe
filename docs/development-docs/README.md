@@ -56,10 +56,10 @@ Status values: `planned`, `in progress`, `done`.
 | `13-donation-slider.md` | Pay-What-You-Want Donation Slider | F13 | 4 | P1 | planned |
 | `18-content-features.md` | Member Bookmarks and Saved Tray | F14, feature plan FP-10 | 4 | P2 | done |
 | `15-member-directory.md` | Member Directory with Tier Badges | F15 | 4 | P2 | planned |
-| `16-onboarding-modal.md` | Custom Profile Fields and Progressive Onboarding | F16, feature plan FP-09 | 3 | P2 | in progress |
+| `16-onboarding-modal.md` | Custom Profile Fields (the Onboarding Modal was removed 2026-10-18) | F16, feature plan FP-09 | 3 | P2 | in progress |
 | `17-announcement-bar.md` | Targeted Member Announcement Bar | F17 | 4 | P2 | planned |
 | `18-grace-and-dunning.md` | Grace Period and Automated Dunning | F18 | 2 | P1 | planned |
-| `19-pro-lock-and-trial.md` | Client Pro-Lock and Trial Licensing | F19 | 2 | P0 | planned |
+| `19-pro-lock-and-trial.md` | Plugin Billing, Trial, Watermark, and Pro Lock | F19 | 2 | P0 | in progress |
 | `20-site-telemetry.md` | Framer Site Telemetry Sync | F20 | 2 | P0 | planned |
 | `21-bot-defense.md` | Bot Defense on Auth Endpoints | F21 | 2 | P1 | planned |
 | `22-shared-password.md` | Shared Password Access | F22 | 3 | P2 | planned |

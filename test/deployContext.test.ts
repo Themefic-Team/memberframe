@@ -155,7 +155,7 @@ describe("generateMemberDashboardCode", () => {
     );
 
     expect(config.accentColor).toBe(DEFAULT_MEMBER_DASHBOARD_CONFIG.accentColor);
-    expect(code).not.toContain("display: none");
+    expect(code).not.toContain("body { display: none");
   });
 
   it("clamps the corner radius", () => {

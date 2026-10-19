@@ -30,7 +30,6 @@ export type CanvasComponentId =
   | "member_directory"
   | "bookmark_button"
   | "bookmarks_tray"
-  | "onboarding_modal"
   | "member_announcement_bar";
 
 export interface CanvasComponentEntry {
@@ -93,7 +92,7 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "A sign in form. Links to your sign up and reset pages.",
+      "Sign in with a password, or with a one-time email code for existing members, in one card. Links to your sign up and reset pages.",
     placement: "/login",
   },
   {
@@ -126,7 +125,7 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Passwordless sign in with a six digit code sent by email.",
+      "Passwordless sign in for existing members, with a six digit code sent by email.",
     placement: "Login page",
   },
  
@@ -201,17 +200,6 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewNote:
       "A saved items button that opens a drawer of everything a member saved.",
     placement: "Navigation bar",
-  },
-  {
-    id: "onboarding_modal",
-    name: "Onboarding Modal",
-    features: "F16",
-    task: "6.3",
-    previewReady: false,
-    deployable: true,
-    previewNote:
-      "Asks the questions from Settings, Fields, only while a required answer is missing.",
-    placement: "Dashboard",
   },
   // { id: "member_announcement_bar", name: "Announcement Bar", features: "F17", task: "7.4", previewReady: false, deployable: false },
 ];

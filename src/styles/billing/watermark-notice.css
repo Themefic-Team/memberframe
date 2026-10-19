@@ -1,0 +1,100 @@
+/**
+ * Framefic billing UI, copied from the BEAF plugin (features/slider/components/WatermarkNotice.css) so every
+ * Framefic plugin shows the same account, trial, and subscription screens.
+ * Company standard, decided 2026-10-18: this folder follows BEAF, not the
+ * Pixelfic kit, and the design lint skips it (design-system.md section 15).
+ * Edit it only to stay in step with BEAF.
+ */
+
+/* ── Watermark Notice (Framer Callout Standard) ── */
+.beaf-watermark-notice {
+  margin: 0px 12px;
+  padding: 10px;
+  /* var(--px-space-12) */
+  border-radius: 10px;
+  box-sizing: border-box;
+  font-family: "Inter", sans-serif;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.beaf-watermark-notice.is-clickable {
+  cursor: pointer;
+}
+
+.beaf-watermark-notice.is-clickable:hover {
+  filter: brightness(1.04);
+}
+
+.beaf-watermark-notice-icon-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.beaf-watermark-notice-text-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.beaf-watermark-notice-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.1px;
+}
+
+.beaf-watermark-notice-desc {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* ── Dark Mode (Default) ── */
+.beaf-watermark-notice.is-trial {
+  background-color: #171d27;
+  border: 1px solid rgba(82, 113, 255, 0.18);
+}
+
+.beaf-watermark-notice.is-trial .beaf-watermark-notice-icon {
+  color: #708aff;
+}
+
+.beaf-watermark-notice.is-trial .beaf-watermark-notice-title {
+  color: #ffffff;
+}
+
+.beaf-watermark-notice.is-trial .beaf-watermark-notice-desc {
+  color: #94a3b8;
+}
+
+/* ── Light Mode ── */
+body[data-framer-theme="light"] .beaf-watermark-notice.is-trial,
+[data-theme="light"] .beaf-watermark-notice.is-trial {
+  background-color: #f0f4ff;
+  border: 1px solid rgba(82, 113, 255, 0.15);
+}
+
+body[data-framer-theme="light"] .beaf-watermark-notice.is-trial .beaf-watermark-notice-icon,
+[data-theme="light"] .beaf-watermark-notice.is-trial .beaf-watermark-notice-icon {
+  color: #3b82f6;
+}
+
+body[data-framer-theme="light"] .beaf-watermark-notice.is-trial .beaf-watermark-notice-title,
+[data-theme="light"] .beaf-watermark-notice.is-trial .beaf-watermark-notice-title {
+  color: #0f172a;
+}
+
+body[data-framer-theme="light"] .beaf-watermark-notice.is-trial .beaf-watermark-notice-desc,
+[data-theme="light"] .beaf-watermark-notice.is-trial .beaf-watermark-notice-desc {
+  color: #475569;
+}

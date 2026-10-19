@@ -32,13 +32,18 @@ const IS_LOCKED = false;
 const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
+// Bookmarks never show the trial watermark or the lock (product owner,
+// 2026-10-18): they are too small to carry either. The lines stay because the
+// generator asserts them in every file, and the patcher skips this one.
+void IS_LOCKED;
+void IS_TRIAL;
 
 // @memberframe-appearance-start
 // ============================================================================
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// MemberPricing, MeteredPaywall, ProtectedDownload,
 // BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
@@ -737,14 +742,6 @@ const cssContent = `
   font-size: calc(13px * var(--mf-text-scale, 1));
 }
 .mf-tray-more { margin: 0; color: var(--mf-c-muted); font-size: calc(12px * var(--mf-text-scale, 1)); text-align: center; }
-.mf-tray-watermark {
-  position: absolute; right: -4px; bottom: -14px; padding: 1px 6px; border-radius: 999px;
-  font-size: calc(9px * var(--mf-text-scale, 1)); color: var(--mf-c-on-accent); background: rgba(15, 17, 23, 0.82); text-decoration: none;
-}
-.mf-tray-prolock {
-  position: absolute; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
-  border-radius: 999px; background: rgba(15, 17, 23, 0.78); color: var(--mf-c-on-accent); font-size: calc(10px * var(--mf-text-scale, 1));
-}
 `;
 
 // ============================================================================
@@ -1171,12 +1168,6 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
             document.body
           )
         : drawer}
-      {IS_LOCKED ? <div className="mf-tray-prolock">Locked</div> : null}
-      {IS_TRIAL && !IS_LOCKED ? (
-        <a className="mf-tray-watermark" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
-          Trial
-        </a>
-      ) : null}
     </div>
   );
 }

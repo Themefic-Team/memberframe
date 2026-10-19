@@ -41,6 +41,16 @@ const source = readFileSync(COMPONENT_PATH, "utf-8");
 /** The source with comments removed, for assertions about absence. */
 const code = source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 
+/**
+ * The component without its F19 license block. That block reads the license
+ * with one GET and is held on its own by canvasLicenseParity.test.ts; every
+ * auth request is outside it.
+ */
+const authCode = source
+  .replace(/\/\/ @memberframe-license-start[\s\S]*?\/\/ @memberframe-license-end/, "")
+  .replace(/\/\*[\s\S]*?\*\//g, " ")
+  .replace(/\/\/[^\n]*/g, " ");
+
 const config = (overrides: Partial<MemberAuthConfig> = {}): MemberAuthConfig => ({
   ...DEFAULT_MEMBER_AUTH_CONFIG,
   ...overrides,
@@ -203,8 +213,9 @@ describe("the email code flow", () => {
     // Two for the code flow, send and verify, and one shared by all four FP-02
     // password endpoints. A fourth appearing means a flow grew its own request
     // and its own error handling, which is where the one that forgets to clear
-    // the password comes from.
-    expect(code.match(/fetch\(/g)).toHaveLength(3);
+    // the password comes from. The license block's GET is not an auth
+    // request, and canvasLicenseParity.test.ts holds it on its own (F19).
+    expect(authCode.match(/fetch\(/g)).toHaveLength(3);
   });
 });
 
@@ -395,7 +406,7 @@ describe("the property controls", () => {
     const controlBlock = source.slice(source.indexOf("addPropertyControls(MemberAuth"));
 
     expect(controlBlock).toContain(
-      'hidden: (props) => CONFIG.screen !== "all" || !props.enablePasswordAuth'
+      'hidden: (props) => (CONFIG.screen !== "all" && CONFIG.screen !== "login") || !props.enablePasswordAuth'
     );
     expect(controlBlock).toContain(
       'CONFIG.screen === "all" ? !props.enablePasswordAuth : CONFIG.screen !== "register" && CONFIG.screen !== "reset"'
@@ -648,7 +659,7 @@ describe("FP-02: the plaintext password does not outlive its submit", () => {
   });
 
   it("posts every credential, never gets", () => {
-    const fetchCalls = code.match(/fetch\([^)]*\)[\s\S]{0,400}?\}\)/g) ?? [];
+    const fetchCalls = authCode.match(/fetch\([^)]*\)[\s\S]{0,400}?\}\)/g) ?? [];
     expect(fetchCalls.length).toBeGreaterThan(0);
 
     for (const call of fetchCalls) {

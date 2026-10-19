@@ -12,6 +12,10 @@ export interface PluginShellProps {
   onToggleCollapse: () => void;
   /** Opens the account view (Connect) from the Account icon. */
   onOpenAccount: () => void;
+  /** Above the tab bar: the BEAF trial countdown (F19). Renders nothing when empty. */
+  topBanner?: React.ReactNode;
+  /** No content padding: the billing screens carry their own (BEAF layout). */
+  flush?: boolean;
   children: React.ReactNode;
 }
 
@@ -38,9 +42,12 @@ export const PluginShell: React.FC<PluginShellProps> = ({
   collapsed,
   onToggleCollapse,
   onOpenAccount,
+  topBanner,
+  flush = false,
   children,
 }) => (
   <div className={cn("framefic-shell", collapsed && "is-collapsed")}>
+    {collapsed ? null : topBanner}
     <TabBar
       activeTab={activeTab}
       onSelectTab={onSelectTab}
@@ -54,12 +61,12 @@ export const PluginShell: React.FC<PluginShellProps> = ({
         <div className="framefic-content-area">
           {activeTab === ACCOUNT_VIEW ? (
             // Not a tab, so not a tabpanel: the account view is a named region.
-            <div className="tab-panel" role="region" id="panel-account" aria-label="Account">
+            <div className={cn("tab-panel", flush && "is-flush")} role="region" id="panel-account" aria-label="Account">
               {children}
             </div>
           ) : (
             <div
-              className="tab-panel"
+              className={cn("tab-panel", flush && "is-flush")}
               role="tabpanel"
               id={`panel-${activeTab}`}
               aria-labelledby={`tab-${activeTab}`}

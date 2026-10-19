@@ -40,13 +40,18 @@ const IS_LOCKED = false;
 const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
+// Bookmarks never show the trial watermark or the lock (product owner,
+// 2026-10-18): they are too small to carry either. The lines stay because the
+// generator asserts them in every file, and the patcher skips this one.
+void IS_LOCKED;
+void IS_TRIAL;
 
 // @memberframe-appearance-start
 // ============================================================================
 // APPEARANCE, SHARED BY EVERY MEMBERFRAME CANVAS COMPONENT
 // ============================================================================
 // Byte-identical in every canvas component: MemberAuth, MemberDashboard,
-// MemberPricing, OnboardingModal, MeteredPaywall, ProtectedDownload,
+// MemberPricing, MeteredPaywall, ProtectedDownload,
 // BookmarkButton, and BookmarksTray. Held so by
 // `test/canvasAppearanceParity.test.ts`, which also compiles this block and
 // runs it. A canvas component is compiled by Framer alone and cannot import
@@ -885,15 +890,6 @@ const cssContent = `
 .mf-bookmark-pop button.is-primary { background: var(--mf-c-accent); border-color: var(--mf-c-accent); color: var(--mf-c-on-accent); }
 .mf-bookmark-pop button:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
 .mf-bookmark-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.mf-bookmark-prolock {
-  position: absolute; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
-  border-radius: var(--mf-c-radius); background: rgba(15, 17, 23, 0.78); color: var(--mf-c-on-accent);
-  font-size: calc(10px * var(--mf-text-scale, 1));
-}
-.mf-bookmark-watermark {
-  position: absolute; right: -4px; bottom: -14px; padding: 1px 6px; border-radius: 999px;
-  font-size: calc(9px * var(--mf-text-scale, 1)); color: var(--mf-c-on-accent); background: rgba(15, 17, 23, 0.82); text-decoration: none;
-}
 `;
 
 // ============================================================================
@@ -1095,12 +1091,6 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
         <div className="mf-bookmark-pop is-error" role="alert">
           <p>{t("failed")}</p>
         </div>
-      ) : null}
-      {IS_LOCKED ? <div className="mf-bookmark-prolock">Locked</div> : null}
-      {IS_TRIAL && !IS_LOCKED ? (
-        <a className="mf-bookmark-watermark" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
-          Trial
-        </a>
       ) : null}
     </div>
   );

@@ -13,7 +13,7 @@ import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
 
 const DIR = path.join(process.cwd(), "src", "canvas-components");
-const FILES = ["MemberPricing", "MemberDashboard", "OnboardingModal", "ProtectedDownload"] as const;
+const FILES = ["MemberPricing", "MemberDashboard", "ProtectedDownload"] as const;
 const sources = Object.fromEntries(FILES.map((name) => [name, readFileSync(path.join(DIR, `${name}.tsx`), "utf-8")])) as Record<
   (typeof FILES)[number],
   string
@@ -82,11 +82,9 @@ describe("each component on the canvas", () => {
     expect(sources.MemberPricing).toContain('onCanvas ? { phase: "ready", pricing: PREVIEW_PRICING }');
   });
 
-  it("Onboarding and the Dashboard show the site's own questions", () => {
-    for (const name of ["OnboardingModal", "MemberDashboard"] as const) {
-      expect(sources[name]).toMatch(/data\["profileFields"\]/);
-      expect(sources[name]).toContain("fields.length === 0) return;");
-    }
+  it("the Dashboard shows the site's own questions", () => {
+    expect(sources.MemberDashboard).toMatch(/data\["profileFields"\]/);
+    expect(sources.MemberDashboard).toContain("fields.length === 0) return;");
   });
 
   it("the Dashboard puts the preview member on the site's top tier", () => {

@@ -146,10 +146,20 @@ describe("links between the screens", () => {
 
 describe("what a dedicated screen fixes in place", () => {
   it("starts each screen on its own view", () => {
-    expect(source).toContain('if (screen === "login") return "password_signin";');
+    // Member Login starts on its Default Method, password unless the creator chose the code.
+    expect(source).toContain('if (screen === "login") return !enablePasswordAuth || defaultAuthMethod === "otp" ? "otp" : "password_signin";');
     expect(source).toContain('if (screen === "register") return "password_signup";');
     expect(source).toContain('if (screen === "otp") return "otp";');
     expect(source).toContain('if (screen === "reset") return readResetToken() !== null ? "reset" : "forgot";');
+  });
+
+  it("lets Member Login sign in with a code in the same card", () => {
+    // Password Auth and Default Method apply to Member Login as to Member Auth.
+    expect(source).toContain('const passwordless = screen === "all" || screen === "login";');
+    expect(source).toContain('const enablePasswordAuth = passwordless ? passwordControl : screen !== "otp";');
+    // With no Code Sign In Page set, the code link switches the form in place.
+    expect(source).toContain('flowLink(t("codeLink"), "otp", otpPath, undefined, screen === "login")');
+    expect(source).toContain('flowLink(t("passwordLink"), "password_signin", "", undefined, true)');
   });
 
   it("shows no provider buttons on the reset and code screens", () => {

@@ -1,0 +1,113 @@
+/**
+ * Framefic billing UI: the BEAF plugin's inline styles, as classes. BEAF writes
+ * these as style={{...}} on the elements (SubscriptionPage.jsx, PaymentModal.jsx,
+ * CheckoutForm.jsx, ProfilePage.jsx); MemberFrame's lint allows no inline
+ * styles, so the same values live here under the names below. Company
+ * standard (2026-10-18): this folder follows BEAF, and the design lint skips it.
+ */
+
+/* ── Text links drawn as <button> ──
+   framer-plugin/framer.css gives every button display: flex, height 30px,
+   and overflow: hidden. That turned "Already have an account? Sign in" into
+   a block pinned to the left edge. BEAF means these as inline text links. */
+.beaf-auth-link-btn,
+.beaf-auth-footer button {
+  display: inline;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+.beaf-trial-status-logout-link,
+.beaf-cancel-text-link,
+.beaf-coupon-toggle {
+  width: auto;
+  height: auto;
+  overflow: visible;
+}
+.beaf-trial-status-logout-link,
+.beaf-cancel-text-link {
+  align-self: center;
+}
+
+/* ── ProfilePage: the TRIAL badge's black text ── */
+.beaf-avatar-badge--trial span { color: black; }
+.beaf-avatar-segmented-ring { overflow: visible; }
+
+/* ── Profile: this project's site and domains (MemberFrame addition, BEAF field style) ── */
+.beaf-profile-project { margin-top: 20px; }
+.beaf-profile-domain-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.beaf-profile-domain-list li { color: var(--beaf-text-muted); font-size: 12px; font-family: "Inter", sans-serif; word-break: break-all; }
+.beaf-profile-hint { margin: 0; color: var(--beaf-text-muted); font-size: 11px; font-family: "Inter", sans-serif; line-height: 1.45; }
+.beaf-profile-error { margin: 0; color: #ff6b6b; font-size: 12px; font-family: "Inter", sans-serif; }
+.beaf-profile-input-wrapper input:not([readonly]) { color: var(--beaf-heading); }
+.beaf-profile-logout-wrap { margin-top: 16px; }
+
+/* ── SubscriptionPage ── */
+.beaf-billing-error { color: #d32f2f; font-size: 12px; margin-bottom: 12px; padding: 8px; background-color: #ffebee; border-radius: 4px; }
+.beaf-subscription-actions--column { display: flex; flex-direction: column; gap: 10px; }
+.beaf-subscription-content { display: flex; flex-direction: column; gap: 12px; }
+
+/* Confirm Plan Change */
+.beaf-confirm-box { padding: 20px; }
+.beaf-confirm-title { color: var(--beaf-heading); font-size: 16px; margin: 0 0 8px; font-family: Inter, sans-serif; }
+.beaf-confirm-text { color: var(--beaf-text-muted); font-size: 13px; line-height: 1.5; font-family: Inter, sans-serif; margin: 0; }
+.beaf-confirm-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding: 12px; border-radius: 10px; border: 1px solid var(--beaf-surface-border); background: var(--beaf-page-bg2); }
+.beaf-confirm-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-family: Inter, sans-serif; color: var(--beaf-text-muted); }
+.beaf-confirm-row strong { color: var(--beaf-heading); font-weight: 600; }
+.beaf-confirm-actions { display: flex; gap: 8px; margin-top: 20px; }
+.beaf-confirm-cancel { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid var(--beaf-surface-border); cursor: pointer; background: transparent; color: var(--beaf-text-muted); font-weight: 600; font-size: 13px; font-family: Inter, sans-serif; }
+.beaf-confirm-pay { flex: 1; padding: 10px; border-radius: 6px; border: none; cursor: pointer; background: #5271FF; color: #FFF; font-weight: 600; font-size: 13px; font-family: Inter, sans-serif; }
+.beaf-confirm-pay:disabled { cursor: not-allowed; opacity: 0.7; }
+
+/* Cancel wizard */
+.beaf-cancel-box { padding: 20px; max-width: 320px; }
+.beaf-cancel-step-content { display: flex; flex-direction: column; gap: 16px; }
+.beaf-cancel-step-content--center { align-items: center; text-align: center; }
+.beaf-cancel-step-content h3 { margin: 0; color: var(--beaf-heading); font-size: 18px; font-weight: 600; font-family: Inter, sans-serif; }
+.beaf-cancel-intro { margin: 0; color: var(--beaf-text-muted); font-size: 13px; line-height: 1.4; font-family: Inter, sans-serif; }
+.beaf-cancel-options { display: flex; flex-direction: column; gap: 12px; margin: 8px 0; }
+.beaf-cancel-option-label { display: flex; align-items: center; gap: 10px; color: var(--beaf-heading); font-size: 13px; font-family: Inter, sans-serif; cursor: pointer; }
+.beaf-cancel-radio-input { display: none; }
+.beaf-cancel-radio-custom { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--beaf-surface-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background-color: transparent; transition: all 0.15s ease; box-sizing: border-box; }
+.beaf-cancel-radio-custom.checked { border: 2px solid #5271FF; }
+.beaf-cancel-radio-dot { width: 8px; height: 8px; border-radius: 50%; background-color: #5271FF; }
+.beaf-cancel-actions-row { display: flex; flex-direction: column; gap: 4px; }
+.beaf-cancel-actions-row--spaced { gap: 12px; margin-top: 8px; width: 100%; }
+.beaf-cancel-text-link { background: transparent; border: none; color: var(--beaf-text-muted); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px 0; }
+.beaf-cancel-warnings { display: flex; flex-direction: column; gap: 12px; margin: 8px 0; }
+.beaf-cancel-warning-item { display: flex; align-items: center; gap: 10px; color: var(--beaf-heading); font-size: 13px; font-family: Inter, sans-serif; }
+.beaf-cancel-warning-icon { color: #EF4444; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.beaf-cancel-status-icon-wrapper { width: 48px; height: 48px; border-radius: 50%; background-color: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; color: #EF4444; margin-bottom: 8px; }
+.beaf-cancel-resubscribe-text { color: var(--beaf-text-muted); font-size: 11px; font-family: Inter, sans-serif; }
+.beaf-primary-cta--tall { height: 38px; }
+.beaf-primary-cta:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── PaymentModal ── */
+.beaf-payment-muted { color: var(--framer-color-text-secondary, #888); font-size: 13px; line-height: 1.5; }
+.beaf-payment-muted--small { font-size: 12px; margin-top: 8px; }
+.beaf-payment-unavailable-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.beaf-payment-support { font-size: 12px; color: #5271FF; text-decoration: none; display: inline-flex; align-items: center; margin-right: auto; font-weight: 500; }
+.beaf-payment-box--center { text-align: center; padding: 28px 16px; }
+.beaf-payment-box--center h3 { margin-bottom: 8px; }
+.beaf-payment-center-actions { margin-top: 16px; display: flex; justify-content: center; }
+.beaf-payment-modal .beaf-payment-cancel--solo { flex: 0 0 auto; min-width: 90px; }
+
+/* ── CheckoutForm ── */
+.beaf-coupon-input-row--spaced { display: flex; gap: 8px; margin: 8px 0; }
+.beaf-coupon-input--large { flex: 1; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--beaf-surface-border); background: var(--beaf-surface-3); color: var(--beaf-heading); font-size: 13px; }
+.beaf-coupon-apply { padding: 0 16px; border-radius: 4px; border: none; background: var(--beaf-color-1); color: #fff; font-size: 13px; width: 100px; font-weight: 600; cursor: pointer; }
+.beaf-coupon-apply:disabled { cursor: not-allowed; opacity: 0.7; }
+.beaf-coupon-error { color: #F97066; font-size: 12px; margin-top: 6px; }
+.beaf-coupon-success-badge { color: #4ade80; font-size: 12px; margin: 8px 0 12px; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.beaf-link-auth { margin-bottom: 16px; }
+.beaf-processing-banner { background: #0284C7; border: 1px solid #0369A1; border-radius: 6px; display: flex; gap: 12px; align-items: center; width: 100%; padding: 8px 12px; margin-top: 10px; box-sizing: border-box; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); color: #ffffff; }
+.beaf-processing-banner p { margin: 0; color: #ffffff; font-size: 13px; font-weight: 500; line-height: 1.3; }
+.beaf-payment-modal .beaf-payment-button button:disabled { opacity: 0.6; pointer-events: none; }
+
+/* ── The sticky trial banner's crown ── */
+.beaf-trial-sticky-upgrade-btn .beaf-crown { margin-right: 4px; }
+
+/* ── Signed-out profile ── */
+.beaf-profile-auth-section { margin-top: 8px; }

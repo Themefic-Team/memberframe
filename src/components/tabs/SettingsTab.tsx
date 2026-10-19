@@ -18,6 +18,7 @@ import {
 } from "../settings/integrationRegistry";
 import type { ThemePreference } from "../../hooks/useFramerTheme";
 import { failureMessage } from "../../services/apiClient";
+import { SMTP_INTEGRATION_ID } from "../../utils/smtpSettings";
 import { isSafeSitePath, saveSiteSettings } from "../../services/siteSettingsService";
 import { useConnection } from "../../hooks/useConnection";
 import { useSiteTiers } from "../../hooks/useSiteTiers";
@@ -178,6 +179,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingIntegration, setSavingIntegration] = useState<IntegrationId | null>(null);
+  const [savingSmtp, setSavingSmtp] = useState(false);
   const showToast = useToast();
 
   /**
@@ -276,6 +278,35 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       setFailure(failureMessage(result));
       showToast({ tone: "error", message: "Could not save integration" });
+    },
+    [applySettings, settingsVersion, showToast, siteId]
+  );
+
+  /**
+   * Save the site's own SMTP (25-custom-smtp.md). The whole entry, on or off;
+   * a password left out keeps the one the server holds. Resolves true on
+   * success, so the card can close.
+   */
+  const handleSaveSmtp = useCallback(
+    async (enabled: boolean, values: Record<string, string>): Promise<boolean> => {
+      if (!siteId) return false;
+
+      setSavingSmtp(true);
+      const result = await saveSiteSettings(siteId, settingsVersion, {
+        integrations: { [SMTP_INTEGRATION_ID]: { enabled, values } },
+      });
+      setSavingSmtp(false);
+
+      if (result.kind === "ok") {
+        applySettings(result.data.settings, result.data.version);
+        setFailure(null);
+        showToast({ tone: "success", message: enabled ? "Email sending saved" : "Using MemberFrame's sender" });
+        return true;
+      }
+
+      setFailure(failureMessage(result));
+      showToast({ tone: "error", message: "Could not save email sending" });
+      return false;
     },
     [applySettings, settingsVersion, showToast, siteId]
   );
@@ -406,6 +437,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             onChangeAuth={setAuth}
             failure={failure}
             saving={saving}
+            email={{
+              siteId,
+              stored: integrationState[SMTP_INTEGRATION_ID],
+              saving: savingSmtp,
+              onSave: handleSaveSmtp,
+            }}
           />
 
           {/* The Config view's one and only `.primary-cta`, per PRD section 7.3. */}

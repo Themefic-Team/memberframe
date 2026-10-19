@@ -54,6 +54,7 @@ export async function readProjectContext(): Promise<FramerProjectContext> {
     projectId: project.value.id,
     projectName: project.value.name,
     creatorName: user.status === "fulfilled" ? user.value.name : null,
+    framerUserId: user.status === "fulfilled" ? user.value.id : null,
     publishedOrigins:
       publish.status === "fulfilled" ? originsFromPublishInfo(publish.value) : [],
     unavailable: false,

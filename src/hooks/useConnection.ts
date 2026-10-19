@@ -24,8 +24,9 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiFailure } from "../services/apiClient";
+import { setCreatorToken, type ApiFailure } from "../services/apiClient";
 import {
+  attachProject,
   disconnect as disconnectRequest,
   fetchConnectSession,
   siteForProject,
@@ -62,6 +63,12 @@ export interface ConnectionValue {
     settings: SiteSettingsDocument,
     version: number
   ) => Promise<void>;
+  /**
+   * F19: finish the browser-tab sign in. Takes the hand-off's token, claims
+   * this project for the creator (starting its trial when they have none),
+   * and stores both. Resolves to a failure to show, or null.
+   */
+  signInWithToken: (token: string, creator: { email: string; name: string; avatarUrl: string | null }) => Promise<ApiFailure | null>;
   /** Called by the Settings tab after a successful save, so the panel stays current. */
   applySettings: (settings: SiteSettingsDocument, version: number) => void;
   /** Called after origins change, so the Connect tab's list is not stale. */
@@ -154,12 +161,27 @@ export function useConnectionState(): ConnectionValue {
 
       const site = siteForProject(result.data.sites, context.projectId);
 
-      // A stored connection for a different Framer project. The creator opened
-      // another project with the same plugin, and showing them the stored
-      // site's members here would be showing them the wrong site.
+      // A token that works, for a project it has no site for yet. Attach it
+      // (F19): the creator is signed in, and this project either starts their
+      // trial or reports that the trial is already used on another one.
       if (!site) {
+        const attached = await attachProject({
+          framerProjectId: context.projectId,
+          framerUserId: context.framerUserId ?? null,
+          projectName: context.projectName,
+          origins: context.publishedOrigins,
+        });
+        if (!active || id !== loadId.current) return;
+        if (attached.kind !== "ok") {
+          setFailure(attached.kind === "unauthorized" ? null : attached);
+          setState({ status: "disconnected" });
+          return;
+        }
+        const connection = toConnection(attached.data.site, attached.data.creator);
+        void saveConnectionOnly(connection);
+        setSettingsVersion(attached.data.settingsVersion);
         setFailure(null);
-        setState({ status: "disconnected" });
+        setState({ status: "connected", connection, settings: attached.data.settings });
         return;
       }
 
@@ -194,6 +216,33 @@ export function useConnectionState(): ConnectionValue {
     []
   );
 
+  const signInWithToken = useCallback(
+    async (token: string, creator: { email: string; name: string; avatarUrl: string | null }): Promise<ApiFailure | null> => {
+      const context = project ?? (await readProjectContext());
+      setCreatorToken(token);
+      const attached = await attachProject({
+        framerProjectId: context.projectId,
+        framerUserId: context.framerUserId ?? null,
+        projectName: context.projectName,
+        origins: context.publishedOrigins,
+      });
+      if (attached.kind !== "ok") {
+        setCreatorToken(null);
+        return attached;
+      }
+      const connection = {
+        ...toConnection(attached.data.site, attached.data.creator),
+        ...(creator.avatarUrl ? { creatorAvatarUrl: creator.avatarUrl } : {}),
+      };
+      await saveConnection(connection, token);
+      setSettingsVersion(attached.data.settingsVersion);
+      setFailure(null);
+      setState({ status: "connected", connection, settings: attached.data.settings });
+      return null;
+    },
+    [project]
+  );
+
   const applySettings = useCallback((settings: SiteSettingsDocument, version: number) => {
     setSettingsVersion(version);
     setState((current) =>
@@ -226,12 +275,14 @@ export function useConnectionState(): ConnectionValue {
       settingsVersion,
       failure,
       completeConnect,
+      signInWithToken,
       applySettings,
       applyConnection,
       disconnect,
       reload,
     }),
     [
+      signInWithToken,
       state,
       project,
       settingsVersion,

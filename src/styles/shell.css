@@ -42,6 +42,16 @@ button {
 }
 
 /* Stack of rows or sections inside a tab panel. */
+/* Account: the billing screens (styles/billing, BEAF layout) pad themselves. */
+.tab-panel.is-flush {
+  padding: 0;
+}
+
+/* License notices above a tab: failed payment, canceling, renewing (F19). */
+.license-banner-slot:not(:empty) {
+  margin-bottom: 12px;
+}
+
 .tab-panel-body {
   display: flex;
   flex-direction: column;

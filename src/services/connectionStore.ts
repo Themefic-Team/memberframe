@@ -164,6 +164,7 @@ function asConnection(value: unknown): SiteConnection | null {
     siteName: text("siteName") ?? "Untitled project",
     creatorEmail: text("creatorEmail") ?? "",
     creatorName: text("creatorName") ?? "",
+    ...(text("creatorAvatarUrl") ? { creatorAvatarUrl: text("creatorAvatarUrl")! } : {}),
     allowedOrigins: Array.isArray(record["allowedOrigins"])
       ? record["allowedOrigins"].filter((entry): entry is string => typeof entry === "string")
       : [],

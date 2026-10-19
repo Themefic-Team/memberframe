@@ -9,8 +9,7 @@
  *   4. The metadata patch serializes cleanly and keeps UTF-8 intact.
  *
  * Plus the editor's rules, because a definition the server would refuse
- * should be caught before the round trip, and the onboarding step plan,
- * because a conditional field placed in the wrong step can never be shown.
+ * should be caught before the round trip.
  *
  * Everything here runs against `src/utils/customFields.ts`. The two canvas
  * components carry copies, and `customFieldsParity.test.ts` proves the copies
@@ -31,9 +30,7 @@ import {
   isValidFieldKey,
   keyFromLabel,
   moveDefinition,
-  needsOnboarding,
   normalizeDefinitions,
-  planSteps,
   readDefinitions,
   removeDefinition,
   toSubmittedValue,
@@ -176,7 +173,7 @@ describe("required fields", () => {
     expect(validateProfile([terms], { terms: true }).metadata).toEqual({ terms: true });
   });
 
-  it("check only the keys of one onboarding step when asked to", () => {
+  it("check only the keys it is given when asked to", () => {
     const result = validateProfile([company, portfolio], { portfolio_url: "bad" }, ["company"]);
 
     expect(Object.keys(result.problems)).toEqual(["company"]);
@@ -403,45 +400,6 @@ describe("editing the list", () => {
 // ============================================================================
 // ONBOARDING
 // ============================================================================
-
-describe("needsOnboarding", () => {
-  it("is false when nothing is required, so optional fields never trap anyone", () => {
-    expect(needsOnboarding([field({})], {})).toBe(false);
-  });
-
-  it("is true while a visible required answer is missing", () => {
-    expect(needsOnboarding([ROLE, TEAM], {})).toBe(true);
-    expect(needsOnboarding([ROLE, TEAM], { role: "Agency" })).toBe(true);
-  });
-
-  it("is false once every visible required answer is in", () => {
-    expect(needsOnboarding([ROLE, TEAM], { role: "Freelancer" })).toBe(false);
-    expect(needsOnboarding([ROLE, TEAM], { role: "Agency", team_size: 8 })).toBe(false);
-  });
-});
-
-describe("planSteps", () => {
-  it("puts required fields first and optional fields second", () => {
-    const steps = planSteps([field({ key: "bio" }), field({ key: "company", required: true })]);
-    expect(steps).toEqual({ required: ["company"], optional: ["bio"] });
-  });
-
-  it("places a conditional field with its parent, whatever its own flag says", () => {
-    const optionalParent = field({ key: "newsletter", type: "boolean" });
-    const requiredChild = field({
-      key: "frequency",
-      type: "select",
-      options: ["Weekly"],
-      required: true,
-      showWhen: { key: "newsletter", value: "true" },
-    });
-
-    expect(planSteps([ROLE, TEAM, optionalParent, requiredChild])).toEqual({
-      required: ["role", "team_size"],
-      optional: ["newsletter", "frequency"],
-    });
-  });
-});
 
 describe("displayValue", () => {
   it("never shows a raw boolean or a null to the creator", () => {

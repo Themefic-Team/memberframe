@@ -23,6 +23,8 @@
 import type { ApiClient, ApiResult } from "./apiClient";
 import { apiClient } from "./apiClient";
 import type { SiteConnection, SiteSettingsDocument } from "../types/connection";
+import type { LicenseView } from "./licenseService";
+import { API_BASE_URL } from "../config/backend";
 
 export interface StartConnectInput {
   email: string;
@@ -134,6 +136,51 @@ export function siteForProject(
   framerProjectId: string
 ): ConnectSessionSite | null {
   return sites.find((site) => site.framerProjectId === framerProjectId) ?? null;
+}
+
+// ============================================================================
+// F19: THE ACCOUNT PAGE IN A NEW TAB, 19-pro-lock-and-trial.md 2.1
+// ============================================================================
+
+/** The hosted account page, opened in a browser tab with the panel's session id. */
+export function accountPageUrl(mode: "login" | "register", sessionId: string, theme: "light" | "dark", base: string = API_BASE_URL): string {
+  const query = new URLSearchParams({ mode, sessionId, theme });
+  return `${base.replace(/\/+$/, "")}/auth?${query.toString()}`;
+}
+
+/** A session id for one sign-in: random, and only ever sent to our own backend. */
+export function newSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 10)).join("-");
+}
+
+export type HandoffResponse =
+  | { status: "pending" }
+  | { status: "ready"; token: string; expiresAt: string; creator: { email: string; name: string; avatarUrl: string | null } };
+
+/** The poll: pending until the creator signs in on the page, then the token, once. */
+export function pollHandoff(sessionId: string, client: ApiClient = apiClient): Promise<ApiResult<HandoffResponse>> {
+  return client.get("/api/connect/handoff", { sessionId });
+}
+
+export interface AttachProjectInput {
+  framerProjectId: string;
+  framerUserId: string | null;
+  projectName: string;
+  origins: string[];
+}
+
+export interface AttachProjectResponse {
+  creator: { email: string; name: string };
+  site: VerifyConnectResponse["site"];
+  settings: SiteSettingsDocument;
+  settingsVersion: number;
+  license: LicenseView;
+}
+
+/** Claim this project for the signed-in creator, and start its trial if they have none. */
+export function attachProject(input: AttachProjectInput, client: ApiClient = apiClient): Promise<ApiResult<AttachProjectResponse>> {
+  return client.post("/api/connect/attach-project", input);
 }
 
 /** The session response, reduced to what the panel stores. */

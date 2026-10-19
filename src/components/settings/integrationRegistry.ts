@@ -43,7 +43,9 @@ export type IntegrationId =
   | "google_oauth"
   | "github_oauth"
   | "apple_oauth"
-  | "discord_oauth";
+  | "discord_oauth"
+  // Not in the catalogue: its card is Settings, Config, Email sending (25-custom-smtp.md).
+  | "custom_smtp";
 
 /**
  * The three groups the catalogue is shown in.
