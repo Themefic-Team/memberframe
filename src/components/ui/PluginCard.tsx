@@ -10,7 +10,7 @@ export interface PluginCardProps {
 }
 
 /**
- * Foundations Content: Plugin card ("More from Pixelfic").
+ * Foundations Content: Plugin card ("More from Framefic").
  *
  * Sibling Pixelfic plugins only, listed below Help. bg/raised, radius 14,
  * hairline, Shadow/Card; hover is border/brand plus a lifted shadow. The

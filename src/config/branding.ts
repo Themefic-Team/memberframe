@@ -9,7 +9,7 @@
  */
 export const BRANDING = {
   pluginName: "MemberFrame",
-  companyName: "Pixelfic",
+  companyName: "Framefic",
   /** The footer handle, as the Figma Plugin footer writes it. */
   companyHandle: "@Framefic",
   companyUrl: "https://framefic.com",
@@ -26,22 +26,42 @@ export const HELP_LINKS = {
   changelog: BRANDING.changelogUrl,
 } as const;
 
-export type SiblingPluginId = "crestbar" | "beaf" | "formfic";
+export type SiblingPluginId = "beaf" | "connectfic" | "crestbar";
 
 /**
- * "More from Pixelfic": sibling plugins only, per the Foundations Content doc.
- * Names and descriptions are the ones in the Figma Home tab. UNCONFIRMED: each
- * href is the company site until the real listing URLs are known, task 8.8.
+ * "More from Framefic": sibling plugins only, per the Foundations Content doc.
+ * Names, descriptions, logos, and Marketplace links are BEAF's own "More from
+ * Framefic" section, so every Framefic plugin lists its siblings the same way.
+ * Each logo is a file in `public/`, copied from BEAF.
  */
 export const SIBLING_PLUGINS: ReadonlyArray<{
   id: SiblingPluginId;
   name: string;
   description: string;
+  logo: string;
   href: string;
 }> = [
-  { id: "crestbar", name: "Crestbar", description: "Marketing & design widgets", href: BRANDING.companyUrl },
-  { id: "beaf", name: "BEAF", description: "Advanced before & after image slider", href: BRANDING.companyUrl },
-  { id: "formfic", name: "Formfic", description: "Send form submissions to connected tools", href: BRANDING.companyUrl },
+  {
+    id: "beaf",
+    name: "Before After Images Slider",
+    description: "Advanced image slider fully customizable and responsive",
+    logo: "/Beaf.png",
+    href: "https://www.framer.com/marketplace/plugins/beaf/",
+  },
+  {
+    id: "connectfic",
+    name: "Connectfic",
+    description: "Connect your framer site with shopify store and components",
+    logo: "/Connectfic.png",
+    href: "https://www.framer.com/marketplace/plugins/connectfic/",
+  },
+  {
+    id: "crestbar",
+    name: "Announcement Bar",
+    description: "Create bars and countdown timers to boost engagement and conversions.",
+    logo: "/Crestbar.png",
+    href: "https://www.framer.com/community/marketplace/plugins/announcement-bar/",
+  },
 ];
 
 /** Mirrors `version` in framer.json. Keep the two in step at packaging time. */

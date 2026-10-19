@@ -210,6 +210,18 @@ Three rules shape which pages are derived:
 | Duplicate paths collapse | `signupPath` defaults to `loginPath`, the recommended one-page setup. Creating it twice would fail |
 | Only the dashboard is gated | The reset page is opened from an email by someone who cannot sign in. Gating it makes recovery impossible |
 
+Each page gets the screen it is named for:
+
+| Page | Component |
+| :--- | :--- |
+| Sign in / Login | `MemberLogin`, or the combined `MemberAuth` when sign up shares the login path, so a visitor can still register |
+| Sign up / Registration | `MemberRegister` |
+| Reset password / OTP | `MemberPasswordReset`: asks for the email with no token in the URL, sets the new password when the emailed link brings one |
+| Member dashboard | `MemberDashboard` |
+| Member pricing | `MemberPricing` |
+
+Before this, the login and reset pages both got the combined `MemberAuth`, so all three auth pages opened on the same sign in form.
+
 ---
 
 ## 5. `<MemberDashboard>`

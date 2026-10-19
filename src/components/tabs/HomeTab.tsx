@@ -7,11 +7,8 @@ import {
   List,
   Lock,
   Mail,
-  PanelsTopLeft,
   Plus,
-  Send,
   ShieldCheck,
-  SquareSplitHorizontal,
 } from "lucide-react";
 import {
   Banner,
@@ -22,7 +19,7 @@ import {
   PluginCard,
   PluginCardList,
 } from "../ui";
-import { BRANDING, HELP_LINKS, SIBLING_PLUGINS, type SiblingPluginId } from "../../config/branding";
+import { BRANDING, HELP_LINKS, SIBLING_PLUGINS } from "../../config/branding";
 import { useConnection } from "../../hooks/useConnection";
 
 export interface HomeTabProps {
@@ -38,12 +35,6 @@ interface QuickStep {
   icon: React.ReactNode;
   onClick: () => void;
 }
-
-const SIBLING_LOGOS: Record<SiblingPluginId, React.ReactNode> = {
-  crestbar: <PanelsTopLeft />,
-  beaf: <SquareSplitHorizontal />,
-  formfic: <Send />,
-};
 
 /**
  * The Home tab. PRD task 2.7, layout in section 7.3.
@@ -78,7 +69,7 @@ const SIBLING_LOGOS: Record<SiblingPluginId, React.ReactNode> = {
  *
  * ## Foundations layout
  *
- * Hero card, Quick start, Help, More from Pixelfic, in that order, per the
+ * Hero card, Quick start, Help, More from Framefic, in that order, per the
  * Pixelfic shell Home tab and `.agents/rules/design-system.md` section 7.
  * The routes used to sit in Help tiles, which the Content doc reserves for
  * Guide, Contact us, and Changelog links out. They are step rows now, and
@@ -179,7 +170,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               key={plugin.id}
               name={plugin.name}
               description={plugin.description}
-              logo={SIBLING_LOGOS[plugin.id]}
+              logo={<img src={plugin.logo} alt="" className="framefic-card-logo-img" />}
               href={plugin.href}
             />
           ))}

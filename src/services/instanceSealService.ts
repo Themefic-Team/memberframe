@@ -15,8 +15,15 @@ import { apiClient, type ApiClient, type ApiResult } from "./apiClient";
 
 /** Project plugin data: `{ [seal]: nodeId }`. */
 export const SEAL_REGISTRY_KEY = "memberframe.seals";
-/** Set once every instance from before seals existed has been given one. */
-export const SEALS_MIGRATED_KEY = "memberframe.sealsMigrated";
+/**
+ * Set once every instance without a working seal has been given one. v2 also
+ * re-seals instances the first version locked by mistake: components whose
+ * seal belonged to the project's previous site (after signing in again) were
+ * read as pasted from another project. v3 repairs again: v2 counted a pass
+ * as done when the server could not be reached, then locked what it had
+ * failed to seal.
+ */
+export const SEALS_MIGRATED_KEY = "memberframe.sealsMigrated.v3";
 /** The hidden property control that carries the seal. */
 export const SEAL_CONTROL = "mfSeal";
 /** What every licensed component file contains, whatever it is called. */
@@ -77,7 +84,11 @@ export interface SealPlan {
  * - A seal with no record: asked about (`unknown`), then `resolveUnknown`.
  * - No seal after migration: not from the Builder, `clear` (sets "" so the
  *   component asks the server and locks).
- * - Its code file is another site's: `clear`, whatever the seal.
+ * - Its code file is another site's: `seal`, a fresh seal for this site. The
+ *   plugin has already pointed the file at this site (configPatcher), so the
+ *   component now runs on this site's own license, as an insert would.
+ * - Not migrated yet: a cleared seal ("") is sealed again too, which undoes
+ *   the first version's mistaken locks once.
  */
 export function planSeals(instances: ReadonlyArray<SealedInstance>, registry: SealRegistry, migrated: boolean): SealPlan {
   const actions: SealAction[] = [];
@@ -86,10 +97,10 @@ export function planSeals(instances: ReadonlyArray<SealedInstance>, registry: Se
 
   for (const instance of instances) {
     if (!instance.ownSite) {
-      if (instance.seal !== "") actions.push({ kind: "clear", nodeId: instance.nodeId });
+      actions.push({ kind: "seal", nodeId: instance.nodeId });
       continue;
     }
-    if (instance.seal === undefined) {
+    if (instance.seal === undefined || (instance.seal === "" && !migrated)) {
       actions.push(migrated ? { kind: "clear", nodeId: instance.nodeId } : { kind: "seal", nodeId: instance.nodeId });
       continue;
     }
@@ -113,7 +124,12 @@ export function planSeals(instances: ReadonlyArray<SealedInstance>, registry: Se
   return { actions, unknown: [...unknown] };
 }
 
-/** After the server answers: a valid unknown seal is adopted by its first holder, an invalid one cleared everywhere. */
+/**
+ * After the server answers. A valid unknown seal is adopted by its first
+ * holder. An invalid one was issued for another site (this project's previous
+ * one, or the project it was pasted from): its first holder gets a fresh seal
+ * for this site. Either way, any further holder is a copy and is cleared.
+ */
 export function resolveUnknown(instances: ReadonlyArray<SealedInstance>, unknown: ReadonlyArray<string>, valid: ReadonlyArray<string>): SealAction[] {
   const actions: SealAction[] = [];
   for (const seal of unknown) {
@@ -123,7 +139,8 @@ export function resolveUnknown(instances: ReadonlyArray<SealedInstance>, unknown
       actions.push({ kind: "adopt", nodeId: nodes[0]!, seal });
       for (const node of nodes.slice(1)) actions.push({ kind: "clear", nodeId: node });
     } else {
-      for (const node of nodes) actions.push({ kind: "clear", nodeId: node });
+      actions.push({ kind: "seal", nodeId: nodes[0]! });
+      for (const node of nodes.slice(1)) actions.push({ kind: "clear", nodeId: node });
     }
   }
   return actions;

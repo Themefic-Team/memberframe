@@ -28,6 +28,7 @@ import {
   type DeployContext,
   type GeneratedCanvasFile,
   type MembershipPageSpec,
+  type ScaffoldComponent,
 } from "../../services";
 
 /**
@@ -58,6 +59,17 @@ async function sealForInsert(componentId: string, siteId: string | undefined): P
   if (result.kind !== "ok") throw new Error("Could not reach MemberFrame to add this component. Check your connection and try again.");
   return result.data.seal;
 }
+
+/** The badge on each predefined page: the component that lands on it. */
+const SCAFFOLD_COMPONENT_LABELS: Record<ScaffoldComponent, string | null> = {
+  member_auth: "MemberAuth",
+  member_login: "MemberLogin",
+  member_register: "MemberRegister",
+  member_password_reset: "MemberPasswordReset",
+  member_dashboard: "MemberDashboard",
+  member_pricing: "MemberPricing",
+  none: null,
+};
 
 export const COMPONENT_LAYOUT_DEFAULTS: Record<
   string,
@@ -556,21 +568,13 @@ export const BuilderTab: React.FC = () => {
             {pages.map((page) => {
               const alreadyExists = existingPagePaths.has(normalizePagePath(page.path));
               const isSelected = selectedPageIds.has(page.id);
-              const componentLabel =
-                page.component === "member_auth"
-                  ? "MemberAuth"
-                  : page.component === "member_dashboard"
-                    ? "MemberDashboard"
-                    : page.component === "member_pricing"
-                      ? "MemberPricing"
-                      : null;
-
+              const componentLabel = SCAFFOLD_COMPONENT_LABELS[page.component];
               const componentTone =
-                page.component === "member_auth"
-                  ? "brand"
-                  : page.component === "member_dashboard"
-                    ? "pro"
-                    : "new";
+                page.component === "member_dashboard"
+                  ? "pro"
+                  : page.component === "member_pricing"
+                    ? "new"
+                    : "brand";
 
               return (
                 <li

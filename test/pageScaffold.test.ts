@@ -144,12 +144,24 @@ describe("membershipPages", () => {
     expect(gated).toEqual(["dashboard"]);
   });
 
-  it("puts the auth component on the auth pages and the dashboard on the dashboard", () => {
+  it("puts the screen each page is named for on it", () => {
+    const byId = new Map(
+      membershipPages(AUTH, { includeRegistration: true }).map((page) => [page.id, page.component])
+    );
+
+    expect(byId.get("login")).toBe("member_login");
+    expect(byId.get("signup")).toBe("member_register");
+    expect(byId.get("reset")).toBe("member_password_reset");
+    expect(byId.get("dashboard")).toBe("member_dashboard");
+  });
+
+  it("keeps the combined component on a login page that also signs up", () => {
+    // The one-page setup: sign up shares the login path, so a login-only
+    // screen there would leave a visitor nowhere to register.
     const byId = new Map(membershipPages(AUTH).map((page) => [page.id, page.component]));
 
     expect(byId.get("login")).toBe("member_auth");
-    expect(byId.get("reset")).toBe("member_auth");
-    expect(byId.get("dashboard")).toBe("member_dashboard");
+    expect(byId.get("reset")).toBe("member_password_reset");
   });
 });
 

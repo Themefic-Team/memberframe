@@ -41,7 +41,11 @@ Technical development specification for two rules from the product owner (2026-1
 - Breakpoint replicas (the Tablet and Phone versions of a layer, `originalId` set) are the same layer, not copies, and are skipped.
 - A seal the plugin has no record of is checked against this project's site:
   - **This project's site:** recorded, for example after the plugin data was cleared.
-  - **Another site** (a cross-project paste): cleared, so it locks.
+  - **Another site:** re-sealed for this site, not locked (changed 2026-10-19).
+    - **Why:** the first version locked these. That was wrong after the creator signed in again and the project got a new site: their own components were reported as "pasted" and blurred.
+    - **Why it is safe:** the component file is pointed at this site first (`utils/configPatcher.ts`), so it runs on this site's own license, exactly as a fresh insert would.
+    - **What still locks:** a second component holding the same seal as another, and an instance that never had a seal.
+  - **Repair:** the migration key is now `memberframe.sealsMigrated.v2`, so the first run re-seals instances the old rule cleared.
 
 ### 2.4. Instances from before this feature
 

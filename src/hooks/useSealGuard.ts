@@ -78,7 +78,19 @@ async function guardOnce(siteId: string, siteKey: string): Promise<number> {
     if (answer.kind === "ok") actions.push(...resolveUnknown(instances, plan.unknown, answer.data.valid));
   }
 
+  // Every new seal comes from the server, first. If any request fails (the
+  // server is down, or the browser blocks it), this pass changes nothing and
+  // is not counted: an unreachable server must never lock a component. An
+  // earlier version marked the pass done anyway, and the next pass locked
+  // every component it had failed to seal.
   const sealed: Record<string, string> = {};
+  for (const action of actions) {
+    if (action.kind !== "seal" || !byId.has(action.nodeId)) continue;
+    const issued = await requestSeal(siteId);
+    if (issued.kind !== "ok") return 0;
+    sealed[action.nodeId] = issued.data.seal;
+  }
+
   let cleared = 0;
   for (const action of actions) {
     const node = byId.get(action.nodeId);
@@ -86,11 +98,8 @@ async function guardOnce(siteId: string, siteKey: string): Promise<number> {
     if (action.kind === "clear") {
       await node.setAttributes({ controls: { [SEAL_CONTROL]: "" } });
       cleared += 1;
-    } else if (action.kind === "seal") {
-      const issued = await requestSeal(siteId);
-      if (issued.kind !== "ok") continue;
-      await node.setAttributes({ controls: { [SEAL_CONTROL]: issued.data.seal } });
-      sealed[node.id] = issued.data.seal;
+    } else if (action.kind === "seal" && sealed[node.id]) {
+      await node.setAttributes({ controls: { [SEAL_CONTROL]: sealed[node.id] } });
     }
   }
 
@@ -103,6 +112,7 @@ async function guardOnce(siteId: string, siteKey: string): Promise<number> {
 /** Record the node the Builder just inserted, so it is the one that keeps its seal. */
 export async function recordSeal(seal: string, nodeId: string): Promise<void> {
   try {
+    if (!framer.isAllowedTo("setPluginData")) return;
     const registry = parseRegistry(await framer.getPluginData(SEAL_REGISTRY_KEY));
     registry[seal] = nodeId;
     await framer.setPluginData(SEAL_REGISTRY_KEY, JSON.stringify(registry));

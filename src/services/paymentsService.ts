@@ -224,6 +224,8 @@ export function paymentsFailure(result: Exclude<ApiResult<unknown>, { kind: "ok"
       return "Members still renew through this gateway. It can be removed once their plans end.";
     case "unsafe_path":
       return "Use a page path that starts with a slash, like /pricing.";
+    case "invalid_request":
+      return "The server refused one of the values. Check each field and try again.";
     default:
       return "The server did not respond. Check your connection and try again.";
   }

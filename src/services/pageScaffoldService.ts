@@ -69,7 +69,9 @@ export const SCAFFOLD_METHODS: [ProtectedMethod, ...ProtectedMethod[]] = ["creat
 /** Which authored component belongs on a scaffolded page. */
 export type ScaffoldComponent =
   | "member_auth"
+  | "member_login"
   | "member_register"
+  | "member_password_reset"
   | "member_dashboard"
   | "member_pricing"
   | "none";
@@ -165,21 +167,26 @@ export function membershipPages(
     specs.push({ ...spec, path });
   };
 
-  add({
-    id: "login",
-    path: auth.loginPath,
-    title: "Sign in / Login",
-    purpose: "Where a locked gate sends a signed-out visitor.",
-    component: "member_auth",
-    gated: false,
-  });
-
   const signupPath =
     auth.signupPath && auth.signupPath !== auth.loginPath && auth.signupPath !== "/"
       ? auth.signupPath
       : options?.includeRegistration
         ? "/signup"
         : auth.signupPath;
+
+  // Each page gets the screen it is named for. The one exception is the
+  // one-page setup, where sign up shares the login path: that page keeps the
+  // combined component, or a visitor would have nowhere to register.
+  const hasSignupPage = normalizePagePath(signupPath) !== normalizePagePath(auth.loginPath);
+
+  add({
+    id: "login",
+    path: auth.loginPath,
+    title: "Sign in / Login",
+    purpose: "Where a locked gate sends a signed-out visitor.",
+    component: hasSignupPage ? "member_login" : "member_auth",
+    gated: false,
+  });
 
   add({
     id: "signup",
@@ -195,7 +202,9 @@ export function membershipPages(
     path: auth.resetPath,
     title: "Reset password / OTP",
     purpose: "The page the emailed reset link or OTP opens.",
-    component: "member_auth",
+    // Asks for the email with no token in the URL, and sets the new password
+    // when the emailed link brings one.
+    component: "member_password_reset",
     gated: false,
   });
 

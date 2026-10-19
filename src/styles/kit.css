@@ -75,6 +75,28 @@
   background: var(--px-color-pressed);
 }
 
+/* The sibling plugin's own logo fills the 44px tile, clipped to its radius. */
+.framefic-card-logo {
+  overflow: hidden;
+}
+
+.framefic-card-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Same type as the Quick start rows above it: Body/Strong name, Body/Small description. */
+.framefic-card-name {
+  font: var(--text-body-strong);
+  letter-spacing: normal;
+}
+
+.framefic-card-desc {
+  font: var(--text-body-sm);
+}
+
 /* Focus on the link-shaped kit surfaces: 1px focus/ring + Focus/Halo. */
 .framefic-card:focus-visible,
 .help-tile:focus-visible {

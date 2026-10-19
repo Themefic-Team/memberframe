@@ -41,9 +41,14 @@ describe("planSeals", () => {
     expect(planSeals([own("n1", "")], {}, true).actions).toEqual([]);
   });
 
-  it("clears a component whose code file is another site's", () => {
+  it("re-seals a component whose code file is another site's, rather than locking it", () => {
     const plan = planSeals([{ nodeId: "n9", seal: "s1.b.y", ownSite: false }], {}, true);
-    expect(plan.actions).toEqual([{ kind: "clear", nodeId: "n9" }]);
+    expect(plan.actions).toEqual([{ kind: "seal", nodeId: "n9" }]);
+  });
+
+  it("repairs components the first version locked by mistake, once", () => {
+    expect(planSeals([own("n1", "")], {}, false).actions).toEqual([{ kind: "seal", nodeId: "n1" }]);
+    expect(planSeals([own("n1", "")], {}, true).actions).toEqual([]);
   });
 
   it("asks the server about a seal it has no record of", () => {
@@ -54,11 +59,11 @@ describe("planSeals", () => {
 describe("resolveUnknown", () => {
   const instances = [own("n1", "s1.c.z"), own("n2", "s1.c.z"), own("n3", "s1.d.w")];
 
-  it("adopts a seal this site issued, once, and clears the rest", () => {
+  it("adopts a seal this site issued, re-seals one from another site, and clears any copy", () => {
     expect(resolveUnknown(instances, ["s1.c.z", "s1.d.w"], ["s1.c.z"])).toEqual([
       { kind: "adopt", nodeId: "n1", seal: "s1.c.z" },
       { kind: "clear", nodeId: "n2" },
-      { kind: "clear", nodeId: "n3" },
+      { kind: "seal", nodeId: "n3" },
     ]);
   });
 });
@@ -86,5 +91,16 @@ describe("finding MemberFrame instances", () => {
   it("reads the site key baked into a component file", () => {
     expect(siteKeyOfFile('const CONFIG = {\n  siteKey: "sk_abc",\n};')).toBe("sk_abc");
     expect(siteKeyOfFile("no config here")).toBeNull();
+  });
+});
+
+describe("the guard", () => {
+  it("changes nothing in a pass where the server cannot issue a seal", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(join(__dirname, "..", "src", "hooks", "useSealGuard.ts"), "utf8");
+    // Seals are fetched before any write, and one failure ends the pass.
+    expect(source).toContain('if (issued.kind !== "ok") return 0;');
+    expect(source.indexOf("const issued = await requestSeal(siteId);")).toBeLessThan(source.indexOf('controls: { [SEAL_CONTROL]: "" }'));
   });
 });
