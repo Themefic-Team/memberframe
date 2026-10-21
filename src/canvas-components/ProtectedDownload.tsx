@@ -56,17 +56,20 @@ const IS_TRIAL = false;
 // Upgrade card. The server refuses an unlicensed site's member requests on its
 // own, so removing these lines unlocks nothing.
 //
-// The server is asked again every half minute and when the tab regains focus,
-// so a trial that ends while a page is open locks it. Each instance also sends
+// The server is asked once when the component mounts, and again only when the
+// tab comes back after ten minutes or more: nothing polls. On the canvas the
+// open plugin hears every license change from the server and rewrites the
+// four lines above, which remounts the component with the new state. Each
+// instance also sends
 // the seal the Builder gave it (27-instance-seal.md): a pasted copy, or one
 // that never came from the Builder, is answered "copied" and shows an insert
 // card instead. An instance from before seals sends none and is held to the
 // license alone.
 
-type MfLicense = "trial" | "active" | "locked" | "copied";
+type MfLicense = "trial" | "active" | "locked" | "copied" | "domain";
 
 const MF_LICENSE_CACHE_MS = 60000;
-const MF_LICENSE_RECHECK_MS = 30000;
+const MF_LICENSE_STALE_MS = 600000;
 
 function mfBakedLicense(): MfLicense {
   return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
@@ -77,7 +80,9 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
   const cache = (host.__mfLicense = host.__mfLicense || {});
   const base = String(apiBaseUrl).replace(/\/+$/, "");
-  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal);
+  // The baked state is part of the key: once the plugin rewrites it, the
+  // remounted component asks afresh instead of reusing the old answer.
+  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal) + "|" + mfBakedLicense();
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
@@ -98,7 +103,10 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
     })
     .then((data: { state?: unknown } | null): MfLicense | null => {
       const state = data ? data.state : null;
-      if (state === "copied" || state === "foreign") return "copied";
+      if (state === "copied") return "copied";
+      // Published at an address the site does not allow yet. Not a copy: the
+      // plugin adds the address the next time it is open in this project.
+      if (state === "foreign") return "domain";
       return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
     })
     .catch(() => null);
@@ -110,26 +118,26 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
+    let checkedAt = 0;
     const check = () => {
+      checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
         if (live && answer) setLicense(answer);
       });
     };
     check();
     if (typeof window === "undefined") return () => undefined;
-    // Instances on one page share the cached answer, so this is one request a
-    // minute per page, not one per component.
-    const timer = window.setInterval(check, MF_LICENSE_RECHECK_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+    // Instances on one page share the cached answer, so a return to the tab is
+    // at most one request per page, not one per component.
+    const onReturn = () => {
+      if (document.visibilityState === "visible" && Date.now() - checkedAt >= MF_LICENSE_STALE_MS) check();
     };
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
     return () => {
       live = false;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
     };
   }, [apiBaseUrl, siteKey, seal]);
   return license;
@@ -169,9 +177,16 @@ function MfWatermark(): React.ReactElement {
   );
 }
 
-function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
+const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
+  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
+  domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
+};
+
+function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
+  const copy = MF_LOCK_COPY[props.kind];
   return (
-    <div className="mf-lock" role="note" aria-label={props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}>
+    <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -179,12 +194,8 @@ function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
         </span>
-        <p className="mf-lock-title">{props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}</p>
-        <p className="mf-lock-text">
-          {props.copied
-            ? "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin."
-            : "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it."}
-        </p>
+        <p className="mf-lock-title">{copy.title}</p>
+        <p className="mf-lock-text">{copy.text}</p>
       </div>
     </div>
   );
@@ -196,7 +207,7 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay copied={props.license === "copied"} />}
+      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
     </>
   );
 }
@@ -423,6 +434,11 @@ function mfBox(value: unknown, max: number): [number, number, number, number] | 
  * component's own spacing alone. Top and bottom margin keep a root's own
  * centring; a side margin replaces it, and `width: auto` lets the root fill
  * the space between the two margins instead of overflowing at 100%.
+ *
+ * Margin sits inside the instance's box, so a root that fills its frame
+ * (`height: 100%`) shrinks by the top and bottom margin rather than spilling
+ * past the frame Framer shows as selected. A root sized by its content
+ * cannot resolve the percentage, and the browser treats it as `auto`.
  */
 function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
   const input = spacing || {};
@@ -433,6 +449,7 @@ function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
     const [t, r, b, l] = margin;
     if (t > 0) out.push(`margin-top: ${t}px;`);
     if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (t + b > 0) out.push(`height: calc(100% - ${t + b}px);`);
     if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
   }
 
@@ -608,6 +625,15 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
     controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
   }
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+/** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
+const MF_SCOPE_SLOT = "@mf-scope";
+
+function mfStyleScope(prefix: string, rule: string): { scope: string; css: string } {
+  let hash = 5381;
+  for (let index = 0; index < rule.length; index++) hash = ((hash << 5) + hash + rule.charCodeAt(index)) | 0;
+  const scope = prefix + (hash >>> 0).toString(36);
+  return { scope, css: rule.split(MF_SCOPE_SLOT).join(scope) };
 }
 // @memberframe-appearance-end
 
@@ -1144,7 +1170,7 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
 
   const view = shown();
   const scopedCss =
-    `[data-mf-download="${scope}"] { ` +
+    `[data-mf-download="${MF_SCOPE_SLOT}"] { ` +
     mfAppearanceVars({
       accent: accentColor,
       radius: borderRadius,
@@ -1156,6 +1182,7 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
       spacing,
     }) +
     " }";
+  const styled = mfStyleScope("mfx", scopedCss);
 
   const buttonClass = [
     "mf-download-button",
@@ -1165,10 +1192,10 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
     .join(" ");
 
   return (
-    <div className={`mf-download ${mfThemeClass(theme)}`} data-mf-download={scope}>
+    <div className={`mf-download ${mfThemeClass(theme)}`} data-mf-download={styled.scope}>
       <style>{mfThemeCss(".mf-download")}</style>
       <style>{cssContent}</style>
-      <style>{scopedCss}</style>
+      <style>{styled.css}</style>
       <button
         type="button"
         className={buttonClass}

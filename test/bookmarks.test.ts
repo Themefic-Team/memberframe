@@ -232,3 +232,117 @@ describe("the generated files", () => {
     expect(trayFile.code).toContain("maxItems: 200,");
   });
 });
+
+describe("the page a navigation-bar button saves (2026-10-20)", () => {
+  // Cut out of the shipped file, from the location listener to `itemFor`.
+  const start = button.indexOf('const LOCATION_EVENT = "memberframe:location";');
+  const end = button.indexOf("function ShapeIcon(");
+  const js = ts.transpileModule(button.slice(start, end), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None },
+  }).outputText;
+
+  function load(page: { path: string; title: string; headings?: Array<{ text: string; inNav?: boolean; hidden?: boolean }> }) {
+    const listeners = new Map<string, Array<() => void>>();
+    const window = {
+      location: { pathname: page.path, search: "" },
+      history: {
+        pushState(_state: unknown, _title: string, url: string) {
+          window.location.pathname = url;
+        },
+        replaceState() {},
+      },
+      addEventListener(name: string, fn: () => void) {
+        listeners.set(name, [...(listeners.get(name) ?? []), fn]);
+      },
+      removeEventListener() {},
+      dispatchEvent(event: { type: string }) {
+        for (const fn of listeners.get(event.type) ?? []) fn();
+        return true;
+      },
+    };
+    const document = {
+      title: page.title,
+      headings: page.headings ?? [],
+      querySelectorAll: () =>
+        document.headings.map((heading) => ({
+          textContent: heading.text,
+          closest: () => (heading.inNav ? {} : null),
+          getClientRects: () => (heading.hidden ? [] : [{}]),
+        })),
+    };
+    class FakeEvent {
+      constructor(public type: string) {}
+    }
+    // eslint-disable-next-line no-new-func
+    const api = new Function("window", "document", "Event", "History", `${js}\nreturn { mfOnLocationChange, noteTitle, itemFor, slugWords };`)(
+      window,
+      document,
+      FakeEvent,
+      Object
+    ) as {
+      mfOnLocationChange(fn: () => void): () => void;
+      noteTitle(): void;
+      itemFor(slug: string, title: string, url: string): { itemSlug: string; title: string; url: string };
+      slugWords(path: string): string;
+    };
+    return { api, window, document };
+  }
+
+  it("saves the page shown after a client-side navigation, not the first one", () => {
+    const { api, window, document } = load({ path: "/", title: "Journal - Personal Blog Framer Template" });
+    let changes = 0;
+    api.mfOnLocationChange(() => (changes += 1));
+    api.noteTitle();
+    expect(api.itemFor("", "", "")).toMatchObject({ itemSlug: "/", title: "Journal - Personal Blog Framer Template", url: "/" });
+
+    window.history.pushState(null, "", "/article/artificial-intelligence");
+    expect(changes).toBe(1);
+    document.title = "Journal - Personal Blog Framer Template";
+    api.noteTitle();
+    // The site-wide title was seen on another page, so it names nothing here.
+    expect(api.itemFor("", "", "")).toMatchObject({
+      itemSlug: "/article/artificial-intelligence",
+      title: "Artificial Intelligence",
+      url: "/article/artificial-intelligence",
+    });
+  });
+
+  it("names a page by its main heading, skipping the navigation's, then by its own title", () => {
+    const { api } = load({ path: "/article/ai", title: "Site", headings: [{ text: "Menu", inNav: true }, { text: "The Rise of AI" }] });
+    expect(api.itemFor("", "", "").title).toBe("The Rise of AI");
+    const own = load({ path: "/article/ai", title: "AI, explained" });
+    expect(own.api.itemFor("", "", "").title).toBe("AI, explained");
+  });
+
+  it("never takes the title of the page just left, when saved before Framer sets the new one", () => {
+    const { api, window } = load({ path: "/article/artificial-intelligence", title: "Artificial Intelligence: Beyond the Hype" });
+    api.mfOnLocationChange(() => undefined);
+    // Navigated, and document.title still names the article left.
+    window.history.pushState(null, "", "/article/nomadic-tech");
+    expect(api.itemFor("", "", "").title).toBe("Nomadic Tech");
+    window.history.pushState(null, "", "/");
+    expect(api.itemFor("", "", "").title).toBe("Home");
+  });
+
+  it("skips a heading hidden for another breakpoint", () => {
+    const { api } = load({ path: "/article/ai", title: "Site", headings: [{ text: "Hidden", hidden: true }, { text: "Shown heading" }] });
+    expect(api.itemFor("", "", "").title).toBe("Shown heading");
+  });
+
+  it("sends the real title once Framer sets it, and repairs a saved site-wide title", () => {
+    expect(button).toContain("watchTitle(current.itemSlug, path);");
+    expect(button).toContain("if (genericTitle(stored.title, path)) retitle(item.itemSlug, pageTitle(path).slice(0, 255));");
+  });
+
+  it("keeps the creator's Item Slug and Item Title when set", () => {
+    const { api } = load({ path: "/blog", title: "Blog" });
+    expect(api.itemFor("pricing-guide", "", "")).toMatchObject({ itemSlug: "pricing-guide", title: "Pricing Guide" });
+    expect(api.itemFor("pricing-guide", "How to Price", "/blog/pricing-guide")).toMatchObject({ title: "How to Price", url: "/blog/pricing-guide" });
+  });
+
+  it("builds the item at the click, and the tray shows each item's path", () => {
+    expect(button).toContain('const current = itemFor(String(itemSlug ?? ""), String(itemTitle ?? ""), String(itemUrl ?? ""));');
+    expect(button).toContain("[itemSlug, itemTitle, itemUrl, locationKey]");
+    expect(tray).toContain('const path = item.url.startsWith("/") ? item.url.split(/[?#]/)[0] : "";');
+  });
+});

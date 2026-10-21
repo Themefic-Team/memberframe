@@ -137,6 +137,23 @@ License resolution: licensed when the plan is `active`, `past_due` (Stripe still
 
 Environment: `PLATFORM_STRIPE_SECRET_KEY`, `PLATFORM_STRIPE_PUBLISHABLE_KEY`, `PLATFORM_STRIPE_WEBHOOK_SECRET`, `PLATFORM_PRICE_MONTHLY`, `PLATFORM_PRICE_YEARLY`, `PLATFORM_PRICE_LIFETIME`, `LIFETIME_MAX`, `TRIAL_DURATION_DAYS`, `TRIAL_DURATION_MINUTES`, `BILLING_RETURN_URL`, `TEAM_NOTIFICATION_EMAIL`.
 
+### 5.1. The License Push (2026-10-20)
+
+Nothing polls the license. The server tells the open plugin when it changes, and the plugin relocks the canvas.
+
+```
+GET /api/plugin/events?siteId=                    creator, text/event-stream
+  event: license
+  data: { license: <the /api/plugin/license view> }    on open, then on every change
+  : ping                                               every 25 seconds
+```
+
+- **Backend:** `invalidateLicense(siteId)`, which every change already calls (the trial-end job, billing, the trial start), also calls `emitLicenseChanged` (`services/license/licenseEvents.ts`). Each open stream sends the fresh license. Each stream also reads the license itself once a minute and sends it only if it changed. That catches a trial ending by date before the hourly license job, and a row edited outside the server (a script, phpMyAdmin). A stream lasts at most an hour, and a creator may hold 5.
+- **Plugin:** `services/licenseStream.ts` reads the stream with `fetch`, since `EventSource` cannot send the bearer header. `useLicense` applies each license, and `enforceLockState` rewrites the four baked lines, so every canvas instance remounts locked or unlocked within seconds. Reconnects back off: 2, 5, 15, 60 seconds, then 5 minutes. A stream that ends within 30 seconds counts as a failure, so a proxy that will not hold it never causes a reconnect loop.
+- **Canvas components:** ask `/api/license` once on mount, and again only when the tab comes back after ten minutes or more. The old 30 second recheck is gone. The baked state is part of the per-page cache key, so a rewritten component asks afresh.
+- **Published site:** one license request per page load. The member API refuses an unlicensed site on its own (`requireActiveLicense`).
+- **Deployment:** the proxy in front of the backend must not buffer `text/event-stream`. The route sends `X-Accel-Buffering: no` for nginx. The emitter is in memory, which suits the single process in the Dockerfile; more than one process would need a shared channel such as Redis pub/sub.
+
 ---
 
 ## 6. Verification and Testing Checklist

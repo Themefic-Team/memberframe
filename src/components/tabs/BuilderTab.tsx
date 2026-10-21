@@ -20,6 +20,11 @@ import {
   generateBookmarkButtonCode,
   generateBookmarksTrayCode,
   SCAFFOLD_COMPONENT_SPACING,
+  SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER,
+  applyPageChrome,
+  heightWithMargin,
+  findPageChrome,
+  type PageChrome,
   findPageContentParent,
   membershipPages,
   normalizePagePath,
@@ -60,6 +65,9 @@ async function sealForInsert(componentId: string, siteId: string | undefined): P
   return result.data.seal;
 }
 
+/** How often the predefined page list is read again, as a fallback to Framer's own change events. */
+const PAGE_LIST_REFRESH_MS = 4000;
+
 /** The badge on each predefined page: the component that lands on it. */
 const SCAFFOLD_COMPONENT_LABELS: Record<ScaffoldComponent, string | null> = {
   member_auth: "MemberAuth",
@@ -93,7 +101,9 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   member_register: { width: "400px", height: "680px", position: "relative", top: null, centerX: null },
   member_password_reset: { width: "400px", height: "440px", position: "relative", top: null, centerX: null },
   member_otp_verify: { width: "400px", height: "420px", position: "relative", top: null, centerX: null },
-  member_dashboard: { width: "480px", height: "560px", position: "relative", top: null, centerX: null },
+  // Grows with its content (product owner, 2026-10-20): the profile form is
+  // long, and a fixed height made the account card scroll inside the page.
+  member_dashboard: { width: "480px", height: "fit-content", position: "relative", top: null, centerX: null },
   member_pricing: { width: "960px", height: "600px", position: "relative", top: null, centerX: null },
   // The one exception to a fixed height: the paywall wraps the article, so its
   // height is the article's. A fixed height would cut the article off or let
@@ -106,10 +116,12 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   bookmarks_tray: { width: "44px", height: "44px", position: "relative", top: null, centerX: null },
 };
 import { assetSummary, fetchAssets, type AssetList, type SiteAsset } from "../../services/assetsService";
+import { fetchPayments } from "../../services/paymentsService";
 import { useConnection } from "../../hooks/useConnection";
 import { recordSeal } from "../../hooks/useSealGuard";
 import { SEAL_CONTROL, requestSeal } from "../../services/instanceSealService";
 import { useSiteTiers } from "../../hooks/useSiteTiers";
+import { PAGE_CHROME_METHODS, framerPageChromeDeps } from "../../services/pageChromeFramer";
 import { deployBaseUrl } from "../../config/backend";
 import {
   DEFAULT_MEMBER_AUTH_CONFIG,
@@ -152,11 +164,24 @@ export const BuilderTab: React.FC = () => {
   const siteTierList = useSiteTiers(connection?.siteId ?? null);
   const [componentId, setComponentId] = useState<CanvasComponentId>(DEFAULT_COMPONENT_ID);
   const [assetsList, setAssetsList] = useState<AssetList | null>(null);
+  // The site's pricing page, from Payments, for the paywall's buttons.
+  const [pricingPath, setPricingPath] = useState<string | undefined>(undefined);
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [scaffolding, setScaffolding] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
   const showToast = useToast();
+
+  useEffect(() => {
+    if (!connection?.siteId) return;
+    let active = true;
+    void fetchPayments(connection.siteId).then((result) => {
+      if (active && result.kind === "ok") setPricingPath(result.data.settings.pricingPath || undefined);
+    });
+    return () => {
+      active = false;
+    };
+  }, [connection?.siteId]);
 
   useEffect(() => {
     if (!connection?.siteId) return;
@@ -209,17 +234,19 @@ export const BuilderTab: React.FC = () => {
       afterLoginPath: settings?.auth.afterLoginPath ?? "",
       loginPath: settings?.auth.loginPath ?? "/login",
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+      passwordPolicy: settings?.auth.passwordPolicy,
       signupPath:
         settings?.auth.signupPath && settings?.auth.signupPath !== settings?.auth.loginPath
           ? settings.auth.signupPath
           : "/signup",
       resetPath: settings?.auth.resetPath ?? "/reset-password",
+      pricingPath,
       // Tier lists in deployed components are written from these. Conflict C9.
       tiers: siteTierList,
       // F19: a new file shows the trial mark or the lock from its first render.
       license: canvasLicense(licenseView?.state),
     }),
-    [connection, settings, siteTierList, licenseView]
+    [connection, settings, siteTierList, licenseView, pricingPath]
   );
 
   /**
@@ -255,8 +282,27 @@ export const BuilderTab: React.FC = () => {
     }
   }, []);
 
+  // Pages are added and deleted in Framer's own sidebar, which tells the panel
+  // nothing directly. Read the list again whenever the canvas or the selection
+  // changes (deleting a page does both), when Framer regains focus, and every
+  // few seconds as a fallback, so a deleted page stops reading "Already exists".
   useEffect(() => {
     void checkExistingPages();
+    const refresh = () => void checkExistingPages();
+    const unsubscribes: Array<() => void> = [];
+    try {
+      unsubscribes.push(framer.subscribeToCanvasRoot(refresh));
+      unsubscribes.push(framer.subscribeToSelection(refresh));
+    } catch {
+      // Outside Framer: the timer and focus still refresh.
+    }
+    const timer = window.setInterval(refresh, PAGE_LIST_REFRESH_MS);
+    window.addEventListener("focus", refresh);
+    return () => {
+      for (const unsubscribe of unsubscribes) unsubscribe();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
   }, [checkExistingPages]);
 
   const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(() =>
@@ -307,6 +353,17 @@ export const BuilderTab: React.FC = () => {
       let componentsDeployed = 0;
       const componentDeployErrors: string[] = [];
 
+      // The site's own header and footer, borrowed from an existing page, so a
+      // new page looks like the rest of the site rather than a bare frame.
+      // Missing permission or no stacked page with chrome just means bare pages.
+      const createdPageIds = new Set(
+        outcome.results.flatMap((result) => (result.status === "created" ? [result.nodeId] : []))
+      );
+      let chrome: PageChrome | null = null;
+      if (createdPageIds.size > 0 && framer.isAllowedTo(...PAGE_CHROME_METHODS)) {
+        chrome = await findPageChrome(framerPageChromeDeps, createdPageIds).catch(() => null);
+      }
+
       for (const result of outcome.results) {
         // ONLY deploy components for pages that were actually newly created in this run
         if (result.status === "created") {
@@ -324,6 +381,11 @@ export const BuilderTab: React.FC = () => {
                 continue;
               }
 
+              // Header first and footer last, so the component lands between them.
+              const applied = chrome
+                ? await applyPageChrome(framerPageChromeDeps, contentParent.id, chrome)
+                : { header: false, footer: false, stacked: false };
+
               const generated = generateForComponent(spec.component, deployContext);
               const flowAttrs = COMPONENT_LAYOUT_DEFAULTS[spec.component] ?? {
                 width: "100%",
@@ -334,17 +396,24 @@ export const BuilderTab: React.FC = () => {
               };
               // A stack or grid flows the child between the layout's header and
               // footer. A plain frame does not, so pin it to the top, centred.
-              const flows = contentParent.layout === "stack" || contentParent.layout === "grid";
+              const flows = applied.stacked || contentParent.layout === "stack" || contentParent.layout === "grid";
               const layoutAttrs = flows
                 ? flowAttrs
                 : { ...flowAttrs, position: "absolute" as const, top: "0px", centerX: "50%" };
+              // A header in the stack already pushes the component down. One laid
+              // over the page (absolute or fixed) does not, so keep the larger gap.
+              const headerInFlow =
+                applied.header && chrome?.header?.position !== "absolute" && chrome?.header?.position !== "fixed";
+              const spacing = headerInFlow ? SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER : SCAFFOLD_COMPONENT_SPACING;
               const seal = await sealForInsert(spec.component, connection?.siteId);
               const deployResult = await deployCanvasComponent(framer, generated, {
                 parentId: contentParent.id,
-                // Clear a header the layout template lays over the page.
+                ...(flows ? { index: applied.header ? 1 : 0 } : {}),
                 attributes: {
                   ...layoutAttrs,
-                  controls: { spacing: SCAFFOLD_COMPONENT_SPACING, ...(seal ? { [SEAL_CONTROL]: seal } : {}) },
+                  // The margin is drawn inside the frame, so the frame grows by it.
+                  height: heightWithMargin(layoutAttrs.height, spacing.margin),
+                  controls: { spacing, ...(seal ? { [SEAL_CONTROL]: seal } : {}) },
                 },
               });
               if (deployResult.ok) {

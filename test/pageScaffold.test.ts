@@ -15,7 +15,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  applyPageChrome,
+  findPageChrome,
   findPageContentParent,
+  heightWithMargin,
+  pickPageChrome,
   membershipPages,
   normalizePagePath,
   scaffoldMembershipPages,
@@ -360,5 +364,130 @@ describe("findPageContentParent", () => {
     );
 
     expect(parent).toBeNull();
+  });
+});
+
+describe("page chrome", () => {
+  const node = (id: string, name: string | null, kind: "component" | "frame" | "other" = "component", position: string | null = "relative") => ({
+    id,
+    name,
+    kind,
+    position,
+  });
+
+  it("takes the named header and footer wherever they sit", () => {
+    const { header, footer } = pickPageChrome([
+      node("hero", "Hero"),
+      node("nav", "Navigation"),
+      node("body", "Content", "frame"),
+      node("foot", "Footer"),
+      node("cookie", "Cookie Banner"),
+    ]);
+    expect(header?.id).toBe("nav");
+    expect(footer?.id).toBe("foot");
+  });
+
+  it("falls back to an unnamed first and last component, but never content", () => {
+    expect(pickPageChrome([node("a", "Topline"), node("b", "Body", "frame"), node("c", "Bottomline")])).toMatchObject({
+      header: { id: "a" },
+      footer: { id: "c" },
+    });
+    const content = pickPageChrome([node("a", "Hero Section"), node("b", "Body", "frame"), node("c", "CTA")]);
+    expect(content).toEqual({ header: null, footer: null });
+    // A first frame is a layout, not a header.
+    expect(pickPageChrome([node("a", "Frame", "frame"), node("b", "Body", "frame")]).header).toBeNull();
+  });
+
+  it("finds nothing on a page with a single child", () => {
+    expect(pickPageChrome([node("only", "Navigation")])).toEqual({ header: null, footer: null });
+  });
+
+  const chromeDeps = (pages: Record<string, { path: string; layout: string; children: ReturnType<typeof node>[] }>) => ({
+    getNodesWithType: async () => Object.entries(pages).map(([id, page]) => ({ id, path: page.path })),
+    getBreakpoints: async (pageId: string) => [
+      {
+        id: `${pageId}-desktop`,
+        isBreakpoint: true,
+        isPrimaryBreakpoint: true,
+        layout: pages[pageId]!.layout,
+        layoutAttributes: { layout: pages[pageId]!.layout, stackDirection: "vertical" },
+      },
+    ],
+    getChildren: async (nodeId: string) => pages[nodeId.replace("-desktop", "")]!.children,
+  });
+
+  it("borrows from Home first, skips new pages, and ignores unstacked pages", async () => {
+    const deps = chromeDeps({
+      p404: { path: "/404", layout: "stack", children: [node("n1", "Nav"), node("x", "Body", "frame"), node("f1", "Footer")] },
+      home: { path: "/", layout: "stack", children: [node("n2", "Navigation"), node("y", "Hero"), node("f2", "Footer")] },
+      fresh: { path: "/login", layout: "stack", children: [node("n3", "Navigation"), node("z", "Body", "frame")] },
+    });
+    const chrome = await findPageChrome(deps, new Set(["fresh"]));
+    expect(chrome).toMatchObject({ sourcePageId: "home", header: { id: "n2" }, footer: { id: "f2" } });
+
+    const absolute = chromeDeps({
+      home: { path: "/", layout: "none", children: [node("n2", "Navigation"), node("f2", "Footer")] },
+    });
+    expect(await findPageChrome(absolute, new Set())).toBeNull();
+  });
+
+  it("stacks the new page, puts the header first and the footer last", async () => {
+    const calls: string[] = [];
+    const applied = await applyPageChrome(
+      {
+        setAttributes: async (id, attributes) => void calls.push(`attrs ${id} ${String(attributes["layout"])}`),
+        cloneNode: async (id) => ({ id: `${id}-copy` }),
+        setParent: async (id, parent, index) => void calls.push(`parent ${id} ${parent} ${index ?? "end"}`),
+        removeNodes: async () => undefined,
+      },
+      "page-desktop",
+      { sourcePageId: "home", header: node("nav", "Navigation"), footer: node("foot", "Footer"), layoutAttributes: { layout: "stack" } }
+    );
+
+    expect(applied).toEqual({ header: true, footer: true, stacked: true });
+    expect(calls).toEqual([
+      "attrs page-desktop stack",
+      "parent nav-copy page-desktop 0",
+      "parent foot-copy page-desktop end",
+    ]);
+  });
+
+  it("keeps the footer when the header will not clone", async () => {
+    const applied = await applyPageChrome(
+      {
+        setAttributes: async () => undefined,
+        cloneNode: async (id) => (id === "nav" ? null : { id: `${id}-copy` }),
+        setParent: async () => undefined,
+        removeNodes: async () => undefined,
+      },
+      "page-desktop",
+      { sourcePageId: "home", header: node("nav", "Navigation"), footer: node("foot", "Footer"), layoutAttributes: {} }
+    );
+    expect(applied).toEqual({ header: false, footer: true, stacked: true });
+  });
+
+  it("removes a copy that could not be moved, so the source page keeps one header", async () => {
+    const removed: string[] = [];
+    const applied = await applyPageChrome(
+      {
+        setAttributes: async () => undefined,
+        cloneNode: async (id) => ({ id: `${id}-copy` }),
+        setParent: async (id) => {
+          if (id === "nav-copy") throw new Error("refused");
+        },
+        removeNodes: async (ids) => void removed.push(...ids),
+      },
+      "page-desktop",
+      { sourcePageId: "home", header: node("nav", "Navigation"), footer: node("foot", "Footer"), layoutAttributes: {} }
+    );
+    expect(applied).toEqual({ header: false, footer: true, stacked: true });
+    expect(removed).toEqual(["nav-copy"]);
+  });
+
+  it("grows a pixel height by the margin and leaves other heights alone", () => {
+    expect(heightWithMargin("620px", "64px 0px 96px 0px")).toBe("780px");
+    expect(heightWithMargin("440px", "120px 0px 80px 0px")).toBe("640px");
+    expect(heightWithMargin("fit-content", "64px 0px 96px 0px")).toBe("fit-content");
+    expect(heightWithMargin("400px", "24px")).toBe("448px");
   });
 });

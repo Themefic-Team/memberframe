@@ -195,6 +195,26 @@
   color: var(--title);
 }
 
+/* The name, and the provider the account was made with (31-sign-in-methods.md). */
+.member-row-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.member-row-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row-provider {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--paragraph);
+}
+
 .member-row-email {
   font-size: 11px;
   line-height: 16px;
@@ -468,6 +488,12 @@
   white-space: pre-line;
 }
 
+.member-signin-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .member-profile-value.is-empty {
   color: var(--framefic-text-muted);
 }
@@ -609,4 +635,55 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Tier features (28-tier-features.md): a repeater inside the open tier card.
+   Each row is the included checkbox, the text, and the remove button, the
+   same grid as the webhook field map.
+   -------------------------------------------------------------------------- */
+.tier-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-8) 0;
+}
+
+.tier-features-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 18px;
+}
+
+.tier-features-title {
+  font: var(--text-body-sm-strong);
+  color: var(--title);
+}
+
+.tier-feature-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* The kit's input is 160px outside a field row; here it takes the row's middle column. */
+.tier-feature-row .framefic-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.tier-feature-row .framefic-checkbox {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tier-feature-row.is-excluded .framefic-input {
+  color: var(--framefic-text-muted);
+}
+
+.tier-features-actions {
+  display: flex;
+  gap: var(--space-8);
 }

@@ -35,6 +35,8 @@ export interface MembersTableProps {
   onCreateFirstTier: () => void;
   /** FP-09. The site's profile field definitions, shown in each flyout. */
   profileFields?: ReadonlyArray<CustomFieldDefinition>;
+  /** For each flyout's purchases list. */
+  siteId?: string;
 }
 
 /**
@@ -61,6 +63,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
   onMemberAction,
   onCreateFirstTier,
   profileFields = [],
+  siteId,
 }) => {
   const [filters, setFilters] = useState<MemberFilters>(NO_MEMBER_FILTERS);
   const [openMemberId, setOpenMemberId] = useState<string | null>(null);
@@ -188,6 +191,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                     onAction={(action) => onMemberAction(member, action)}
                     onClose={() => setOpenMemberId(null)}
                     profileFields={profileFields}
+                    siteId={siteId}
                   />
                 ) : null}
               </React.Fragment>

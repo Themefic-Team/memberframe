@@ -84,11 +84,12 @@ function normalize(body: string): string {
     .trim();
 }
 
-const SHARED_FUNCTIONS = ["looksLikeEmail", "passwordProblems", "passwordScore"] as const;
+const SHARED_FUNCTIONS = ["looksLikeEmail", "passwordProblems", "readPasswordPolicy", "passwordScore"] as const;
 const SHARED_CONSTANTS = [
   "PASSWORD_MIN_LENGTH",
   "PASSWORD_MAX_LENGTH",
   "EMAIL_FRAGMENT_MIN_LENGTH",
+  "PASSWORD_POLICY_MAX_MIN",
 ] as const;
 
 describe("the shared rules are byte-identical once comments are stripped", () => {
@@ -145,8 +146,8 @@ describe("the extractor can fail, which is the only reason to trust it", () => {
     // comparison has to reject it.
     const real = normalize(extractFunction(moduleSource, "passwordProblems"));
     const perturbed = real.replace(
-      "value.length < PASSWORD_MIN_LENGTH",
-      "value.length <= PASSWORD_MIN_LENGTH"
+      "value.length < rules.minLength",
+      "value.length <= rules.minLength"
     );
 
     expect(perturbed).not.toBe(real);

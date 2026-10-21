@@ -45,8 +45,11 @@ describe("the shared license block", () => {
       expect(source, name).toContain("const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey, props.mfSeal);");
       // A site this server does not know locks, rather than trusting the baked state.
       expect(source, name).toContain('body.reason === "site_not_found" ? { state: "copied" } : null');
-      // Re-checked while open, so an ended trial locks without a reload.
-      expect(source, name).toContain("window.setInterval(check, MF_LICENSE_RECHECK_MS)");
+      // Asked on mount and on a return after ten minutes, never on a timer: the
+      // plugin's license push rewrites the baked lines on the canvas.
+      expect(source, name).toContain("Date.now() - checkedAt >= MF_LICENSE_STALE_MS");
+      expect(source, name).toContain('+ "|" + mfBakedLicense();');
+      expect(block(source), name).not.toContain("setInterval");
       // 27-instance-seal.md: the Builder's seal travels in a hidden control.
       expect(source, name).toContain('mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },');
       expect(source, name).toContain("<MfLicenseLayer license={license} />");

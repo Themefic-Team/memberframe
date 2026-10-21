@@ -29,8 +29,21 @@ export type AuthProvider = "otp" | "google" | "apple" | "github" | "discord";
  */
 export type AuthMethod = "password" | "otp";
 
+/** What opens a Modal Overlay sign-in on a published page (05-member-auth.md). */
+export type AuthModalTrigger = "click" | "load" | "scroll";
+
 export interface MemberAuthConfig {
   authMode: AuthDisplayMode;
+  /** Modal only: on a click of the trigger, after a delay on load, or at a scroll depth. */
+  modalTrigger: AuthModalTrigger;
+  /** A link to `#id`, or a layer named `id`, opens the modal. */
+  modalTriggerId: string;
+  /** On Page Load: seconds, 0 to 60. */
+  modalDelay: number;
+  /** On Scroll: percent of the page, 0 to 100. */
+  modalScrollPercent: number;
+  /** On Page Load and On Scroll: once per visit. */
+  modalOncePerSession: boolean;
   headline: string;
   welcomeMessage: string;
   emailEnabled: boolean;
@@ -71,7 +84,6 @@ export interface MemberAuthConfig {
    * See `05-member-auth.md` section 9.3, which also records that NIST SP
    * 800-63B advises against composition rules of exactly this kind.
    */
-  requirePasswordStrength: boolean;
 }
 
 export const AUTH_RADIUS_MIN = 0;
@@ -80,6 +92,11 @@ export const AUTH_RADIUS_MAX = 24;
 /** Defaults matching the property controls in `MemberAuth.tsx`. */
 export const DEFAULT_MEMBER_AUTH_CONFIG: MemberAuthConfig = {
   authMode: "inline",
+  modalTrigger: "click",
+  modalTriggerId: "sign-in",
+  modalDelay: 0,
+  modalScrollPercent: 50,
+  modalOncePerSession: true,
   headline: "Sign in to continue",
   welcomeMessage: "Use your email or a connected account.",
   emailEnabled: true,
@@ -91,7 +108,6 @@ export const DEFAULT_MEMBER_AUTH_CONFIG: MemberAuthConfig = {
   borderRadius: 10,
   enablePasswordAuth: true,
   defaultAuthMethod: "password",
-  requirePasswordStrength: true,
 };
 
 export const AUTH_PROVIDER_LABELS: Record<AuthProvider, string> = {

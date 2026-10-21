@@ -5,6 +5,7 @@ import type { SiteMemberRecord } from "../../types/site";
 import { formatMinorWithCurrency } from "../../utils/money";
 import { currencyExponent } from "../../utils/currencies";
 import { formatJoinedDate, statusLabel, statusTone, tierLabel } from "./memberFilters";
+import { ProviderMark, SIGN_IN_PROVIDER_NAMES, isSignInProvider } from "../providerMarks";
 
 export interface MemberRowProps {
   member: SiteMemberRecord;
@@ -58,7 +59,20 @@ export const MemberRow: React.FC<MemberRowProps> = ({ member, selected, onSelect
         Not every provider returns a name, and a row reading "Unknown" over an
         address tells the creator less than the address on its own.
       */}
-      <span className="member-row-name">{member.name ?? member.email}</span>
+      <span className="member-row-name">
+        <span className="member-row-name-text">{member.name ?? member.email}</span>
+        {/* 31-sign-in-methods.md: which provider the account was made with. */}
+        {isSignInProvider(member.signupMethod) ? (
+          <span
+            className="member-row-provider"
+            title={`Signed up with ${SIGN_IN_PROVIDER_NAMES[member.signupMethod]}`}
+            aria-label={`Signed up with ${SIGN_IN_PROVIDER_NAMES[member.signupMethod]}`}
+            role="img"
+          >
+            <ProviderMark provider={member.signupMethod} size={12} />
+          </span>
+        ) : null}
+      </span>
       {member.name ? <span className="member-row-email">{member.email}</span> : null}
       <span className="member-row-meta">
         {tierLabel(member.tier)}

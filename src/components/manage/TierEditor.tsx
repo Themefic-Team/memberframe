@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { ChevronDown, Crown, Gift, Layers, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Crown, Gift, Layers, Plus, Trash2, X } from "lucide-react";
 import {
   Badge,
   Banner,
@@ -8,15 +8,19 @@ import {
   EmptyState,
   FieldRow,
   FieldRows,
+  IconButton,
+  InfoTip,
   Segmented,
   TextField,
   fieldErrorId,
 } from "../ui";
 import { cn } from "../../utils/cn";
-import type { CurrencyCode, SiteTierRecord } from "../../types/site";
+import type { CurrencyCode, SiteTierRecord, TierFeature } from "../../types/site";
 import {
   EMPTY_TIER_FORM_DRAFT,
   FREE_TIER_RANK,
+  MAX_TIER_FEATURES,
+  MAX_TIER_FEATURE_LENGTH,
   byRankDescending,
   isFreeTier,
   resolvedTierKey,
@@ -59,6 +63,7 @@ function draftFromRecord(tier: SiteTierRecord, currency: CurrencyCode): TierForm
     currency,
     rank: String(tier.rank),
     isActive: tier.isActive,
+    features: (tier.features ?? []).map((feature) => ({ ...feature })),
   };
 }
 
@@ -420,6 +425,13 @@ const TierForm: React.FC<{
         </FieldRow>
       </FieldRows>
 
+      <TierFeatures
+        features={draft.features}
+        error={errors.features}
+        disabled={saving}
+        onChange={(features) => onPatch("features", features)}
+      />
+
       <div className="integration-card-actions">
         {onDelete ? (
           <Button
@@ -468,6 +480,96 @@ const TierForm: React.FC<{
         />
       ) : null}
     </>
+  );
+};
+
+/**
+ * The tier's pricing card lines (28-tier-features.md): each one a checkbox for
+ * whether the tier includes it, the text, and a remove button. Removing asks
+ * first, in a popup, even though nothing is written until Save tier
+ * (2026-10-19: nothing is removed on one click).
+ */
+const TierFeatures: React.FC<{
+  features: ReadonlyArray<TierFeature>;
+  error: string | undefined;
+  disabled: boolean;
+  onChange: (features: TierFeature[]) => void;
+}> = ({ features, error, disabled, onChange }) => {
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+  const setRow = (index: number, patch: Partial<TierFeature>) =>
+    onChange(features.map((feature, i) => (i === index ? { ...feature, ...patch } : feature)));
+  const removing = removingIndex === null ? null : features[removingIndex];
+
+  return (
+    <div className="tier-features" role="group" aria-label="Features">
+      {/* The explanation is an info tip beside the title, as FieldRow does: never a paragraph. */}
+      <div className="tier-features-head">
+        <span className="tier-features-title">Features</span>
+        <InfoTip label="Features">
+          Shown on this tier's pricing card, in this order. Untick a line the tier does not include: it shows with a
+          cross, so buyers see what a higher tier adds.
+        </InfoTip>
+      </div>
+
+      {features.map((feature, index) => (
+        <div key={index} className={cn("tier-feature-row", !feature.included && "is-excluded")}>
+          <Checkbox
+            id={`tier-feature-included-${index}`}
+            ariaLabel={`Feature ${index + 1} included`}
+            checked={feature.included}
+            disabled={disabled}
+            onChange={(included) => setRow(index, { included })}
+          />
+          <TextField
+            id={`tier-feature-text-${index}`}
+            aria-label={`Feature ${index + 1}`}
+            value={feature.text}
+            placeholder={index === 0 ? "All courses" : "Another feature"}
+            maxLength={MAX_TIER_FEATURE_LENGTH}
+            invalid={Boolean(error) && feature.text.trim() === ""}
+            disabled={disabled}
+            onChange={(text) => setRow(index, { text })}
+            fill
+          />
+          <IconButton label="Remove feature" variant="ghost" disabled={disabled} onClick={() => setRemovingIndex(index)}>
+            <X aria-hidden={true} />
+          </IconButton>
+        </div>
+      ))}
+
+      {error ? (
+        <span className="field-error-message" role="alert">
+          {error}
+        </span>
+      ) : null}
+
+      <div className="tier-features-actions">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={disabled || features.length >= MAX_TIER_FEATURES}
+          onClick={() => onChange([...features, { text: "", included: true }])}
+        >
+          <Plus aria-hidden={true} />
+          <span>Add feature</span>
+        </Button>
+      </div>
+
+      {removing ? (
+        <ConfirmDialog
+          title={removing.text.trim() ? `Remove "${removing.text.trim()}"?` : "Remove this feature?"}
+          message={<p>It leaves this tier's pricing card when you save the tier. Until then, Cancel keeps it.</p>}
+          confirmLabel="Remove feature"
+          cancelLabel="Keep feature"
+          onCancel={() => setRemovingIndex(null)}
+          onConfirm={() => {
+            const index = removingIndex;
+            setRemovingIndex(null);
+            if (index !== null) onChange(features.filter((_, i) => i !== index));
+          }}
+        />
+      ) : null}
+    </div>
   );
 };
 

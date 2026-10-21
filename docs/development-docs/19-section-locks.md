@@ -156,3 +156,19 @@ The Page Locks view was trimmed on request: it had more prose than controls.
 - CSS removed with them: `.section-title-row`, `.shield-code-card`, `.shield-code-desc`, `.shield-quick-steps`, `.shield-steps-*`.
 
 Needs human verification: the view at 360px in both themes.
+
+## Blurred Sections: Visible, With a Way In (2026-10-20)
+
+- **The bug:** a section set to "Blurred, not clickable" was blank on the published site, keeping its space but showing nothing. The `MemberLocks` overrides wrapped the layer in a plain function component, which drops React's `ref`. Framer's appear and scroll effects hold a layer by its ref, so the layer stayed at its starting state (`opacity: 0`, moved down) and the blur had nothing to show.
+- **The fix:** every override is now `React.forwardRef` and passes the ref on, as Framer's own overrides do.
+  - The plugin rewrites an older `MemberLocks.tsx` when it opens (`staleSectionLocksFile`, in the seal guard's pass), so projects get the fix without a Save locks click.
+  - The creator republishes to put it live.
+- **The card:** over each blurred section of a members' lock, the Route Shield draws a centred card.
+  - **A visitor:** "Members only", "Sign in to see this.", a **Sign in** button to the login page. The current page is remembered in `memberframe:return-to:<siteKey>`, so sign in returns here.
+  - **A member below the required tier:** "Standard members only" (the tier's name), "Upgrade your plan to see this.", **See plans** to the pricing page (`PaymentSettings.pricingPath`).
+  - **A lock for everyone else** (`audience: others`) blurs with no card: there is nothing to sign in to.
+- **How the card is placed:**
+  - It lives in `<body>`, laid over the section's box, never inside it. The section is React's, and a node added there before hydration is a mismatch React removes.
+  - It is placed again in an animation frame on any DOM change, resize, scroll, load, and three times while appear animations settle. It is written only when the box moved.
+  - A tall section's card is sticky, so it stays in view while scrolling.
+- **Still cosmetic:** a blurred section's content is in the page and readable in its source, as a hidden one's is. Section locks decide what a visitor sees, not what the page sends. Content that must never reach a non-member belongs in a component that loads it from the API for entitled members only, such as Protected Download.

@@ -590,3 +590,95 @@ Requested: passwordless (email code) sign in must not create accounts. Before, `
 - **Copy**. The code screen says "If {email} has an account, we sent it a 6 digit code", not "sent to". The Allow new sign ups hint says code sign in is for existing members. Builder descriptions for Member Login and OTP Verification say so.
 - **Unchanged**: password sign up, and Google, Apple, GitHub, Discord, which still create an account when Allow new sign ups is on.
 - Tests: backend `test/memberOtp.test.ts` (no code and the same answer for an unknown address; confirmation codes still sent; a registered member signs in and is confirmed; an unknown address is refused and nothing is created).
+
+---
+
+## 11. Modal Triggers
+
+Requested by the product owner, 2026-10-20. Applies to `<MemberAuth>` and the four dedicated screens, which share its source.
+
+### 11.1. The Problem
+
+**Display Mode: Modal Overlay** drew a full-page overlay the moment the page loaded, with no way to close it: the component took an `onClose` prop that nothing in Framer ever passed. There was no way to open it from a button, after a delay, or partway down the page.
+
+### 11.2. Controls (shown only for Modal Overlay)
+
+| Control | Values | Default |
+| :--- | :--- | :--- |
+| Opens | On Click, On Page Load, On Scroll | On Click |
+| Trigger ID | Letters, digits, dash, underscore | `sign-in` |
+| Delay | 0 to 60 seconds, On Page Load only | 0 |
+| Scroll Depth | 0 to 100 percent of the page, On Scroll only | 50 |
+| Once Per Visit | Yes or No, On Page Load and On Scroll only | Yes |
+
+All five are in the `CONFIG` block (`MemberAuthConfig`), normalized by `normalizeAuthConfig`, so the Builder and the sidebar agree.
+
+### 11.3. How A Button Is Identified
+
+A click opens the modal when the clicked element, or any parent, is:
+
+- a link whose address is `#<id>` or ends in `#<id>` (Framer: select the button, Link, type `#sign-in`), or
+- a layer named `<id>` (Framer writes the layer name to `data-framer-name` on the published page).
+
+The listener is on `document` in the capture phase and calls `preventDefault` and `stopPropagation`, so the trigger's own `#sign-in` link never scrolls or navigates. Visiting the page with `#sign-in` in the address also opens it. The Trigger ID works in every Opens mode, so a header "Sign in" button can open a modal that also opens on scroll.
+
+### 11.4. Rules
+
+- On the canvas the modal is always shown, so it can be designed. On a published page it starts closed and renders nothing until it opens.
+- Opening by itself (load or scroll) never happens for a visitor the component's `HINT_KEY` marks as signed in. A click always opens.
+- Once Per Visit is remembered in `sessionStorage` under `MODAL_SHOWN_KEY`, per page and trigger (not a credential; listed in the storage test).
+- It closes on the close button (top right of the card), a click on the dimmed backdrop, or Escape. The page behind it does not scroll while it is open.
+
+### 11.5. Verification
+
+- [x] Unit: normalization of the five settings; the trigger match, capture listener, signed-in rule, close paths, and canvas behaviour read from source.
+- [ ] Human, on a published page: each Opens mode; a button linked to `#sign-in`; a layer named `sign-in`; Once Per Visit; signed in, no automatic opening; close by button, backdrop, Escape.
+
+## 12. Sign-in Methods and Account Linking, 2026-10-20
+
+How a social sign-in finds its member (one account per email, linked by the provider's own user id, only for a verified address), what Manage shows about it, and the OAuth security fixes made at the same time: see [31-sign-in-methods.md](31-sign-in-methods.md).
+
+## 13. Password Rules, Set Once for the Site (2026-10-20)
+
+Supersedes the **Strong Password** control.
+- **The problem:** the control changed only what one form checked. The server always enforced its own fixed rule, so turning it off let a form accept a password the server then refused. It was also on some screens and not others.
+- **Where the rules live:** in **MemberFrame → Settings → Membership → Password rules**:
+  - Minimum length, from 8 to 64.
+  - Require a number (on by default).
+  - Require an uppercase letter.
+  - Require a lowercase letter.
+  - Require a symbol.
+- **Always applied:** a letter, at most 128 characters, not a common password, and not the email address.
+- **Stored as** `auth.passwordPolicy`. An older document's `requirePasswordStrength` reads as "Require a number" and stays in step for older plugins.
+- **Enforced** by the server on register and reset, from the site's settings only (`isAcceptablePassword(password, email, policy)`). A refusal names each failed rule in `problems`.
+- **Followed** by every form:
+  - The sign-up page, the login page's sign-up tab, the reset page, and the modal all use the same rules.
+  - Each form asks for them (`GET /api/member/auth-config`, cached for a minute) only when a password is being chosen. Until the answer arrives, it uses the rules baked in when the component was written.
+  - A line under the field says what is asked, for example "At least 12 characters, with a letter, a number and a symbol."
+- **Sign in never checks the rules.** A member whose password predates a stricter rule still signs in, and meets the rule at their next reset.
+- **Three copies:** the rule (`passwordProblems`, `readPasswordPolicy`, `PASSWORD_POLICY_MAX_MIN`) is still held identical across the server, the plugin, and MemberAuth by the parity tests.
+
+### 13.1. Generated files carry no comments
+
+`generateComponentCode` now runs `utils/stripComments.ts` on every component it writes.
+- **What it removes:** whole-line comments only.
+- **What it keeps:** the plugin's markers (`@memberframe-…`, `@plugin-…`), Framer's `@framer…` layout notes, and compiler directives.
+- **The check:** `test/stripComments.test.ts` proves each component compiles to the same code with and without them.
+- **The effect:** MemberAuth went from about 41.6kB to 25kB gzipped, well under its 40kB budget.
+
+## 14. After Sign In Follows the Setting Now (2026-10-20)
+
+- **The bug:** a sign up, then the email code, then sign in, landed on the home page although Settings, Membership said After sign in `/dashboard`. The published login component had `afterLoginPath: "/"` baked in: it was written when the setting was `/`. The setting changed later, and nothing rewrote the file.
+- **The fix:** every sign in answer now carries the site's current `afterLoginPath` (`afterLoginPathOf` in `routes/member.ts`):
+  - password sign in
+  - email code sign in
+  - password reset
+  - the social sign-in exchange
+  - the session check
+- **In MemberAuth:** `noteAfterLoginPath` records it and `afterLoginTarget()` prefers it. The baked path is only the fallback for an older server.
+- **Order kept:**
+  1. A plan chosen before signing in (checkout intent).
+  2. Then a content component's return page: a bookmark, the paywall, or a section card remembered the page for 30 minutes.
+  3. Then After sign in.
+
+  So a visitor who pressed Sign in on a component goes back to that page, which is intended.

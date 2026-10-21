@@ -14,6 +14,8 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_TIER_FORM_DRAFT,
+  MAX_TIER_FEATURES,
+  MAX_TIER_FEATURE_LENGTH,
   RANK_MAX,
   TIER_NAME_MAX_LENGTH,
   byRankDescending,
@@ -351,5 +353,29 @@ describe("tierEditorCta: exactly one primary CTA, by construction", () => {
     const results = space.map(tierEditorCta);
 
     expect(results.every((value) => typeof value === "string")).toBe(true);
+  });
+});
+
+describe("tier features (28-tier-features.md)", () => {
+  const paid: TierFormDraft = { ...EMPTY_TIER_FORM_DRAFT, name: "Gold", rank: "2", monthlyPrice: "19.00" };
+
+  it("starts with no features and accepts a list of lines", () => {
+    expect(EMPTY_TIER_FORM_DRAFT.features).toEqual([]);
+    const draft = { ...paid, features: [{ text: "All courses", included: true }, { text: "1:1 calls", included: false }] };
+    expect(validateTierDraft(draft, [tier()]).errors.features).toBeUndefined();
+  });
+
+  it("names an empty line, a long line, and too many lines", () => {
+    expect(validateTierDraft({ ...paid, features: [{ text: "  ", included: true }] }, []).errors.features).toMatch(/empty/);
+    expect(validateTierDraft({ ...paid, features: [{ text: "x".repeat(MAX_TIER_FEATURE_LENGTH + 1), included: true }] }, []).errors.features).toMatch(
+      /characters/
+    );
+    const many = Array.from({ length: MAX_TIER_FEATURES + 1 }, () => ({ text: "Line", included: true }));
+    expect(validateTierDraft({ ...paid, features: many }, []).errors.features).toMatch(/20/);
+  });
+
+  it("checks the Free tier's features too", () => {
+    const free: TierFormDraft = { ...EMPTY_TIER_FORM_DRAFT, kind: "free", name: "Free", rank: "0", features: [{ text: "", included: true }] };
+    expect(validateTierDraft(free, []).errors.features).toBeDefined();
   });
 });

@@ -267,6 +267,11 @@ function mfBox(value: unknown, max: number): [number, number, number, number] | 
  * component's own spacing alone. Top and bottom margin keep a root's own
  * centring; a side margin replaces it, and `width: auto` lets the root fill
  * the space between the two margins instead of overflowing at 100%.
+ *
+ * Margin sits inside the instance's box, so a root that fills its frame
+ * (`height: 100%`) shrinks by the top and bottom margin rather than spilling
+ * past the frame Framer shows as selected. A root sized by its content
+ * cannot resolve the percentage, and the browser treats it as `auto`.
  */
 function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
   const input = spacing || {};
@@ -277,6 +282,7 @@ function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
     const [t, r, b, l] = margin;
     if (t > 0) out.push(`margin-top: ${t}px;`);
     if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (t + b > 0) out.push(`height: calc(100% - ${t + b}px);`);
     if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
   }
 
@@ -452,6 +458,15 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
     controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
   }
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+/** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
+const MF_SCOPE_SLOT = "@mf-scope";
+
+function mfStyleScope(prefix: string, rule: string): { scope: string; css: string } {
+  let hash = 5381;
+  for (let index = 0; index < rule.length; index++) hash = ((hash << 5) + hash + rule.charCodeAt(index)) | 0;
+  const scope = prefix + (hash >>> 0).toString(36);
+  return { scope, css: rule.split(MF_SCOPE_SLOT).join(scope) };
 }
 // @memberframe-appearance-end
 
@@ -676,6 +691,43 @@ function loadBookmarks(fresh = false): Promise<void> {
   return loading;
 }
 
+/** Send a saved item's title again; the server keeps the newest title for a slug. */
+function retitle(slug: string, title: string): void {
+  const saved = store.saved.get(slug);
+  if (!saved || !title || saved.title === title || store.status !== "member") return;
+  void timedFetch("/api/member/bookmarks", {
+    method: "PATCH",
+    headers: apiHeaders(true),
+    body: JSON.stringify({ action: "add", item: { itemSlug: slug, title, url: saved.url } }),
+  })
+    .then(async (response) => {
+      if (!response.ok) return;
+      const list = readList(((await response.json()) as { bookmarks?: unknown }).bookmarks);
+      applyList(list);
+      broadcast(list);
+      notify();
+    })
+    .catch(() => undefined);
+}
+
+/**
+ * Saved before Framer set the new page's title: watch for it for a few
+ * seconds, then send it, so the tray names the page, not the one before.
+ */
+function watchTitle(slug: string, path: string): void {
+  let tries = 0;
+  const check = () => {
+    tries += 1;
+    if (window.location.pathname !== path || tries > 20) return;
+    if (store.sync.has(slug) || staleTitle(path, document.title)) {
+      window.setTimeout(check, 250);
+      return;
+    }
+    retitle(slug, pageTitle(path).slice(0, 255));
+  };
+  window.setTimeout(check, 250);
+}
+
 function pump(slug: string): void {
   const entry = store.sync.get(slug);
   if (!entry) return;
@@ -793,7 +845,103 @@ function rememberReturn(): void {
   }
 }
 
-/** The item this button saves: the creator's values, or this page. */
+/*
+  Framer moves between pages with history.pushState, without a reload, and a
+  button in a shared navigation bar never remounts. So the page is read when
+  it changes and again at the click, never once at mount, or every page saves
+  the first one the visitor opened.
+*/
+const LOCATION_EVENT = "memberframe:location";
+
+/** The last navigation: where it went, and the title of the page it left. */
+type MfNavHost = { __mfHistory?: boolean; __mfNav?: { path: string; title: string } };
+
+/** Whether `title` is still the last page's: this page was navigated to and the title has not changed since. */
+function staleTitle(path: string, title: string): boolean {
+  const nav = (window as unknown as MfNavHost).__mfNav;
+  return Boolean(nav && nav.path === path && nav.title === title);
+}
+
+/** Call `listener` after every client-side navigation. Returns the unsubscribe. */
+function mfOnLocationChange(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  const host = window as unknown as MfNavHost;
+  if (!host.__mfHistory) {
+    host.__mfHistory = true;
+    for (const name of ["pushState", "replaceState"] as const) {
+      const original = window.history[name];
+      window.history[name] = function (this: History, ...args: Parameters<History["pushState"]>) {
+        // The title now is still the page being left: Framer sets the new one after it renders.
+        const before = document.title;
+        const result = original.apply(this, args);
+        host.__mfNav = { path: window.location.pathname, title: before };
+        window.dispatchEvent(new Event(LOCATION_EVENT));
+        return result;
+      };
+    }
+    window.addEventListener("popstate", () => {
+      host.__mfNav = { path: window.location.pathname, title: document.title };
+      window.dispatchEvent(new Event(LOCATION_EVENT));
+    });
+  }
+  window.addEventListener(LOCATION_EVENT, listener);
+  return () => window.removeEventListener(LOCATION_EVENT, listener);
+}
+
+/** The document title seen on each path. A title seen on two paths is the site's, not a page's. */
+const seenTitles = new Map<string, string>();
+
+function noteTitle(): void {
+  if (typeof document === "undefined" || !document.title) return;
+  const path = window.location.pathname;
+  if (!staleTitle(path, document.title)) seenTitles.set(path, document.title);
+}
+
+/** A title that names no page: one seen on another path (the site's), or this path in words. */
+function genericTitle(title: string, path: string): boolean {
+  if (title === slugWords(path)) return true;
+  let shared = false;
+  seenTitles.forEach((seen, seenPath) => {
+    if (seen === title && seenPath !== path) shared = true;
+  });
+  // Or another saved page carries the same title: the site's, from before this fix.
+  store.saved.forEach((other) => {
+    if (other.title === title && other.url.split(/[?#]/)[0] !== path) shared = true;
+  });
+  return shared;
+}
+
+/** "/article/artificial-intelligence" as "Artificial Intelligence". */
+function slugWords(path: string): string {
+  const last = decodeURIComponent(path.split("/").filter(Boolean).pop() ?? "");
+  return last.replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()).trim();
+}
+
+/**
+ * What names this page: its main heading (not one in the header or nav), else
+ * its own document title, else its path in words. The site-wide title, which
+ * Framer gives every page without an SEO title of its own, names only home.
+ */
+function pageTitle(path: string): string {
+  if (typeof document === "undefined") return "";
+  const title = document.title.trim();
+  // Saved too soon after a navigation, the title still names the page left.
+  const stale = staleTitle(path, document.title);
+  if (path === "/") return stale ? "Home" : title;
+  for (const heading of Array.from(document.querySelectorAll("h1"))) {
+    const text = (heading.textContent ?? "").replace(/\s+/g, " ").trim();
+    // Framer keeps hidden copies of a layer for other breakpoints; only a shown one counts.
+    const shown = typeof heading.getClientRects !== "function" || heading.getClientRects().length > 0;
+    if (text && shown && !heading.closest("header, nav")) return text;
+  }
+  let shared = false;
+  seenTitles.forEach((seen, seenPath) => {
+    if (seen === title && seenPath !== path) shared = true;
+  });
+  return (!shared && !stale && title) || slugWords(path) || title;
+}
+
+/** The item this button saves: the creator's values, or the page shown now. */
 function itemFor(slug: string, title: string, url: string): BookmarkItem {
   const path = typeof window === "undefined" ? "/" : window.location.pathname;
   const cleanSlug = (slug.trim() || path.replace(/\/+$/, "") || "/").replace(/[^A-Za-z0-9\-_./:]/g, "-").slice(0, 191);
@@ -801,7 +949,7 @@ function itemFor(slug: string, title: string, url: string): BookmarkItem {
   const link = url.trim();
   return {
     itemSlug: cleanSlug || "/",
-    title: (title.trim() || (typeof document === "undefined" ? "" : document.title) || cleanSlug).slice(0, 255),
+    title: (title.trim() || (slug.trim() ? slugWords(`/${slug.trim()}`) : pageTitle(path)) || cleanSlug).slice(0, 255),
     url: link.startsWith("/") || /^https?:\/\//.test(link) ? link : pageUrl,
     savedAt: Date.now(),
   };
@@ -970,7 +1118,28 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
     return target === RenderTarget.canvas || target === RenderTarget.thumbnail;
   }, []);
 
-  const item = useMemo(() => itemFor(String(itemSlug ?? ""), String(itemTitle ?? ""), String(itemUrl ?? "")), [itemSlug, itemTitle, itemUrl]);
+  // The page shown now: a client-side navigation changes it without a remount.
+  const [locationKey, setLocationKey] = useState(() => (typeof window === "undefined" ? "/" : window.location.pathname + window.location.search));
+  useEffect(() => {
+    if (onCanvas) return;
+    noteTitle();
+    let timer = 0;
+    const off = mfOnLocationChange(() => {
+      setLocationKey(window.location.pathname + window.location.search);
+      // Framer sets the new page's title just after the navigation.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(noteTitle, 600);
+    });
+    return () => {
+      off();
+      window.clearTimeout(timer);
+    };
+  }, [onCanvas]);
+  const item = useMemo(
+    () => itemFor(String(itemSlug ?? ""), String(itemTitle ?? ""), String(itemUrl ?? "")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [itemSlug, itemTitle, itemUrl, locationKey]
+  );
   const [, setVersion] = useState(0);
   const [pulsing, setPulsing] = useState(false);
   const [announce, setAnnounce] = useState("");
@@ -988,6 +1157,19 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
 
   const saved = onCanvas ? canvasPreview === "saved" : isSaved(item.itemSlug);
   const notice = !onCanvas && store.notice?.slug === item.itemSlug ? store.notice : null;
+
+  // A bookmark of this page saved under the site's title, or under its path in
+  // words, gets the page's real title once it is known.
+  useEffect(() => {
+    if (onCanvas || !saved || String(itemSlug ?? "").trim() || String(itemTitle ?? "").trim()) return;
+    const timer = window.setTimeout(() => {
+      const path = window.location.pathname;
+      const stored = store.saved.get(item.itemSlug);
+      if (!stored || path === "/" || staleTitle(path, document.title)) return;
+      if (genericTitle(stored.title, path)) retitle(item.itemSlug, pageTitle(path).slice(0, 255));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [onCanvas, saved, item.itemSlug, itemSlug, itemTitle]);
 
   useEffect(() => {
     if (!pulsing) return;
@@ -1009,8 +1191,15 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
 
   const onClick = () => {
     if (onCanvas) return;
-    const willSave = !isSaved(item.itemSlug);
-    toggle(item);
+    // Built now, from the page shown now, never from an earlier render.
+    noteTitle();
+    const current = itemFor(String(itemSlug ?? ""), String(itemTitle ?? ""), String(itemUrl ?? ""));
+    const willSave = !isSaved(current.itemSlug);
+    toggle(current);
+    const path = window.location.pathname;
+    if (willSave && !String(itemTitle ?? "").trim() && !String(itemSlug ?? "").trim() && staleTitle(path, document.title)) {
+      watchTitle(current.itemSlug, path);
+    }
     if (store.status !== "guest") {
       if (willSave && animateSave) {
         // Restart the pulse without remounting the button, which would drop
@@ -1038,7 +1227,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
 
   const fill = mfSafeColor(activeFillColor, CONFIG.activeFillColor);
   const scopedCss =
-    `[data-mf-bookmark="${scope}"] { --mf-bookmark-fill: ${fill}; --mf-bookmark-icon: ${Math.round(mfNumber(iconSize, 12, 48, 20))}px; ` +
+    `[data-mf-bookmark="${MF_SCOPE_SLOT}"] { --mf-bookmark-fill: ${fill}; --mf-bookmark-icon: ${Math.round(mfNumber(iconSize, 12, 48, 20))}px; ` +
     mfAppearanceVars({
       accent: accentColor,
       radius: borderRadius,
@@ -1050,6 +1239,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
       spacing,
     }) +
     " }";
+  const styled = mfStyleScope("mfb", scopedCss);
 
   const label = saved ? t("savedLabel") : labelText || CONFIG.labelText;
   const style: ButtonStyle = BUTTON_STYLES.indexOf(buttonStyle) === -1 ? "outline" : buttonStyle;
@@ -1058,10 +1248,10 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
     (showLabel && iconPosition === "right" ? " is-icon-right" : "");
 
   return (
-    <div className={`mf-bookmark ${mfThemeClass(theme)}`} data-mf-bookmark={scope}>
+    <div className={`mf-bookmark ${mfThemeClass(theme)}`} data-mf-bookmark={styled.scope}>
       <style>{mfThemeCss(".mf-bookmark")}</style>
       <style>{cssContent}</style>
-      <style>{scopedCss}</style>
+      <style>{styled.css}</style>
       <button
         type="button"
         className={buttonClass}

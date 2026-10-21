@@ -4,15 +4,24 @@
  * pure rule in `services/instanceSealService.ts`, and writes back only what
  * changed: a seal cleared on a copy, a seal recorded for the node that keeps it.
  *
- * Runs on open, every 10 seconds, and when Framer regains focus. Never throws:
- * a canvas it cannot read is left as it is.
+ * Runs when the canvas changes (Framer's canvas and selection events, a second
+ * after the last one; a paste selects what it pasted), when Framer regains
+ * focus, and once a minute as a fallback. A pass that finds the canvas as the
+ * last finished pass left it stops at once. Each unknown seal is asked about
+ * once per session, and after a failure the guard waits (30 seconds, rising
+ * to 10 minutes) before it asks the server anything again. An idle canvas
+ * sends nothing. Never throws: a canvas it cannot read is left as it is.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { framer } from "framer-plugin";
 import { useConnection } from "./useConnection";
 import { deployBaseUrl } from "../config/backend";
+import { missingPublishedOrigins } from "../services/framerProjectService";
+import { addAllowedOrigins } from "../services/siteSettingsService";
 import { syncSiteConfig, type PatchableFile } from "../utils/configPatcher";
+import { SECTION_LOCKS_FILE_NAME, sectionLocksCode, staleSectionLocksFile } from "../services/sectionLocks";
+import { ARTICLE_TAG_FILE_NAME, articleTagCode } from "../services/articleTag";
 import {
   LICENSE_MARKER,
   SEAL_CONTROL,
@@ -20,17 +29,53 @@ import {
   SEALS_MIGRATED_KEY,
   applyToRegistry,
   instanceOfFile,
+  nextRetryDelay,
   parseRegistry,
   planSeals,
+  pruneRegistry,
   requestSeal,
   resolveUnknown,
+  sealFingerprint,
   siteKeyOfFile,
   verifySeals,
   type SealAction,
   type SealedInstance,
 } from "../services/instanceSealService";
 
-const GUARD_INTERVAL_MS = 10_000;
+/** The fallback pass, for a change Framer's events did not report. */
+const GUARD_INTERVAL_MS = 60_000;
+/** Canvas events come in bursts (a drag, a paste); one pass after the burst. */
+const GUARD_DEBOUNCE_MS = 1_000;
+
+/** The server's answer for each seal asked about this session, keyed `siteId|seal`: valid for that site or not. */
+const answeredSeals = new Map<string, boolean>();
+
+/** Backoff for one kind of request: failed tries in a row, and when the next may go. */
+interface Backoff {
+  failures: number;
+  retryAt: number;
+}
+
+interface GuardState {
+  /** The fingerprint of the last pass that finished with nothing left to do. */
+  settled: string | null;
+  seals: Backoff;
+  origins: Backoff;
+}
+
+function waiting(backoff: Backoff): boolean {
+  return Date.now() < backoff.retryAt;
+}
+
+function failed(backoff: Backoff): void {
+  backoff.failures += 1;
+  backoff.retryAt = Date.now() + nextRetryDelay(backoff.failures);
+}
+
+function succeeded(backoff: Backoff): void {
+  backoff.failures = 0;
+  backoff.retryAt = 0;
+}
 
 interface InstanceNode {
   id: string;
@@ -42,7 +87,7 @@ interface InstanceNode {
   setAttributes(update: { controls: Record<string, unknown> }): Promise<unknown>;
 }
 
-async function guardOnce(siteId: string, siteKey: string): Promise<number> {
+async function guardOnce(siteId: string, siteKey: string, state: GuardState): Promise<number> {
   if (!framer.isAllowedTo("Node.setAttributes", "setPluginData")) return 0;
 
   const files = (await framer.getCodeFiles()).filter((file) => typeof file.content === "string" && file.content.includes(LICENSE_MARKER));
@@ -69,13 +114,28 @@ async function guardOnce(siteId: string, siteKey: string): Promise<number> {
 
   const registry = parseRegistry(await framer.getPluginData(SEAL_REGISTRY_KEY));
   const migrated = (await framer.getPluginData(SEALS_MIGRATED_KEY)) === "1";
+  const fingerprint = sealFingerprint(instances, registry, migrated);
+  // Nothing changed since the last finished pass: nothing to ask or write.
+  if (fingerprint === state.settled) return 0;
+  // A recent failure: wait before asking the server or writing again.
+  if (waiting(state.seals)) return 0;
+
   const plan = planSeals(instances, registry, migrated);
   const actions: SealAction[] = [...plan.actions];
 
   if (plan.unknown.length > 0) {
-    const answer = await verifySeals(siteId, plan.unknown);
-    // No answer, no change: an unreachable server never locks anything.
-    if (answer.kind === "ok") actions.push(...resolveUnknown(instances, plan.unknown, answer.data.valid));
+    const toAsk = plan.unknown.filter((seal) => !answeredSeals.has(`${siteId}|${seal}`));
+    if (toAsk.length > 0) {
+      const answer = await verifySeals(siteId, toAsk);
+      // No answer, no change: an unreachable server never locks anything.
+      if (answer.kind !== "ok") {
+        failed(state.seals);
+        return 0;
+      }
+      for (const seal of toAsk) answeredSeals.set(`${siteId}|${seal}`, answer.data.valid.includes(seal));
+    }
+    const valid = plan.unknown.filter((seal) => answeredSeals.get(`${siteId}|${seal}`) === true);
+    actions.push(...resolveUnknown(instances, plan.unknown, valid));
   }
 
   // Every new seal comes from the server, first. If any request fails (the
@@ -87,25 +147,43 @@ async function guardOnce(siteId: string, siteKey: string): Promise<number> {
   for (const action of actions) {
     if (action.kind !== "seal" || !byId.has(action.nodeId)) continue;
     const issued = await requestSeal(siteId);
-    if (issued.kind !== "ok") return 0;
+    if (issued.kind !== "ok") {
+      failed(state.seals);
+      return 0;
+    }
     sealed[action.nodeId] = issued.data.seal;
   }
 
   let cleared = 0;
-  for (const action of actions) {
-    const node = byId.get(action.nodeId);
-    if (!node) continue;
-    if (action.kind === "clear") {
-      await node.setAttributes({ controls: { [SEAL_CONTROL]: "" } });
-      cleared += 1;
-    } else if (action.kind === "seal" && sealed[node.id]) {
-      await node.setAttributes({ controls: { [SEAL_CONTROL]: sealed[node.id] } });
+  try {
+    for (const action of actions) {
+      const node = byId.get(action.nodeId);
+      if (!node) continue;
+      if (action.kind === "clear") {
+        await node.setAttributes({ controls: { [SEAL_CONTROL]: "" } });
+        cleared += 1;
+      } else if (action.kind === "seal" && sealed[node.id]) {
+        await node.setAttributes({ controls: { [SEAL_CONTROL]: sealed[node.id] } });
+      }
     }
+
+    // Only the seals still on the canvas, and the ones just issued, are kept.
+    const held = new Set<string>(Object.values(sealed));
+    for (const instance of instances) if (instance.seal) held.add(instance.seal);
+    const next = pruneRegistry(applyToRegistry(registry, actions, sealed), held);
+    if (JSON.stringify(next) !== JSON.stringify(registry)) await framer.setPluginData(SEAL_REGISTRY_KEY, JSON.stringify(next));
+    if (!migrated) await framer.setPluginData(SEALS_MIGRATED_KEY, "1");
+  } catch {
+    // A write Framer refused: try again after the backoff. The answers above
+    // are remembered, so the retry asks the server nothing it already asked.
+    failed(state.seals);
+    return cleared;
   }
 
-  const next = applyToRegistry(registry, actions, sealed);
-  if (JSON.stringify(next) !== JSON.stringify(registry)) await framer.setPluginData(SEAL_REGISTRY_KEY, JSON.stringify(next));
-  if (!migrated) await framer.setPluginData(SEALS_MIGRATED_KEY, "1");
+  succeeded(state.seals);
+  // Settled only when the pass found nothing to do; after changes, the next
+  // pass reads the canvas they left and settles there.
+  if (actions.length === 0 && migrated) state.settled = fingerprint;
   return cleared;
 }
 
@@ -121,17 +199,54 @@ export async function recordSeal(seal: string, nodeId: string): Promise<void> {
   }
 }
 
+/**
+ * Allow every address this project is published at. Without it, a site first
+ * published after connecting answers `foreign` on its own domain, and every
+ * component there draws the "copied, not inserted" lock. Asks the server only
+ * when an address is missing, and waits after a failure.
+ */
+async function syncPublishedOrigins(
+  siteId: string,
+  allowed: ReadonlyArray<string>,
+  backoff: Backoff,
+  onUpdated: (origins: string[]) => Promise<void>
+): Promise<void> {
+  const missing = missingPublishedOrigins(await framer.getPublishInfo(), allowed);
+  if (missing.length === 0 || waiting(backoff)) return;
+  const result = await addAllowedOrigins(siteId, missing);
+  if (result.kind !== "ok") {
+    failed(backoff);
+    return;
+  }
+  succeeded(backoff);
+  await onUpdated(result.data.allowedOrigins);
+}
+
 export function useSealGuard(): void {
-  const { connection } = useConnection();
+  const { connection, applyConnection, settings } = useConnection();
   const siteId = connection?.siteId ?? null;
   const siteKey = connection?.siteKey ?? null;
+  // Read inside the pass, so a change to the list does not restart the guard.
+  const connectionRef = useRef(connection);
+  connectionRef.current = connection;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     if (!siteId || siteKey === null) return;
     let running = false;
+    let again = false;
     let stopped = false;
+    let debounce: number | null = null;
+    const state: GuardState = { settled: null, seals: { failures: 0, retryAt: 0 }, origins: { failures: 0, retryAt: 0 } };
+
     const run = async () => {
-      if (running || stopped) return;
+      if (stopped) return;
+      if (running) {
+        // A change during a pass gets one more pass after it.
+        again = true;
+        return;
+      }
       running = true;
       try {
         // First, point every deployed component at this site and server, so
@@ -143,8 +258,26 @@ export function useSealGuard(): void {
           if (updated > 0 && !stopped) {
             framer.notify(`Updated ${updated} MemberFrame component file${updated === 1 ? "" : "s"} for this site. Publish to update your live site.`, { variant: "info" });
           }
+          // MemberLocks.tsx as the saved rules and the current generator say,
+          // so a fix to the overrides reaches projects without a Save locks click.
+          const rules = settingsRef.current?.sectionLocks;
+          const locksFile = files.find((file) => file.name === SECTION_LOCKS_FILE_NAME);
+          if (rules && locksFile && staleSectionLocksFile(locksFile.content, rules) && !stopped) {
+            await locksFile.setFileContent(sectionLocksCode(rules));
+            framer.notify("Updated MemberLocks for this site. Publish to update your live site.", { variant: "info" });
+          }
+          // MemberArticle.tsx holds no creator input: any other content is an older plugin's.
+          const articleFile = files.find((file) => file.name === ARTICLE_TAG_FILE_NAME);
+          if (articleFile && articleFile.content !== articleTagCode() && !stopped) {
+            await articleFile.setFileContent(articleTagCode());
+            framer.notify("Updated MemberArticle for this site. Publish to update your live site.", { variant: "info" });
+          }
         }
-        const cleared = await guardOnce(siteId, siteKey);
+        await syncPublishedOrigins(siteId, connectionRef.current?.allowedOrigins ?? [], state.origins, async (origins) => {
+          const current = connectionRef.current;
+          if (current && !stopped) await applyConnection({ ...current, allowedOrigins: origins });
+        }).catch(() => undefined);
+        const cleared = await guardOnce(siteId, siteKey, state);
         if (cleared > 0 && !stopped) {
           framer.notify(
             cleared === 1
@@ -157,16 +290,38 @@ export function useSealGuard(): void {
         // Outside Framer, or the canvas is read only.
       } finally {
         running = false;
+        if (again && !stopped) {
+          again = false;
+          schedule();
+        }
       }
     };
+
+    const schedule = () => {
+      if (stopped) return;
+      if (debounce !== null) window.clearTimeout(debounce);
+      debounce = window.setTimeout(() => {
+        debounce = null;
+        void run();
+      }, GUARD_DEBOUNCE_MS);
+    };
+
     void run();
+    const unsubscribes: Array<() => void> = [];
+    try {
+      unsubscribes.push(framer.subscribeToCanvasRoot(schedule));
+      unsubscribes.push(framer.subscribeToSelection(schedule));
+    } catch {
+      // Outside Framer: the fallback timer and focus still run the guard.
+    }
     const timer = window.setInterval(() => void run(), GUARD_INTERVAL_MS);
-    const onFocus = () => void run();
-    window.addEventListener("focus", onFocus);
+    window.addEventListener("focus", schedule);
     return () => {
       stopped = true;
+      if (debounce !== null) window.clearTimeout(debounce);
       window.clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", schedule);
+      for (const unsubscribe of unsubscribes) unsubscribe();
     };
-  }, [siteId, siteKey]);
+  }, [applyConnection, siteId, siteKey]);
 }

@@ -108,17 +108,29 @@ export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string 
     "",
     'import * as React from "react"',
     "",
+    "// forwardRef, as Framer's own overrides do: Framer's appear and scroll",
+    "// effects hold the layer by its ref, and without it the layer stays at its",
+    "// starting state (often invisible) on the published site.",
     "function lock(Component: React.ComponentType<any>, rule: string, slug: string): React.ComponentType<any> {",
-    "  function Locked(props: any) {",
+    "  return React.forwardRef(function Locked(props: any, ref: any) {",
     '    const className = props && props.className ? props.className + " mf-lock-" + slug : "mf-lock-" + slug',
-    '    return React.createElement(Component, { ...props, className, "data-mf-lock": rule })',
-    "  }",
-    "  return Locked",
+    '    return React.createElement(Component, { ...props, ref, className, "data-mf-lock": rule })',
+    "  }) as React.ComponentType<any>",
     "}",
     "",
     ...(overrides.length > 0 ? overrides : ["// No section locks yet. Add one in the plugin, then click Save locks."]),
     "",
   ].join("\n");
+}
+
+/**
+ * Whether a project's MemberLocks.tsx was written by an older plugin: one
+ * whose overrides drop the layer's ref, so Framer's appear effects never run
+ * and a locked layer stays invisible. Only that is rewritten on open; a file
+ * that merely lists other rules waits for Save locks, as before.
+ */
+export function staleSectionLocksFile(content: string, rules: ReadonlyArray<SectionLockRule>): boolean {
+  return !content.includes("React.forwardRef(function Locked") && content !== sectionLocksCode(rules);
 }
 
 export interface SectionLockTier {

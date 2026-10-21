@@ -82,6 +82,7 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({ siteId }) => {
       afterLoginPath: settings?.auth.afterLoginPath ?? "",
       loginPath: settings?.auth.loginPath ?? "/login",
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+      passwordPolicy: settings?.auth.passwordPolicy,
       signupPath: settings?.auth.signupPath ?? "",
       resetPath: settings?.auth.resetPath ?? "/reset-password",
       tiers,

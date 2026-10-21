@@ -20,14 +20,36 @@ export const PAYMENT_GATEWAY_LABELS: Record<PaymentGateway, string> = {
   razorpay: "Razorpay",
 };
 
+/**
+ * The checkout chooser's default wording, the same as the server's
+ * `DEFAULT_METHOD_LABELS` (memberframe-backend/src/lib/methodLabels.ts), for
+ * a server too old to send its own.
+ */
+export const DEFAULT_METHOD_LABELS: Record<PaymentGateway, { title: string; description: string }> = {
+  stripe: { title: "Stripe", description: "Credit or debit card, Apple Pay, and Google Pay." },
+  lemonsqueezy: { title: "Lemon Squeezy", description: "Card or PayPal. Sales tax and VAT included." },
+  razorpay: { title: "Razorpay", description: "UPI, cards, net banking, and wallets." },
+};
+
+/** What the checkout chooser calls one gateway (29-checkout-methods.md). */
+export interface MethodLabel {
+  title: string;
+  description: string;
+}
+
+export type MethodLabels = Partial<Record<PaymentGateway, Partial<MethodLabel>>>;
+
 export interface PaymentSettings {
   mode: PaymentMode;
+  /** No longer used: buyers choose (29-checkout-methods.md). Still sent by the server. */
   defaultGateway: PaymentGateway | "";
   autoDetectGeolocation: boolean;
   defaultCurrency: string;
   graceDays: number;
   afterPurchasePath: string;
   pricingPath: string;
+  /** The creator's own titles and descriptions; a missing one uses the default. */
+  methodLabels?: MethodLabels;
 }
 
 export interface GatewayStatus {
@@ -39,6 +61,8 @@ export interface GatewayStatus {
   maskedSuffix: string | null;
   options: Record<string, unknown>;
   webhookUrl: string;
+  /** Shown to buyers at checkout. False when not connected. */
+  enabled?: boolean;
   webhookConfigured: boolean;
   webhookAutomatic: boolean;
   lastWebhookAt: string | null;
@@ -48,6 +72,8 @@ export interface GatewayStatus {
 export interface PaymentsOverview {
   settings: PaymentSettings;
   gateways: GatewayStatus[];
+  /** The chooser's wording for a gateway without its own. Absent from an older server. */
+  defaultMethodLabels?: Record<PaymentGateway, MethodLabel>;
   secretsAvailable: boolean;
   publicApi: boolean;
   activeSubscriptions: { test: number; live: number };
@@ -78,6 +104,17 @@ export function connectGateway(
   // Empty fields are left out, so an update keeps what is stored for them.
   const filled = Object.fromEntries(Object.entries(values).filter(([, value]) => value.trim() !== ""));
   return client.put(`/api/site/payments/gateways/${gateway}`, { siteId, mode, values: filled });
+}
+
+/** Show or hide a connected gateway at checkout. Instant: the panel's Toggle. */
+export function setGatewayEnabled(
+  siteId: string,
+  gateway: PaymentGateway,
+  mode: PaymentMode,
+  enabled: boolean,
+  client: ApiClient = apiClient
+): Promise<ApiResult<PaymentsOverview>> {
+  return client.put(`/api/site/payments/gateways/${gateway}/enabled`, { siteId, mode, enabled });
 }
 
 export function disconnectGateway(
@@ -224,6 +261,10 @@ export function paymentsFailure(result: Exclude<ApiResult<unknown>, { kind: "ok"
       return "Members still renew through this gateway. It can be removed once their plans end.";
     case "unsafe_path":
       return "Use a page path that starts with a slash, like /pricing.";
+    case "last_live_method":
+      return "Keep one gateway on while payments are live.";
+    case "gateway_not_connected":
+      return "Connect this gateway first.";
     case "invalid_request":
       return "The server refused one of the values. Check each field and try again.";
     default:

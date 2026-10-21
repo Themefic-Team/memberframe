@@ -24,13 +24,18 @@ import {
   passwordProblems,
   passwordScore,
   passwordScoreLabel,
+  readPasswordPolicy,
   type PasswordProblem,
   type PasswordScore,
 } from "../src/utils/credentials";
 
+/** The site's rules: the default (a number), or none of the optional ones. */
+const DEFAULT_RULES = { minLength: 8, requireNumber: true, requireUppercase: false, requireLowercase: false, requireSymbol: false };
+const NO_RULES = { ...DEFAULT_RULES, requireNumber: false };
+
 /** The three arguments in the order the component passes them. */
 const problems = (password: string, email = "member@example.com", strong = true) =>
-  passwordProblems(password, email, strong);
+  passwordProblems(password, email, strong ? DEFAULT_RULES : NO_RULES);
 
 describe("looksLikeEmail", () => {
   it("accepts an ordinary address", () => {
@@ -102,10 +107,24 @@ describe("the strength rule, which is optional", () => {
     expect(problems("abcdefgh")).toContain("needs_number");
   });
 
-  it("asks for nothing beyond length when it is off", () => {
-    // Not "12345678": that is on the common list, which applies either way.
-    expect(problems("19283746", "member@example.com", false)).toEqual([]);
+  it("asks for nothing beyond length and a letter when no rule is on", () => {
+    // A letter is always required (05-member-auth.md 13): digits alone are too weak.
+    expect(problems("19283746", "member@example.com", false)).toEqual(["needs_letter"]);
     expect(problems("abcdefgh", "member@example.com", false)).toEqual([]);
+  });
+
+  it("applies each rule the site turns on, and names it", () => {
+    const strict = { minLength: 12, requireNumber: true, requireUppercase: true, requireLowercase: true, requireSymbol: true };
+    expect(passwordProblems("abcdefg1", "member@example.com", strict)).toEqual(["too_short", "needs_uppercase", "needs_symbol"]);
+    expect(passwordProblems("ABCDEFGHIJ1!", "member@example.com", strict)).toEqual(["needs_lowercase"]);
+    expect(passwordProblems("Abcdefghij1!", "member@example.com", strict)).toEqual([]);
+  });
+
+  it("reads the rules defensively: 8 to 64 characters, a number unless switched off", () => {
+    expect(readPasswordPolicy({ minLength: 3 }).minLength).toBe(8);
+    expect(readPasswordPolicy({ minLength: 500 }).minLength).toBe(64);
+    expect(readPasswordPolicy(null)).toEqual(DEFAULT_RULES);
+    expect(readPasswordPolicy({ requireNumber: false }).requireNumber).toBe(false);
   });
 
   it("is satisfied by one letter and one digit, not a symbol zoo", () => {
@@ -224,7 +243,7 @@ describe("isAcceptablePassword", () => {
     const cases = ["", "short", "12345678", "Valid123", "password123", "Tr0ubadour"];
 
     for (const candidate of cases) {
-      expect(isAcceptablePassword(candidate, "member@example.com", true)).toBe(
+      expect(isAcceptablePassword(candidate, "member@example.com", DEFAULT_RULES)).toBe(
         problems(candidate).length === 0
       );
     }
@@ -277,6 +296,9 @@ describe("the copy never shows a raw enum value", () => {
     "too_long",
     "needs_letter",
     "needs_number",
+    "needs_uppercase",
+    "needs_lowercase",
+    "needs_symbol",
     "contains_email",
     "too_common",
   ];
@@ -306,7 +328,7 @@ describe("the copy never shows a raw enum value", () => {
 
   it("uses no em-dash or en-dash in any message", () => {
     const text = [
-      ...everyProblem.map(passwordProblemMessage),
+      ...everyProblem.map((problem) => passwordProblemMessage(problem)),
       ...([0, 1, 2, 3, 4] as PasswordScore[]).map(passwordScoreLabel),
     ].join(" ");
 

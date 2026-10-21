@@ -10,10 +10,12 @@
   ],
   "permissions": [
     "addComponentInstance",
+    "cloneNode",
     "createCodeFile",
     "createWebPage",
-    "setCodeFileContent",
+    "removeNodes2",
     "setAttributes",
+    "setCodeFileContent",
     "setParent",
     "setPluginData"
   ]

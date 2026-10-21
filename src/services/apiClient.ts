@@ -190,6 +190,24 @@ export class ApiClient {
     });
   }
 
+  /**
+   * A long-lived GET whose body is read as a stream: the license push
+   * (`services/licenseStream.ts`). No deadline, since the stream is meant to
+   * stay open; the caller ends it through `signal`. Rejects when the request
+   * cannot be made, as `fetch` does.
+   */
+  openStream(path: string, query: Record<string, QueryValue>, signal: AbortSignal): Promise<Response> {
+    const rawBase = this.deps.baseUrl ?? PANEL_API_BASE_URL;
+    const base = rawBase.replace(/\/api\/?$/, "").replace(/\/+$/, "");
+    const doFetch = this.deps.fetchImpl ?? globalThis.fetch;
+    if (typeof doFetch !== "function") return Promise.reject(new Error("No fetch implementation available."));
+    const headers: Record<string, string> = { Accept: "text/event-stream" };
+    if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+    const token = this.deps.getCreatorToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return doFetch(`${base}${path}${buildQuery(query)}`, { method: "GET", headers, signal, cache: "no-store" });
+  }
+
   private async request<T>(
     method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
     path: string,

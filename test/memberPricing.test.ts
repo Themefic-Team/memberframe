@@ -94,8 +94,11 @@ describe("checkout from the published site", () => {
   it("sends a tier and an interval, never a price", () => {
     // The server prices the purchase from the tier table. An amount from the
     // browser would be an amount the buyer chose.
-    const body = /body: JSON\.stringify\(\{ tierKey, interval: chosen, returnPath \}\)/;
-    expect(code).toMatch(body);
+    // The buyer's chosen method travels too (29-checkout-methods.md): a gateway name, not an amount.
+    expect(code).toContain(
+      "JSON.stringify(gateway ? { tierKey, interval: chosen, returnPath, gateway } : { tierKey, interval: chosen, returnPath })"
+    );
+    expect(code).toContain("body: JSON.stringify({ tierKey, interval: chosen }),");
     for (const sent of code.match(/JSON\.stringify\(\{[^}]*\}\)/g) ?? []) {
       expect(sent).not.toMatch(/amount|price|currency/i);
     }
@@ -131,7 +134,7 @@ describe("checkout from the published site", () => {
 describe("MemberAuth returns a buyer to the pricing page", () => {
   it("prefers a fresh checkout intent, then a content component's return page, over the After sign in page", () => {
     expect(authCode).toContain(
-      'const path = checkoutIntentPath() ?? returnPath() ?? (CONFIG.afterLoginPath || "/dashboard");'
+      "const path = checkoutIntentPath() ?? returnPath() ?? afterLoginTarget();"
     );
   });
 
@@ -167,5 +170,97 @@ describe("paymentsService", () => {
       paymentsFailure({ kind: "unavailable", status: 400, detail: "", reason: "gateway_rejected", message: "That is a live key." })
     ).toBe("That is a live key.");
     expect(paymentsFailure({ kind: "unavailable", status: 400, detail: "", reason: "no_live_gateway" })).toMatch(/live keys/);
+  });
+});
+
+describe("tier features on the card (28-tier-features.md)", () => {
+  it("takes a card's lines only from the tier's own list; there is no Features property", () => {
+    expect(code).toContain("features?: Array<{ text: string; included: boolean }>;");
+    expect(code).toContain("function featuresFor(tier: PublicTier): Array<{ text: string; included: boolean }> {");
+    expect(code).not.toContain("DEFAULT_FEATURES");
+    expect(code).not.toMatch(/^\s{2}features: \{\s*type: ControlType\.Array/m);
+  });
+
+  it("marks a line the tier does not include, for sight and for screen readers", () => {
+    expect(code).toContain("line.included ? <Check aria-hidden={true} /> : <MfCross />");
+    expect(code).toContain("(not included)");
+    expect(code).toContain(".mf-pricing-feature.is-excluded");
+  });
+});
+
+describe("payment method chooser (29-checkout-methods.md)", () => {
+  it("asks which methods can sell the price before opening a checkout", () => {
+    expect(code).toContain('const OPTIONS_PATH = "/api/checkout/options";');
+    expect(code).toContain("const response = await fetch(`${base}${OPTIONS_PATH}`, {");
+  });
+
+  it("goes straight on only when exactly one gateway is shown at checkout, else opens the chooser", () => {
+    expect(code).toContain("if (methods.length === 0 || (methods.length === 1 && !canUse(methods[0]))) {");
+    expect(code).toContain("await openCheckout(tierKey, chosen, methods[0].gateway);");
+    expect(code).toMatch(/if \(methods\.length > 1\) \{[\s\S]*?setChoice\(\{ tierKey, interval: chosen, summary: body\.summary, methods, selected \}\);/);
+  });
+
+  it("lists a method that cannot sell this price, greyed, with the reason, and never selects it", () => {
+    expect(code).toContain("const canUse = (method: PayMethod) => method.available !== false;");
+    expect(code).toContain("disabled={!usable}");
+    expect(code).toContain('<span className="mf-pay-method-desc">{method.reason || t("unavailable")}</span>');
+    expect(code).toContain("const usable = choice.methods.filter(canUse);");
+  });
+
+  it("pays in a new tab opened inside the click, and waits on this page for the gateway", () => {
+    expect(code).toContain('const tab = window.open("", "_blank");');
+    expect(code).toContain("tab.location.href = body.url;");
+    expect(code).toContain("void confirm(body.checkoutId, true);");
+    expect(code).toContain("const deadline = waitingInTab ? TAB_TIMEOUT_MS : CONFIRM_TIMEOUT_MS;");
+    // A tab that ends up unused is closed again, and a failed method says so.
+    expect(code).toContain("if (tab && !tab.closed) tab.close();");
+    expect(code).toContain('? t("methodFailed")');
+  });
+
+  it("keeps a switch made in place, and an older server, on today's path", () => {
+    // kind "change" and a 404 from a server without the route both fall through.
+    expect(code).toContain("} else if (response.status !== 404) {");
+    expect(code).toMatch(/\n      await openCheckout\(tierKey, chosen\);\n    \},/);
+  });
+
+  it("is a labelled modal radio group that closes on Escape, the backdrop, and its button", () => {
+    expect(code).toContain('role="dialog" aria-modal={true} aria-labelledby={`${scope}-pay-title`}');
+    expect(code).toContain('role="radiogroup" aria-label={t("payTitle")}');
+    expect(code).toContain('role="radio"');
+    expect(code).toContain('if (event.key === "Escape") {');
+    expect(code).toContain("if (event.target === event.currentTarget) closeChoice();");
+    expect(code).toContain('className="mf-pay-close" aria-label={t("payClose")} onClick={closeChoice}');
+  });
+
+  it("declares openCheckout before startCheckout uses it", () => {
+    expect(code.indexOf("const openCheckout = useCallback(")).toBeLessThan(code.indexOf("const startCheckout = useCallback("));
+  });
+});
+
+describe("why a chosen method failed", () => {
+  it("adds the gateway's own reason in Test mode only", () => {
+    expect(code).toContain('const testing = load.phase === "ready" && load.pricing.mode === "test";');
+    expect(code).toContain("const detail = testing && typeof payload.detail === \"string\" ? ` ${payload.detail.slice(0, 300)}` : \"\";");
+  });
+});
+
+describe("refusals before the chooser (2026-10-20)", () => {
+  it("never skips the chooser because the methods call failed, and says why", () => {
+    expect(code).toContain('setFlow({ phase: "idle", message: describeFailure(payload), tone: "error" });');
+    // The network failing is an error too, not a silent one-click checkout.
+    expect(code).toMatch(/\} catch \{\s*setFlow\(\{ phase: "idle", message: t\("error"\), tone: "error" \}\);\s*return;\s*\}\s*await openCheckout\(tierKey, chosen\);/);
+  });
+
+  it("says how long to wait when rate limited", () => {
+    expect(code).toContain('rateLimited: ["Too many attempts", "Too many checkout attempts. Try again in {minutes} min."]');
+    expect(code).toContain('if (payload.reason === "rate_limited") {');
+  });
+});
+
+describe("upgrade credit in the chooser (30-plan-changes.md)", () => {
+  it("shows the credit and what is due today, and a scheduled downgrade as a message", () => {
+    expect(code).toContain('t("creditLine", { plan: choice.summary.creditFrom ?? "" })');
+    expect(code).toContain("formatPrice(choice.summary.dueMinor ?? choice.summary.amountMinor, choice.summary.currency)");
+    expect(code).toContain('if (body.kind === "scheduled") {');
   });
 });

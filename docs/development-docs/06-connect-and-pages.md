@@ -222,6 +222,17 @@ Each page gets the screen it is named for:
 
 Before this, the login and reset pages both got the combined `MemberAuth`, so all three auth pages opened on the same sign in form.
 
+### 4.3. New Pages Get the Site's Header and Footer
+
+`createWebPage` makes a bare page: no navigation, no footer. A membership page that looks unlike the rest of the site reads as broken, so each new page borrows the site's own chrome (`findPageChrome`, `applyPageChrome` in `pageScaffoldService.ts`, the SDK adapter in `pageChromeFramer.ts`):
+
+1. **Source page**: Home first, then the other pages in project order, skipping pages made in this run. Only a page whose primary breakpoint is a **stack** qualifies; an absolutely positioned page places its footer by coordinates that are wrong on a page of another height.
+2. **Header and footer** (`pickPageChrome`): a child named like one (`Nav`, `Navigation`, `Header`, `Menu`, `Footer`) wherever it sits; otherwise the first and last children when they are component instances not named like content (`Hero`, `Section`, `CTA`...). A page with one child has none.
+3. **Placement**: the new page's primary breakpoint gets the source's stack attributes (layout, direction, alignment, distribution, gap, padding, height, min height). The header is cloned to index 0, the footer to the end, and the MemberFrame component is inserted at index 1 between them. Spacing is `64px 0 96px` below an in-flow header, and the larger `SCAFFOLD_COMPONENT_SPACING` when the header is absolute or fixed.
+4. **Failure**: each step is independent. No permission (`cloneNode` is declared in `framer.json`), no qualifying page, or a clone that fails leaves a bare page with the component, as before.
+
+Known limit: the copies go into the primary (Desktop) breakpoint, and Tablet and Phone inherit them. A per-breakpoint override on the source page, such as a header switched to its mobile variant on Phone, is not copied, so set it again on the new page if the template uses one.
+
 ---
 
 ## 5. `<MemberDashboard>`

@@ -32,16 +32,19 @@ describe("Member Pricing", () => {
     expect(pricingSource).toContain('if (body.kind === "changed") {');
   });
 
-  it("opens Lemon Squeezy and Razorpay on the page, and falls back to the hosted page", () => {
-    expect(pricingSource).toContain('const LEMON_SCRIPT = "https://app.lemonsqueezy.com/js/lemon.js";');
-    expect(pricingSource).toContain('const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";');
-    expect(pricingSource).toContain("(await openEmbedded(body.embed, body.url, body.checkoutId))");
+  it("opens every gateway on its own page, never an overlay on this one (2026-10-20)", () => {
+    // Lemon Squeezy's overlay and Razorpay's in-page window were removed: each
+    // gateway opens its hosted checkout, in the chooser's new tab or this tab.
+    expect(pricingSource).not.toContain("lemon.js");
+    expect(pricingSource).not.toContain("checkout.razorpay.com");
+    expect(pricingSource).not.toContain("openEmbedded");
+    expect(pricingSource).toContain("tab.location.href = body.url;");
     expect(pricingSource).toContain("window.location.assign(body.url);");
   });
 
-  it("confirms every on-page checkout through the server, like a redirect", () => {
-    expect(pricingSource).toContain("handler: () => void confirm(checkoutId),");
-    expect(pricingSource).toContain('if (event?.event === "Checkout.Success") {');
+  it("confirms every checkout through the server when the buyer comes back", () => {
+    expect(pricingSource).toContain('const checkoutId = readParam("mf_checkout");');
+    expect(pricingSource).toContain("void confirm(body.checkoutId, true);");
   });
 
   it("sends a test country only as a header the API ignores outside test mode", () => {

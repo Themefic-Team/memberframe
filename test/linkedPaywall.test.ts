@@ -11,6 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   ARTICLE_TAG_FILE_NAME,
@@ -30,7 +31,9 @@ describe("the PaywallArticle override", () => {
   });
 
   it("keeps the layer's own class and props, and adds the two the paywall reads", () => {
-    expect(code).toContain("{ ...props, className,");
+    expect(code).toContain("{ ...props, ref, className,");
+    // forwardRef: Framer's appear effect needs the ref, or the post stays invisible.
+    expect(code).toContain("return React.forwardRef(function Tagged(props: any, ref: any) {");
     expect(code).toContain(`props.className + " ${GATED_BODY_CLASS} ${LINKED_ARTICLE_CLASS}"`);
     expect(code).toContain(`: "${GATED_BODY_CLASS} ${LINKED_ARTICLE_CLASS}"`);
   });
@@ -42,8 +45,21 @@ describe("the PaywallArticle override", () => {
 });
 
 describe("the component in linked mode", () => {
-  it("is linked whenever Article Body is empty", () => {
-    expect(source).toContain("const linked = !hasArticle;");
+  it("has no Article Body, Article ID, or the other settings it now decides itself", () => {
+    const controls = source.slice(source.indexOf("addPropertyControls(MeteredPaywall"));
+    for (const gone of ["contentSlot:", "articleId:", "previewHeight:", "blurIntensity:", "showSignInLink:", "pricingPath:", "loginPath:", "seoMarkup:", "schemaType:"]) {
+      expect(controls, gone).not.toContain(gone);
+    }
+    expect(source).toContain("const pricingPath = CONFIG.pricingPath;");
+    expect(source).toContain('mfInjectPaywallSchema("Article");');
+  });
+
+  it("finds the article itself: a tagged layer first, else the nearest text block above with two paragraphs", () => {
+    expect(source).toContain("function findArticle(root: Element | null): HTMLElement | null {");
+    expect(source).toContain('[data-framer-component-type="RichTextContainer"]');
+    expect(source).toContain('element.querySelectorAll("p").length >= 2');
+    expect(source).toContain("filter(mfShown)");
+    expect(source).toContain("linkedArticle.setAttribute(MF_ARTICLE_ATTR, \"\");");
   });
 
   it("cuts the tagged layer from the first render, and only while it is not open", () => {
@@ -51,7 +67,8 @@ describe("the component in linked mode", () => {
     // server-rendered page already hides the rest of the post.
     expect(source).toContain('const [view, setView] = useState<View>({ phase: "checking" });');
     expect(source).toContain('const cut = effective.phase !== "open";');
-    expect(source).toMatch(/const linkedCss =\s*linked && !onCanvas && cut/);
+    expect(source).toMatch(/const linkedCss =\s*!onCanvas && cut/);
+    expect(source).toContain("const target = `.${MF_LINKED_ARTICLE_CLASS}, [${MF_ARTICLE_ATTR}]`;");
     expect(source).toContain("{linkedCss ? <style>{linkedCss}</style> : null}");
   });
 
@@ -63,19 +80,72 @@ describe("the component in linked mode", () => {
   });
 
   it("keeps locked text out of focus and screen readers on the tagged layer", () => {
-    expect(source).toContain("const articleElement = (): HTMLElement | null => (linked ? linkedArticle : bodyRef.current);");
-    expect(source).toMatch(/const body = articleElement\(\);\s*if \(!body\) return;\s*if \(locked\) body\.setAttribute\("inert", ""\);/);
+    expect(source).toMatch(/const body = linkedArticle;\s*if \(!body\) return;\s*if \(locked\) body\.setAttribute\("inert", ""\);/);
   });
 
   it("shows the lock card on the canvas, so it can be designed there", () => {
-    const linkedBranch = source.slice(source.indexOf("if (linked) {"), source.indexOf("return (\n      <React.Fragment>\n        {onCanvas ?"));
-    expect(linkedBranch).toContain('lockCard(mode === "teaser" ? "teaser" : "meter", false)');
-    expect(linkedBranch).toContain("PaywallArticle override");
+    const canvasBranch = source.slice(source.indexOf("function body(): React.ReactNode {"), source.indexOf("if (!linkedArticle) return null;"));
+    expect(canvasBranch).toContain('lockCard(mode === "teaser" ? "teaser" : "meter", false)');
+    expect(canvasBranch).toContain("Place this below the article.");
   });
 });
 
 describe("a linked paywall with no tagged post body", () => {
   it("shows nothing on the live site rather than a card under a readable post", () => {
     expect(source).toContain("if (!linkedArticle) return null;");
+  });
+});
+
+describe("finding the article with no override (2026-10-20)", () => {
+  // Cut out of the shipped file and run against a small fake page.
+  const start = source.indexOf("/** Shown on this viewport");
+  const end = source.indexOf("type TierKey =");
+  const js = ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
+
+  type Fake = { name: string; paragraphs: number; tagged?: boolean; hidden?: boolean; order: number; rich?: boolean };
+  function find(layers: Fake[], paywallOrder: number): string | null {
+    const make = (layer: Fake) => ({
+      name: layer.name,
+      order: layer.order,
+      getClientRects: () => (layer.hidden ? [] : [{}]),
+      querySelectorAll: () => ({ length: layer.paragraphs }),
+      contains: () => false,
+      compareDocumentPosition: (other: { order: number }) => (other.order > layer.order ? 4 : 2),
+    });
+    const all = layers.map(make);
+    const document = {
+      querySelectorAll: (selector: string) =>
+        selector.startsWith(".")
+          ? all.filter((_, index) => layers[index]!.tagged)
+          : all.filter((_, index) => layers[index]!.rich !== false && !layers[index]!.tagged),
+    };
+    // eslint-disable-next-line no-new-func
+    const api = new Function("document", "Node", "MF_LINKED_ARTICLE_CLASS", `${js}\nreturn { findArticle };`)(
+      document,
+      { DOCUMENT_POSITION_FOLLOWING: 4 },
+      "mf-paywall-article"
+    ) as { findArticle(root: unknown): { name: string } | null };
+    return api.findArticle({ order: paywallOrder })?.name ?? null;
+  }
+
+  it("takes the nearest text block above with two or more paragraphs, skipping a heading block", () => {
+    expect(find([{ name: "about", paragraphs: 8, order: 1 }, { name: "heading", paragraphs: 0, order: 2 }], 5)).toBe("about");
+  });
+
+  it("ignores a block below the paywall and a copy hidden for another breakpoint", () => {
+    expect(
+      find(
+        [
+          { name: "shown", paragraphs: 4, order: 1 },
+          { name: "hidden copy", paragraphs: 4, order: 2, hidden: true },
+          { name: "below", paragraphs: 9, order: 9 },
+        ],
+        5
+      )
+    ).toBe("shown");
+  });
+
+  it("prefers a layer given the PaywallArticle override", () => {
+    expect(find([{ name: "tagged", paragraphs: 2, order: 1, tagged: true }, { name: "closer", paragraphs: 5, order: 3 }], 5)).toBe("tagged");
   });
 });

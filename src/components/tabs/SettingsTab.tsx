@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Save } from "lucide-react";
 import { Banner, Button, Segmented, useToast } from "../ui";
 import { ConfigPanel } from "../settings/ConfigPanel";
+import { passwordPolicyProblem } from "../settings/MembershipSettings";
 import { IntegrationPanel } from "../settings/IntegrationPanel";
 import { WebhooksPanel } from "../settings/WebhooksPanel";
 import { PageLocksPanel } from "../settings/PageLocksPanel";
@@ -109,25 +110,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
    */
   const [auth, setAuth] = useState<AuthSettings | null>(null);
 
-  const [gatedPages, setGatedPages] = useState<GatedPageRule[]>(
-    () =>
-      settings?.gatedPages ?? [
-        {
-          path: "/dashboard",
-          enabled: true,
-          requiredTier: "signed_in",
-          fallbackAction: "redirect",
-          redirectPath: "/login",
-        },
-        {
-          path: "/private-content",
-          enabled: true,
-          requiredTier: "signed_in",
-          fallbackAction: "redirect",
-          redirectPath: "/login",
-        },
-      ]
-  );
+  // Empty until the creator adds a lock (2026-10-20): no sample rules.
+  const [gatedPages, setGatedPages] = useState<GatedPageRule[]>(() => settings?.gatedPages ?? []);
 
   /** Section locks being edited. Saved with the page locks, by the same button. */
   const [sectionLocks, setSectionLocks] = useState<SectionLockRule[]>(() => settings?.sectionLocks ?? []);
@@ -171,6 +155,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       afterLoginPath: settings?.auth.afterLoginPath ?? "",
       loginPath: settings?.auth.loginPath ?? "/login",
       afterLogoutPath: settings?.auth.afterLogoutPath ?? "/",
+      passwordPolicy: settings?.auth.passwordPolicy,
       tiers: siteTierList,
     }),
     [connection, settings, siteTierList]
@@ -220,7 +205,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         auth.afterLoginPath,
         auth.afterLogoutPath,
       ] as const
-    ).some((path) => !isSafeSitePath(path));
+    ).some((path) => !isSafeSitePath(path)) ||
+    (auth !== null && passwordPolicyProblem(auth.passwordPolicy) !== null);
 
   const handleSave = useCallback(async () => {
     if (!siteId) return;

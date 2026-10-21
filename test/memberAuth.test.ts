@@ -140,7 +140,7 @@ describe("the component holds no credential", () => {
     expect(stray).toBe(false);
     expect(calls.length).toBeGreaterThan(0);
     for (const call of calls) {
-      expect(call).toMatch(/\((HINT_KEY|SESSION_CACHE_KEY|DENIED_KEY|VERIFIED_KEY|CHECKOUT_INTENT_KEY|RETURN_KEY)[,)]/);
+      expect(call).toMatch(/\((HINT_KEY|SESSION_CACHE_KEY|DENIED_KEY|VERIFIED_KEY|CHECKOUT_INTENT_KEY|RETURN_KEY|MODAL_SHOWN_KEY)[,)]/);
       if (call.startsWith("localStorage.setItem")) expect(call).toBe('localStorage.setItem(HINT_KEY, "1")');
       if (call.includes("SESSION_CACHE_KEY")) expect(call).toContain("removeItem");
     }
@@ -214,8 +214,10 @@ describe("the email code flow", () => {
     // password endpoints. A fourth appearing means a flow grew its own request
     // and its own error handling, which is where the one that forgets to clear
     // the password comes from. The license block's GET is not an auth
-    // request, and canvasLicenseParity.test.ts holds it on its own (F19).
-    expect(authCode.match(/fetch\(/g)).toHaveLength(3);
+    // request, and canvasLicenseParity.test.ts holds it on its own (F19). Nor
+    // is the password rules GET (05-member-auth.md 13): it carries nothing.
+    expect(authCode.match(/fetch\(/g)).toHaveLength(4);
+    expect(authCode).toContain("void fetch(`${CONFIG.apiBaseUrl}${AUTH_CONFIG_PATH}`, { credentials: \"omit\", headers: apiHeaders(false) })");
   });
 });
 
@@ -306,11 +308,13 @@ describe("the component is safe by construction", () => {
     expect(code).toContain("radiusMax: 24,");
   });
 
-  it("scopes its custom properties per instance", () => {
+  it("scopes its custom properties per instance, the same on server and browser", () => {
     // Two sign-in boxes on one page with different accents must not overwrite
-    // each other, which a shared class would allow.
-    expect(code).toContain("data-memberframe-auth={scope}");
-    expect(code).toContain("useId()");
+    // each other, which a shared class would allow. The scope comes from the
+    // rule itself, not useId, so a published page's first paint is styled.
+    expect(code).toContain("data-memberframe-auth={styled.scope}");
+    expect(code).toContain('const styled = mfStyleScope("mfa", scopedVars);');
+    expect(code).toContain("<style>{styled.css}</style>");
   });
 
   it("carries no inline style and no unicode emoji", () => {
@@ -337,16 +341,25 @@ describe("the component is safe by construction", () => {
     }
   });
 
-  it("draws the four brand marks with fill=currentColor and no raster", () => {
+  it("draws the brand marks as SVG, never a raster: Google's four-colour G, the others in the button's colour", () => {
     // A documented deviation: the icon rule says stroke=currentColor, Lucide
     // carries no brand marks, and a brand glyph is a filled shape rather than a
-    // line. `fill="currentColor"` keeps the intent, which is that an icon
-    // inherits theme colour and is never an emoji or an image.
+    // line. Google's guidelines allow only its four-colour G.
     const marks = code.match(/fill="currentColor"/g) ?? [];
 
-    expect(marks.length).toBe(4);
+    expect(marks.length).toBe(3);
+    for (const colour of ["#EA4335", "#4285F4", "#FBBC05", "#34A853"]) expect(code).toContain(`fill="${colour}"`);
     expect(code).not.toContain("<img");
     expect(code).not.toMatch(/url\(data:image/);
+  });
+
+  it("gives each provider button its brand's colours, light and dark", () => {
+    expect(code).toContain("className={`memberframe-auth-provider is-${provider}`}");
+    // light-dark() follows the theme's color-scheme, so Dark and Auto need no media query.
+    expect(code).toContain(".memberframe-auth-provider.is-google { background: light-dark(#ffffff, #131314); border-color: light-dark(#747775, #8e918f);");
+    expect(code).toContain(".memberframe-auth-provider.is-apple { background: light-dark(#000000, #ffffff);");
+    expect(code).toContain(".memberframe-auth-provider.is-github { background: #24292f;");
+    expect(code).toContain(".memberframe-auth-provider.is-discord { background: #5865f2; border-color: #5865f2; color: #ffffff; }");
   });
 
   it("respects a reduced motion preference on its spinner", () => {
@@ -362,6 +375,11 @@ describe("the property controls", () => {
   /** Ten from task 2.5, three from FP-02. */
   const EVERY_CONTROL = [
     "authMode",
+    "modalTrigger",
+    "modalTriggerId",
+    "modalDelay",
+    "modalScrollPercent",
+    "modalOncePerSession",
     "headline",
     "welcomeMessage",
     "emailEnabled",
@@ -373,7 +391,6 @@ describe("the property controls", () => {
     "borderRadius",
     "enablePasswordAuth",
     "defaultAuthMethod",
-    "requirePasswordStrength",
     // The dedicated screens' link targets. Hidden on `<MemberAuth>` itself.
     "loginPath",
     "signupPath",
@@ -408,9 +425,8 @@ describe("the property controls", () => {
     expect(controlBlock).toContain(
       'hidden: (props) => (CONFIG.screen !== "all" && CONFIG.screen !== "login") || !props.enablePasswordAuth'
     );
-    expect(controlBlock).toContain(
-      'CONFIG.screen === "all" ? !props.enablePasswordAuth : CONFIG.screen !== "register" && CONFIG.screen !== "reset"'
-    );
+    // Strong Password is gone: the rules are the site's (05-member-auth.md 13).
+    expect(controlBlock).not.toContain("requirePasswordStrength");
   });
 
   it("gives the method enum readable option titles", () => {
@@ -659,7 +675,8 @@ describe("FP-02: the plaintext password does not outlive its submit", () => {
   });
 
   it("posts every credential, never gets", () => {
-    const fetchCalls = authCode.match(/fetch\([^)]*\)[\s\S]{0,400}?\}\)/g) ?? [];
+    // The password rules GET sends no credential and no cookie.
+    const fetchCalls = (authCode.match(/fetch\([^)]*\)[\s\S]{0,400}?\}\)/g) ?? []).filter((call) => !call.includes("AUTH_CONFIG_PATH"));
     expect(fetchCalls.length).toBeGreaterThan(0);
 
     for (const call of fetchCalls) {
@@ -754,10 +771,15 @@ describe("FP-02: the form details that only matter when they are wrong", () => {
 });
 
 describe("FP-02: the three new controls round-trip through the generator", () => {
-  it("emits all three into the config block", () => {
-    const generated = generateMemberAuthCode(
-      config({ enablePasswordAuth: true, defaultAuthMethod: "otp", requirePasswordStrength: false })
-    ).code;
+  it("emits them into the config block, with the site's password rules", () => {
+    const generated = generateMemberAuthCode(config({ enablePasswordAuth: true, defaultAuthMethod: "otp" }), undefined, {
+      apiBaseUrl: "https://api.example.com",
+      siteKey: "site_1",
+      afterLoginPath: "",
+      loginPath: "/login",
+      afterLogoutPath: "/",
+      passwordPolicy: { minLength: 12, requireNumber: false, requireUppercase: true, requireLowercase: false, requireSymbol: true },
+    }).code;
 
     const block = generated.slice(
       generated.indexOf(CONFIG_START_MARKER),
@@ -766,7 +788,9 @@ describe("FP-02: the three new controls round-trip through the generator", () =>
 
     expect(block).toContain("enablePasswordAuth: true,");
     expect(block).toContain('defaultAuthMethod: "otp",');
-    expect(block).toContain("requirePasswordStrength: false,");
+    expect(block).toContain(
+      "passwordPolicy: { minLength: 12, requireNumber: false, requireUppercase: true, requireLowercase: false, requireSymbol: true },"
+    );
   });
 
   it("coerces an unrecognised method to otp, not to the newer flow", () => {
@@ -786,16 +810,18 @@ describe("FP-02: the three new controls round-trip through the generator", () =>
     expect(normalizeAuthConfig(config({ defaultAuthMethod: "otp" })).defaultAuthMethod).toBe("otp");
   });
 
-  it("coerces the two booleans rather than passing a truthy value through", () => {
-    const normalized = normalizeAuthConfig(
-      config({
-        enablePasswordAuth: 1 as unknown as boolean,
-        requirePasswordStrength: "" as unknown as boolean,
-      })
-    );
+  it("coerces the boolean rather than passing a truthy value through", () => {
+    const normalized = normalizeAuthConfig(config({ enablePasswordAuth: 1 as unknown as boolean }));
 
     expect(normalized.enablePasswordAuth).toBe(true);
-    expect(normalized.requirePasswordStrength).toBe(false);
+  });
+
+  it("has no Strong Password control: the rules are the site's (05-member-auth.md 13)", () => {
+    const controls = code.slice(code.indexOf("addPropertyControls("));
+    expect(controls).not.toContain("requirePasswordStrength");
+    expect(code).toContain('const AUTH_CONFIG_PATH = "/api/member/auth-config";');
+    expect(code).toContain("if (body && body.passwordPolicy) setPolicy(readPasswordPolicy(body.passwordPolicy));");
+    expect(code).toContain("passwordProblems(password, email, policy)");
   });
 
   it("still changes nothing outside the config block", () => {
@@ -813,7 +839,6 @@ describe("FP-02: the three new controls round-trip through the generator", () =>
     // creator who deploys without touching a control gets it.
     expect(DEFAULT_MEMBER_AUTH_CONFIG.enablePasswordAuth).toBe(true);
     expect(DEFAULT_MEMBER_AUTH_CONFIG.defaultAuthMethod).toBe("password");
-    expect(DEFAULT_MEMBER_AUTH_CONFIG.requirePasswordStrength).toBe(true);
   });
 });
 
@@ -876,7 +901,7 @@ describe("email confirmation after password sign up", () => {
 
 describe("no redirect loop with the Route Shield", () => {
   it("does not send a signed-in member back to a page the shield just denied them", () => {
-    expect(code).toContain('if (!recentlyDenied(CONFIG.afterLoginPath || "/dashboard")) redirectAfterAuth();');
+    expect(code).toContain("if (!recentlyDenied(afterLoginTarget())) redirectAfterAuth();");
   });
 
   it("keeps the shield's hint in step with every sign in and sign out", () => {
@@ -884,5 +909,60 @@ describe("no redirect loop with the Route Shield", () => {
     expect(notify).toContain('localStorage.setItem(HINT_KEY, "1")');
     expect(notify).toContain("localStorage.removeItem(HINT_KEY)");
     expect(notify).toContain("sessionStorage.removeItem(SESSION_CACHE_KEY)");
+  });
+});
+
+describe("modal triggers (05-member-auth.md)", () => {
+  it("keeps the trigger settings safe to emit", () => {
+    const normal = normalizeAuthConfig(
+      config({ modalTrigger: "nope" as never, modalTriggerId: '#sign in"; }', modalDelay: 999, modalScrollPercent: -5 })
+    );
+    expect(normal.modalTrigger).toBe("click");
+    expect(normal.modalTriggerId).toBe("signin");
+    expect(normal.modalDelay).toBe(60);
+    expect(normal.modalScrollPercent).toBe(0);
+    expect(normalizeAuthConfig(config({ modalTrigger: "scroll" })).modalTrigger).toBe("scroll");
+  });
+
+  it("opens from a link to #id or a layer named id, before the link can navigate", () => {
+    expect(code).toContain('node.getAttribute("data-framer-name") === id');
+    expect(code).toContain('href === "#" + id || href.endsWith("#" + id)');
+    expect(code).toContain('document.addEventListener("click", onClick, true);');
+    expect(code).toContain("event.preventDefault();");
+  });
+
+  it("never opens by itself for a signed-in member, and closes on backdrop, Escape, and its button", () => {
+    expect(code).toContain('return window.localStorage.getItem(HINT_KEY) === "1";');
+    expect(code).toContain("if (event.target === event.currentTarget) closeModal();");
+    expect(code).toMatch(/event\.key === "Escape"\)\s*\{\s*event\.stopPropagation\(\);\s*closeModal\(\);/);
+    expect(code).toContain('className="memberframe-auth-close" aria-label="Close" onClick={closeModal}');
+  });
+
+  it("is always shown on the canvas, and draws nothing on a page until it opens", () => {
+    expect(code).toContain("const showCard = !isModal || onCanvas || modalOpen;");
+    expect(code).toContain("if (!showCard) return null;");
+  });
+});
+
+describe("social sign in under the email form (2026-10-20)", () => {
+  it("renders the form, then the divider, then the providers", () => {
+    const form = code.indexOf('<div className="memberframe-auth-form">{emailBody}</div>');
+    const divider = code.indexOf('<div className="memberframe-auth-divider">');
+    const providers = code.indexOf('<div className="memberframe-auth-providers">');
+    expect(form).toBeGreaterThan(0);
+    expect(divider).toBeGreaterThan(form);
+    expect(providers).toBeGreaterThan(divider);
+  });
+
+  it("hides the providers while a code is being entered", () => {
+    expect(code).toContain("providers.length > 0 && !awaitingCode ? (");
+  });
+});
+
+describe("after sign in, the site's setting now, not the one the file was written with (2026-10-20)", () => {
+  it("takes the destination from every sign in answer, the baked path only as a fallback", () => {
+    expect(code).toContain("noteAfterLoginPath(data);");
+    expect(code).toContain('return (siteAfterLoginPath ?? CONFIG.afterLoginPath) || "/dashboard";');
+    expect(code).toContain("const path = checkoutIntentPath() ?? returnPath() ?? afterLoginTarget();");
   });
 });

@@ -21,7 +21,7 @@
  */
 
 import type { TierKey } from "../../types/member";
-import type { CurrencyCode, SiteTierRecord } from "../../types/site";
+import type { CurrencyCode, SiteTierRecord, TierFeature } from "../../types/site";
 import { moneyErrorMessage, parseMinor } from "../../utils/money";
 import { currencyExponent } from "../../utils/currencies";
 
@@ -89,7 +89,13 @@ export interface TierFormDraft {
   currency: CurrencyCode;
   rank: string;
   isActive: boolean;
+  /** The pricing card lines, in order (28-tier-features.md). */
+  features: TierFeature[];
 }
+
+/** The server's limits on a tier's feature list. */
+export const MAX_TIER_FEATURES = 20;
+export const MAX_TIER_FEATURE_LENGTH = 120;
 
 export const EMPTY_TIER_FORM_DRAFT: TierFormDraft = {
   id: null,
@@ -102,6 +108,7 @@ export const EMPTY_TIER_FORM_DRAFT: TierFormDraft = {
   currency: "USD",
   rank: "1",
   isActive: true,
+  features: [],
 };
 
 /** One message per field, keyed by field name, for inline rendering. */
@@ -143,6 +150,9 @@ export function validateTierDraft(
     if (!TIER_KEY_PATTERN.test(key)) errors.key = "Use a name with at least two letters or digits.";
   }
 
+  const featuresError = validateFeatures(draft.features);
+  if (featuresError) errors.features = featuresError;
+
   if (draft.kind === "free") {
     // One Free tier per site: it is where every member starts.
     if (others.some(isFreeTier)) errors.kind = "This site already has its Free tier. Make this one paid.";
@@ -155,6 +165,16 @@ export function validateTierDraft(
   Object.assign(errors, validatePrices(draft));
 
   return { errors, valid: Object.keys(errors).length === 0 };
+}
+
+/** Every line has text, none is too long, and there are not too many. One message for the list. */
+function validateFeatures(features: ReadonlyArray<TierFeature>): string | null {
+  if (features.length > MAX_TIER_FEATURES) return `Keep it to ${MAX_TIER_FEATURES} features.`;
+  if (features.some((feature) => feature.text.trim() === "")) return "Write each feature, or remove the empty one.";
+  if (features.some((feature) => feature.text.trim().length > MAX_TIER_FEATURE_LENGTH)) {
+    return `Keep each feature under ${MAX_TIER_FEATURE_LENGTH} characters.`;
+  }
+  return null;
 }
 
 /** A paid tier's level: 1 and up, unique, since ranks decide which tier outranks which. */

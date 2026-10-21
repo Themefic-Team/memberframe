@@ -12,7 +12,7 @@ Technical development specification for two rules from the product owner (2026-1
 
 ## 1. Overview and Problem Solved
 
-- **Live license.** Before this change, a component asked `/api/license` once, when it mounted. A canvas or page left open past the end of a trial stayed unlocked until it was reloaded. Now it asks again every 60 seconds and whenever the tab regains focus.
+- **Live license.** Before this change, a component asked `/api/license` once, when it mounted. A canvas or page left open past the end of a trial stayed unlocked until it was reloaded. It then asked every 60 seconds; since 2026-10-20 nothing polls (section 6): the server pushes license changes to the open plugin, which rewrites the components, and a component asks once on mount and again on a return to the tab after ten minutes.
 - **Copy and paste.** Framer's clipboard cannot be switched off by a plugin: it copies a layer and its control values, and it carries a code component into another project with its code file. This feature does not stop the paste. It makes the pasted copy render locked, with the message "Insert this component from the MemberFrame plugin". The only way to a working component is the Builder.
 
 ## 2. How It Works
@@ -30,12 +30,18 @@ Technical development specification for two rules from the product owner (2026-1
   - `copied`: no seal, or a seal not signed for this site.
   - `foreign`: the page's `Origin` is neither a Framer editor host nor one of the site's allowed domains. This is a copy pasted into another project and published there.
   - `expired`, `trial`, or `active`: from the license, as before.
-- `copied` and `foreign` render the lock card with the insert message. `expired` renders the upgrade message.
+- `copied` renders the lock card with the insert message. `expired` renders the upgrade message.
+- `foreign` renders its own card, "Domain not allowed yet" (changed 2026-10-20). It used to share the insert message, which told a creator their own component had been pasted when the real cause was a published address missing from the site's allowed domains.
+
+### 2.2.1. Published addresses are allowed automatically
+
+- **The gap:** allowed domains were read from `getPublishInfo()` only when the project was connected. A site first published later (a new `*.framer.app` address, staging, a custom domain) answered `foreign` everywhere it was published.
+- **The fix:** the guard pass (section 2.3, When it runs) compares `getPublishInfo()` with the site's allowed domains (`missingPublishedOrigins`) and adds any missing address through `POST /api/site/origins`. The next page load on the published site then succeeds, without a republish. A failed request waits before it is tried again (section 6).
 
 ### 2.3. Copies inside the same project
 
 - A paste inside one project carries the same seal, so the seal alone cannot tell the copy from the original. The plugin decides, by comparing node ids:
-  - **When it runs:** while the panel is open, on open, every 10 seconds, and when Framer regains focus.
+  - **When it runs:** while the panel is open: on open, a second after the canvas or the selection changes (a paste selects what it pasted), when Framer regains focus, and once a minute as a fallback. A pass that finds the canvas unchanged since the last finished pass stops without a request.
   - **How it finds them:** it walks the component instances that carry an `mfSeal`.
   - **Rule:** a seal whose recorded node id is a different node is a copy. The plugin clears that copy's seal, so it locks.
 - Breakpoint replicas (the Tablet and Phone versions of a layer, `originalId` set) are the same layer, not copies, and are skipped.
@@ -82,6 +88,19 @@ Technical development specification for two rules from the product owner (2026-1
   - License block parity in all five components.
 - [ ] In Framer:
   - Insert from Builder: works.
-  - Copy and paste in the same project, with the panel open: the copy locks within 10 seconds.
+  - Copy and paste in the same project, with the panel open: the copy locks within a few seconds.
+  - Leave the canvas idle with the Network panel open: no `instance-seal/verify` requests.
   - Paste into another project: locks there once the plugin opens, and on its published site.
-  - End the trial (`npm run trial:reset -- <email> --expire`): open components lock within 60 seconds.
+  - End the trial (`npm run trial:reset -- <email> --expire`), with the panel open: canvas components lock within seconds (the license push).
+
+## 6. No Constant Requests (2026-10-20)
+
+The guard once ran every 10 seconds and asked `POST /api/plugin/instance-seal/verify` about every seal it had no record of. The record (`memberframe.seals`) only ever grew, so once writing it failed the same seals were asked about on every pass, and the network panel showed a request every few seconds.
+
+- **Event driven:** `subscribeToCanvasRoot` and `subscribeToSelection`, debounced by a second, plus focus and a one minute fallback.
+- **Unchanged canvas, no pass:** `sealFingerprint` (instances, seals, record, migration flag); equal to the last finished pass, the guard stops.
+- **Asked once:** answers are remembered for the session per site and seal, so a failed write never repeats a question.
+- **Backoff:** a failed request or write waits 30 seconds, 1, 2, 5, then 10 minutes (`nextRetryDelay`). The published-origins sync uses the same backoff.
+- **Small record:** `pruneRegistry` keeps only seals still on the canvas or just issued.
+
+Copy detection stays in the plugin: only Framer knows a layer was pasted. The license (trial or plan ended) is pushed by the server instead, 19-pro-lock-and-trial.md 5.1.

@@ -2,6 +2,35 @@ import React from "react";
 import { Checkbox, FieldRow, FieldRows, TextField } from "../ui";
 import { AUTH_PATH_FIELDS, isSafeSitePath } from "../../services/siteSettingsService";
 import type { AuthSettings } from "../../types/connection";
+import { PASSWORD_MIN_LENGTH, PASSWORD_POLICY_MAX_MIN, readPasswordPolicy, type PasswordPolicy } from "../../utils/credentials";
+
+/** Why these rules cannot be saved, or null. Only the minimum can be wrong. */
+export function passwordPolicyProblem(policy: PasswordPolicy | undefined): string | null {
+  if (!policy) return null;
+  const length = policy.minLength;
+  return Number.isInteger(length) && length >= PASSWORD_MIN_LENGTH && length <= PASSWORD_POLICY_MAX_MIN
+    ? null
+    : `Choose a minimum between ${PASSWORD_MIN_LENGTH} and ${PASSWORD_POLICY_MAX_MIN} characters.`;
+}
+
+/** The rules in one sentence, as a member will meet them. */
+export function passwordPolicySummary(policy: PasswordPolicy): string {
+  const extras = [
+    policy.requireNumber ? "a number" : "",
+    policy.requireUppercase ? "an uppercase letter" : "",
+    policy.requireLowercase ? "a lowercase letter" : "",
+    policy.requireSymbol ? "a symbol" : "",
+  ].filter(Boolean);
+  const list = extras.length > 1 ? `${extras.slice(0, -1).join(", ")} and ${extras[extras.length - 1]}` : extras[0] ?? "";
+  return `At least ${policy.minLength} characters, with a letter${list ? `, ${list}` : ""}.`;
+}
+
+const RULE_TOGGLES: ReadonlyArray<{ key: "requireNumber" | "requireUppercase" | "requireLowercase" | "requireSymbol"; label: string }> = [
+  { key: "requireNumber", label: "Require a number" },
+  { key: "requireUppercase", label: "Require an uppercase letter" },
+  { key: "requireLowercase", label: "Require a lowercase letter" },
+  { key: "requireSymbol", label: "Require a symbol" },
+];
 
 export interface MembershipSettingsProps {
   value: AuthSettings;
@@ -35,10 +64,10 @@ export interface MembershipSettingsProps {
  *
  * ## Only what the server enforces lives here
  *
- * "Sign in opens with" and "Require a strong password" were removed: nothing
- * read them. Each `<MemberAuth>` instance has its own Default Method and
- * Password Strength controls in the Framer properties panel, and those are
- * what a visitor actually gets. "Allow new sign ups" stays because the server
+ * "Sign in opens with" was removed: nothing read it. Each `<MemberAuth>` has
+ * its own Default Method control in Framer. The password rules are here, not
+ * on each component (05-member-auth.md 13): the server enforces them on sign
+ * up and reset, and every form on the site follows them without a republish. "Allow new sign ups" stays because the server
  * enforces it, so it closes registration for every sign in component on the
  * site and for anyone calling the API directly, which no canvas control can.
  */
@@ -49,6 +78,11 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
 }) => {
   const set = <Key extends keyof AuthSettings>(key: Key, next: AuthSettings[Key]): void =>
     onChange({ ...value, [key]: next });
+  // The stored rules, or the defaults for an older server; the minimum as typed.
+  const policy: PasswordPolicy = value.passwordPolicy ?? readPasswordPolicy(undefined);
+  const setPolicy = (next: Partial<PasswordPolicy>) =>
+    onChange({ ...value, passwordPolicy: { ...policy, ...next }, requirePasswordStrength: next.requireNumber ?? policy.requireNumber });
+  const policyProblem = passwordPolicyProblem(policy);
 
   return (
     <>
@@ -110,6 +144,42 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
           />
         </FieldRow>
       </FieldRows>
+
+      {/*
+        Password rules, for sign up and reset on every form on this site. Sign
+        in never checks them, so a member whose password predates a stricter
+        rule still signs in and meets it at their next reset.
+      */}
+      <FieldRows>
+        <FieldRow
+          label="Minimum password length"
+          htmlFor="settings-password-min"
+          hint={`From ${PASSWORD_MIN_LENGTH} to ${PASSWORD_POLICY_MAX_MIN} characters.`}
+        >
+          <TextField
+            id="settings-password-min"
+            inputMode="numeric"
+            value={Number.isFinite(policy.minLength) && policy.minLength > 0 ? String(policy.minLength) : ""}
+            invalid={policyProblem !== null}
+            disabled={disabled}
+            placeholder="8"
+            onChange={(next) => setPolicy({ minLength: Number.parseInt(next.replace(/[^0-9]/g, ""), 10) || 0 })}
+          />
+        </FieldRow>
+        {RULE_TOGGLES.map((rule) => (
+          <FieldRow key={rule.key} label={rule.label} htmlFor={`settings-password-${rule.key}`}>
+            <Checkbox
+              id={`settings-password-${rule.key}`}
+              checked={policy[rule.key]}
+              disabled={disabled}
+              onChange={(checked) => setPolicy({ [rule.key]: checked })}
+            />
+          </FieldRow>
+        ))}
+      </FieldRows>
+      <p className={policyProblem ? "settings-help settings-help-problem" : "settings-help"}>
+        {policyProblem ?? `${passwordPolicySummary(policy)} Used on sign up and password reset. Sign in is not affected.`}
+      </p>
 
     </>
   );

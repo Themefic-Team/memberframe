@@ -9,6 +9,8 @@ export interface CheckboxProps {
   /** Tri-state. Renders the dash and leaves `checked` alone. */
   indeterminate?: boolean;
   disabled?: boolean;
+  /** The accessible name when there is no visible label beside the box. */
+  ariaLabel?: string;
   children?: React.ReactNode;
 }
 
@@ -22,6 +24,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   onChange,
   indeterminate = false,
   disabled = false,
+  ariaLabel,
   children,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +51,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         type="checkbox"
         checked={checked}
         disabled={disabled}
+        aria-label={ariaLabel}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
       <span className="framefic-checkbox-box">

@@ -30,11 +30,8 @@
  * No token is read or stored. PRD section 14.1 S2 puts the member session in an
  * HTTP-only cookie, so the browser holds it and this component never sees it.
  * There is no `localStorage` call in this file and there must not be one.
- *
- * It does not count verification attempts and it does not rate limit. F05's
- * three-attempt rule is a server rule, because the code is hashed at rest and
- * only the server can count tries against it. Rate limiting is F21, task 4.10.
- * The 60 second resend lock here is a courtesy, not a control.
+ * Attempt counts and rate limits are the server's (F05, F21); the resend lock
+ * here is a courtesy.
  */
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -76,17 +73,20 @@ const IS_TRIAL = false;
 // Upgrade card. The server refuses an unlicensed site's member requests on its
 // own, so removing these lines unlocks nothing.
 //
-// The server is asked again every half minute and when the tab regains focus,
-// so a trial that ends while a page is open locks it. Each instance also sends
+// The server is asked once when the component mounts, and again only when the
+// tab comes back after ten minutes or more: nothing polls. On the canvas the
+// open plugin hears every license change from the server and rewrites the
+// four lines above, which remounts the component with the new state. Each
+// instance also sends
 // the seal the Builder gave it (27-instance-seal.md): a pasted copy, or one
 // that never came from the Builder, is answered "copied" and shows an insert
 // card instead. An instance from before seals sends none and is held to the
 // license alone.
 
-type MfLicense = "trial" | "active" | "locked" | "copied";
+type MfLicense = "trial" | "active" | "locked" | "copied" | "domain";
 
 const MF_LICENSE_CACHE_MS = 60000;
-const MF_LICENSE_RECHECK_MS = 30000;
+const MF_LICENSE_STALE_MS = 600000;
 
 function mfBakedLicense(): MfLicense {
   return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
@@ -97,7 +97,9 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
   const cache = (host.__mfLicense = host.__mfLicense || {});
   const base = String(apiBaseUrl).replace(/\/+$/, "");
-  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal);
+  // The baked state is part of the key: once the plugin rewrites it, the
+  // remounted component asks afresh instead of reusing the old answer.
+  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal) + "|" + mfBakedLicense();
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
@@ -118,7 +120,10 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
     })
     .then((data: { state?: unknown } | null): MfLicense | null => {
       const state = data ? data.state : null;
-      if (state === "copied" || state === "foreign") return "copied";
+      if (state === "copied") return "copied";
+      // Published at an address the site does not allow yet. Not a copy: the
+      // plugin adds the address the next time it is open in this project.
+      if (state === "foreign") return "domain";
       return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
     })
     .catch(() => null);
@@ -130,26 +135,26 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
+    let checkedAt = 0;
     const check = () => {
+      checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
         if (live && answer) setLicense(answer);
       });
     };
     check();
     if (typeof window === "undefined") return () => undefined;
-    // Instances on one page share the cached answer, so this is one request a
-    // minute per page, not one per component.
-    const timer = window.setInterval(check, MF_LICENSE_RECHECK_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+    // Instances on one page share the cached answer, so a return to the tab is
+    // at most one request per page, not one per component.
+    const onReturn = () => {
+      if (document.visibilityState === "visible" && Date.now() - checkedAt >= MF_LICENSE_STALE_MS) check();
     };
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
     return () => {
       live = false;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
     };
   }, [apiBaseUrl, siteKey, seal]);
   return license;
@@ -189,9 +194,16 @@ function MfWatermark(): React.ReactElement {
   );
 }
 
-function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
+const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
+  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
+  domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
+};
+
+function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
+  const copy = MF_LOCK_COPY[props.kind];
   return (
-    <div className="mf-lock" role="note" aria-label={props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}>
+    <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -199,12 +211,8 @@ function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
         </span>
-        <p className="mf-lock-title">{props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}</p>
-        <p className="mf-lock-text">
-          {props.copied
-            ? "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin."
-            : "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it."}
-        </p>
+        <p className="mf-lock-title">{copy.title}</p>
+        <p className="mf-lock-text">{copy.text}</p>
       </div>
     </div>
   );
@@ -216,7 +224,7 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay copied={props.license === "copied"} />}
+      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
     </>
   );
 }
@@ -443,6 +451,11 @@ function mfBox(value: unknown, max: number): [number, number, number, number] | 
  * component's own spacing alone. Top and bottom margin keep a root's own
  * centring; a side margin replaces it, and `width: auto` lets the root fill
  * the space between the two margins instead of overflowing at 100%.
+ *
+ * Margin sits inside the instance's box, so a root that fills its frame
+ * (`height: 100%`) shrinks by the top and bottom margin rather than spilling
+ * past the frame Framer shows as selected. A root sized by its content
+ * cannot resolve the percentage, and the browser treats it as `auto`.
  */
 function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
   const input = spacing || {};
@@ -453,6 +466,7 @@ function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
     const [t, r, b, l] = margin;
     if (t > 0) out.push(`margin-top: ${t}px;`);
     if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (t + b > 0) out.push(`height: calc(100% - ${t + b}px);`);
     if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
   }
 
@@ -629,6 +643,15 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
   }
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
+/** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
+const MF_SCOPE_SLOT = "@mf-scope";
+
+function mfStyleScope(prefix: string, rule: string): { scope: string; css: string } {
+  let hash = 5381;
+  for (let index = 0; index < rule.length; index++) hash = ((hash << 5) + hash + rule.charCodeAt(index)) | 0;
+  const scope = prefix + (hash >>> 0).toString(36);
+  return { scope, css: rule.split(MF_SCOPE_SLOT).join(scope) };
+}
 // @memberframe-appearance-end
 
 // ============================================================================
@@ -657,6 +680,11 @@ type AuthScreen = "all" | "login" | "register" | "reset" | "otp";
 
 interface AuthConfig {
   authMode: AuthDisplayMode;
+  modalTrigger: ModalTrigger;
+  modalTriggerId: string;
+  modalDelay: number;
+  modalScrollPercent: number;
+  modalOncePerSession: boolean;
   headline: string;
   welcomeMessage: string;
   emailEnabled: boolean;
@@ -668,7 +696,7 @@ interface AuthConfig {
   borderRadius: number;
   enablePasswordAuth: boolean;
   defaultAuthMethod: AuthMethod;
-  requirePasswordStrength: boolean;
+  passwordPolicy: PasswordPolicy;
   apiBaseUrl: string;
   /**
    * Which MemberFrame site this component belongs to.
@@ -714,6 +742,11 @@ const ENV_API_BASE_URL =
 // @memberframe-config-start
 const CONFIG: AuthConfig = {
   authMode: "inline",
+  modalTrigger: "click",
+  modalTriggerId: "sign-in",
+  modalDelay: 0,
+  modalScrollPercent: 50,
+  modalOncePerSession: true,
   headline: "Sign in to continue",
   welcomeMessage: "Use your email or a connected account.",
   emailEnabled: true,
@@ -725,7 +758,7 @@ const CONFIG: AuthConfig = {
   borderRadius: 10,
   enablePasswordAuth: true,
   defaultAuthMethod: "password",
-  requirePasswordStrength: true,
+  passwordPolicy: { minLength: 8, requireNumber: true, requireUppercase: false, requireLowercase: false, requireSymbol: false },
   apiBaseUrl: ENV_API_BASE_URL,
   siteKey: "",
   afterLoginPath: "",
@@ -770,6 +803,7 @@ const LOGIN_PASSWORD_PATH = "/api/member/login-password";
 const FORGOT_PASSWORD_PATH = "/api/member/forgot-password";
 const RESET_PASSWORD_PATH = "/api/member/reset-password";
 const SESSION_PATH = "/api/member/session";
+const AUTH_CONFIG_PATH = "/api/member/auth-config";
 /** Email confirmation for a new account. Confirms only; the member signs in next. */
 const VERIFY_EMAIL_PATH = "/api/member/verify-email";
 const RESEND_VERIFICATION_PATH = "/api/member/verify-email/resend";
@@ -785,6 +819,8 @@ const RESEND_VERIFICATION_PATH = "/api/member/verify-email/resend";
   key is the page the shield just turned a signed-in member away from.
 */
 const HINT_KEY = `memberframe:signed-in:${CONFIG.siteKey}`;
+/** Modal triggers: the pages and triggers whose modal opened by itself this visit. Not a credential. */
+const MODAL_SHOWN_KEY = "memberframe:modal-shown";
 const SESSION_CACHE_KEY = `__mf_session_${CONFIG.siteKey}`;
 const DENIED_KEY = `memberframe:denied:${CONFIG.siteKey}`;
 /** Carries a just-confirmed address from a sign up page to the sign in page. */
@@ -903,10 +939,27 @@ function apiHeaders(withBody: boolean): Record<string, string> {
  *   4. Navigating to the page you are already on would reload it and discard
  *      the state that was just established.
  */
+/**
+ * The site's After sign in page as the server last said it. Every sign in
+ * answer carries it, so a change in Settings, Membership takes effect at once;
+ * the path this file was written with is only the fallback. It was the only
+ * source once, and a component written before the setting changed kept
+ * sending members to the old page.
+ */
+let siteAfterLoginPath: string | null = null;
+
+function noteAfterLoginPath(data: Record<string, unknown>): void {
+  if (typeof data["afterLoginPath"] === "string") siteAfterLoginPath = data["afterLoginPath"];
+}
+
+function afterLoginTarget(): string {
+  return (siteAfterLoginPath ?? CONFIG.afterLoginPath) || "/dashboard";
+}
+
 function redirectAfterAuth(): void {
   // A visitor who chose a plan before signing in goes back to finish buying
   // it; one who pressed a content component's sign in goes back to that page.
-  const path = checkoutIntentPath() ?? returnPath() ?? (CONFIG.afterLoginPath || "/dashboard");
+  const path = checkoutIntentPath() ?? returnPath() ?? afterLoginTarget();
 
   if (path === "" || !path.startsWith("/")) return;
   if (path.startsWith("//") || path.includes("\\")) return;
@@ -998,6 +1051,9 @@ function oauthFailureMessage(reason: string): string {
   if (reason === "access_denied" || reason === "cancelled") {
     return "Sign in was cancelled.";
   }
+  // 31-sign-in-methods.md: an address the provider has not verified.
+  if (reason === "email_unverified_link") return "This email already has an account. Sign in the way you first did.";
+  if (reason.includes("email_unverified")) return "Verify your email with that provider first, then try again.";
   return "That sign in did not complete. Try again.";
 }
 
@@ -1136,6 +1192,18 @@ const PASSWORD_MIN_LENGTH = 8;
  */
 const PASSWORD_MAX_LENGTH = 128;
 
+/** The longest minimum a site may ask for. */
+const PASSWORD_POLICY_MAX_MIN = 64;
+
+/** The rules a creator sets in Settings, Membership. Sign in never checks them. */
+interface PasswordPolicy {
+  minLength: number;
+  requireNumber: boolean;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireSymbol: boolean;
+}
+
 /** Below three characters the email check fires on ordinary words. */
 const EMAIL_FRAGMENT_MIN_LENGTH = 3;
 
@@ -1168,6 +1236,9 @@ type PasswordProblem =
   | "too_long"
   | "needs_letter"
   | "needs_number"
+  | "needs_uppercase"
+  | "needs_lowercase"
+  | "needs_symbol"
   | "contains_email"
   | "too_common";
 
@@ -1176,12 +1247,13 @@ type PasswordScore = 0 | 1 | 2 | 3 | 4;
 function passwordProblems(
   password: string,
   email: string,
-  requireStrength: boolean
+  policy: PasswordPolicy
 ): ReadonlyArray<PasswordProblem> {
   const problems: PasswordProblem[] = [];
   const value = String(password ?? "");
+  const rules = readPasswordPolicy(policy);
 
-  if (value.length < PASSWORD_MIN_LENGTH) problems.push("too_short");
+  if (value.length < rules.minLength) problems.push("too_short");
   if (value.length > PASSWORD_MAX_LENGTH) problems.push("too_long");
 
   const lowered = value.toLowerCase();
@@ -1201,12 +1273,31 @@ function passwordProblems(
     problems.push("contains_email");
   }
 
-  if (requireStrength) {
-    if (!/[a-zA-Z]/.test(value)) problems.push("needs_letter");
-    if (!/[0-9]/.test(value)) problems.push("needs_number");
-  }
+  // Always a letter; the rest as the site's rules say (05-member-auth.md 13).
+  if (!/[a-zA-Z]/.test(value)) problems.push("needs_letter");
+  if (rules.requireNumber && !/[0-9]/.test(value)) problems.push("needs_number");
+  if (rules.requireUppercase && !/[A-Z]/.test(value)) problems.push("needs_uppercase");
+  if (rules.requireLowercase && !/[a-z]/.test(value)) problems.push("needs_lowercase");
+  if (rules.requireSymbol && !/[^a-zA-Z0-9]/.test(value)) problems.push("needs_symbol");
 
   return problems;
+}
+
+/**
+ * The site's rules, read defensively: a length from 8 to 64, and a number
+ * required unless the rules say otherwise, which is the rule before rules
+ * could be set. Anything missing or malformed falls back to that.
+ */
+function readPasswordPolicy(value: unknown): PasswordPolicy {
+  const raw = (value && typeof value === "object" ? value : {}) as Partial<Record<keyof PasswordPolicy, unknown>>;
+  const length = Math.round(Number(raw.minLength));
+  return {
+    minLength: Number.isFinite(length) ? Math.min(PASSWORD_POLICY_MAX_MIN, Math.max(PASSWORD_MIN_LENGTH, length)) : PASSWORD_MIN_LENGTH,
+    requireNumber: raw.requireNumber !== false,
+    requireUppercase: raw.requireUppercase === true,
+    requireLowercase: raw.requireLowercase === true,
+    requireSymbol: raw.requireSymbol === true,
+  };
 }
 
 function passwordScore(password: string): PasswordScore {
@@ -1238,21 +1329,39 @@ function passwordScore(password: string): PasswordScore {
 // Outside the parity test on purpose: this is wording, and wording drifting
 // between the two copies is cosmetic where a rule drifting is a bug.
 
-function passwordProblemMessage(problem: PasswordProblem): string {
+function passwordProblemMessage(problem: PasswordProblem, rules: PasswordPolicy): string {
   switch (problem) {
     case "too_short":
-      return `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
+      return `Use at least ${rules.minLength} characters.`;
     case "too_long":
       return `Keep it under ${PASSWORD_MAX_LENGTH} characters.`;
     case "needs_letter":
       return "Add at least one letter.";
     case "needs_number":
       return "Add at least one number.";
+    case "needs_uppercase":
+      return "Add an uppercase letter.";
+    case "needs_lowercase":
+      return "Add a lowercase letter.";
+    case "needs_symbol":
+      return "Add a symbol, such as ! or #.";
     case "contains_email":
       return "Do not use your email address in your password.";
     case "too_common":
       return "That password is too easy to guess. Pick another.";
   }
+}
+
+/** The site's rules in one line, as a member meets them on sign up and reset. */
+function passwordRulesLine(rules: PasswordPolicy): string {
+  const extras = [
+    rules.requireNumber ? "a number" : "",
+    rules.requireUppercase ? "an uppercase letter" : "",
+    rules.requireLowercase ? "a lowercase letter" : "",
+    rules.requireSymbol ? "a symbol" : "",
+  ].filter(Boolean);
+  const list = extras.length > 1 ? `${extras.slice(0, -1).join(", ")} and ${extras[extras.length - 1]}` : extras[0] || "";
+  return `At least ${rules.minLength} characters, with a letter${list ? `, ${list}` : ""}.`;
 }
 
 function passwordScoreLabel(score: PasswordScore): string {
@@ -1459,6 +1568,42 @@ const cssContent = `
   max-height: 100%;
 }
 
+.memberframe-auth-root.is-modal .memberframe-auth-card {
+  position: relative;
+}
+
+.memberframe-auth-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mf-c-muted);
+  cursor: pointer;
+}
+
+.memberframe-auth-close:hover {
+  background: var(--mf-c-field);
+  color: var(--mf-c-text);
+}
+
+.memberframe-auth-close:focus-visible {
+  outline: 2px solid var(--mf-c-accent);
+  outline-offset: 2px;
+}
+
+.memberframe-auth-close svg {
+  width: 16px;
+  height: 16px;
+}
+
 .memberframe-auth-head {
   display: flex;
   flex-direction: column;
@@ -1502,11 +1647,11 @@ const cssContent = `
   font-size: calc(13px * var(--mf-text-scale, 1));
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.1s ease;
+  transition: filter 0.15s ease, transform 0.1s ease;
 }
 
 .memberframe-auth-provider:hover {
-  border-color: var(--memberframe-auth-accent);
+  filter: brightness(0.94);
 }
 
 .memberframe-auth-provider:active {
@@ -1523,6 +1668,12 @@ const cssContent = `
   height: 16px;
   flex-shrink: 0;
 }
+
+/* Each provider's brand colours; light-dark() follows the theme's color-scheme. */
+.memberframe-auth-provider.is-google { background: light-dark(#ffffff, #131314); border-color: light-dark(#747775, #8e918f); color: light-dark(#1f1f1f, #e3e3e3); }
+.memberframe-auth-provider.is-apple { background: light-dark(#000000, #ffffff); border-color: light-dark(#000000, #ffffff); color: light-dark(#ffffff, #000000); }
+.memberframe-auth-provider.is-github { background: #24292f; border-color: light-dark(#24292f, rgba(255, 255, 255, 0.2)); color: #ffffff; }
+.memberframe-auth-provider.is-discord { background: #5865f2; border-color: #5865f2; color: #ffffff; }
 
 .memberframe-auth-divider {
   display: flex;
@@ -1685,6 +1836,14 @@ const cssContent = `
   font-size: calc(11px * var(--mf-text-scale, 1));
   line-height: 1.45;
   color: var(--memberframe-auth-danger);
+}
+
+/* The site's password rules, before the first submit (05-member-auth.md 13). */
+.memberframe-auth-rules {
+  margin: 0;
+  font-size: calc(11px * var(--mf-text-scale, 1));
+  line-height: 1.45;
+  color: var(--memberframe-auth-body);
 }
 
 .memberframe-auth-tabs {
@@ -1874,13 +2033,9 @@ const cssContent = `
 // ============================================================================
 // PROVIDER MARKS
 // ============================================================================
-// Monochrome single-path marks using `fill="currentColor"`.
-//
-// A deviation worth naming. The icon standard says Lucide React or Framer SVG
-// with `stroke="currentColor"`, and Lucide carries no brand marks: it removed
-// them. A brand glyph is a filled shape rather than a line, so `fill` is the
-// equivalent that keeps the rule's intent, which is that an icon inherits theme
-// colour and is never an emoji or a raster.
+// Google's four-colour G (its guidelines allow no other); the rest use
+// `fill="currentColor"`, the button's text colour. Lucide has no brand marks,
+// so these are filled SVG paths, never an emoji or a raster.
 //
 // Each provider publishes brand guidelines governing how its mark may appear on
 // a sign-in button. That review is a human task, recorded in
@@ -1888,11 +2043,11 @@ const cssContent = `
 
 const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
   google: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path
-        fill="currentColor"
-        d="M12 11v3.2h5.3c-.2 1.4-1.6 4.1-5.3 4.1-3.2 0-5.8-2.6-5.8-5.9S8.8 6.5 12 6.5c1.8 0 3 .8 3.7 1.4l2.5-2.4C16.6 4 14.5 3 12 3 7 3 3 7 3 12s4 9 9 9c5.2 0 8.6-3.6 8.6-8.7 0-.6 0-1-.1-1.3H12z"
-      />
+    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
     </svg>
   ),
   apple: (
@@ -2008,7 +2163,6 @@ export interface MemberAuthProps extends MfAppearanceProps {
   borderRadius?: number;
   enablePasswordAuth?: boolean;
   defaultAuthMethod?: AuthMethod;
-  requirePasswordStrength?: boolean;
   /** Dedicated screens only. See `AuthConfig`. */
   loginPath?: string;
   signupPath?: string;
@@ -2016,6 +2170,38 @@ export interface MemberAuthProps extends MfAppearanceProps {
   otpPath?: string;
   /** Modal mode only. Framer wires this to an interaction. */
   onClose?: () => void;
+  /** Modal triggers, 05-member-auth.md section 11. */
+  modalTrigger?: ModalTrigger;
+  modalTriggerId?: string;
+  modalDelay?: number;
+  modalScrollPercent?: number;
+  modalOncePerSession?: boolean;
+}
+
+type ModalTrigger = "click" | "load" | "scroll";
+
+/** A click on a link to `#id`, or on a layer named `id` (`data-framer-name`). */
+function isModalTrigger(target: EventTarget | null, id: string): boolean {
+  let node = target instanceof Element ? target : null;
+  while (node) {
+    if (node.getAttribute("data-framer-name") === id) return true;
+    if (node.tagName === "A") {
+      const href = node.getAttribute("href") || "";
+      if (href === "#" + id || href.endsWith("#" + id)) return true;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+
+/** Drawn here: Framer's bundled lucide-react may lack `X`. */
+function MfCloseMark(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
 }
 
 /** Set by the MemberFrame Builder on insert, never by hand (27-instance-seal.md). */
@@ -2047,12 +2233,16 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     borderRadius = CONFIG.borderRadius,
     enablePasswordAuth: passwordControl = CONFIG.enablePasswordAuth,
     defaultAuthMethod = CONFIG.defaultAuthMethod,
-    requirePasswordStrength = CONFIG.requirePasswordStrength,
     loginPath = CONFIG.loginPath,
     signupPath = CONFIG.signupPath,
     resetPath = CONFIG.resetPath,
     otpPath = CONFIG.otpPath,
     onClose,
+    modalTrigger = CONFIG.modalTrigger,
+    modalTriggerId = CONFIG.modalTriggerId,
+    modalDelay = CONFIG.modalDelay,
+    modalScrollPercent = CONFIG.modalScrollPercent,
+    modalOncePerSession = CONFIG.modalOncePerSession,
     theme = "light",
     colors,
     typography,
@@ -2103,11 +2293,111 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     return target === RenderTarget.canvas || target === RenderTarget.thumbnail;
   }, []);
 
+  // Modal triggers (05-member-auth.md section 11). Always shown on the canvas.
+  const isModal = authMode === "modal";
+  const [modalOpen, setModalOpen] = useState(false);
+  const showCard = !isModal || onCanvas || modalOpen;
+
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    onClose?.();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isModal || onCanvas || typeof window === "undefined") return;
+    const id = String(modalTriggerId || "").trim().replace(/^#/, "");
+    const entry = window.location.pathname + "|" + (id || modalTrigger);
+    const signedIn = () => {
+      try {
+        return window.localStorage.getItem(HINT_KEY) === "1";
+      } catch {
+        return false;
+      }
+    };
+    const shown = (): string[] => {
+      try {
+        const list = JSON.parse(window.sessionStorage.getItem(MODAL_SHOWN_KEY) || "[]");
+        return Array.isArray(list) ? list.filter((item): item is string => typeof item === "string") : [];
+      } catch {
+        return [];
+      }
+    };
+    // Never by itself for a signed-in member; once per page per visit if asked.
+    const openAutomatically = () => {
+      if (signedIn()) return;
+      const seen = shown();
+      if (modalOncePerSession && seen.includes(entry)) return;
+      try {
+        window.sessionStorage.setItem(MODAL_SHOWN_KEY, JSON.stringify([...seen, entry].slice(-50)));
+      } catch {
+        // Blocked storage only means it may show again.
+      }
+      setModalOpen(true);
+    };
+
+    const cleanups: Array<() => void> = [];
+
+    if (id !== "") {
+      // Capture phase, so the trigger's own `#id` link never navigates.
+      const onClick = (event: MouseEvent) => {
+        if (!isModalTrigger(event.target, id)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setModalOpen(true);
+      };
+      const onHash = () => {
+        if (window.location.hash === "#" + id) setModalOpen(true);
+      };
+      document.addEventListener("click", onClick, true);
+      window.addEventListener("hashchange", onHash);
+      onHash();
+      cleanups.push(() => {
+        document.removeEventListener("click", onClick, true);
+        window.removeEventListener("hashchange", onHash);
+      });
+    }
+
+    if (modalTrigger === "load") {
+      const seconds = Math.min(60, Math.max(0, Number(modalDelay) || 0));
+      const timer = window.setTimeout(openAutomatically, seconds * 1000);
+      cleanups.push(() => window.clearTimeout(timer));
+    }
+
+    if (modalTrigger === "scroll") {
+      const depth = Math.min(100, Math.max(0, Number(modalScrollPercent) || 0));
+      const onScroll = () => {
+        const room = document.documentElement.scrollHeight - window.innerHeight;
+        const reached = room <= 0 ? 100 : (window.scrollY / room) * 100;
+        if (reached < depth) return;
+        window.removeEventListener("scroll", onScroll);
+        openAutomatically();
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      cleanups.push(() => window.removeEventListener("scroll", onScroll));
+    }
+
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+    };
+  }, [isModal, onCanvas, modalTrigger, modalTriggerId, modalDelay, modalScrollPercent, modalOncePerSession]);
+
+  useEffect(() => {
+    if (!isModal || onCanvas || !modalOpen || typeof document === "undefined") return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isModal, onCanvas, modalOpen]);
+
   const [state, setState] = useState<AuthState>({ phase: "idle" });
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [oauthBusy, setOauthBusy] = useState<OAuthProvider | null>(null);
+  const [policy, setPolicy] = useState<PasswordPolicy>(() => readPasswordPolicy(CONFIG.passwordPolicy));
+  const policyLoaded = useRef(false);
 
   /* ---- FP-02 state ---- */
 
@@ -2564,7 +2854,9 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         setShowPassword(false);
 
         if (response.ok) {
-          onOk(((await response.json().catch(() => ({}))) ?? {}) as Record<string, unknown>);
+          const data = ((await response.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+          noteAfterLoginPath(data);
+          onOk(data);
           return;
         }
 
@@ -2647,7 +2939,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         notifySessionUpdated(true);
         // Not back to a page the shield just turned this member away from:
         // that page would send them here again, and round it would go.
-        if (!recentlyDenied(CONFIG.afterLoginPath || "/dashboard")) redirectAfterAuth();
+        if (!recentlyDenied(afterLoginTarget())) redirectAfterAuth();
       },
       true
     );
@@ -2741,7 +3033,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     setSubmitted(true);
 
     if (!looksLikeEmail(email)) return;
-    if (passwordProblems(password, email, requirePasswordStrength).length > 0) return;
+    if (passwordProblems(password, email, policy).length > 0) return;
 
     void submitCredentials(
       REGISTER_PATH,
@@ -2771,7 +3063,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         redirectAfterAuth();
       }
     );
-  }, [email, name, password, requirePasswordStrength, submitCredentials]);
+  }, [email, name, password, policy, submitCredentials]);
 
   /**
    * FP-02 section 2.3 and section 3.4 rule 3.
@@ -2794,7 +3086,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     setSubmitted(true);
 
     if (resetToken === null) return;
-    if (passwordProblems(password, email, requirePasswordStrength).length > 0) return;
+    if (passwordProblems(password, email, policy).length > 0) return;
 
     void submitCredentials(RESET_PASSWORD_PATH, { token: resetToken, newPassword: password }, () => {
       // Strip the token from the address bar. It is spent now, and leaving it
@@ -2814,7 +3106,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       notifySessionUpdated(true);
       redirectAfterAuth();
     });
-  }, [email, password, requirePasswordStrength, resetToken, submitCredentials]);
+  }, [email, password, policy, resetToken, submitCredentials]);
 
   // --------------------------------------------------------------------------
   // Modal keyboard behaviour. F05 requires Escape and a focus trap.
@@ -2825,7 +3117,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose?.();
+        closeModal();
         return;
       }
 
@@ -2855,7 +3147,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         first.focus();
       }
     },
-    [authMode, onClose]
+    [authMode, closeModal]
   );
 
   // --------------------------------------------------------------------------
@@ -2864,7 +3156,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   // Accent, radius, Colors, Typography, and Layout, sanitized by the shared
   // appearance block and scoped to this instance.
   const scopedVars =
-    `[data-memberframe-auth="${scope}"] { ` +
+    `[data-memberframe-auth="${MF_SCOPE_SLOT}"] { ` +
     mfAppearanceVars({
       accent: accentColor,
       radius: borderRadius,
@@ -2876,6 +3168,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       spacing,
     }) +
     " }";
+  const styled = mfStyleScope("mfa", scopedVars);
 
   const busy = state.phase === "sending" || state.phase === "verifying";
   const remaining =
@@ -2899,9 +3192,24 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   /** Where a new password is being chosen, so where the meter belongs. */
   const choosingPassword = view === "password_signup" || view === "reset";
 
+  // The site's password rules, set in MemberFrame, Settings, Membership. Asked
+  // for only where a password is chosen, so sign in costs no request; until
+  // then, the rules baked in when this file was written.
+  useEffect(() => {
+    if (onCanvas || !choosingPassword || policyLoaded.current) return;
+    policyLoaded.current = true;
+    void fetch(`${CONFIG.apiBaseUrl}${AUTH_CONFIG_PATH}`, { credentials: "omit", headers: apiHeaders(false) })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { passwordPolicy?: unknown } | null) => {
+        if (body && body.passwordPolicy) setPolicy(readPasswordPolicy(body.passwordPolicy));
+      })
+      .catch(() => undefined);
+  }, [onCanvas, choosingPassword]);
+
   const problems = choosingPassword
-    ? passwordProblems(password, email, requirePasswordStrength)
+    ? passwordProblems(password, email, policy)
     : [];
+  const rules = readPasswordPolicy(policy);
   const score = passwordScore(password);
 
   // Errors appear only after a submit attempt. Marking a field invalid while
@@ -3090,10 +3398,12 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         <p className="memberframe-auth-error">Enter your password.</p>
       ) : null}
 
+      {choosingPassword && !passwordProblem ? <p className="memberframe-auth-rules">{passwordRulesLine(rules)}</p> : null}
+
       {passwordProblem ? (
         <ul className="memberframe-auth-hints">
           {problems.map((problem) => (
-            <li key={problem}>{passwordProblemMessage(problem)}</li>
+            <li key={problem}>{passwordProblemMessage(problem, rules)}</li>
           ))}
         </ul>
       ) : null}
@@ -3343,6 +3653,11 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 
   const card = (
     <div className="memberframe-auth-card" ref={cardRef}>
+      {isModal ? (
+        <button type="button" className="memberframe-auth-close" aria-label="Close" onClick={closeModal}>
+          <MfCloseMark />
+        </button>
+      ) : null}
       {state.phase === "signed_in" ? (
         <div className="memberframe-auth-done">
           <ShieldCheck stroke="currentColor" aria-hidden={true} />
@@ -3387,33 +3702,6 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
             {viewWelcome ? <p className="memberframe-auth-welcome">{viewWelcome}</p> : null}
           </div>
 
-          {providers.length > 0 ? (
-            <div className="memberframe-auth-providers">
-              {providers.map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  className="memberframe-auth-provider"
-                  disabled={oauthBusy !== null || busy}
-                  onClick={() => startOAuth(provider)}
-                >
-                  {oauthBusy === provider ? (
-                    <Loader2 className="memberframe-auth-spin" stroke="currentColor" aria-hidden={true} />
-                  ) : (
-                    PROVIDER_MARKS[provider]
-                  )}
-                  <span>{t("continueWith", { provider: PROVIDER_LABELS[provider] })}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {emailEnabled && providers.length > 0 ? (
-            <div className="memberframe-auth-divider">
-              <span>{t("divider")}</span>
-            </div>
-          ) : null}
-
           {emailEnabled && passwordPath && !awaitingCode ? authTabs : null}
 
           {notice && !awaitingCode ? (
@@ -3430,6 +3718,34 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
             <p className="memberframe-auth-error" role="alert">
               {errorMessage}
             </p>
+          ) : null}
+
+          {/* Email first, then the providers (2026-10-20). */}
+          {emailEnabled && providers.length > 0 && !awaitingCode ? (
+            <div className="memberframe-auth-divider">
+              <span>{t("divider")}</span>
+            </div>
+          ) : null}
+
+          {providers.length > 0 && !awaitingCode ? (
+            <div className="memberframe-auth-providers">
+              {providers.map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  className={`memberframe-auth-provider is-${provider}`}
+                  disabled={oauthBusy !== null || busy}
+                  onClick={() => startOAuth(provider)}
+                >
+                  {oauthBusy === provider ? (
+                    <Loader2 className="memberframe-auth-spin" stroke="currentColor" aria-hidden={true} />
+                  ) : (
+                    PROVIDER_MARKS[provider]
+                  )}
+                  <span>{t("continueWith", { provider: PROVIDER_LABELS[provider] })}</span>
+                </button>
+              ))}
+            </div>
           ) : null}
 
           {!emailEnabled && providers.length === 0 ? (
@@ -3454,10 +3770,21 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     </div>
   );
 
+  // A closed modal on a published page draws nothing until its trigger fires.
+  if (!showCard) return null;
+
   return (
     <div
       className={`memberframe-auth-root ${mfThemeClass(theme)}${authMode === "modal" ? " is-modal" : ""}${license === "trial" ? " has-mf-wm" : ""}`}
-      data-memberframe-auth={scope}
+      onClick={
+        isModal && !onCanvas
+          ? (event) => {
+              // A click on the dimmed backdrop, not inside the card, closes it.
+              if (event.target === event.currentTarget) closeModal();
+            }
+          : undefined
+      }
+      data-memberframe-auth={styled.scope}
       role={authMode === "modal" ? "dialog" : undefined}
       aria-modal={authMode === "modal" ? true : undefined}
       aria-label={authMode === "modal" ? headline : undefined}
@@ -3465,7 +3792,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     >
       <style>{mfThemeCss(".memberframe-auth-root")}</style>
       <style>{cssContent}</style>
-      <style>{scopedVars}</style>
+      <style>{styled.css}</style>
       {card}
 
       <MfLicenseLayer license={license} />
@@ -3495,6 +3822,50 @@ addPropertyControls(MemberAuth, {
     options: ["inline", "modal"],
     optionTitles: ["Inline On Page", "Modal Overlay"],
     defaultValue: CONFIG.authMode,
+  },
+  // Modal triggers (05-member-auth.md). Shown only for Modal Overlay.
+  modalTrigger: {
+    type: ControlType.Enum,
+    title: "Opens",
+    options: ["click", "load", "scroll"],
+    optionTitles: ["On Click", "On Page Load", "On Scroll"],
+    defaultValue: CONFIG.modalTrigger,
+    hidden: (props) => props.authMode !== "modal",
+  },
+  modalTriggerId: {
+    type: ControlType.String,
+    title: "Trigger ID",
+    placeholder: "sign-in",
+    defaultValue: CONFIG.modalTriggerId,
+    description: "Set a button's link to #sign-in, or name its layer sign-in. Clicking it opens this modal, whichever Opens you choose.",
+    hidden: (props) => props.authMode !== "modal",
+  },
+  modalDelay: {
+    type: ControlType.Number,
+    title: "Delay",
+    unit: "s",
+    min: 0,
+    max: 60,
+    step: 0.5,
+    displayStepper: true,
+    defaultValue: CONFIG.modalDelay,
+    hidden: (props) => props.authMode !== "modal" || props.modalTrigger !== "load",
+  },
+  modalScrollPercent: {
+    type: ControlType.Number,
+    title: "Scroll Depth",
+    unit: "%",
+    min: 0,
+    max: 100,
+    step: 5,
+    defaultValue: CONFIG.modalScrollPercent,
+    hidden: (props) => props.authMode !== "modal" || props.modalTrigger !== "scroll",
+  },
+  modalOncePerSession: {
+    type: ControlType.Boolean,
+    title: "Once Per Visit",
+    defaultValue: CONFIG.modalOncePerSession,
+    hidden: (props) => props.authMode !== "modal" || (props.modalTrigger !== "load" && props.modalTrigger !== "scroll"),
   },
   headline: {
     type: ControlType.String,
@@ -3568,13 +3939,6 @@ addPropertyControls(MemberAuth, {
     optionTitles: ["Email & Password", "Passwordless Code"],
     defaultValue: CONFIG.defaultAuthMethod,
     hidden: (props) => (CONFIG.screen !== "all" && CONFIG.screen !== "login") || !props.enablePasswordAuth,
-  },
-  requirePasswordStrength: {
-    type: ControlType.Boolean,
-    title: "Strong Password",
-    defaultValue: CONFIG.requirePasswordStrength,
-    hidden: (props) =>
-      CONFIG.screen === "all" ? !props.enablePasswordAuth : CONFIG.screen !== "register" && CONFIG.screen !== "reset",
   },
 
   /* ---- Dedicated screens only: the pages their links go to ---- */

@@ -58,17 +58,20 @@ const IS_TRIAL = false;
 // Upgrade card. The server refuses an unlicensed site's member requests on its
 // own, so removing these lines unlocks nothing.
 //
-// The server is asked again every half minute and when the tab regains focus,
-// so a trial that ends while a page is open locks it. Each instance also sends
+// The server is asked once when the component mounts, and again only when the
+// tab comes back after ten minutes or more: nothing polls. On the canvas the
+// open plugin hears every license change from the server and rewrites the
+// four lines above, which remounts the component with the new state. Each
+// instance also sends
 // the seal the Builder gave it (27-instance-seal.md): a pasted copy, or one
 // that never came from the Builder, is answered "copied" and shows an insert
 // card instead. An instance from before seals sends none and is held to the
 // license alone.
 
-type MfLicense = "trial" | "active" | "locked" | "copied";
+type MfLicense = "trial" | "active" | "locked" | "copied" | "domain";
 
 const MF_LICENSE_CACHE_MS = 60000;
-const MF_LICENSE_RECHECK_MS = 30000;
+const MF_LICENSE_STALE_MS = 600000;
 
 function mfBakedLicense(): MfLicense {
   return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
@@ -79,7 +82,9 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
   const cache = (host.__mfLicense = host.__mfLicense || {});
   const base = String(apiBaseUrl).replace(/\/+$/, "");
-  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal);
+  // The baked state is part of the key: once the plugin rewrites it, the
+  // remounted component asks afresh instead of reusing the old answer.
+  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal) + "|" + mfBakedLicense();
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
@@ -100,7 +105,10 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
     })
     .then((data: { state?: unknown } | null): MfLicense | null => {
       const state = data ? data.state : null;
-      if (state === "copied" || state === "foreign") return "copied";
+      if (state === "copied") return "copied";
+      // Published at an address the site does not allow yet. Not a copy: the
+      // plugin adds the address the next time it is open in this project.
+      if (state === "foreign") return "domain";
       return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
     })
     .catch(() => null);
@@ -112,26 +120,26 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
+    let checkedAt = 0;
     const check = () => {
+      checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
         if (live && answer) setLicense(answer);
       });
     };
     check();
     if (typeof window === "undefined") return () => undefined;
-    // Instances on one page share the cached answer, so this is one request a
-    // minute per page, not one per component.
-    const timer = window.setInterval(check, MF_LICENSE_RECHECK_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+    // Instances on one page share the cached answer, so a return to the tab is
+    // at most one request per page, not one per component.
+    const onReturn = () => {
+      if (document.visibilityState === "visible" && Date.now() - checkedAt >= MF_LICENSE_STALE_MS) check();
     };
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
     return () => {
       live = false;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
     };
   }, [apiBaseUrl, siteKey, seal]);
   return license;
@@ -171,9 +179,16 @@ function MfWatermark(): React.ReactElement {
   );
 }
 
-function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
+const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
+  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
+  domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
+};
+
+function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
+  const copy = MF_LOCK_COPY[props.kind];
   return (
-    <div className="mf-lock" role="note" aria-label={props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}>
+    <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -181,12 +196,8 @@ function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
         </span>
-        <p className="mf-lock-title">{props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}</p>
-        <p className="mf-lock-text">
-          {props.copied
-            ? "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin."
-            : "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it."}
-        </p>
+        <p className="mf-lock-title">{copy.title}</p>
+        <p className="mf-lock-text">{copy.text}</p>
       </div>
     </div>
   );
@@ -198,7 +209,7 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay copied={props.license === "copied"} />}
+      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
     </>
   );
 }
@@ -425,6 +436,11 @@ function mfBox(value: unknown, max: number): [number, number, number, number] | 
  * component's own spacing alone. Top and bottom margin keep a root's own
  * centring; a side margin replaces it, and `width: auto` lets the root fill
  * the space between the two margins instead of overflowing at 100%.
+ *
+ * Margin sits inside the instance's box, so a root that fills its frame
+ * (`height: 100%`) shrinks by the top and bottom margin rather than spilling
+ * past the frame Framer shows as selected. A root sized by its content
+ * cannot resolve the percentage, and the browser treats it as `auto`.
  */
 function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
   const input = spacing || {};
@@ -435,6 +451,7 @@ function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
     const [t, r, b, l] = margin;
     if (t > 0) out.push(`margin-top: ${t}px;`);
     if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (t + b > 0) out.push(`height: calc(100% - ${t + b}px);`);
     if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
   }
 
@@ -611,6 +628,15 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
   }
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
+/** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
+const MF_SCOPE_SLOT = "@mf-scope";
+
+function mfStyleScope(prefix: string, rule: string): { scope: string; css: string } {
+  let hash = 5381;
+  for (let index = 0; index < rule.length; index++) hash = ((hash << 5) + hash + rule.charCodeAt(index)) | 0;
+  const scope = prefix + (hash >>> 0).toString(36);
+  return { scope, css: rule.split(MF_SCOPE_SLOT).join(scope) };
+}
 // @memberframe-appearance-end
 
 // @memberframe-canvas-preview-start
@@ -698,11 +724,15 @@ const CONFIG: PricingConfig = {
 
 const PRICING_PATH = "/api/checkout/pricing";
 const CHECKOUT_PATH = "/api/checkout/create-session";
+/** The order summary and payment methods for the chooser (29-checkout-methods.md). */
+const OPTIONS_PATH = "/api/checkout/options";
 const STATUS_PATH = "/api/checkout/status/";
 const SESSION_PATH = "/api/member/session";
 
 /** How long the return page waits for the gateway's webhook before saying so. */
 const CONFIRM_TIMEOUT_MS = 30_000;
+/** Paying in a new tab can take a while (a card form, a bank's 3-D Secure, UPI on a phone). */
+const TAB_TIMEOUT_MS = 20 * 60_000;
 const CONFIRM_POLL_MS = 2_000;
 
 /**
@@ -758,20 +788,21 @@ const PRICING_LABELS: Record<string, readonly [string, string]> = {
     "Switching plans: you pay for the new plan now and are credited for the time left on your current one.",
   ],
   closed: ["Checkout closed", "Checkout closed. You have not been charged."],
+  payTitle: ["Payment chooser title", "Choose how to pay"],
+  payContinue: ["Continue button", "Continue to payment"],
+  renewsMonth: ["Monthly renewal note", "Renews every month"],
+  renewsYear: ["Yearly renewal note", "Renews every year"],
+  payOnce: ["One payment note", "One payment"],
+  payClose: ["Close chooser", "Close"],
+  payInTab: ["Paying in a new tab", "Finish paying in the new tab. This page updates by itself."],
+  methodFailed: ["Method failed", "That payment method could not start. Choose another one."],
+  backToPlans: ["Back to plans button", "Back to plans"],
+  rateLimited: ["Too many attempts", "Too many checkout attempts. Try again in {minutes} min."],
+  creditLine: ["Credit line", "Credit for unused {plan}"],
+  dueToday: ["Due today", "Due today"],
+  thenEvery: ["Renewal line", "Then {price} every {period}"],
+  scheduled: ["Downgrade scheduled", "Your plan changes to {tier} on {date}. Nothing is charged today."],
 };
-
-/** Feature lines per tier, matched by the tier's name or key. */
-interface FeatureRow {
-  tier?: string;
-  lines?: string;
-}
-
-const DEFAULT_FEATURES: FeatureRow[] = [
-  { tier: "Free", lines: "Members only posts\nCommunity access" },
-  { tier: "Silver", lines: "Everything in Free\nAll courses\nMonthly live session" },
-  { tier: "Gold", lines: "Everything in Silver\nDownloadable resources\nPriority support" },
-  { tier: "VIP", lines: "Everything, forever\nOne payment, no renewals" },
-];
 
 // ============================================================================
 // TYPES FROM THE API
@@ -784,6 +815,8 @@ interface PublicTier {
   currency: string;
   prices: Record<PricingInterval, number | null>;
   purchasable: Record<PricingInterval, boolean>;
+  /** The tier's own card lines, from Manage, Tiers. Absent from an older server. */
+  features?: Array<{ text: string; included: boolean }>;
 }
 
 interface PublicPricing {
@@ -801,12 +834,44 @@ type LoadState =
 
 type Viewer = { kind: "unknown" } | { kind: "guest" } | { kind: "member"; activeTier: string };
 
+/** One payment method in the chooser, as the server words it. */
+interface PayMethod {
+  gateway: string;
+  title: string;
+  description: string;
+  /** False when it cannot sell this price; shown, greyed, with the reason. */
+  available?: boolean;
+  reason?: string | null;
+}
+
+const canUse = (method: PayMethod) => method.available !== false;
+
+/** An open chooser: what is being bought, the methods, and the one ticked. */
+interface PayChoice {
+  tierKey: string;
+  interval: PricingInterval;
+  summary: {
+    tierName: string;
+    interval: PricingInterval;
+    amountMinor: number;
+    currency: string;
+    /** Unused credit from the plan being upgraded (30-plan-changes.md). Absent from an older server. */
+    creditMinor?: number;
+    dueMinor?: number;
+    creditFrom?: string | null;
+  };
+  methods: PayMethod[];
+  selected: string;
+}
+
 type Flow =
   | { phase: "idle"; message: string | null; tone: "info" | "error" }
   | { phase: "opening"; tierKey: string }
   | { phase: "confirming"; checkoutId: string }
   | { phase: "confirmed"; tierName: string }
-  | { phase: "pending"; checkoutId: string };
+  | { phase: "pending"; checkoutId: string }
+  /** The buyer is paying in another tab; this page polls until it completes. */
+  | { phase: "waiting"; checkoutId: string };
 
 /** What the canvas shows: a creator designs against real-looking plans. */
 const PREVIEW_PRICING: PublicPricing = {
@@ -814,10 +879,10 @@ const PREVIEW_PRICING: PublicPricing = {
   pricingPath: "/pricing",
   afterPurchasePath: "/dashboard",
   tiers: [
-    { key: "free_member", name: "Free", rank: 0, currency: "USD", prices: { month: null, year: null, lifetime: null }, purchasable: { month: false, year: false, lifetime: false } },
-    { key: "tier_1", name: "Silver", rank: 1, currency: "USD", prices: { month: 900, year: 9000, lifetime: null }, purchasable: { month: true, year: true, lifetime: false } },
-    { key: "tier_2", name: "Gold", rank: 2, currency: "USD", prices: { month: 1900, year: 19000, lifetime: null }, purchasable: { month: true, year: true, lifetime: false } },
-    { key: "vip", name: "VIP", rank: 3, currency: "USD", prices: { month: null, year: null, lifetime: 29900 }, purchasable: { month: false, year: false, lifetime: true } },
+    { key: "free_member", name: "Free", rank: 0, currency: "USD", prices: { month: null, year: null, lifetime: null }, purchasable: { month: false, year: false, lifetime: false }, features: [{ text: "Members only posts", included: true }, { text: "Community access", included: true }] },
+    { key: "tier_1", name: "Silver", rank: 1, currency: "USD", prices: { month: 900, year: 9000, lifetime: null }, purchasable: { month: true, year: true, lifetime: false }, features: [{ text: "Everything in Free", included: true }, { text: "All courses", included: true }, { text: "Monthly live session", included: true }] },
+    { key: "tier_2", name: "Gold", rank: 2, currency: "USD", prices: { month: 1900, year: 19000, lifetime: null }, purchasable: { month: true, year: true, lifetime: false }, features: [{ text: "Everything in Silver", included: true }, { text: "Downloadable resources", included: true }, { text: "Priority support", included: true }] },
+    { key: "vip", name: "VIP", rank: 3, currency: "USD", prices: { month: null, year: null, lifetime: 29900 }, purchasable: { month: false, year: false, lifetime: true }, features: [{ text: "Everything, forever", included: true }, { text: "One payment, no renewals", included: true }] },
   ],
 };
 
@@ -852,57 +917,6 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   if (country) headers["X-MemberFrame-Test-Country"] = country;
   return headers;
 }
-
-/** The gateways' own checkout scripts, for opening checkout on this page. */
-const LEMON_SCRIPT = "https://app.lemonsqueezy.com/js/lemon.js";
-const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
-
-/** Load a script once. Resolves false when it cannot load, and the caller falls back to a redirect. */
-function loadScript(src: string): Promise<boolean> {
-  if (typeof document === "undefined") return Promise.resolve(false);
-  const existing = document.querySelector(`script[data-mf-src="${src}"]`) as HTMLScriptElement | null;
-  if (existing?.dataset.mfLoaded === "true") return Promise.resolve(true);
-
-  return new Promise((resolve) => {
-    const script = existing ?? document.createElement("script");
-    const timer = window.setTimeout(() => resolve(false), 8000);
-    script.addEventListener("load", () => {
-      window.clearTimeout(timer);
-      script.dataset.mfLoaded = "true";
-      resolve(true);
-    });
-    script.addEventListener("error", () => {
-      window.clearTimeout(timer);
-      resolve(false);
-    });
-    if (!existing) {
-      script.src = src;
-      script.async = true;
-      script.dataset.mfSrc = src;
-      document.head.appendChild(script);
-    }
-  });
-}
-
-/** What the API sends to open a checkout on this page instead of leaving it. */
-type CheckoutEmbed =
-  | { kind: "lemonsqueezy" }
-  | {
-      kind: "razorpay";
-      key: string;
-      orderId?: string;
-      subscriptionId?: string;
-      name: string;
-      description: string;
-      prefill: { email: string; name: string };
-    };
-
-interface LemonSqueezyGlobal {
-  Setup(options: { eventHandler: (event: { event?: string }) => void }): void;
-  Url: { Open(url: string): void; Close?(): void };
-}
-
-type RazorpayConstructor = new (options: Record<string, unknown>) => { open(): void };
 
 /*
   Decimal places per currency, so an amount in minor units reads right: 1500
@@ -950,16 +964,26 @@ function yearlySaving(tiers: ReadonlyArray<PublicTier>): number {
   return best;
 }
 
-function featuresFor(tier: PublicTier, rows: ReadonlyArray<FeatureRow>): string[] {
-  const match = rows.find((row) => {
-    const name = (row.tier ?? "").trim().toLowerCase();
-    return name !== "" && (name === tier.name.toLowerCase() || name === tier.key.toLowerCase());
-  });
-  return (match?.lines ?? "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "")
-    .slice(0, 12);
+/** A card's lines: the tier's own list from MemberFrame, Manage, Tiers (28-tier-features.md). */
+function featuresFor(tier: PublicTier): Array<{ text: string; included: boolean }> {
+  const own = Array.isArray(tier.features)
+    ? tier.features.filter((feature) => feature && typeof feature.text === "string" && feature.text.trim() !== "")
+    : [];
+  return own.slice(0, 20).map((feature) => ({ text: feature.text.trim(), included: feature.included !== false }));
+}
+
+/**
+ * The "not included" mark. Drawn here rather than imported: Framer's bundled
+ * lucide-react is older than this repository's, and an icon it lacks stops
+ * the whole file compiling (test/canvasIconImports.test.ts).
+ */
+function MfCross(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
 }
 
 function readParam(name: string): string | null {
@@ -1100,6 +1124,9 @@ const cssContent = `
 .mf-pricing-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; }
 .mf-pricing-feature { display: flex; gap: 8px; align-items: flex-start; color: var(--mf-c-muted); }
 .mf-pricing-feature svg { flex: 0 0 16px; width: 16px; height: 16px; margin-top: 2px; color: var(--mf-c-accent); stroke: currentColor; }
+.mf-pricing-feature.is-excluded { opacity: 0.6; }
+.mf-pricing-feature.is-excluded svg { color: var(--mf-c-muted); }
+.mf-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .mf-pricing-button {
   appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; margin: 0; padding: 11px 16px; border: 1px solid var(--mf-c-border);
@@ -1111,6 +1138,51 @@ const cssContent = `
 .mf-pricing-button:disabled { opacity: 0.55; cursor: default; }
 .mf-pricing-button:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
 .mf-pricing-button svg { width: 16px; height: 16px; stroke: currentColor; }
+.mf-pay {
+  position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: var(--mf-c-backdrop, rgba(15, 18, 24, 0.55));
+}
+.mf-pay-card {
+  box-sizing: border-box; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: 24px;
+  color: var(--mf-c-text); background: var(--mf-c-surface); border: 1px solid var(--mf-c-border);
+  border-radius: var(--mf-c-radius); box-shadow: 0 24px 48px -12px rgba(15, 18, 24, 0.35);
+}
+.mf-pay-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mf-pay-title { margin: 0; font-size: calc(18px * var(--mf-text-scale, 1)); font-weight: 700; }
+.mf-pay-close {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--mf-c-muted); cursor: pointer;
+}
+.mf-pay-close:hover { background: var(--mf-c-field); color: var(--mf-c-text); }
+.mf-pay-close svg { width: 16px; height: 16px; stroke: currentColor; }
+.mf-pay-summary {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 14px;
+  border-radius: max(0px, calc(var(--mf-c-radius) - 6px)); background: var(--mf-c-field);
+}
+.mf-pay-plan { font-weight: 600; }
+.mf-pay-amount { font-weight: 700; text-align: right; }
+.mf-pay-period { grid-column: 1 / -1; color: var(--mf-c-muted); font-size: calc(12px * var(--mf-text-scale, 1)); }
+.mf-pay-credit { color: var(--mf-c-muted); }
+.mf-pay-amount-credit { text-align: right; }
+.mf-pay-methods { display: flex; flex-direction: column; gap: 8px; }
+.mf-pay-method {
+  appearance: none; display: flex; align-items: flex-start; gap: 12px; width: 100%; margin: 0; padding: 12px 14px;
+  text-align: left; font: inherit; color: var(--mf-c-text); background: transparent; cursor: pointer;
+  border: 1px solid var(--mf-c-border); border-radius: max(0px, calc(var(--mf-c-radius) - 6px));
+}
+.mf-pay-method.is-selected { border-color: var(--mf-c-accent); box-shadow: 0 0 0 1px var(--mf-c-accent); }
+.mf-pay-method:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
+.mf-pay-method.is-unavailable { opacity: 0.55; cursor: not-allowed; }
+.mf-pay-radio {
+  flex: 0 0 16px; width: 16px; height: 16px; margin-top: 2px; box-sizing: border-box;
+  border: 1.5px solid var(--mf-c-border); border-radius: 50%;
+}
+.mf-pay-method.is-selected .mf-pay-radio { border: 5px solid var(--mf-c-accent); }
+.mf-pay-method-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mf-pay-method-title { font-weight: 600; }
+.mf-pay-method-desc { color: var(--mf-c-muted); font-size: calc(12px * var(--mf-text-scale, 1)); }
+.mf-pay-continue { margin-top: 4px; }
 .mf-pricing-once {
   appearance: none; border: 0; margin: 0; padding: 0; background: transparent; color: var(--mf-c-muted);
   font: inherit; font-size: calc(13px * var(--mf-text-scale, 1)); text-decoration: underline; cursor: pointer; align-self: center;
@@ -1135,10 +1207,6 @@ const cssContent = `
 // COMPONENT
 // ============================================================================
 
-interface PricingDisplayProps {
-  features?: FeatureRow[];
-}
-
 /** Set by the MemberFrame Builder on insert, never by hand (27-instance-seal.md). */
 interface MfSealProps {
   mfSeal?: string;
@@ -1154,11 +1222,10 @@ interface MfSealProps {
  * @framerSupportedLayoutHeight any-prefer-fixed
  */
 export default function MemberPricing(
-  props: Partial<PricingConfig> & MfAppearanceProps & PricingDisplayProps & MfSealProps
+  props: Partial<PricingConfig> & MfAppearanceProps & MfSealProps
 ): React.ReactElement {
   const config: PricingConfig = { ...CONFIG, ...props };
   const { theme = "light", colors, typography, layout, spacing, labels } = props;
-  const features = Array.isArray(props.features) ? props.features : DEFAULT_FEATURES;
   const t = (key: string, values?: Record<string, string | number>) => {
     const text = mfLabel(labels, PRICING_LABELS, key);
     return values ? mfFill(text, values) : text;
@@ -1179,6 +1246,9 @@ export default function MemberPricing(
   const resumed = useRef(false);
   /** A paid member's first press on another plan asks; the second switches. */
   const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
+  /** The payment method chooser, open when two or more methods can sell the price. */
+  const [choice, setChoice] = useState<PayChoice | null>(null);
+  const choiceRef = useRef<HTMLDivElement>(null);
 
   // Keep the switch on the creator's choice while they edit it on the canvas.
   useEffect(() => {
@@ -1191,17 +1261,32 @@ export default function MemberPricing(
 
   // On the canvas: the site's real plans once they arrive, the samples until
   // then, and the samples for good if the site has none or is not connected.
+  //
+  // Asked again every MF_PREVIEW_TTL_MS and when the window regains focus: the
+  // canvas keeps a component mounted, so a tier created in the plugin after it
+  // was inserted would otherwise never appear until the project reloads.
   useEffect(() => {
     if (!onCanvas) return;
     let active = true;
-    void mfCanvasPreview(base, CONFIG.siteKey).then((data) => {
-      const pricing = data ? (data["pricing"] as PublicPricing | undefined) : undefined;
-      if (active && pricing && Array.isArray(pricing.tiers) && pricing.tiers.length > 0) {
+    let shown = "";
+    const refresh = () => {
+      void mfCanvasPreview(base, CONFIG.siteKey).then((data) => {
+        const pricing = data ? (data["pricing"] as PublicPricing | undefined) : undefined;
+        if (!active || !pricing || !Array.isArray(pricing.tiers) || pricing.tiers.length === 0) return;
+        // Redraw only when something changed, so the canvas does not flicker.
+        const next = JSON.stringify(pricing);
+        if (next === shown) return;
+        shown = next;
         setLoad({ phase: "ready", pricing });
-      }
-    });
+      });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, MF_PREVIEW_TTL_MS);
+    window.addEventListener("focus", refresh);
     return () => {
       active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
     };
   }, [base, onCanvas]);
 
@@ -1263,11 +1348,12 @@ export default function MemberPricing(
   );
 
   const confirm = useCallback(
-    async (checkoutId: string) => {
-      setFlow({ phase: "confirming", checkoutId });
+    async (checkoutId: string, waitingInTab = false) => {
+      setFlow(waitingInTab ? { phase: "waiting", checkoutId } : { phase: "confirming", checkoutId });
       const started = Date.now();
+      const deadline = waitingInTab ? TAB_TIMEOUT_MS : CONFIRM_TIMEOUT_MS;
 
-      while (Date.now() - started < CONFIRM_TIMEOUT_MS) {
+      while (Date.now() - started < deadline) {
         try {
           const response = await fetch(`${base}${STATUS_PATH}${encodeURIComponent(checkoutId)}`, {
             credentials: "include",
@@ -1297,56 +1383,6 @@ export default function MemberPricing(
     [base, finishPurchase]
   );
 
-  /**
-   * Open the gateway's checkout on this page. Lemon Squeezy shows an overlay
-   * through lemon.js; Razorpay opens Checkout with the UPI QR. Both confirm
-   * through the same status poll as a redirect. False when the script cannot
-   * load, and the caller sends the buyer to the hosted page instead.
-   */
-  const openEmbedded = useCallback(
-    async (embed: CheckoutEmbed, url: string, checkoutId: string): Promise<boolean> => {
-      const host = window as unknown as {
-        createLemonSqueezy?: () => void;
-        LemonSqueezy?: LemonSqueezyGlobal;
-        Razorpay?: RazorpayConstructor;
-      };
-
-      if (embed.kind === "lemonsqueezy") {
-        if (!(await loadScript(LEMON_SCRIPT))) return false;
-        host.createLemonSqueezy?.();
-        const lemon = host.LemonSqueezy;
-        if (!lemon?.Url?.Open) return false;
-        lemon.Setup({
-          eventHandler: (event) => {
-            if (event?.event === "Checkout.Success") {
-              lemon.Url.Close?.();
-              void confirm(checkoutId);
-            }
-          },
-        });
-        lemon.Url.Open(url);
-        return true;
-      }
-
-      if (!(await loadScript(RAZORPAY_SCRIPT)) || !host.Razorpay) return false;
-      const accent = /^#[0-9a-fA-F]{6}$/.test(config.accentColor) ? config.accentColor : undefined;
-      new host.Razorpay({
-        key: embed.key,
-        ...(embed.orderId ? { order_id: embed.orderId } : {}),
-        ...(embed.subscriptionId ? { subscription_id: embed.subscriptionId } : {}),
-        name: embed.name,
-        description: embed.description,
-        prefill: embed.prefill,
-        ...(accent ? { theme: { color: accent } } : {}),
-        handler: () => void confirm(checkoutId),
-        modal: { ondismiss: () => setFlow({ phase: "idle", message: t("closed"), tone: "info" }) },
-      }).open();
-      return true;
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [config.accentColor, confirm]
-  );
-
   useEffect(() => {
     if (onCanvas || load.phase !== "ready") return;
 
@@ -1371,6 +1407,113 @@ export default function MemberPricing(
   // Buying
   // ------------------------------------------------------------------------
 
+  /** Create the checkout on the chosen gateway (none: the server picks) and open it. */
+  /**
+   * A refused checkout in words. In Test mode the gateway's own reason follows
+   * ("Your Lemon Squeezy store charges in BDT..."), so the creator sees what to
+   * fix; live buyers get the plain message.
+   */
+  const describeFailure = (
+    payload: { reason?: string; detail?: string; retryAfterSeconds?: number },
+    chosenGateway?: string
+  ): string => {
+    if (payload.reason === "rate_limited") {
+      return t("rateLimited", { minutes: Math.max(1, Math.ceil(Number(payload.retryAfterSeconds ?? 60) / 60)) });
+    }
+    const message =
+      payload.reason === "no_gateway"
+        ? t("noGateway")
+        : payload.reason === "already_subscribed"
+          ? t("already")
+          : chosenGateway && (payload.reason === "gateway_error" || payload.reason === "method_unavailable")
+            ? t("methodFailed")
+            : t("error");
+    const testing = load.phase === "ready" && load.pricing.mode === "test";
+    const detail = testing && typeof payload.detail === "string" ? ` ${payload.detail.slice(0, 300)}` : "";
+    return message + detail;
+  };
+
+  const openCheckout = useCallback(
+    async (tierKey: string, chosen: PricingInterval, gateway?: string, tab?: Window | null) => {
+      const returnPath = typeof window !== "undefined" ? window.location.pathname : "/";
+      setFlow({ phase: "opening", tierKey });
+      // A tab opened for this payment that ends up unused is closed again.
+      const dropTab = () => {
+        if (tab && !tab.closed) tab.close();
+      };
+
+      try {
+        const response = await fetch(`${base}${CHECKOUT_PATH}`, {
+          method: "POST",
+          credentials: "include",
+          headers: apiHeaders(true),
+          body: JSON.stringify(gateway ? { tierKey, interval: chosen, returnPath, gateway } : { tierKey, interval: chosen, returnPath }),
+        });
+
+        if (response.ok) {
+          const body = (await response.json()) as {
+            kind?: string;
+            url?: string;
+            checkoutId?: string;
+            tierName?: string;
+            /** Sent by the server for in-page checkout; unused: every gateway opens its own page. */
+            embed?: unknown;
+          };
+
+          // Switched in place by the gateway, prorated: no checkout page at all.
+          if (body.kind === "changed") {
+            dropTab();
+            finishPurchase(body.tierName ?? "");
+            return;
+          }
+
+          // A downgrade waits for the end of the paid period (30-plan-changes.md).
+          if (body.kind === "scheduled") {
+            dropTab();
+            const scheduled = body as { tierName?: string; effectiveAt?: string | null };
+            const date = scheduled.effectiveAt ? new Date(scheduled.effectiveAt).toLocaleDateString() : "";
+            setFlow({ phase: "idle", message: t("scheduled", { tier: scheduled.tierName ?? "", date }), tone: "info" });
+            return;
+          }
+
+          if (body.url && /^https:\/\//.test(body.url)) {
+            // Chosen in the chooser: pay in the new tab, and this page waits
+            // for the gateway to confirm (29-checkout-methods.md).
+            if (tab && !tab.closed && body.checkoutId) {
+              tab.location.href = body.url;
+              void confirm(body.checkoutId, true);
+              return;
+            }
+            // The gateway's own checkout page, as Stripe's always was: Lemon
+            // Squeezy's overlay and Razorpay's in-page window are gone (2026-10-20).
+            // It returns to this page, which confirms and goes to After purchase.
+            window.location.assign(body.url);
+            return;
+          }
+        }
+
+        if (response.status === 401) {
+          saveIntent({ tierKey, interval: chosen, returnPath, ts: Date.now() });
+          if (safePath(config.signupPath)) window.location.assign(config.signupPath);
+          return;
+        }
+
+        dropTab();
+        const payload = (await response.json().catch(() => ({}))) as {
+          reason?: string;
+          detail?: string;
+          retryAfterSeconds?: number;
+        };
+        setFlow({ phase: "idle", message: describeFailure(payload, gateway), tone: "error" });
+      } catch {
+        dropTab();
+        setFlow({ phase: "idle", message: t("error"), tone: "error" });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [base, config.signupPath, confirm, finishPurchase, load]
+  );
+
   const startCheckout = useCallback(
     async (tierKey: string, chosen: PricingInterval) => {
       if (onCanvas) return;
@@ -1387,59 +1530,120 @@ export default function MemberPricing(
       saveIntent(null);
       setFlow({ phase: "opening", tierKey });
 
+      // Which methods can sell this (29-checkout-methods.md): none, a message;
+      // one, straight to its checkout; more, the chooser. A switch made in place
+      // and a server without the route both go straight on, as before.
       try {
-        const response = await fetch(`${base}${CHECKOUT_PATH}`, {
+        const response = await fetch(`${base}${OPTIONS_PATH}`, {
           method: "POST",
           credentials: "include",
           headers: apiHeaders(true),
-          body: JSON.stringify({ tierKey, interval: chosen, returnPath }),
+          body: JSON.stringify({ tierKey, interval: chosen }),
         });
-
-        if (response.ok) {
-          const body = (await response.json()) as {
-            kind?: string;
-            url?: string;
-            checkoutId?: string;
-            tierName?: string;
-            embed?: CheckoutEmbed | null;
-          };
-
-          // Switched in place by the gateway, prorated: no checkout page at all.
-          if (body.kind === "changed") {
-            finishPurchase(body.tierName ?? "");
-            return;
-          }
-
-          if (body.url && /^https:\/\//.test(body.url)) {
-            if (body.embed && body.checkoutId && (await openEmbedded(body.embed, body.url, body.checkoutId))) {
-              setFlow({ phase: "idle", message: null, tone: "info" });
-              return;
-            }
-            window.location.assign(body.url);
-            return;
-          }
-        }
-
         if (response.status === 401) {
           saveIntent({ tierKey, interval: chosen, returnPath, ts: Date.now() });
           if (safePath(config.signupPath)) window.location.assign(config.signupPath);
           return;
         }
-
-        const payload = (await response.json().catch(() => ({}))) as { reason?: string };
-        const message =
-          payload.reason === "no_gateway"
-            ? t("noGateway")
-            : payload.reason === "already_subscribed"
-              ? t("already")
-              : t("error");
-        setFlow({ phase: "idle", message, tone: "error" });
+        if (response.ok) {
+          const body = (await response.json()) as {
+            kind?: string;
+            summary?: PayChoice["summary"];
+            methods?: PayMethod[];
+            recommended?: string | null;
+          };
+          const methods = Array.isArray(body.methods) ? body.methods : [];
+          if (body.kind === "choose" && body.summary) {
+            // Exactly one gateway shown at checkout: straight into it, on this
+            // page. Two or more: the chooser, every one listed.
+            if (methods.length === 0 || (methods.length === 1 && !canUse(methods[0]))) {
+              setFlow({ phase: "idle", message: t("noGateway"), tone: "error" });
+              return;
+            }
+            if (methods.length > 1) {
+              const usable = methods.filter(canUse);
+              const selected = usable.some((method) => method.gateway === body.recommended)
+                ? String(body.recommended)
+                : usable[0]?.gateway ?? "";
+              setChoice({ tierKey, interval: chosen, summary: body.summary, methods, selected });
+              setFlow({ phase: "idle", message: null, tone: "info" });
+              return;
+            }
+            await openCheckout(tierKey, chosen, methods[0].gateway);
+            return;
+          }
+        } else if (response.status !== 404) {
+          // Any refusal is shown, and the chooser is never skipped for it
+          // (2026-10-20): only a server without the route goes straight on.
+          const payload = (await response.json().catch(() => ({}))) as {
+            reason?: string;
+            detail?: string;
+            retryAfterSeconds?: number;
+          };
+          setFlow({ phase: "idle", message: describeFailure(payload), tone: "error" });
+          return;
+        }
       } catch {
         setFlow({ phase: "idle", message: t("error"), tone: "error" });
+        return;
       }
+      // A switch made in place, or a server without the route: today's path.
+      await openCheckout(tierKey, chosen);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [base, config.signupPath, finishPurchase, onCanvas, openEmbedded, viewer.kind]
+    [base, config.signupPath, onCanvas, openCheckout, viewer.kind]
+  );
+
+  // The chooser: focus its ticked method on open, and keep the page still behind it.
+  useEffect(() => {
+    if (!choice || typeof document === "undefined") return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    choiceRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+    };
+    // Only on open and close, not on each change of the ticked method.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choice !== null]);
+
+  const closeChoice = useCallback(() => {
+    setChoice(null);
+    setFlow({ phase: "idle", message: t("closed"), tone: "info" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const confirmChoice = useCallback(() => {
+    if (!choice || choice.selected === "") return;
+    const { tierKey, interval: chosen, selected } = choice;
+    // Opened here, inside the click, so a popup blocker allows it; the
+    // checkout address is filled in once the server answers. Blocked anyway:
+    // the checkout opens on this page instead.
+    const tab = window.open("", "_blank");
+    setChoice(null);
+    void openCheckout(tierKey, chosen, selected, tab);
+  }, [choice, openCheckout]);
+
+  /** Arrow keys move the tick, as a radio group does. */
+  const onChoiceKey = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!choice) return;
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeChoice();
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key)) return;
+      event.preventDefault();
+      const usable = choice.methods.filter(canUse);
+      if (usable.length === 0) return;
+      const index = usable.findIndex((method) => method.gateway === choice.selected);
+      const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+      const next = usable[(index + step + usable.length) % usable.length];
+      setChoice({ ...choice, selected: next.gateway });
+      choiceRef.current?.querySelector<HTMLElement>(`[data-gateway="${next.gateway}"]`)?.focus();
+    },
+    [choice, closeChoice]
   );
 
   // Back from sign up with a plan already chosen: carry on to checkout.
@@ -1457,7 +1661,7 @@ export default function MemberPricing(
   // ------------------------------------------------------------------------
 
   const scopedVars =
-    `[data-mf-pricing="${scope}"] { ` +
+    `[data-mf-pricing="${MF_SCOPE_SLOT}"] { ` +
     mfAppearanceVars({
       accent: config.accentColor,
       radius: config.borderRadius,
@@ -1469,17 +1673,18 @@ export default function MemberPricing(
       spacing,
     }) +
     " }";
+  const styled = mfStyleScope("mfp", scopedVars);
   const rootClass = `mf-pricing ${mfThemeClass(theme)}`;
   const style = (
     <>
       <style>{mfThemeCss(".mf-pricing")}</style>
       <style>{cssContent}</style>
-      <style>{scopedVars}</style>
+      <style>{styled.css}</style>
     </>
   );
 
   const shell = (body: React.ReactNode) => (
-    <div className={rootClass} data-mf-pricing={scope}>
+    <div className={rootClass} data-mf-pricing={styled.scope}>
       {style}
       {body}
       <MfLicenseLayer license={license} />
@@ -1512,16 +1717,18 @@ export default function MemberPricing(
     );
   }
 
-  if (flow.phase === "confirming" || flow.phase === "confirmed" || flow.phase === "pending") {
+  if (flow.phase === "confirming" || flow.phase === "confirmed" || flow.phase === "pending" || flow.phase === "waiting") {
     return shell(
       <div className="mf-pricing-state" role="status" aria-live="polite">
         {flow.phase === "confirmed" ? (
           <Check aria-hidden={true} />
         ) : (
-          <Loader2 className={flow.phase === "confirming" ? "mf-pricing-spin" : undefined} aria-hidden={true} />
+          <Loader2 className={flow.phase === "confirming" || flow.phase === "waiting" ? "mf-pricing-spin" : undefined} aria-hidden={true} />
         )}
         <p>
-          {flow.phase === "confirming"
+          {flow.phase === "waiting"
+            ? t("payInTab")
+            : flow.phase === "confirming"
             ? t("confirming")
             : flow.phase === "confirmed"
               ? t("confirmed", { tier: flow.tierName })
@@ -1530,6 +1737,13 @@ export default function MemberPricing(
         {flow.phase === "pending" ? (
           <button type="button" className="mf-pricing-button" onClick={() => void confirm(flow.checkoutId)}>
             {t("checkAgain")}
+          </button>
+        ) : null}
+        {flow.phase === "waiting" ? (
+          // Closed the payment tab, or want another method: back to the cards.
+          // A payment that still completes is picked up by the next check.
+          <button type="button" className="mf-pricing-button" onClick={() => setFlow({ phase: "idle", message: null, tone: "info" })}>
+            {t("backToPlans")}
           </button>
         ) : null}
       </div>
@@ -1671,12 +1885,110 @@ export default function MemberPricing(
         </p>
       ) : null}
 
+      {choice ? (
+        <div
+          className="mf-pay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeChoice();
+          }}
+          onKeyDown={onChoiceKey}
+        >
+          <div className="mf-pay-card" ref={choiceRef} role="dialog" aria-modal={true} aria-labelledby={`${scope}-pay-title`}>
+            <div className="mf-pay-head">
+              <h3 className="mf-pay-title" id={`${scope}-pay-title`}>
+                {t("payTitle")}
+              </h3>
+              <button type="button" className="mf-pay-close" aria-label={t("payClose")} onClick={closeChoice}>
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" aria-hidden={true}>
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mf-pay-summary">
+              <span className="mf-pay-plan">{choice.summary.tierName}</span>
+              <span className="mf-pay-amount">{formatPrice(choice.summary.amountMinor, choice.summary.currency)}</span>
+              {(choice.summary.creditMinor ?? 0) > 0 ? (
+                // An upgrade: the unused part of the current plan comes off today's charge.
+                <>
+                  <span className="mf-pay-credit">{t("creditLine", { plan: choice.summary.creditFrom ?? "" })}</span>
+                  <span className="mf-pay-credit mf-pay-amount-credit">
+                    -{formatPrice(choice.summary.creditMinor ?? 0, choice.summary.currency)}
+                  </span>
+                  <span className="mf-pay-plan">{t("dueToday")}</span>
+                  <span className="mf-pay-amount">
+                    {formatPrice(choice.summary.dueMinor ?? choice.summary.amountMinor, choice.summary.currency)}
+                  </span>
+                  <span className="mf-pay-period">
+                    {choice.summary.interval === "lifetime"
+                      ? t("payOnce")
+                      : t("thenEvery", {
+                          price: formatPrice(choice.summary.amountMinor, choice.summary.currency),
+                          period: choice.summary.interval === "year" ? "year" : "month",
+                        })}
+                  </span>
+                </>
+              ) : (
+                <span className="mf-pay-period">
+                  {choice.summary.interval === "lifetime"
+                    ? t("payOnce")
+                    : choice.summary.interval === "year"
+                      ? t("renewsYear")
+                      : t("renewsMonth")}
+                </span>
+              )}
+            </div>
+
+            <div className="mf-pay-methods" role="radiogroup" aria-label={t("payTitle")}>
+              {choice.methods.map((method) => {
+                const selected = method.gateway === choice.selected;
+                const usable = canUse(method);
+                return (
+                  <button
+                    key={method.gateway}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-disabled={!usable || undefined}
+                    disabled={!usable}
+                    tabIndex={selected ? 0 : -1}
+                    data-gateway={method.gateway}
+                    className={`mf-pay-method${selected ? " is-selected" : ""}${usable ? "" : " is-unavailable"}`}
+                    onClick={() => usable && setChoice({ ...choice, selected: method.gateway })}
+                  >
+                    <span className="mf-pay-radio" aria-hidden={true} />
+                    <span className="mf-pay-method-text">
+                      <span className="mf-pay-method-title">{method.title}</span>
+                      {usable ? (
+                        method.description ? <span className="mf-pay-method-desc">{method.description}</span> : null
+                      ) : (
+                        <span className="mf-pay-method-desc">{method.reason || t("unavailable")}</span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="mf-pricing-button is-primary mf-pay-continue"
+              disabled={choice.selected === ""}
+              onClick={confirmChoice}
+            >
+              {t("payContinue")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mf-pricing-grid">
         {cards.map(({ tier, recurring, recurringInterval, lifetime, free }) => {
           const highlighted =
             highlight !== "" && (tier.name.toLowerCase() === highlight || tier.key.toLowerCase() === highlight);
           const current = viewer.kind === "member" && viewer.activeTier === tier.key;
-          const lines = featuresFor(tier, features);
+          const lines = featuresFor(tier);
           const lifetimeOnly = recurring === null && lifetime !== null;
 
           return (
@@ -1708,9 +2020,10 @@ export default function MemberPricing(
               {lines.length > 0 ? (
                 <ul className="mf-pricing-features">
                   {lines.map((line, index) => (
-                    <li key={index} className="mf-pricing-feature">
-                      <Check aria-hidden={true} />
-                      <span>{line}</span>
+                    <li key={index} className={`mf-pricing-feature${line.included ? "" : " is-excluded"}`}>
+                      {line.included ? <Check aria-hidden={true} /> : <MfCross />}
+                      <span>{line.text}</span>
+                      {line.included ? null : <span className="mf-visually-hidden"> (not included)</span>}
                     </li>
                   ))}
                 </ul>
@@ -1786,19 +2099,6 @@ addPropertyControls(MemberPricing, {
     title: "Highlight Tier",
     placeholder: "Gold",
     defaultValue: CONFIG.highlightTier,
-  },
-  features: {
-    type: ControlType.Array,
-    title: "Features",
-    maxCount: 12,
-    control: {
-      type: ControlType.Object,
-      controls: {
-        tier: { type: ControlType.String, title: "Tier", placeholder: "Gold" },
-        lines: { type: ControlType.String, title: "Lines", displayTextArea: true, placeholder: "One feature per line" },
-      },
-    },
-    defaultValue: DEFAULT_FEATURES,
   },
 
   /* ---- Navigation ---- */

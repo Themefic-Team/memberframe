@@ -38,6 +38,17 @@ import bookmarksTraySource from "../canvas-components/BookmarksTray.tsx?raw";
 import { LICENSED_FILE_NAMES, patchLockState } from "../utils/lockPatcher";
 import type { CanvasLicense } from "./licenseService";
 import { isSafeSitePath } from "./siteSettingsService";
+import { readPasswordPolicy, type PasswordPolicy } from "../utils/credentials";
+import { stripComments } from "../utils/stripComments";
+
+/** The site's password rules as a CONFIG literal, read defensively first. */
+function policyLiteral(policy: PasswordPolicy | undefined): string {
+  const rules = readPasswordPolicy(policy);
+  return (
+    `{ minLength: ${rules.minLength}, requireNumber: ${rules.requireNumber}, requireUppercase: ${rules.requireUppercase}, ` +
+    `requireLowercase: ${rules.requireLowercase}, requireSymbol: ${rules.requireSymbol} }`
+  );
+}
 import { SESSION_CACHE_TTL_MS, deployBaseUrl } from "../config/backend";
 import {
   AUTH_RADIUS_MAX,
@@ -180,6 +191,10 @@ export interface DeployContext {
    */
   signupPath?: string;
   resetPath?: string;
+  /** The site's password rules (05-member-auth.md 13). Absent means the defaults. */
+  passwordPolicy?: PasswordPolicy;
+  /** Site-relative. The pricing page from Payments, where the paywall's buttons go. Absent means /pricing. */
+  pricingPath?: string;
   /**
    * The site's tiers, when the panel has them. The gate's Access Tier list is
    * written from these, so a creator's custom tiers can be chosen in Framer.
@@ -300,10 +315,12 @@ export function generateComponentCode<Config>(
   const replaced = replaceConfigBlock(source, buildConfigBlock(descriptor, normalized, context));
   const transformed = descriptor.transform ? descriptor.transform(replaced, context) : replaced;
   // After the signature check in replaceConfigBlock, which reads the authored lines.
-  const code =
+  const patched =
     context.license && LICENSED_FILE_NAMES.includes(descriptor.fileName)
       ? patchLockState(transformed, context.license) ?? transformed
       : transformed;
+  // The repository's explanations stay in the repository (utils/stripComments.ts).
+  const code = stripComments(patched);
 
   return { fileName: descriptor.fileName, code, config: normalized };
 }
@@ -397,6 +414,12 @@ export const MEMBER_AUTH_FILE_NAME = "MemberAuth.tsx";
  * unchecked: `MemberAuth.tsx` sanitizes again at runtime, because a prop can
  * also be set from a Framer variable the generator never sees.
  */
+/** A finite number within `min..max`, or the fallback. */
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+}
+
 export function normalizeAuthConfig(config: MemberAuthConfig): MemberAuthConfig {
   const rawRadius = Number(config.borderRadius);
   const borderRadius = Number.isFinite(rawRadius)
@@ -405,6 +428,12 @@ export function normalizeAuthConfig(config: MemberAuthConfig): MemberAuthConfig 
 
   return {
     authMode: config.authMode === "modal" ? "modal" : "inline",
+    modalTrigger: config.modalTrigger === "load" || config.modalTrigger === "scroll" ? config.modalTrigger : "click",
+    // An id is a link hash or a layer name: letters, digits, dash, underscore.
+    modalTriggerId: String(config.modalTriggerId ?? "").trim().replace(/^#/, "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60),
+    modalDelay: clampNumber(config.modalDelay, 0, 60, DEFAULT_MEMBER_AUTH_CONFIG.modalDelay),
+    modalScrollPercent: clampNumber(config.modalScrollPercent, 0, 100, DEFAULT_MEMBER_AUTH_CONFIG.modalScrollPercent),
+    modalOncePerSession: config.modalOncePerSession !== false,
     headline: sanitizeText(String(config.headline ?? ""), MAX_CARD_TITLE),
     welcomeMessage: sanitizeText(String(config.welcomeMessage ?? ""), MAX_CARD_DESCRIPTION),
     emailEnabled: Boolean(config.emailEnabled),
@@ -421,7 +450,6 @@ export function normalizeAuthConfig(config: MemberAuthConfig): MemberAuthConfig 
     // because the OTP path is the one that exists in the contract already. A
     // malformed config should not silently select the newer flow.
     defaultAuthMethod: config.defaultAuthMethod === "password" ? "password" : "otp",
-    requirePasswordStrength: Boolean(config.requirePasswordStrength),
   };
 }
 
@@ -508,6 +536,11 @@ function renameComponent(code: string, name: string): string {
 function authFields(config: MemberAuthConfig, context: DeployContext): string[] {
   return [
     `  authMode: ${encodeLiteral(config.authMode)},`,
+    `  modalTrigger: ${encodeLiteral(config.modalTrigger)},`,
+    `  modalTriggerId: ${encodeLiteral(config.modalTriggerId)},`,
+    `  modalDelay: ${config.modalDelay},`,
+    `  modalScrollPercent: ${config.modalScrollPercent},`,
+    `  modalOncePerSession: ${config.modalOncePerSession},`,
     `  headline: ${encodeLiteral(config.headline)},`,
     `  welcomeMessage: ${encodeLiteral(config.welcomeMessage)},`,
     `  emailEnabled: ${config.emailEnabled},`,
@@ -519,7 +552,8 @@ function authFields(config: MemberAuthConfig, context: DeployContext): string[] 
     `  borderRadius: ${config.borderRadius},`,
     `  enablePasswordAuth: ${config.enablePasswordAuth},`,
     `  defaultAuthMethod: ${encodeLiteral(config.defaultAuthMethod)},`,
-    `  requirePasswordStrength: ${config.requirePasswordStrength},`,
+    // The site's rules, until the form asks the server for the current ones (05-member-auth.md 13).
+    `  passwordPolicy: ${policyLiteral(context.passwordPolicy)},`,
     `  apiBaseUrl: ${encodeLiteral(context.apiBaseUrl)},`,
     `  siteKey: ${encodeLiteral(context.siteKey)},`,
     `  afterLoginPath: ${encodeLiteral(context.afterLoginPath)},`,
@@ -789,7 +823,7 @@ export const METERED_PAYWALL_DESCRIPTOR: CanvasComponentDescriptor<MeteredPaywal
     `  sessionTtlMs: ${SESSION_CACHE_TTL_MS},`,
     `  siteKey: ${encodeLiteral(context.siteKey)},`,
     `  loginPath: ${encodeLiteral(isSafeSitePath(context.loginPath) ? context.loginPath : "/login")},`,
-    `  pricingPath: ${encodeLiteral("/pricing")},`,
+    `  pricingPath: ${encodeLiteral(context.pricingPath && isSafeSitePath(context.pricingPath) ? context.pricingPath : "/pricing")},`,
   ],
   // Full Access For lists the site's own tiers after Any Paid Plan and Any Signed In.
   transform: (code, context) =>

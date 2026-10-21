@@ -74,6 +74,8 @@ interface Block {
   mfLabelControls(defaults: Record<string, readonly [string, string]>): Record<string, unknown>;
   mfBox(value: unknown, max: number): [number, number, number, number] | null;
   mfSpacingCss(spacing: Record<string, unknown> | null | undefined): string;
+  mfStyleScope(prefix: string, rule: string): { scope: string; css: string };
+  MF_SCOPE_SLOT: string;
 }
 
 const ControlType = {
@@ -105,6 +107,8 @@ function loadBlock(): Block {
     "mfLabelControls",
     "mfBox",
     "mfSpacingCss",
+    "mfStyleScope",
+    "MF_SCOPE_SLOT",
   ];
 
   // eslint-disable-next-line no-new-func
@@ -346,7 +350,10 @@ describe("Spacing", () => {
   });
 
   it("keeps a root's own centring for top and bottom margin, and fills between side margins", () => {
-    expect(mf.mfSpacingCss({ margin: "120px 0px 80px 0px" })).toBe("margin-top: 120px; margin-bottom: 80px;");
+    // The root shrinks by its vertical margin, so it stays inside the frame Framer selects.
+    expect(mf.mfSpacingCss({ margin: "120px 0px 80px 0px" })).toBe(
+      "margin-top: 120px; margin-bottom: 80px; height: calc(100% - 200px);"
+    );
     expect(mf.mfSpacingCss({ margin: "0px 16px" })).toBe("margin-left: 16px; margin-right: 16px; width: auto;");
   });
 
@@ -364,7 +371,7 @@ describe("Spacing", () => {
       shadowByDefault: true,
       spacing: { margin: "40px 0px 0px 0px" },
     });
-    expect(out.endsWith("margin-top: 40px;")).toBe(true);
+    expect(out.endsWith("margin-top: 40px; height: calc(100% - 40px);")).toBe(true);
   });
 });
 
@@ -432,9 +439,12 @@ describe.each(NAMES)("%s", (name) => {
     expect(rest).toMatch(/theme = "light"/);
   });
 
-  it("is a fixed size by default", () => {
+  it("is a fixed size by default, the Dashboard's height alone fitting its content", () => {
     expect(rest).toContain("@framerSupportedLayoutWidth any-prefer-fixed");
-    expect(rest).toContain("@framerSupportedLayoutHeight any-prefer-fixed");
+    // The Dashboard grows with its profile form (2026-10-20), so the page scrolls, not the panel.
+    expect(rest).toContain(
+      `@framerSupportedLayoutHeight ${name === "MemberDashboard" ? "any-prefer-auto" : "any-prefer-fixed"}`
+    );
     expect(rest).toMatch(/@framerIntrinsicWidth \d+/);
     expect(rest).toMatch(/@framerIntrinsicHeight \d+/);
   });
@@ -470,5 +480,23 @@ describe.each(NAMES)("%s", (name) => {
     const css = rest.slice(rest.indexOf("const cssContent = `"));
     const stylesheet = css.slice(0, css.indexOf("`;"));
     expect(stylesheet).not.toMatch(/font-size: \d+px;/);
+  });
+});
+
+describe("style scope (no unstyled first paint on a published page)", () => {
+  const rule = (accent: string) => `[data-x="${mf.MF_SCOPE_SLOT}"] { --mf-accent: ${accent}; }`;
+
+  it("is the same every time for the same settings, so server and browser agree", () => {
+    expect(mf.mfStyleScope("mfa", rule("#5271ff"))).toEqual(mf.mfStyleScope("mfa", rule("#5271ff")));
+  });
+
+  it("differs for different settings, so two instances do not overwrite each other", () => {
+    expect(mf.mfStyleScope("mfa", rule("#5271ff")).scope).not.toBe(mf.mfStyleScope("mfa", rule("#ff0000")).scope);
+  });
+
+  it("writes the scope into the selector and leaves a CSS-safe name", () => {
+    const { scope, css } = mf.mfStyleScope("mfa", rule("#5271ff"));
+    expect(scope).toMatch(/^mfa[a-z0-9]+$/);
+    expect(css).toBe(`[data-x="${scope}"] { --mf-accent: #5271ff; }`);
   });
 });

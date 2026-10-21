@@ -156,6 +156,44 @@ export function applyToRegistry(registry: SealRegistry, actions: ReadonlyArray<S
   return next;
 }
 
+/**
+ * What a guard pass sees, as one string. Equal to the last pass that finished,
+ * nothing on the canvas or in the record changed, and the pass stops there:
+ * no requests and no writes.
+ */
+export function sealFingerprint(instances: ReadonlyArray<SealedInstance>, registry: SealRegistry, migrated: boolean): string {
+  const held = instances
+    .map((instance) => `${instance.nodeId}:${instance.seal === undefined ? "-" : instance.seal}:${instance.ownSite ? 1 : 0}`)
+    .sort();
+  const recorded = Object.keys(registry)
+    .sort()
+    .map((seal) => `${seal}=${registry[seal]}`);
+  return `${migrated ? 1 : 0}|${held.join(",")}|${recorded.join(",")}`;
+}
+
+/**
+ * The record with only the seals still on the canvas (or just issued). Without
+ * this it grew with every insert ever made in the project, until writing it
+ * failed and every pass asked the server about the same seals again. A seal
+ * that comes back later (undo, or cut and paste) is unknown once: one question
+ * to the server, then adopted, as before.
+ */
+export function pruneRegistry(registry: SealRegistry, held: Iterable<string>): SealRegistry {
+  const keep = new Set(held);
+  const next: SealRegistry = {};
+  for (const [seal, node] of Object.entries(registry)) if (keep.has(seal)) next[seal] = node;
+  return next;
+}
+
+const RETRY_STEPS_MS = [30_000, 60_000, 120_000, 300_000];
+const RETRY_CAP_MS = 600_000;
+
+/** How long the guard waits before its next request after `failures` failed passes in a row. */
+export function nextRetryDelay(failures: number): number {
+  if (failures <= 0) return 0;
+  return RETRY_STEPS_MS[failures - 1] ?? RETRY_CAP_MS;
+}
+
 /** The site key baked into a component file's CONFIG, or null. */
 export function siteKeyOfFile(content: string): string | null {
   const match = /\bsiteKey:\s*"([^"]*)"/.exec(content);

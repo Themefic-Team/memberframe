@@ -73,6 +73,23 @@ export interface SiteMemberRecord {
    * either way.
    */
   metadata?: MemberMetadata;
+  /**
+   * How the account was made (31-sign-in-methods.md): email, google, apple,
+   * github, discord, or added. Null for members from before it was recorded;
+   * absent from an older backend.
+   */
+  signupMethod?: string | null;
+  /** The social sign ins linked to this account, oldest first. */
+  identities?: ReadonlyArray<MemberIdentityRecord>;
+  hasPassword?: boolean;
+}
+
+/** One social sign in linked to a member. ISO 8601 dates. */
+export interface MemberIdentityRecord {
+  provider: string;
+  email: string;
+  createdAt: string;
+  lastUsedAt: string;
 }
 
 /**
@@ -86,6 +103,12 @@ export interface SiteMemberRecord {
  * narrows to. Every `SiteTierRecord` is assignable to a `TierLadderEntry`, so
  * callers pass real tiers to `isEntitled` unchanged.
  */
+/** One line on a tier's pricing card (28-tier-features.md). */
+export interface TierFeature {
+  text: string;
+  included: boolean;
+}
+
 export interface SiteTierRecord {
   id: string;
   siteId: string;
@@ -104,6 +127,8 @@ export interface SiteTierRecord {
    */
   rank: number;
   isActive: boolean;
+  /** Its pricing card lines. Absent from a server older than 28-tier-features.md. */
+  features?: TierFeature[];
 }
 
 /** Compile-time proof of the C8 narrowing, so a future field change cannot break it. */

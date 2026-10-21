@@ -434,6 +434,193 @@ export async function findPageContentParent(
   return null;
 }
 
+/* ==========================================================================
+   PAGE CHROME: the site's own header and footer on a scaffolded page
+   ========================================================================== */
+
+/**
+ * A breakpoint child, narrowed to what finding a header and footer needs.
+ * `kind` is "component" for a component instance, which is how nearly every
+ * template builds its navigation and footer.
+ */
+export interface ChromeNode {
+  readonly id: string;
+  readonly name: string | null;
+  readonly kind: "component" | "frame" | "other";
+  readonly position: string | null;
+}
+
+/** A page's breakpoint frame with the layout a scaffolded page should copy. */
+export interface ChromeBreakpoint {
+  readonly id: string;
+  readonly isBreakpoint: boolean;
+  readonly isPrimaryBreakpoint: boolean;
+  readonly layout: string | null;
+  /** Stack and size attributes, already picked: written to the new page as they are. */
+  readonly layoutAttributes: Record<string, unknown>;
+}
+
+export interface PageChromeDeps {
+  getNodesWithType(type: "WebPageNode"): Promise<ReadonlyArray<ExistingWebPage>>;
+  getBreakpoints(pageId: string): Promise<ReadonlyArray<ChromeBreakpoint>>;
+  getChildren(nodeId: string): Promise<ReadonlyArray<ChromeNode>>;
+  cloneNode(nodeId: string): Promise<{ readonly id: string } | null>;
+  setParent(nodeId: string, parentId: string, index?: number): Promise<void>;
+  setAttributes(nodeId: string, attributes: Record<string, unknown>): Promise<unknown>;
+  removeNodes(nodeIds: string[]): Promise<void>;
+}
+
+/** The header and footer of an existing page, and the layout that holds them. */
+export interface PageChrome {
+  readonly sourcePageId: string;
+  readonly header: ChromeNode | null;
+  readonly footer: ChromeNode | null;
+  readonly layoutAttributes: Record<string, unknown>;
+}
+
+const HEADER_NAME = /\b(nav|navbar|navigation|header|menu|top ?bar)\b/i;
+const FOOTER_NAME = /\bfooter\b/i;
+/** Names that say a first or last component is page content, not chrome. */
+const CONTENT_NAME = /\b(hero|section|content|main|banner|cta|article|post)\b/i;
+
+/**
+ * Which children of a page's primary breakpoint are its header and footer.
+ *
+ * A name that says so wins wherever the child sits. Otherwise the first and
+ * last children count when they are component instances whose name does not
+ * read as content: a template's navigation and footer are components, its
+ * hero and sections usually are not, and when they are, they are named so.
+ * A page with a single child has no chrome to speak of.
+ */
+export function pickPageChrome(children: ReadonlyArray<ChromeNode>): { header: ChromeNode | null; footer: ChromeNode | null } {
+  if (children.length < 2) return { header: null, footer: null };
+
+  const looksLikeChrome = (node: ChromeNode | undefined): node is ChromeNode =>
+    node !== undefined && node.kind === "component" && !CONTENT_NAME.test(node.name ?? "");
+
+  const first = children[0];
+  const last = children[children.length - 1];
+
+  const header =
+    children.find((node) => HEADER_NAME.test(node.name ?? "") && !FOOTER_NAME.test(node.name ?? "")) ??
+    (looksLikeChrome(first) && !FOOTER_NAME.test(first.name ?? "") ? first : null);
+
+  const named = [...children].reverse().find((node) => FOOTER_NAME.test(node.name ?? ""));
+  const footer = named ?? (looksLikeChrome(last) && last.id !== header?.id ? last : null);
+
+  return { header, footer: footer && footer.id !== header?.id ? footer : null };
+}
+
+/**
+ * Find a page to borrow the header and footer from.
+ *
+ * Home first, since it is the page a template is designed around, then every
+ * other page in project order. Pages created in this run are skipped: they are
+ * empty. Only a stacked breakpoint qualifies, because a header and footer in an
+ * absolutely positioned page are placed by coordinates that mean nothing on a
+ * page of a different height.
+ */
+export async function findPageChrome(
+  deps: Pick<PageChromeDeps, "getNodesWithType" | "getBreakpoints" | "getChildren">,
+  excludePageIds: ReadonlySet<string>
+): Promise<PageChrome | null> {
+  const pages = (await deps.getNodesWithType("WebPageNode")).filter((page) => !excludePageIds.has(page.id));
+  const ordered = [
+    ...pages.filter((page) => normalizePagePath(page.path ?? "") === "/"),
+    ...pages.filter((page) => normalizePagePath(page.path ?? "") !== "/"),
+  ];
+
+  for (const page of ordered.slice(0, 8)) {
+    try {
+      const breakpoints = (await deps.getBreakpoints(page.id)).filter((node) => node.isBreakpoint);
+      const primary = breakpoints.find((node) => node.isPrimaryBreakpoint) ?? breakpoints[0];
+      if (!primary || primary.layout !== "stack") continue;
+
+      const { header, footer } = pickPageChrome(await deps.getChildren(primary.id));
+      if (header || footer) {
+        return { sourcePageId: page.id, header, footer, layoutAttributes: primary.layoutAttributes };
+      }
+    } catch {
+      // An unreadable page is no reason to give up on the others.
+    }
+  }
+
+  return null;
+}
+
+export interface AppliedChrome {
+  header: boolean;
+  footer: boolean;
+  /** Whether the page now stacks its children, so the component flows between them. */
+  stacked: boolean;
+}
+
+/**
+ * Give a new page the source page's layout, a copy of its header at the top,
+ * and a copy of its footer at the bottom. The caller inserts its component at
+ * index 1 (or 0 with no header), between the two.
+ *
+ * Each copy is independent of the others: a header that will not clone still
+ * leaves the footer, and the page is usable either way.
+ */
+export async function applyPageChrome(
+  deps: Pick<PageChromeDeps, "cloneNode" | "setParent" | "setAttributes" | "removeNodes">,
+  breakpointId: string,
+  chrome: PageChrome
+): Promise<AppliedChrome> {
+  let stacked = false;
+  try {
+    await deps.setAttributes(breakpointId, chrome.layoutAttributes);
+    stacked = true;
+  } catch {
+    stacked = false;
+  }
+
+  const place = async (node: ChromeNode | null, index?: number): Promise<boolean> => {
+    if (!node) return false;
+    let copy: { readonly id: string } | null = null;
+    try {
+      copy = await deps.cloneNode(node.id);
+      if (!copy) return false;
+      await deps.setParent(copy.id, breakpointId, index);
+      return true;
+    } catch {
+      // A clone lands beside its original. One that could not be moved would
+      // leave a second header on the source page, so it is removed.
+      if (copy) await deps.removeNodes([copy.id]).catch(() => undefined);
+      return false;
+    }
+  };
+
+  const header = await place(chrome.header, 0);
+  const footer = await place(chrome.footer);
+
+  return { header, footer, stacked };
+}
+
+/**
+ * The Spacing a component starts with when a real header sits above it in the
+ * stack. Less than `SCAFFOLD_COMPONENT_SPACING`, which has to clear a header
+ * laid over the page.
+ */
+export const SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER = { margin: "64px 0px 96px 0px" } as const;
+
+/**
+ * A fixed height grown by a margin's top and bottom.
+ *
+ * The component draws its Spacing margin inside its own box, so a 620px auth
+ * card given 64px above and 96px below keeps its 620px only if the frame is
+ * 780px. Anything other than a pixel height ("fit-content", "100%") is left
+ * as it is: it already sizes to what is inside.
+ */
+export function heightWithMargin(height: string, margin: string): string {
+  const base = /^(\d+(?:\.\d+)?)px$/.exec(height.trim());
+  if (!base) return height;
+  const parts = margin.trim().split(/\s+/).map((part) => parseFloat(part) || 0);
+  const [top = 0, , bottom = top] = parts;
+  return `${Math.round(Number(base[1]) + top + bottom)}px`;
+}
+
 /**
  * One line summarising the run, for a toast.
  *

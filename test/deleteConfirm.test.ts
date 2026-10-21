@@ -19,7 +19,7 @@ const DESTRUCTIVE: ReadonlyArray<{ file: string; opens: ReadonlyArray<string> }>
   { file: "components/manage/MemberFlyout.tsx", opens: ['setConfirming("revoke")', 'setConfirming("delete")'] },
   { file: "components/manage/FilesPanel.tsx", opens: ["setConfirmDeleteId(asset.id)"] },
   { file: "components/manage/PaymentsPanel.tsx", opens: ["setConfirmRemove(true)"] },
-  { file: "components/manage/TierEditor.tsx", opens: ["setConfirmDelete(true)"] },
+  { file: "components/manage/TierEditor.tsx", opens: ["setConfirmDelete(true)", "setRemovingIndex(index)"] },
   { file: "components/settings/WebhooksPanel.tsx", opens: ["setConfirmingDelete(true)"] },
   { file: "components/settings/CustomFieldsPanel.tsx", opens: ["setRemovingIndex(index)"] },
   { file: "components/settings/PageLocksPanel.tsx", opens: ["setRemovingIndex(index)"] },

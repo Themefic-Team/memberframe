@@ -104,3 +104,18 @@ export function shortProjectId(projectId: string): string {
   if (projectId.length <= 12) return projectId;
   return `${projectId.slice(0, 6)}...${projectId.slice(-4)}`;
 }
+
+/**
+ * The published addresses the site does not allow yet.
+ *
+ * A site's allowed domains are read from the publish info when the project is
+ * connected. A site first published later (a new `*.framer.app` address, a
+ * staging URL, a custom domain) would answer `foreign` and draw every component
+ * as a pasted copy. Comparing again while the panel is open closes that gap.
+ */
+export function missingPublishedOrigins(
+  info: { production: { url: string } | null; staging: { url: string } | null },
+  allowed: ReadonlyArray<string>
+): string[] {
+  return originsFromPublishInfo(info).filter((origin) => !allowed.includes(origin));
+}

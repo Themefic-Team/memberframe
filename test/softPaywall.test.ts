@@ -219,7 +219,7 @@ describe("F08: Schema.org paywall markup", () => {
 
   it("points cssSelector at the class the paywall puts on the gated content", () => {
     expect(schema.MF_GATED_BODY_CLASS).toBe("memberframe-gated-body");
-    expect(paywall).toContain("className={`mf-meter-body ${MF_GATED_BODY_CLASS}");
+    expect(paywall).toContain("linkedArticle.classList.add(MF_GATED_BODY_CLASS);");
   });
 
   it("cannot be broken out of its script element, and falls back to Article for an unknown type", () => {
@@ -231,8 +231,8 @@ describe("F08: Schema.org paywall markup", () => {
 
   it("keeps the article in the page for every visitor: cut with CSS, never removed", () => {
     // Crawler and person receive the same markup (F08 criterion 3).
-    expect(paywall).toMatch(/\{contentSlot\}\s*\{cut \? <div className="mf-meter-fade"/);
-    expect(paywall).toContain(".mf-meter-body.is-cut { max-height: var(--mf-meter-cut); overflow: hidden; }");
+    expect(paywall).toContain("max-height: ${cutAt}px !important; overflow: hidden !important;");
+    expect(paywall).not.toContain("removeChild");
   });
 
   it("keeps focus and screen readers out of the frosted text (criterion 5)", () => {
@@ -261,6 +261,12 @@ describe("the generated paywall", () => {
     expect(code).toContain('apiBaseUrl: "https://api.example.com",');
     expect(code).toContain('loginPath: "/sign-in",');
     expect(code).toContain("freeQuotaCount: 100,");
+  });
+
+  it("sends its buttons to the site's own pricing page, from Payments", () => {
+    expect(generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, { ...context, pricingPath: "/plans" }).code).toContain('pricingPath: "/plans",');
+    expect(generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, context).code).toContain('pricingPath: "/pricing",');
+    expect(generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, { ...context, pricingPath: "//evil.example" }).code).toContain('pricingPath: "/pricing",');
   });
 
   it("lists the site's tiers, by rank and escaped, under Full Access For", () => {

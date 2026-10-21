@@ -33,7 +33,7 @@
  * billing: never" would reasonably conclude their subscription had lapsed.
  */
 
-import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
 import { CreditCard, LogOut, ShieldCheck, User } from "lucide-react";
 
@@ -62,17 +62,20 @@ const IS_TRIAL = false;
 // Upgrade card. The server refuses an unlicensed site's member requests on its
 // own, so removing these lines unlocks nothing.
 //
-// The server is asked again every half minute and when the tab regains focus,
-// so a trial that ends while a page is open locks it. Each instance also sends
+// The server is asked once when the component mounts, and again only when the
+// tab comes back after ten minutes or more: nothing polls. On the canvas the
+// open plugin hears every license change from the server and rewrites the
+// four lines above, which remounts the component with the new state. Each
+// instance also sends
 // the seal the Builder gave it (27-instance-seal.md): a pasted copy, or one
 // that never came from the Builder, is answered "copied" and shows an insert
 // card instead. An instance from before seals sends none and is held to the
 // license alone.
 
-type MfLicense = "trial" | "active" | "locked" | "copied";
+type MfLicense = "trial" | "active" | "locked" | "copied" | "domain";
 
 const MF_LICENSE_CACHE_MS = 60000;
-const MF_LICENSE_RECHECK_MS = 30000;
+const MF_LICENSE_STALE_MS = 600000;
 
 function mfBakedLicense(): MfLicense {
   return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
@@ -83,7 +86,9 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
   const cache = (host.__mfLicense = host.__mfLicense || {});
   const base = String(apiBaseUrl).replace(/\/+$/, "");
-  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal);
+  // The baked state is part of the key: once the plugin rewrites it, the
+  // remounted component asks afresh instead of reusing the old answer.
+  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal) + "|" + mfBakedLicense();
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
@@ -104,7 +109,10 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
     })
     .then((data: { state?: unknown } | null): MfLicense | null => {
       const state = data ? data.state : null;
-      if (state === "copied" || state === "foreign") return "copied";
+      if (state === "copied") return "copied";
+      // Published at an address the site does not allow yet. Not a copy: the
+      // plugin adds the address the next time it is open in this project.
+      if (state === "foreign") return "domain";
       return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
     })
     .catch(() => null);
@@ -116,26 +124,26 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
+    let checkedAt = 0;
     const check = () => {
+      checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
         if (live && answer) setLicense(answer);
       });
     };
     check();
     if (typeof window === "undefined") return () => undefined;
-    // Instances on one page share the cached answer, so this is one request a
-    // minute per page, not one per component.
-    const timer = window.setInterval(check, MF_LICENSE_RECHECK_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+    // Instances on one page share the cached answer, so a return to the tab is
+    // at most one request per page, not one per component.
+    const onReturn = () => {
+      if (document.visibilityState === "visible" && Date.now() - checkedAt >= MF_LICENSE_STALE_MS) check();
     };
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
     return () => {
       live = false;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
     };
   }, [apiBaseUrl, siteKey, seal]);
   return license;
@@ -175,9 +183,16 @@ function MfWatermark(): React.ReactElement {
   );
 }
 
-function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
+const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
+  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
+  domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
+};
+
+function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
+  const copy = MF_LOCK_COPY[props.kind];
   return (
-    <div className="mf-lock" role="note" aria-label={props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}>
+    <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -185,12 +200,8 @@ function MfLockOverlay(props: { copied: boolean }): React.ReactElement {
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
         </span>
-        <p className="mf-lock-title">{props.copied ? "Insert from MemberFrame" : "Upgrade to Pro"}</p>
-        <p className="mf-lock-text">
-          {props.copied
-            ? "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin."
-            : "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it."}
-        </p>
+        <p className="mf-lock-title">{copy.title}</p>
+        <p className="mf-lock-text">{copy.text}</p>
       </div>
     </div>
   );
@@ -202,7 +213,7 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay copied={props.license === "copied"} />}
+      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
     </>
   );
 }
@@ -429,6 +440,11 @@ function mfBox(value: unknown, max: number): [number, number, number, number] | 
  * component's own spacing alone. Top and bottom margin keep a root's own
  * centring; a side margin replaces it, and `width: auto` lets the root fill
  * the space between the two margins instead of overflowing at 100%.
+ *
+ * Margin sits inside the instance's box, so a root that fills its frame
+ * (`height: 100%`) shrinks by the top and bottom margin rather than spilling
+ * past the frame Framer shows as selected. A root sized by its content
+ * cannot resolve the percentage, and the browser treats it as `auto`.
  */
 function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
   const input = spacing || {};
@@ -439,6 +455,7 @@ function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
     const [t, r, b, l] = margin;
     if (t > 0) out.push(`margin-top: ${t}px;`);
     if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (t + b > 0) out.push(`height: calc(100% - ${t + b}px);`);
     if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
   }
 
@@ -615,6 +632,15 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
   }
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
+/** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
+const MF_SCOPE_SLOT = "@mf-scope";
+
+function mfStyleScope(prefix: string, rule: string): { scope: string; css: string } {
+  let hash = 5381;
+  for (let index = 0; index < rule.length; index++) hash = ((hash << 5) + hash + rule.charCodeAt(index)) | 0;
+  const scope = prefix + (hash >>> 0).toString(36);
+  return { scope, css: rule.split(MF_SCOPE_SLOT).join(scope) };
+}
 // @memberframe-appearance-end
 
 // @memberframe-canvas-preview-start
@@ -712,7 +738,7 @@ const DASH_LABELS: Record<string, readonly [string, string]> = {
   manageBilling: ["Manage billing button", "Manage billing"],
   updatePayment: ["Update payment button", "Update payment"],
   cancelPlan: ["Cancel button", "Cancel plan"],
-  confirmCancel: ["Confirm cancel button", "Confirm cancel"],
+  confirmCancel: ["Confirm cancel button", "Cancel plan"],
   resumePlan: ["Resume button", "Resume plan"],
   noPlan: ["No paid plan", "You are on the free plan."],
   seePlans: ["See plans button", "See plans"],
@@ -720,6 +746,35 @@ const DASH_LABELS: Record<string, readonly [string, string]> = {
   receipt: ["Receipt link", "Receipt"],
   refunded: ["Refunded", "Refunded"],
   billingFailed: ["Billing failed", "Billing details could not be loaded."],
+  subscriptionTitle: ["Subscription popup title", "Your subscription"],
+  paidWith: ["Paid with", "Paid with {gateway}"],
+  updateMethod: ["Update payment method button", "Update payment method"],
+  changePlan: ["Change plan title", "Change plan"],
+  upgrade: ["Upgrade button", "Upgrade"],
+  downgrade: ["Downgrade button", "Downgrade"],
+  confirmChange: ["Confirm change button", "Confirm"],
+  changeNote: ["Change note", "You pay the difference now, credited for the time left on your plan."],
+  planChanged: ["Plan changed", "You are now on {tier}."],
+  changeFailed: ["Change failed", "The plan could not be changed. Try again in a moment."],
+  closeBilling: ["Close popup", "Close"],
+  cancelQuestion: ["Cancel question", "Cancel your {tier} plan?"],
+  cancelKeeps: ["Cancel note", "You keep access until {date}. It does not renew after that."],
+  keepPlan: ["Keep plan button", "Keep plan"],
+  renewalPending: ["Renewal pending", "Renewal is being processed."],
+  creditLine: ["Credit line", "Credit for unused {plan}"],
+  dueToday: ["Due today", "Due today"],
+  thenEvery: ["Renewal line", "Then {price} every {period}"],
+  downgradeNote: ["Downgrade note", "Switches to {tier} on {date}. Nothing is charged today."],
+  confirmDowngrade: ["Confirm downgrade button", "Confirm downgrade"],
+  confirmUpgrade: ["Confirm upgrade button", "Pay and upgrade"],
+  notNow: ["Cancel change button", "Not now"],
+  changesTo: ["Scheduled change", "Changes to {tier} on {date}"],
+  undoChange: ["Undo change button", "Undo"],
+  scheduledDone: ["Downgrade scheduled", "Your plan changes to {tier} on {date}."],
+  plansTitle: ["Plans history title", "Plans"],
+  planActive: ["Plan active", "Active"],
+  planEnded: ["Plan ended", "Ended"],
+  creditedLine: ["Credit history line", "Credit for unused time"],
   testPurchase: ["Test purchase", "Test purchase"],
   signIn: ["Sign in button", "Sign in"],
   signOut: ["Sign out button", "Sign out"],
@@ -762,10 +817,24 @@ interface DashboardDisplayProps {
 }
 
 /** `GET /api/member/billing`, FP-16. */
+interface BillingPlanOption {
+  key: string;
+  name: string;
+  rank: number;
+  currency: string;
+  prices: { month: number | null; year: number | null; lifetime: number | null };
+}
+
 interface BillingSummary {
   subscription: {
+    tierKey?: string;
     tierName: string;
     interval: string;
+    /** The gateway it is paid through. Absent from an older server. */
+    gateway?: string;
+    /** A downgrade waiting for the period end (30-plan-changes.md). */
+    scheduledTierName?: string | null;
+    scheduledInterval?: string | null;
     status: string;
     amountMinor: number;
     currency: string;
@@ -777,9 +846,34 @@ interface BillingSummary {
     canResume: boolean;
     canManage: boolean;
   } | null;
-  payments: Array<{ id: string; amountMinor: number; currency: string; status: string; receiptUrl: string | null; paidAt: string }>;
+  payments: Array<{
+    id: string;
+    amountMinor: number;
+    currency: string;
+    status: string;
+    receiptUrl: string | null;
+    paidAt: string;
+    /** Every gateway's payments are listed; each names its own. Absent from an older server. */
+    gateway?: string;
+    mode?: string;
+    planName?: string | null;
+    interval?: string | null;
+  }>;
+  /** The plans a member can switch to. Absent from an older server. */
+  plans?: BillingPlanOption[];
+  /** Every plan held and every credit given (30-plan-changes.md). Absent from an older server. */
+  history?: {
+    plans: Array<{ planName: string; interval: string; gateway: string; mode: string; status: string; startedAt: string; endedAt: string | null }>;
+    credits: Array<{ planName: string; gateway: string; mode: string; amountMinor: number; currency: string; at: string | null }>;
+  };
   pricingPath: string;
 }
+
+const GATEWAY_NAMES: Record<string, string> = { stripe: "Stripe", lemonsqueezy: "Lemon Squeezy", razorpay: "Razorpay" };
+const gatewayName = (gateway: string | undefined) => (gateway ? GATEWAY_NAMES[gateway] ?? gateway : "");
+
+const OPTIONS_PATH = "/api/checkout/options";
+const CHECKOUT_PATH = "/api/checkout/create-session";
 
 type BillingState =
   | { phase: "idle" }
@@ -1199,6 +1293,17 @@ function safePath(value: string): boolean {
   return true;
 }
 
+/**
+ * An auto-renewing plan whose date has passed: the gateway is renewing it,
+ * and the server checks with the gateway if it does not hear (30-plan-changes.md).
+ * Saying "Renews on" a past date would read as an error.
+ */
+function renewalOverdue(periodEnd: string | null): boolean {
+  if (!periodEnd) return false;
+  const end = new Date(periodEnd).getTime();
+  return Number.isFinite(end) && end < Date.now();
+}
+
 function navigate(path: string): void {
   if (!safePath(path)) return;
   if (typeof window === "undefined") return;
@@ -1544,6 +1649,53 @@ textarea.mf-dash-input { min-height: 88px; resize: vertical; }
 .mf-dash-billing-plan { display: flex; flex-direction: column; gap: 10px; }
 .mf-dash-billing-plan .mf-dash-button { margin-top: 0; }
 .mf-dash-history { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+/* The subscription popup (2026-10-20). */
+.mf-dash-modal {
+  position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: var(--mf-c-backdrop, rgba(15, 18, 24, 0.55));
+}
+.mf-dash-modal-card {
+  box-sizing: border-box; width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: var(--mf-pad, 24px);
+  color: var(--mf-c-text); background: var(--mf-c-surface); border: 1px solid var(--mf-c-border);
+  border-radius: var(--mf-c-radius); box-shadow: 0 24px 48px -12px rgba(15, 18, 24, 0.35); text-align: left;
+}
+.mf-dash-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mf-dash-modal-head .mf-dash-profile-title { margin: 0; }
+.mf-dash-modal-close {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--mf-c-muted); cursor: pointer;
+}
+.mf-dash-modal-close:hover { background: var(--mf-c-field); color: var(--mf-c-text); }
+.mf-dash-modal-close svg { width: 16px; height: 16px; stroke: currentColor; }
+.mf-dash-modal-plan, .mf-dash-modal-section { display: flex; flex-direction: column; gap: 6px; }
+.mf-dash-modal-section { padding-top: 12px; border-top: 1px solid var(--mf-c-border); }
+.mf-dash-modal-actions { display: flex; flex-direction: column; gap: 8px; }
+.mf-dash-modal-actions .mf-dash-button { margin-top: 0; }
+.mf-dash-button.mf-dash-button-small { width: auto; margin-top: 0; padding: 6px 12px; flex-shrink: 0; }
+.mf-dash-button-danger { color: var(--mf-c-danger); border-color: var(--mf-c-border); }
+.mf-dash-button-danger:hover:not(:disabled) { border-color: var(--mf-c-danger); background: transparent; }
+.mf-dash-button-danger.is-solid { color: #ffffff; background: var(--mf-c-danger); border-color: var(--mf-c-danger); }
+.mf-dash-button-danger.is-solid:hover:not(:disabled) { background: var(--mf-c-danger); filter: brightness(1.06); }
+.mf-dash-confirm {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px;
+  border: 1px solid var(--mf-c-danger); border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
+}
+.mf-dash-confirm-title { margin: 0; font-weight: 600; }
+.mf-dash-confirm .mf-dash-note { margin: 0; }
+.mf-dash-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.mf-dash-confirm-actions .mf-dash-button { margin-top: 0; }
+.mf-dash-confirm-change { border-color: var(--mf-c-accent); }
+.mf-dash-breakdown { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; }
+.mf-dash-breakdown > :nth-child(even) { text-align: right; }
+.mf-dash-breakdown-wide { grid-column: 1 / -1; }
+.mf-dash-muted { color: var(--mf-c-muted); }
+.mf-dash-scheduled {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px;
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px)); background: var(--mf-c-field);
+  font-size: calc(12px * var(--mf-text-scale, 1));
+}
+.mf-dash-history-row .mf-dash-row-label { display: flex; flex-direction: column; gap: 2px; }
 .mf-dash-link { color: var(--mf-c-accent); text-decoration: underline; }
 `;
 
@@ -1557,13 +1709,13 @@ interface MfSealProps {
 }
 
 /**
- * Fixed size by default, so the frame the creator draws is the panel they get.
- * The panel fills it and scrolls if the profile form is longer than the frame.
+ * Fixed width, height from its content (2026-10-20): the page scrolls, not the
+ * panel. A fixed height chosen in the sidebar still works, and scrolls inside.
  *
  * @framerIntrinsicWidth 480
  * @framerIntrinsicHeight 560
  * @framerSupportedLayoutWidth any-prefer-fixed
- * @framerSupportedLayoutHeight any-prefer-fixed
+ * @framerSupportedLayoutHeight any-prefer-auto
  */
 export default function MemberDashboard(
   props: Partial<DashboardConfig> & MfAppearanceProps & DashboardDisplayProps & MfSealProps
@@ -1591,6 +1743,18 @@ export default function MemberDashboard(
   const [billing, setBilling] = useState<BillingState>({ phase: "idle" });
   const [billingBusy, setBillingBusy] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  /** The subscription popup (2026-10-20): plan, change plan, every payment. */
+  const [billingOpen, setBillingOpen] = useState(false);
+  /** A plan picked to switch to: loading its numbers, then waiting for Confirm. */
+  const [switchTo, setSwitchTo] = useState<{
+    key: string;
+    name: string;
+    kind: "loading" | "change" | "downgrade" | "choose";
+    summary?: { amountMinor: number; currency: string; creditMinor?: number; dueMinor?: number; creditFrom?: string | null; interval: string };
+    effectiveAt?: string | null;
+  } | null>(null);
+  const [billingNotice, setBillingNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const billingRef = useRef<HTMLDivElement>(null);
 
 
   const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey, props.mfSeal);
@@ -1625,21 +1789,34 @@ export default function MemberDashboard(
           { key: "vip", rank: 3, name: "VIP" },
         ],
       });
-      // The site's own tiers, with the preview member on the top one.
+      // The site's own tiers, with the preview member on the top one. Asked
+      // again on a timer and on focus, so a tier created in the plugin shows
+      // up on a component that is already on the canvas.
       let active = true;
-      void mfCanvasPreview(config.apiBaseUrl || ENV_API_BASE_URL || "", config.siteKey || CONFIG.siteKey).then((data) => {
-        const pricing = data ? (data["pricing"] as { tiers?: Array<{ key: string; rank: number; name: string }> } | undefined) : undefined;
-        const tiers = pricing && Array.isArray(pricing.tiers) ? pricing.tiers.map((tier) => ({ key: tier.key, rank: tier.rank, name: tier.name })) : [];
-        if (!active || tiers.length === 0) return;
-        const top = tiers.reduce((best, tier) => (tier.rank > best.rank ? tier : best), tiers[0]);
-        setState((current) =>
-          current.phase === "signed_in" && current.member.memberId === "preview"
-            ? { ...current, member: { ...current.member, activeTier: top.key }, tiers }
-            : current
-        );
-      });
+      let shown = "";
+      const refresh = () => {
+        void mfCanvasPreview(config.apiBaseUrl || ENV_API_BASE_URL || "", config.siteKey || CONFIG.siteKey).then((data) => {
+          const pricing = data ? (data["pricing"] as { tiers?: Array<{ key: string; rank: number; name: string }> } | undefined) : undefined;
+          const tiers = pricing && Array.isArray(pricing.tiers) ? pricing.tiers.map((tier) => ({ key: tier.key, rank: tier.rank, name: tier.name })) : [];
+          if (!active || tiers.length === 0) return;
+          const next = JSON.stringify(tiers);
+          if (next === shown) return;
+          shown = next;
+          const top = tiers.reduce((best, tier) => (tier.rank > best.rank ? tier : best), tiers[0]);
+          setState((current) =>
+            current.phase === "signed_in" && current.member.memberId === "preview"
+              ? { ...current, member: { ...current.member, activeTier: top.key }, tiers }
+              : current
+          );
+        });
+      };
+      refresh();
+      const timer = window.setInterval(refresh, MF_PREVIEW_TTL_MS);
+      window.addEventListener("focus", refresh);
       return () => {
         active = false;
+        window.clearInterval(timer);
+        window.removeEventListener("focus", refresh);
       };
     }
 
@@ -1963,7 +2140,7 @@ export default function MemberDashboard(
   }, [config.apiBaseUrl, config.showBilling, onCanvas, signedInMemberId]);
 
   const billingAction = useCallback(
-    async (action: "portal" | "cancel" | "resume") => {
+    async (action: "portal" | "cancel" | "resume" | "undo-change") => {
       if (onCanvas) return;
       const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
       if (base === "") return;
@@ -1999,6 +2176,112 @@ export default function MemberDashboard(
     [config.apiBaseUrl, onCanvas]
   );
 
+  /** Ask what a switch to this plan costs (30-plan-changes.md), before confirming it. */
+  const previewChange = useCallback(
+    async (key: string, name: string, interval: string) => {
+      if (onCanvas) return;
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+      if (base === "") return;
+      setBillingNotice(null);
+      setSwitchTo({ key, name, kind: "loading" });
+      try {
+        const response = await fetch(`${base}${OPTIONS_PATH}`, {
+          method: "POST",
+          credentials: "include",
+          headers: apiHeaders(true),
+          body: JSON.stringify({ tierKey: key, interval }),
+        });
+        const body = response.ok
+          ? ((await response.json()) as { kind?: string; summary?: NonNullable<typeof switchTo>["summary"]; effectiveAt?: string | null })
+          : null;
+        if (!body || (body.kind !== "change" && body.kind !== "downgrade" && body.kind !== "choose")) {
+          setSwitchTo(null);
+          setBillingNotice({ text: t("changeFailed"), error: true });
+          return;
+        }
+        setSwitchTo({ key, name, kind: body.kind, summary: body.summary, effectiveAt: body.effectiveAt ?? null });
+      } catch {
+        setSwitchTo(null);
+        setBillingNotice({ text: t("changeFailed"), error: true });
+      }
+    },
+    // `t` reads the labels prop; the copy is read when each message is set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config.apiBaseUrl, onCanvas]
+  );
+
+  /**
+   * Do the previewed switch: an upgrade in place (Stripe, credited), a
+   * downgrade scheduled for the period end, or, where neither applies, the
+   * pricing page, where the buyer chooses how to pay with the credit shown.
+   */
+  const confirmChange = useCallback(
+    async (pricingPath: string) => {
+      if (onCanvas || !switchTo || switchTo.kind === "loading") return;
+      if (switchTo.kind === "choose") {
+        if (safePath(pricingPath)) navigate(pricingPath);
+        return;
+      }
+      const base = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+      if (base === "") return;
+      setBillingBusy(true);
+      try {
+        const response = await fetch(`${base}${CHECKOUT_PATH}`, {
+          method: "POST",
+          credentials: "include",
+          headers: apiHeaders(true),
+          body: JSON.stringify({
+            tierKey: switchTo.key,
+            interval: switchTo.summary?.interval ?? "month",
+            returnPath: typeof window !== "undefined" ? window.location.pathname : "/",
+          }),
+        });
+        const result = response.ok ? ((await response.json()) as { kind?: string; tierName?: string; effectiveAt?: string | null }) : null;
+        if (result?.kind === "changed") {
+          setBillingNotice({ text: t("planChanged").split("{tier}").join(result.tierName || switchTo.name), error: false });
+        } else if (result?.kind === "scheduled") {
+          setBillingNotice({
+            text: t("scheduledDone").split("{tier}").join(result.tierName || switchTo.name).split("{date}").join(formatDate(result.effectiveAt ?? null)),
+            error: false,
+          });
+        } else {
+          setBillingNotice({ text: t("changeFailed"), error: true });
+          return;
+        }
+        const refreshed = await fetch(`${base}${BILLING_PATH}`, { credentials: "include", headers: apiHeaders(false) });
+        if (refreshed.ok) setBilling({ phase: "ready", summary: (await refreshed.json()) as BillingSummary });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("memberframe:session-updated", { detail: { signedIn: true } }));
+        }
+      } catch {
+        setBillingNotice({ text: t("changeFailed"), error: true });
+      } finally {
+        setBillingBusy(false);
+        setSwitchTo(null);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config.apiBaseUrl, onCanvas, switchTo]
+  );
+
+  // The popup keeps the page still behind it and starts on its close button.
+  useEffect(() => {
+    if (!billingOpen || onCanvas || typeof document === "undefined") return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    billingRef.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [billingOpen, onCanvas]);
+
+  const closeBilling = useCallback(() => {
+    setBillingOpen(false);
+    setSwitchTo(null);
+    setConfirmingCancel(false);
+    setBillingNotice(null);
+  }, []);
+
   // ------------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------------
@@ -2006,7 +2289,7 @@ export default function MemberDashboard(
   // Accent, radius, Colors, Typography, and Layout, sanitized by the shared
   // appearance block and scoped to this instance.
   const scopedVars =
-    `[data-mf-dash="${scope}"] { ` +
+    `[data-mf-dash="${MF_SCOPE_SLOT}"] { ` +
     mfAppearanceVars({
       accent: config.accentColor,
       radius: config.borderRadius,
@@ -2018,19 +2301,20 @@ export default function MemberDashboard(
       spacing,
     }) +
     " }";
+  const styled = mfStyleScope("mfd", scopedVars);
   const rootClass = `mf-dash ${mfThemeClass(theme)}`;
   const style = (
     <>
       <style>{mfThemeCss(".mf-dash")}</style>
       <style>{cssContent}</style>
-      <style>{scopedVars}</style>
+      <style>{styled.css}</style>
       <MfLicenseLayer license={license} />
     </>
   );
 
   if (state.phase === "loading") {
     return (
-      <div className={rootClass} data-mf-dash={scope}>
+      <div className={rootClass} data-mf-dash={styled.scope}>
         {style}
         <div className="mf-dash-state">
           <p>{t("loading")}</p>
@@ -2043,7 +2327,7 @@ export default function MemberDashboard(
     // Addressed to the creator, not the visitor, because only a creator can
     // fix it and only a creator sees it before the site is published.
     return (
-      <div className={rootClass} data-mf-dash={scope}>
+      <div className={rootClass} data-mf-dash={styled.scope}>
         {style}
         <div className="mf-dash-state">
           <ShieldCheck aria-hidden={true} />
@@ -2055,7 +2339,7 @@ export default function MemberDashboard(
 
   if (state.phase === "unavailable") {
     return (
-      <div className={rootClass} data-mf-dash={scope}>
+      <div className={rootClass} data-mf-dash={styled.scope}>
         {style}
         <div className="mf-dash-state">
           <p>{t("unavailable")}</p>
@@ -2066,7 +2350,7 @@ export default function MemberDashboard(
 
   if (state.phase === "signed_out") {
     return (
-      <div className={rootClass} data-mf-dash={scope}>
+      <div className={rootClass} data-mf-dash={styled.scope}>
         {style}
         <div className="mf-dash-state">
           <User aria-hidden={true} />
@@ -2090,7 +2374,7 @@ export default function MemberDashboard(
   const initial = displayName.trim().charAt(0).toUpperCase() || "M";
 
   return (
-    <div className={rootClass} data-mf-dash={scope}>
+    <div className={rootClass} data-mf-dash={styled.scope}>
       {style}
 
       <div className="mf-dash-head">
@@ -2244,75 +2528,327 @@ export default function MemberDashboard(
                         ? t("lifetime")
                         : plan.cancelAtPeriodEnd
                           ? t("endsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))
-                          : t("renewsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))}
+                          : renewalOverdue(plan.currentPeriodEnd)
+                            ? t("renewalPending")
+                            : t("renewsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))}
                   </p>
 
-                  {plan.canManage ? (
-                    <button
-                      type="button"
-                      className={`mf-dash-button${pastDue ? " mf-dash-button-primary" : ""}`}
-                      disabled={billingBusy || onCanvas}
-                      onClick={() => void billingAction("portal")}
-                    >
-                      <CreditCard aria-hidden={true} />
-                      {pastDue ? t("updatePayment") : t("manageBilling")}
-                    </button>
-                  ) : null}
-
-                  {plan.canResume ? (
+                  {/* A failed payment goes straight to the card update; everything
+                      else opens the subscription popup. */}
+                  {pastDue && plan.canManage ? (
                     <button
                       type="button"
                       className="mf-dash-button mf-dash-button-primary"
                       disabled={billingBusy || onCanvas}
-                      onClick={() => void billingAction("resume")}
+                      onClick={() => void billingAction("portal")}
                     >
-                      {t("resumePlan")}
+                      <CreditCard aria-hidden={true} />
+                      {t("updatePayment")}
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    className="mf-dash-button"
+                    disabled={onCanvas}
+                    onClick={() => setBillingOpen(true)}
+                  >
+                    <CreditCard aria-hidden={true} />
+                    {t("manageBilling")}
+                  </button>
 
-                  {allowCancel && plan.canCancel ? (
-                    <button
-                      type="button"
-                      className="mf-dash-button mf-dash-button-text"
-                      disabled={billingBusy || onCanvas}
-                      onClick={() => {
-                        // Cancel asks once before it acts.
-                        if (!confirmingCancel) {
-                          setConfirmingCancel(true);
-                          return;
-                        }
-                        void billingAction("cancel");
-                      }}
-                    >
-                      {confirmingCancel ? t("confirmCancel") : t("cancelPlan")}
-                    </button>
-                  ) : null}
                 </div>
               );
             })()
           )}
 
-          {showPaymentHistory && billing.phase === "ready" && billing.summary.payments.length > 0 ? (
-            <div className="mf-dash-history">
-              <p className="mf-dash-label">{t("history")}</p>
-              {billing.summary.payments.map((payment) => (
-                <div className="mf-dash-row" key={payment.id}>
-                  <span className="mf-dash-row-label">{formatDate(payment.paidAt)}</span>
-                  <span className="mf-dash-row-value">
-                    {payment.status === "refunded" ? `${t("refunded")} ` : ""}
-                    {formatMoney(payment.amountMinor, payment.currency)}
-                    {payment.receiptUrl && /^https:\/\//.test(payment.receiptUrl) ? (
-                      <>
-                        {" "}
-                        <a className="mf-dash-link" href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
-                          {t("receipt")}
-                        </a>
-                      </>
+          {billingOpen && billing.phase === "ready" && billing.summary.subscription ? (
+            (() => {
+              const plan = billing.summary.subscription;
+              const summary = billing.summary;
+              const currentRank = (summary.plans ?? []).find((option) => option.key === plan.tierKey)?.rank ?? -1;
+              // Paid plans priced for this period, other than the current one.
+              const period = plan.interval === "year" ? "year" : plan.interval === "lifetime" ? "lifetime" : "month";
+              const others = (summary.plans ?? []).filter(
+                (option) => option.rank > 0 && option.key !== plan.tierKey && option.prices[period] !== null
+              );
+              return (
+                <div
+                  className="mf-dash-modal"
+                  onClick={(event) => {
+                    if (event.target === event.currentTarget) closeBilling();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.stopPropagation();
+                      closeBilling();
+                    }
+                  }}
+                >
+                  <div
+                    className="mf-dash-modal-card"
+                    ref={billingRef}
+                    role="dialog"
+                    aria-modal={true}
+                    aria-labelledby={`mf-dash-sub-${member.memberId}`}
+                  >
+                    <div className="mf-dash-modal-head">
+                      <p className="mf-dash-profile-title" id={`mf-dash-sub-${member.memberId}`}>
+                        {t("subscriptionTitle")}
+                      </p>
+                      <button type="button" className="mf-dash-modal-close" aria-label={t("closeBilling")} onClick={closeBilling}>
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" aria-hidden={true}>
+                          <path d="M18 6 6 18" />
+                          <path d="m6 6 12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="mf-dash-modal-plan">
+                      <div className="mf-dash-row">
+                        <span className="mf-dash-row-label">
+                          {plan.tierName}
+                          {plan.mode === "test" ? <span className="mf-dash-optional">{t("testPurchase")}</span> : null}
+                        </span>
+                        <span className="mf-dash-row-value">
+                          {formatMoney(plan.amountMinor, plan.currency)}
+                          {plan.interval === "month" ? " / month" : plan.interval === "year" ? " / year" : ""}
+                        </span>
+                      </div>
+                      {plan.gateway ? (
+                        <p className="mf-dash-saved">{t("paidWith").split("{gateway}").join(gatewayName(plan.gateway))}</p>
+                      ) : null}
+                      {plan.scheduledTierName ? (
+                        <div className="mf-dash-scheduled" role="status">
+                          <span>
+                            {t("changesTo").split("{tier}").join(plan.scheduledTierName).split("{date}").join(formatDate(plan.currentPeriodEnd))}
+                          </span>
+                          <button
+                            type="button"
+                            className="mf-dash-button mf-dash-button-small"
+                            disabled={billingBusy}
+                            onClick={() => void billingAction("undo-change")}
+                          >
+                            {t("undoChange")}
+                          </button>
+                        </div>
+                      ) : null}
+                      <p className="mf-dash-saved">
+                        {plan.interval === "lifetime"
+                          ? t("lifetime")
+                          : plan.cancelAtPeriodEnd
+                            ? t("endsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))
+                            : renewalOverdue(plan.currentPeriodEnd)
+                            ? t("renewalPending")
+                            : t("renewsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))}
+                      </p>
+                      <div className="mf-dash-modal-actions">
+                        {plan.canManage ? (
+                          <button
+                            type="button"
+                            className="mf-dash-button"
+                            disabled={billingBusy}
+                            onClick={() => void billingAction("portal")}
+                          >
+                            <CreditCard aria-hidden={true} />
+                            {t("updateMethod")}
+                          </button>
+                        ) : null}
+                        {plan.canResume ? (
+                          <button
+                            type="button"
+                            className="mf-dash-button mf-dash-button-primary"
+                            disabled={billingBusy}
+                            onClick={() => void billingAction("resume")}
+                          >
+                            {t("resumePlan")}
+                          </button>
+                        ) : null}
+                        {allowCancel && plan.canCancel && !confirmingCancel ? (
+                          <button
+                            type="button"
+                            className="mf-dash-button mf-dash-button-danger"
+                            disabled={billingBusy}
+                            onClick={() => setConfirmingCancel(true)}
+                          >
+                            {t("cancelPlan")}
+                          </button>
+                        ) : null}
+                        {allowCancel && plan.canCancel && confirmingCancel ? (
+                          // Cancel asks once, in place, with what it means.
+                          <div className="mf-dash-confirm" role="group" aria-label={t("cancelPlan")}>
+                            <p className="mf-dash-confirm-title">{t("cancelQuestion").split("{tier}").join(plan.tierName)}</p>
+                            <p className="mf-dash-note">{t("cancelKeeps").split("{date}").join(formatDate(plan.currentPeriodEnd))}</p>
+                            <div className="mf-dash-confirm-actions">
+                              <button
+                                type="button"
+                                className="mf-dash-button"
+                                disabled={billingBusy}
+                                onClick={() => setConfirmingCancel(false)}
+                              >
+                                {t("keepPlan")}
+                              </button>
+                              <button
+                                type="button"
+                                className="mf-dash-button mf-dash-button-danger is-solid"
+                                disabled={billingBusy}
+                                onClick={() => void billingAction("cancel")}
+                              >
+                                {t("confirmCancel")}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {billingNotice ? (
+                      <p className={billingNotice.error ? "mf-dash-error" : "mf-dash-saved"} role={billingNotice.error ? "alert" : "status"}>
+                        {billingNotice.text}
+                      </p>
                     ) : null}
-                  </span>
+
+                    {others.length > 0 && plan.interval !== "lifetime" ? (
+                      <div className="mf-dash-modal-section">
+                        <p className="mf-dash-label">{t("changePlan")}</p>
+                        {others.map((option) => {
+                          const up = option.rank > currentRank;
+                          return (
+                            <div className="mf-dash-row" key={option.key}>
+                              <span className="mf-dash-row-label">
+                                {option.name}
+                                <span className="mf-dash-optional">
+                                  {formatMoney(option.prices[period] ?? 0, option.currency)}
+                                  {period === "month" ? " / month" : " / year"}
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                className={`mf-dash-button mf-dash-button-small${up ? " mf-dash-button-primary" : ""}`}
+                                disabled={billingBusy || switchTo?.kind === "loading" || Boolean(plan.scheduledTierName && !up)}
+                                onClick={() => void previewChange(option.key, option.name, period)}
+                              >
+                                {up ? t("upgrade") : t("downgrade")}
+                              </button>
+                            </div>
+                          );
+                        })}
+
+                        {switchTo && switchTo.kind !== "loading" ? (
+                          // What the switch costs, before it happens.
+                          <div className="mf-dash-confirm mf-dash-confirm-change" role="group" aria-label={switchTo.name}>
+                            {switchTo.kind === "downgrade" ? (
+                              <p className="mf-dash-note">
+                                {t("downgradeNote").split("{tier}").join(switchTo.name).split("{date}").join(formatDate(switchTo.effectiveAt ?? null))}
+                              </p>
+                            ) : switchTo.summary ? (
+                              <div className="mf-dash-breakdown">
+                                <span>{switchTo.name}</span>
+                                <span>{formatMoney(switchTo.summary.amountMinor, switchTo.summary.currency)}</span>
+                                {(switchTo.summary.creditMinor ?? 0) > 0 ? (
+                                  <>
+                                    <span className="mf-dash-muted">{t("creditLine").split("{plan}").join(switchTo.summary.creditFrom ?? plan.tierName)}</span>
+                                    <span className="mf-dash-muted">-{formatMoney(switchTo.summary.creditMinor ?? 0, switchTo.summary.currency)}</span>
+                                  </>
+                                ) : null}
+                                <strong>{t("dueToday")}</strong>
+                                <strong>{formatMoney(switchTo.summary.dueMinor ?? switchTo.summary.amountMinor, switchTo.summary.currency)}</strong>
+                                <span className="mf-dash-muted mf-dash-breakdown-wide">
+                                  {t("thenEvery")
+                                    .split("{price}")
+                                    .join(formatMoney(switchTo.summary.amountMinor, switchTo.summary.currency))
+                                    .split("{period}")
+                                    .join(switchTo.summary.interval === "year" ? "year" : "month")}
+                                </span>
+                              </div>
+                            ) : null}
+                            <div className="mf-dash-confirm-actions">
+                              <button type="button" className="mf-dash-button" disabled={billingBusy} onClick={() => setSwitchTo(null)}>
+                                {t("notNow")}
+                              </button>
+                              <button
+                                type="button"
+                                className="mf-dash-button mf-dash-button-primary"
+                                disabled={billingBusy}
+                                onClick={() => void confirmChange(summary.pricingPath)}
+                              >
+                                {switchTo.kind === "downgrade" ? t("confirmDowngrade") : t("confirmUpgrade")}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {showPaymentHistory && (summary.history?.plans.length ?? 0) > 0 ? (
+                      <div className="mf-dash-modal-section">
+                        <p className="mf-dash-label">{t("plansTitle")}</p>
+                        {summary.history!.plans.map((entry, index) => (
+                          <div className="mf-dash-row mf-dash-history-row" key={`plan-${index}`}>
+                            <span className="mf-dash-row-label">
+                              {entry.planName}
+                              {entry.interval === "month" ? ", monthly" : entry.interval === "year" ? ", yearly" : ", lifetime"}
+                              <span className="mf-dash-optional">
+                                {[gatewayName(entry.gateway), formatDate(entry.startedAt), entry.mode === "test" ? t("testPurchase") : null]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </span>
+                            <span className="mf-dash-row-value">{entry.status === "ended" ? t("planEnded") : t("planActive")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {showPaymentHistory && (summary.history?.credits.length ?? 0) > 0 ? (
+                      <div className="mf-dash-modal-section">
+                        {summary.history!.credits.map((credit, index) => (
+                          <div className="mf-dash-row mf-dash-history-row" key={`credit-${index}`}>
+                            <span className="mf-dash-row-label">
+                              {t("creditedLine")}
+                              <span className="mf-dash-optional">
+                                {[credit.planName, gatewayName(credit.gateway), formatDate(credit.at)].filter(Boolean).join(" · ")}
+                              </span>
+                            </span>
+                            <span className="mf-dash-row-value">-{formatMoney(credit.amountMinor, credit.currency)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {showPaymentHistory && summary.payments.length > 0 ? (
+                      <div className="mf-dash-modal-section">
+                        <p className="mf-dash-label">{t("history")}</p>
+                        {summary.payments.map((payment) => (
+                          <div className="mf-dash-row mf-dash-history-row" key={payment.id}>
+                            <span className="mf-dash-row-label">
+                              {formatDate(payment.paidAt)}
+                              <span className="mf-dash-optional">
+                                {[payment.planName, gatewayName(payment.gateway), payment.mode === "test" ? t("testPurchase") : null]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </span>
+                            <span className="mf-dash-row-value">
+                              {payment.status === "refunded" ? `${t("refunded")} ` : ""}
+                              {payment.status === "credited" ? "-" : ""}
+                              {formatMoney(payment.amountMinor, payment.currency)}
+                              {payment.receiptUrl && /^https:\/\//.test(payment.receiptUrl) ? (
+                                <>
+                                  {" "}
+                                  <a className="mf-dash-link" href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
+                                    {t("receipt")}
+                                  </a>
+                                </>
+                              ) : null}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })()
           ) : null}
         </section>
       ) : null}

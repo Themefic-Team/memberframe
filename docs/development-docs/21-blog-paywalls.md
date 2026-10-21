@@ -127,3 +127,40 @@ export function PaywallArticle(Component: React.ComponentType<any>): React.Compo
 - [x] Zero inline CSS and design lint.
 - [x] The removed Article Paywall was seen working on a published site, which proved the meter and card on a CMS post.
 - [ ] Needs human verification, linked mode: the lock card styled in the sidebar matches on the live site; the tagged Rich Text is cut, faded, and frosted; Framer passes the override's classes to the Rich Text's element.
+
+## 7. Simpler Setup, and the Invisible Article (2026-10-20)
+
+This section supersedes the Article Body parts of sections 1 to 4.
+
+### 7.1. The bug
+
+On a published page, the tagged article was blank for every visitor. Signed out, the card showed with empty space above it; signed in, the whole article was empty.
+- The layer rendered with `opacity:0; transform: translateY(150px)`, the starting state of its Framer appear animation, which never ran.
+- `PaywallArticle` wrapped the layer in a plain function component, which drops React's `ref`, and Framer's appear and scroll effects need it.
+- **The fix:** the override is now `React.forwardRef` and passes the ref on. The plugin rewrites an older `MemberArticle.tsx` when it opens (the seal guard's pass), so a republish puts the fix live.
+
+### 7.2. Setup: place it below the article
+
+The paywall finds its article itself, in this order:
+1. A shown layer with the `PaywallArticle` override (optional).
+2. The nearest shown Framer text block (`RichTextContainer`) above it with at least two paragraphs. A heading block is skipped, and so are hidden copies kept for other breakpoints. It is looked for again on resize.
+
+The found article gets `data-mf-paywall-article`, an attribute React does not manage, and the `memberframe-gated-body` class the SEO markup points at. The cut CSS targets the attribute and the override's class. A tagged article is cut from the first paint; a found one once the page's scripts run.
+
+The cut after Free Paragraphs is measured again once web fonts and the page finish loading.
+
+### 7.3. The sidebar
+
+| Kept | Removed, and what it is now |
+| :--- | :--- |
+| Paywall Type, with a one-line description | **Article Body**: the article is found (7.2) |
+| Full Access For, with the site's own plans | **Article ID**: always the page path |
+| Free Articles, Reset Window, Show Counter (meter only) | **Preview Height**: a fixed 320px, for an article with no more paragraphs than Free Paragraphs |
+| Free Paragraphs | **Blur Amount**: a fixed 8px |
+| Lock Title, Lock Message (meter), Unlock Button | **Sign In Link**: always shown to a signed-out visitor |
+| Canvas Preview | **Pricing Page, Sign In Page**: from the site's settings (Payments pricing page, Auth sign-in page), written into the component when it is added |
+| Accent Color, Corner Radius, Theme, Colors, Typography, Layout, Spacing, Labels | **SEO Paywall Markup, Content Type**: always on, as an Article |
+
+The teaser's card words ("Keep reading", "Join to unlock the rest of this article.") are in Labels, as before.
+
+**Existing instances:** values in the removed controls are ignored. An instance that used Article Body now finds its article instead. Re-add the component to get the new sidebar.

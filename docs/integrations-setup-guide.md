@@ -76,7 +76,8 @@ Each link opens the exact page a step below asks for. Sign in first if asked.
 | Integration | Where in the plugin |
 | :--- | :--- |
 | Stripe, Lemon Squeezy, Razorpay | **Manage**, **Payments**, **Gateways** |
-| Default gateway, grace period, pricing page | **Manage**, **Payments**, **Checkout Settings** |
+| Show at checkout, checkout title and description | Each gateway card in **Manage**, **Payments** |
+| Grace period, pricing page, site currency | **Manage**, **Payments**, **Checkout Settings** |
 | Google, GitHub, Apple, Discord sign in | **Settings**, **Integration**, **Sign in** |
 | Webhooks (Zapier, Make, Zoho Flow, n8n, your server) | **Settings**, **Integration**, **Webhooks** |
 | Custom SMTP | **Settings**, **Config**, **Email** |
@@ -313,10 +314,14 @@ Only Razorpay needs a webhook added by hand ([section 5](#5-payments-razorpay)),
 
 | Card number | Result |
 | :--- | :--- |
-| `4242 4242 4242 4242` | Payment succeeds |
+| `4242 4242 4242 4242` | Payment succeeds (Visa) |
+| `5555 5555 5555 4444` | Payment succeeds (Mastercard) |
+| `4000 0027 6000 3184` | Asks for 3-D Secure: click **Complete** to succeed |
 | `4000 0000 0000 0002` | Card declined |
+| `4000 0000 0000 9995` | Declined: insufficient funds |
 
    Use any future expiry date, any 3 digit CVC, and any name and postal code.
+   Use **Pay by Card**: **Pay with PayPal** in test mode needs a separate PayPal sandbox buyer account.
 5. After paying, you return to the site. The page shows "Your payment is being confirmed" for a few seconds, then the member's plan unlocks.
 
 **Check the result**
@@ -366,6 +371,7 @@ Test and Live keep separate keys, so going live is a second connection, not an e
 | Lemon Squeezy is never offered at checkout | The tier's currency differs from the store's currency, or there is no variant for that billing period | Price the tier in the store's currency, and add the missing variant |
 | Payment succeeds but the plan never unlocks | The webhook cannot reach the server and the buyer left the page before it confirmed | Check the webhook's deliveries in Lemon Squeezy; fix the tunnel or `API_BASE_URL`, then resend the delivery |
 | Webhook deliveries fail after restarting ngrok | The free ngrok address changed | Update `API_BASE_URL`, restart the backend, click **Update keys** |
+| **Manage billing** opens "This store has not been activated. Sorry, you are forbidden from accessing this page." | Lemon Squeezy serves its customer portal only for an activated store, even in test mode. Checkout works without activation | Activate the store in Lemon Squeezy (Home, **Activate your store**: identity, business, payout). Until then, test cancelling with the Dashboard's **Cancel plan**, or in Lemon Squeezy, **Subscriptions** |
 | Webhook deliveries fail with an error status | The webhook was edited or recreated by hand, so its secret no longer matches | Delete the hand made webhook and click **Update keys** to register a fresh one |
 
 ---
@@ -390,14 +396,14 @@ This section sets it up end to end in **test mode**, on a local development mach
 
 **Tiers and prices**: you set every price in **Manage**, **Tiers**, as with the other gateways. There is nothing to create in Razorpay per tier. When you change a tier's price, MemberFrame makes a new plan for it; existing subscribers stay on the plan they bought.
 
-**Currency**: Razorpay sells **INR only** in MemberFrame. A tier priced in any other currency is never offered through Razorpay; buyers in India then go to your default gateway.
+**Currency**: Razorpay takes **INR** for UPI, cards, and net banking. Other currencies (USD and more) work for cards once **International Payments** is enabled in your Razorpay account; without it, Razorpay refuses and the buyer is asked to choose another method.
 
 ### 5.2. What You Need
 
 - A Razorpay account. Test mode works before your account is activated (KYC).
 - **Subscriptions** available on the account, for monthly and yearly tiers. Lifetime prices work without it. If creating a plan fails, enable Subscriptions in the dashboard or ask Razorpay support.
 - The MemberFrame plugin connected to your Framer project, and the server running with `PAYMENTS_ENCRYPTION_KEY` set.
-- At least one tier priced in **INR** in **Manage**, **Tiers**.
+- At least one paid tier in **Manage**, **Tiers**. Priced in INR for UPI and net banking; in another currency, International Payments must be on in Razorpay.
 - For local development, a tunnel such as [ngrok](https://ngrok.com) or Cloudflare Tunnel, so Razorpay can reach your server ([section 5.5](#55-give-a-local-server-a-public-address)).
 
 ### 5.3. Switch the Razorpay Dashboard to Test Mode
@@ -502,7 +508,7 @@ If you ever change the secret in Razorpay, paste the new one here and click **Up
 
 1. Add a `<MemberPricing>` component to a page (or **Builder**, **Predefined Pages**, **Member pricing**) and publish the site, or use the canvas preview.
 2. Sign in as a test member (with `MAIL_DRIVER=log`, the code is written to `memberframe-backend/storage/mail/`).
-3. Choose a tier priced in INR. Razorpay Checkout opens, marked as test mode, with the tier's name and price. (For a buyer outside India with location routing on, another gateway opens instead. To test Razorpay from outside India, set **Default gateway** to Razorpay or turn **Route by buyer location** off.)
+3. Choose a tier priced in INR. Razorpay Checkout opens, marked as test mode, with the tier's name and price. (Outside India, Razorpay is still in the payment list, just not ticked first: pick it there. If it is the only gateway on, checkout opens straight into it.)
 4. Pay with a test method:
 
 | Method | Test value | Result |
@@ -557,7 +563,8 @@ Test and Live keep separate keys and separate webhooks, so going live is a secon
 | "That is a test key. Paste a live key, rzp_live_." | A test key in the Live form | Generate a live key in Live Mode |
 | "Razorpay did not accept that Key ID and Secret." | The secret belongs to another key, or the key was regenerated | Regenerate the key and paste both values again |
 | "Connected. Add the webhook in your Razorpay dashboard and paste its secret..." | No webhook secret stored yet | Do [5.7](#57-add-the-webhook-in-razorpay) and [5.8](#58-paste-the-webhook-secret) |
-| Razorpay is never offered at checkout | The tier is not priced in INR, or the buyer is outside India with location routing on | Price the tier in INR; to test from outside India, make Razorpay the default gateway |
+| Razorpay is never offered at checkout | **Show at checkout** is off on the Razorpay card | Turn Show at checkout on |
+| "That payment method could not start" after choosing Razorpay | Razorpay refused the price, usually a non-INR currency without International Payments | Turn on International Payments in Razorpay, or price the tier in INR |
 | "Subscriptions is not enabled on this Razorpay account, so only lifetime prices can be sold." | Subscriptions is not enabled on the Razorpay account. Monthly and yearly tiers go to another gateway until it is | Enable [Subscriptions](https://dashboard.razorpay.com/app/subscriptions), then click **Update keys** |
 | Webhook form: searching `subscription.charged` shows "0 search results" | Subscriptions is not enabled, so its events are hidden | Enable [Subscriptions](https://dashboard.razorpay.com/app/subscriptions), then edit the webhook and tick the seven events |
 | Payment succeeds but the plan never unlocks | The webhook is missing, points at an old address, or its secret differs, and the buyer left the page before it confirmed | Check the webhook's URL and recent deliveries in Razorpay; paste the same secret into the plugin and click **Update keys** |
@@ -587,14 +594,67 @@ Each event is applied once: a delivery Razorpay repeats is recognised by its eve
 
 ## 6. Checkout Settings
 
+### 6.1. How Buyers Pay
+
+Buyers choose how to pay (development doc 29-checkout-methods.md):
+
+1. The buyer clicks a plan's button on your pricing page.
+2. **Two or more gateways shown at checkout:** a popup lists **every** one of them, with the plan and the price. The method suiting the buyer's location is ticked and listed first (India: Razorpay; the EU, UK, Norway, Iceland, Liechtenstein, and Switzerland: Lemon Squeezy; elsewhere: Stripe), but location never hides a method: a buyer from India abroad can still pick Razorpay. Every gateway that is connected and shown at checkout can be chosen: MemberFrame never blocks one. The buyer clicks **Continue to payment**, the payment opens **in a new tab**, and the pricing page shows "Finish paying in the new tab" and unlocks the plan by itself once the gateway confirms.
+3. **Exactly one gateway shown at checkout:** no popup. The click goes straight into that gateway's checkout on the same page.
+4. **A member switching between paid plans:** no popup. The switch happens on the gateway they already pay through, credited for unused time.
+
+If a chosen gateway cannot take the payment, the buyer sees "That payment method could not start. Choose another one." In **Test mode** the gateway's own reason follows, so you can fix it:
+
+| Reason shown in Test mode | Fix |
+| :--- | :--- |
+| "Your Lemon Squeezy store charges in BDT, but this plan is priced in USD..." | A store charges only in its own currency (a $10 plan through a BDT store would charge 10 taka), so this one is refused. Set the store currency to the plan's in Lemon Squeezy, Settings, Stores, then **Update keys** |
+| "No yearly variant is linked..." (or monthly, one-time) | Add the variant ID on the Lemon Squeezy card |
+| "Subscriptions is not enabled on your Razorpay account..." | Enable Subscriptions in Razorpay, then **Update keys** |
+| "...Turn on International Payments in your Razorpay account, or price this plan in INR." | Razorpay refused the currency: turn on International Payments, or price in INR |
+| "MemberFrame could not read this gateway's keys..." | Open the gateway in Manage, Payments, and click **Update keys** |
+
+Razorpay is offered in any currency. Prices in INR take UPI, cards, and net banking; other currencies need **International Payments** turned on in your Razorpay account, or Razorpay refuses and the buyer is asked to choose another method.
+
+Each purchase records the method it was paid with: **Manage**, **Members**, open a member, **Purchases**.
+
+### 6.2. Each Gateway's Settings
+
+On each connected gateway card in **Manage**, **Payments**:
+
+| Setting | What it does |
+| :--- | :--- |
+| **Show at checkout** (switch on the card) | Off: the gateway stays connected but is never offered to buyers. Members already paying through it keep renewing. Switches apply at once, separately for Test and Live. While payments are live, at least one gateway must stay on |
+| **Checkout title** | What buyers see in the payment list. Empty uses the gateway's own name: Stripe, Lemon Squeezy, or Razorpay |
+| **Checkout description** | One line under the title. Empty uses the default |
+
+### 6.3. Upgrades and Downgrades
+
+Development doc: 30-plan-changes.md.
+
+**Upgrade** (a higher plan, or the same plan on a longer period): the member pays the new price **minus the unused part of the current plan**, and the new period starts today. Example: Standard yearly BDT 100, upgraded to Premium yearly BDT 500 after 5 days: 360 of 365 days are unused, worth 98.63, so **401.37 is due today**, then 500 every year. The popup shows this breakdown before anything is charged.
+
+| Current plan's gateway | How the credit is given |
+| :--- | :--- |
+| Stripe | Changed in place: Stripe credits the unused time and starts the new year today |
+| Stripe (new checkout), Lemon Squeezy | A one-time discount on the first charge; renewals are at the full price |
+| Razorpay | The full price is charged, then the credit is refunded to the earlier payment |
+
+**Downgrade** (a lower plan, or a shorter period): nothing is charged or refunded. The member keeps the current plan until the paid period ends, then renews on the lower plan; the Dashboard shows "Changes to Standard on ..." with **Undo**. On Lemon Squeezy the plan instead ends at the period end and the member is emailed a link to continue on the lower plan.
+
+**History**: Manage billing lists every plan held, every payment from every gateway, and every credit.
+
+### 6.4. Checkout Settings
+
 **Manage**, **Payments**, **Checkout Settings**. These apply to every gateway.
 
 | Setting | What it does |
 | :--- | :--- |
-| Default gateway | Which gateway a checkout uses when location routing does not decide. **First connected** picks the first one connected, in the order Stripe, Lemon Squeezy, Razorpay |
-| Route by buyer location | Picks a gateway from the buyer's country: India goes to Razorpay; the EU, UK, Norway, Iceland, Liechtenstein, and Switzerland go to Lemon Squeezy, which handles VAT; everyone else goes to Stripe. When the matching gateway is not connected, the default gateway is used |
 | Grace period | Days a member keeps access after a renewal payment fails, while the gateway retries the card |
 | Pricing page | The page path of your pricing page, for example `/pricing`. Must start with a slash |
+| After purchase | Where a buyer lands once the payment is confirmed |
+| Site currency | The currency every tier is priced in |
+
+**Default gateway** and **Route by buyer location** were removed: buyers choose now, and the location only decides which method is ticked first.
 
 ---
 

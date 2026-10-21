@@ -40,6 +40,27 @@ export const PASSWORD_MIN_LENGTH = 8;
  */
 export const PASSWORD_MAX_LENGTH = 128;
 
+/** A new site's rules, and the rule before rules could be set: 8 characters, a letter, a number. */
+export const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 8,
+  requireNumber: true,
+  requireUppercase: false,
+  requireLowercase: false,
+  requireSymbol: false,
+};
+
+/** The longest minimum a site may ask for. */
+export const PASSWORD_POLICY_MAX_MIN = 64;
+
+/** The rules a creator sets in Settings, Membership. Sign in never checks them. */
+export interface PasswordPolicy {
+  minLength: number;
+  requireNumber: boolean;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireSymbol: boolean;
+}
+
 /**
  * The shortest email local part worth substring-matching against a password.
  *
@@ -93,6 +114,9 @@ export type PasswordProblem =
   | "too_long"
   | "needs_letter"
   | "needs_number"
+  | "needs_uppercase"
+  | "needs_lowercase"
+  | "needs_symbol"
   | "contains_email"
   | "too_common";
 
@@ -127,12 +151,13 @@ export function looksLikeEmail(value: string): boolean {
 export function passwordProblems(
   password: string,
   email: string,
-  requireStrength: boolean
+  policy: PasswordPolicy
 ): ReadonlyArray<PasswordProblem> {
   const problems: PasswordProblem[] = [];
   const value = String(password ?? "");
+  const rules = readPasswordPolicy(policy);
 
-  if (value.length < PASSWORD_MIN_LENGTH) problems.push("too_short");
+  if (value.length < rules.minLength) problems.push("too_short");
   if (value.length > PASSWORD_MAX_LENGTH) problems.push("too_long");
 
   const lowered = value.toLowerCase();
@@ -152,12 +177,31 @@ export function passwordProblems(
     problems.push("contains_email");
   }
 
-  if (requireStrength) {
-    if (!/[a-zA-Z]/.test(value)) problems.push("needs_letter");
-    if (!/[0-9]/.test(value)) problems.push("needs_number");
-  }
+  // Always a letter; the rest as the site's rules say (05-member-auth.md 13).
+  if (!/[a-zA-Z]/.test(value)) problems.push("needs_letter");
+  if (rules.requireNumber && !/[0-9]/.test(value)) problems.push("needs_number");
+  if (rules.requireUppercase && !/[A-Z]/.test(value)) problems.push("needs_uppercase");
+  if (rules.requireLowercase && !/[a-z]/.test(value)) problems.push("needs_lowercase");
+  if (rules.requireSymbol && !/[^a-zA-Z0-9]/.test(value)) problems.push("needs_symbol");
 
   return problems;
+}
+
+/**
+ * The site's rules, read defensively: a length from 8 to 64, and a number
+ * required unless the rules say otherwise, which is the rule before rules
+ * could be set. Anything missing or malformed falls back to that.
+ */
+export function readPasswordPolicy(value: unknown): PasswordPolicy {
+  const raw = (value && typeof value === "object" ? value : {}) as Partial<Record<keyof PasswordPolicy, unknown>>;
+  const length = Math.round(Number(raw.minLength));
+  return {
+    minLength: Number.isFinite(length) ? Math.min(PASSWORD_POLICY_MAX_MIN, Math.max(PASSWORD_MIN_LENGTH, length)) : PASSWORD_MIN_LENGTH,
+    requireNumber: raw.requireNumber !== false,
+    requireUppercase: raw.requireUppercase === true,
+    requireLowercase: raw.requireLowercase === true,
+    requireSymbol: raw.requireSymbol === true,
+  };
 }
 
 /**
@@ -198,16 +242,22 @@ export function passwordScore(password: string): PasswordScore {
 // wording drifting between the panel and the component is cosmetic, where a
 // rule drifting is a bug. PRD section 7.6 rule 4: never show a raw enum value.
 
-export function passwordProblemMessage(problem: PasswordProblem): string {
+export function passwordProblemMessage(problem: PasswordProblem, rules: PasswordPolicy = DEFAULT_PASSWORD_POLICY): string {
   switch (problem) {
     case "too_short":
-      return `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
+      return `Use at least ${readPasswordPolicy(rules).minLength} characters.`;
     case "too_long":
       return `Keep it under ${PASSWORD_MAX_LENGTH} characters.`;
     case "needs_letter":
       return "Add at least one letter.";
     case "needs_number":
       return "Add at least one number.";
+    case "needs_uppercase":
+      return "Add an uppercase letter.";
+    case "needs_lowercase":
+      return "Add a lowercase letter.";
+    case "needs_symbol":
+      return "Add a symbol, such as ! or #.";
     case "contains_email":
       return "Do not use your email address in your password.";
     case "too_common":
@@ -240,7 +290,7 @@ export function passwordScoreLabel(score: PasswordScore): string {
 export function isAcceptablePassword(
   password: string,
   email: string,
-  requireStrength: boolean
+  policy: PasswordPolicy
 ): boolean {
-  return passwordProblems(password, email, requireStrength).length === 0;
+  return passwordProblems(password, email, policy).length === 0;
 }

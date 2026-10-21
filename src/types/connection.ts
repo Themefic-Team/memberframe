@@ -20,6 +20,7 @@
  */
 
 import type { CustomFieldDefinition } from "../utils/customFields";
+import type { PasswordPolicy } from "../utils/credentials";
 
 /** What the settings document holds. Mirrors `backend/src/lib/siteSettings.ts`. */
 export interface AuthSettings {
@@ -31,6 +32,11 @@ export interface AuthSettings {
   allowRegistration: boolean;
   defaultMethod: "password" | "otp";
   requirePasswordStrength: boolean;
+  /**
+   * The site's password rules for sign up and reset (05-member-auth.md 13).
+   * Absent from an older server; read through `readPasswordPolicy`.
+   */
+  passwordPolicy?: PasswordPolicy;
   rememberMeDays: number;
 }
 

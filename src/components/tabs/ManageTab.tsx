@@ -305,6 +305,7 @@ export const ManageTab: React.FC = () => {
           onMemberAction={(member, action) => void handleMemberAction(member, action)}
           onCreateFirstTier={() => setSegment("tiers")}
           profileFields={profileFields}
+          siteId={siteId ?? undefined}
         />
       ) : segment === "payments" ? (
         <PaymentsPanel siteId={siteId} />
@@ -402,6 +403,7 @@ function toTierDraft(draft: TierFormDraft, tiers: ReadonlyArray<SiteTierRecord>,
     lifetimePriceMinor: free ? null : price(draft.lifetimePrice),
     rank: free ? FREE_TIER_RANK : Number.parseInt(draft.rank, 10),
     isActive: draft.isActive,
+    features: draft.features.map((feature) => ({ text: feature.text.trim(), included: feature.included })),
   };
 }
 

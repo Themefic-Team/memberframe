@@ -31,6 +31,7 @@ import type {
   MemberPage,
   SiteGatewayStatus,
   SiteTierRecord,
+  TierFeature,
 } from "../types/site";
 import { MEMBER_PAGE_SIZE } from "../types/site";
 
@@ -171,6 +172,7 @@ export interface TierDraft {
   lifetimePriceMinor: number | null;
   rank: number;
   isActive: boolean;
+  features: TierFeature[];
 }
 
 export function createTier(

@@ -21,6 +21,7 @@ import {
   sectionLockOverrideNames,
   sectionLockSlug,
   sectionLocksCode,
+  staleSectionLocksFile,
   whoSeesOptions,
   whoSeesValue,
 } from "../src/services/sectionLocks";
@@ -96,20 +97,36 @@ describe("the MemberLocks file", () => {
     }).outputText;
 
     const created: Array<{ type: unknown; props: Record<string, unknown> }> = [];
-    const react = { createElement: (type: unknown, props: Record<string, unknown>) => created.push({ type, props }) };
-    const exports: Record<string, (component: unknown) => (props: Record<string, unknown>) => unknown> = {};
+    // forwardRef returns its render function, so the test can call it with a ref.
+    const react = {
+      createElement: (type: unknown, props: Record<string, unknown>) => created.push({ type, props }),
+      forwardRef: (render: (props: Record<string, unknown>, ref: unknown) => unknown) => render,
+    };
+    const exports: Record<string, (component: unknown) => (props: Record<string, unknown>, ref: unknown) => unknown> = {};
     // eslint-disable-next-line no-new-func
     new Function("exports", "require", js)(exports, (id: string) => (id === "react" ? react : undefined));
 
     const Layer = "Layer";
-    exports.GoldArticle!(Layer)({ className: "framer-abc", style: { width: 1 } });
+    const ref = { current: null };
+    exports.GoldArticle!(Layer)({ className: "framer-abc", style: { width: 1 } }, ref);
 
     expect(created[0]!.type).toBe(Layer);
+    // The ref reaches the layer: Framer's appear effects need it, or the layer stays invisible.
     expect(created[0]!.props).toEqual({
       className: "framer-abc mf-lock-gold-article",
       style: { width: 1 },
+      ref,
       "data-mf-lock": "Gold article",
     });
+    expect(code).toContain("return React.forwardRef(function Locked(props: any, ref: any) {");
+  });
+
+  it("rewrites on open only a file from before the overrides kept the ref", () => {
+    const old = code.replace("return React.forwardRef(function Locked(props: any, ref: any) {", "function Locked(props: any) {");
+    expect(staleSectionLocksFile(old, RULES)).toBe(true);
+    expect(staleSectionLocksFile(code, RULES)).toBe(false);
+    // A current file listing other rules waits for Save locks.
+    expect(staleSectionLocksFile(sectionLocksCode([rule("Other")]), RULES)).toBe(false);
   });
 
   it("says where to edit, and is still a valid file with no locks", () => {

@@ -259,6 +259,11 @@ function mfBox(value: unknown, max: number): [number, number, number, number] | 
  * component's own spacing alone. Top and bottom margin keep a root's own
  * centring; a side margin replaces it, and `width: auto` lets the root fill
  * the space between the two margins instead of overflowing at 100%.
+ *
+ * Margin sits inside the instance's box, so a root that fills its frame
+ * (`height: 100%`) shrinks by the top and bottom margin rather than spilling
+ * past the frame Framer shows as selected. A root sized by its content
+ * cannot resolve the percentage, and the browser treats it as `auto`.
  */
 function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
   const input = spacing || {};
@@ -269,6 +274,7 @@ function mfSpacingCss(spacing: MfAppearanceProps["spacing"]): string {
     const [t, r, b, l] = margin;
     if (t > 0) out.push(`margin-top: ${t}px;`);
     if (b > 0) out.push(`margin-bottom: ${b}px;`);
+    if (t + b > 0) out.push(`height: calc(100% - ${t + b}px);`);
     if (r > 0 || l > 0) out.push(`margin-left: ${l}px; margin-right: ${r}px; width: auto;`);
   }
 
@@ -444,6 +450,15 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
     controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
   }
   return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+}
+/** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
+const MF_SCOPE_SLOT = "@mf-scope";
+
+function mfStyleScope(prefix: string, rule: string): { scope: string; css: string } {
+  let hash = 5381;
+  for (let index = 0; index < rule.length; index++) hash = ((hash << 5) + hash + rule.charCodeAt(index)) | 0;
+  const scope = prefix + (hash >>> 0).toString(36);
+  return { scope, css: rule.split(MF_SCOPE_SLOT).join(scope) };
 }
 // @memberframe-appearance-end
 
@@ -984,7 +999,7 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
   const visible = matches.slice(0, limit);
 
   const scopedCss =
-    `[data-mf-tray="${scope}"] { --mf-tray-icon: ${Math.round(mfNumber(iconSize, 12, 48, 18))}px; ` +
+    `[data-mf-tray="${MF_SCOPE_SLOT}"] { --mf-tray-icon: ${Math.round(mfNumber(iconSize, 12, 48, 18))}px; ` +
     `--mf-tray-width: ${Math.round(mfNumber(drawerWidth, 280, 640, 400))}px; ` +
     (badgeColor && mfSafeColor(badgeColor, "") ? `--mf-tray-badge: ${mfSafeColor(badgeColor, "")}; ` : "") +
     mfAppearanceVars({
@@ -998,6 +1013,7 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
       spacing,
     }) +
     " }";
+  const styled = mfStyleScope("mft", scopedCss);
 
   const side = drawerSide === "left" ? "left" : "right";
   const triggerStyle = buttonStyle === "soft" || buttonStyle === "ghost" ? buttonStyle : "outline";
@@ -1074,17 +1090,20 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
                 yesterday: t("savedYesterday"),
                 days: t("savedDays"),
               });
+              // The path tells apart two pages with the same title.
+              const path = item.url.startsWith("/") ? item.url.split(/[?#]/)[0] : "";
+              const meta = [showDates ? when : "", path].filter(Boolean).join(" · ");
               return (
                 <li key={item.itemSlug} className={`mf-tray-item${removing.has(item.itemSlug) ? " is-removing" : ""}`}>
                   {href ? (
                     <a className="mf-tray-link" href={onCanvas ? undefined : href} onClick={() => !onCanvas && setOpen(false)}>
                       <span className="mf-tray-item-title">{item.title}</span>
-                      {showDates ? <span className="mf-tray-item-meta">{when}</span> : null}
+                      {meta ? <span className="mf-tray-item-meta">{meta}</span> : null}
                     </a>
                   ) : (
                     <span className="mf-tray-link">
                       <span className="mf-tray-item-title">{item.title}</span>
-                      {showDates ? <span className="mf-tray-item-meta">{when}</span> : null}
+                      {meta ? <span className="mf-tray-item-meta">{meta}</span> : null}
                     </span>
                   )}
                   <button
@@ -1108,7 +1127,7 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
   }
 
   const drawer = showDrawer ? (
-    <div className={`mf-tray is-drawer ${mfThemeClass(theme)}`} data-mf-tray={scope}>
+    <div className={`mf-tray is-drawer ${mfThemeClass(theme)}`} data-mf-tray={styled.scope}>
       <div className={`mf-tray-layer is-${side}${onCanvas ? " is-inline" : ""}`}>
         {onCanvas ? null : <div className={`mf-tray-backdrop is-${shade}`} aria-hidden={true} onClick={close} />}
         <div
@@ -1133,10 +1152,10 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
   ) : null;
 
   return (
-    <div className={`mf-tray ${mfThemeClass(theme)}`} data-mf-tray={scope}>
+    <div className={`mf-tray ${mfThemeClass(theme)}`} data-mf-tray={styled.scope}>
       <style>{mfThemeCss(".mf-tray")}</style>
       <style>{cssContent}</style>
-      <style>{scopedCss}</style>
+      <style>{styled.css}</style>
       <button
         ref={triggerRef}
         type="button"
@@ -1162,7 +1181,7 @@ export default function BookmarksTray(props: BookmarksTrayProps) {
             <React.Fragment>
               <style>{mfThemeCss(".mf-tray")}</style>
               <style>{cssContent}</style>
-              <style>{scopedCss}</style>
+              <style>{styled.css}</style>
               {drawer}
             </React.Fragment>,
             document.body

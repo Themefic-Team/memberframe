@@ -8,9 +8,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyToRegistry,
   instanceOfFile,
+  nextRetryDelay,
   parseRegistry,
   planSeals,
+  pruneRegistry,
   resolveUnknown,
+  sealFingerprint,
   siteKeyOfFile,
   type SealedInstance,
 } from "../src/services/instanceSealService";
@@ -100,7 +103,47 @@ describe("the guard", () => {
     const { join } = await import("node:path");
     const source = readFileSync(join(__dirname, "..", "src", "hooks", "useSealGuard.ts"), "utf8");
     // Seals are fetched before any write, and one failure ends the pass.
-    expect(source).toContain('if (issued.kind !== "ok") return 0;');
+    expect(source).toMatch(/if \(issued\.kind !== "ok"\) \{\s*failed\(state\.seals\);\s*return 0;/);
     expect(source.indexOf("const issued = await requestSeal(siteId);")).toBeLessThan(source.indexOf('controls: { [SEAL_CONTROL]: "" }'));
+  });
+});
+
+describe("no constant requests (27-instance-seal.md 6)", () => {
+  const read = async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    return readFileSync(join(__dirname, "..", "src", "hooks", "useSealGuard.ts"), "utf8");
+  };
+
+  it("fingerprints what a pass sees, in any order, and changes on a paste or a new seal", () => {
+    const a = sealFingerprint([own("n1", "s1.a.x"), own("n2", "s1.b.y")], { "s1.a.x": "n1" }, true);
+    expect(sealFingerprint([own("n2", "s1.b.y"), own("n1", "s1.a.x")], { "s1.a.x": "n1" }, true)).toBe(a);
+    expect(sealFingerprint([own("n1", "s1.a.x"), own("n2", "s1.b.y"), own("n3", "s1.a.x")], { "s1.a.x": "n1" }, true)).not.toBe(a);
+    expect(sealFingerprint([own("n1", "s1.a.x"), own("n2", "s1.b.y")], { "s1.a.x": "n1", "s1.b.y": "n2" }, true)).not.toBe(a);
+    expect(sealFingerprint([own("n1", "s1.a.x"), own("n2", "s1.b.y")], { "s1.a.x": "n1" }, false)).not.toBe(a);
+  });
+
+  it("keeps only the seals still held, so the record cannot grow until writing it fails", () => {
+    expect(pruneRegistry({ "s1.a.x": "n1", "s1.gone.z": "n9" }, ["s1.a.x", "s1.new.q"])).toEqual({ "s1.a.x": "n1" });
+  });
+
+  it("backs off after failures, to a cap of 10 minutes", () => {
+    expect([0, 1, 2, 3, 4, 5, 20].map(nextRetryDelay)).toEqual([0, 30_000, 60_000, 120_000, 300_000, 600_000, 600_000]);
+  });
+
+  it("runs on canvas changes and a one minute fallback, not every 10 seconds", async () => {
+    const source = await read();
+    expect(source).toContain("const GUARD_INTERVAL_MS = 60_000;");
+    expect(source).toContain("framer.subscribeToCanvasRoot(schedule)");
+    expect(source).toContain("framer.subscribeToSelection(schedule)");
+    expect(source).toContain("if (fingerprint === state.settled) return 0;");
+    expect(source).toContain("if (waiting(state.seals)) return 0;");
+  });
+
+  it("asks the server about a seal once per session, and prunes the record it writes", async () => {
+    const source = await read();
+    expect(source).toContain("const toAsk = plan.unknown.filter((seal) => !answeredSeals.has(`${siteId}|${seal}`));");
+    expect(source).toContain("const answer = await verifySeals(siteId, toAsk);");
+    expect(source).toContain("const next = pruneRegistry(applyToRegistry(registry, actions, sealed), held);");
   });
 });

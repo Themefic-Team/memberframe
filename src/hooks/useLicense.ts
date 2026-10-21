@@ -2,9 +2,9 @@
  * This project's MemberFrame license, for the whole panel. F19,
  * 19-pro-lock-and-trial.md section 2.1.
  *
- * Read once the connection names a site, again whenever the panel regains
- * focus (the creator may have paid in Stripe's portal), and after anything
- * here changes it. While a trial runs, `now` ticks every second for the
+ * Read once the connection names a site, then pushed by the server whenever it
+ * changes (`services/licenseStream.ts`), again whenever the panel regains
+ * focus, and after anything here changes it. While a trial runs, `now` ticks every second for the
  * countdown. Whenever what the canvas should draw changes, the deployed
  * component files are rewritten (`enforceLockState`).
  */
@@ -14,6 +14,7 @@ import { framer } from "framer-plugin";
 import { useConnection } from "./useConnection";
 import { canvasLicense, fetchLicense, panelUnlocked, type LicenseView } from "../services/licenseService";
 import { enforceLockState, type PatchableCodeFile } from "../utils/lockPatcher";
+import { openLicenseStream } from "../services/licenseStream";
 
 export interface LicenseValue {
   /** Null until the first answer, and while signed out. */
@@ -71,6 +72,13 @@ export function useLicenseState(): LicenseValue {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // The server pushes every change while the panel is open (licenseStream.ts),
+  // so a trial that ends or a plan that lapses locks the canvas at once.
+  useEffect(() => {
+    if (!siteId) return;
+    return openLicenseStream({ siteId, onLicense: setView });
+  }, [siteId]);
 
   useEffect(() => {
     if (!siteId) return;

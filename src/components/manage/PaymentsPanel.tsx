@@ -4,7 +4,6 @@ import {
   Badge,
   Banner,
   Button,
-  Checkbox,
   ConfirmDialog,
   FieldRow,
   FieldRows,
@@ -12,8 +11,8 @@ import {
   InfoTip,
   SearchSelect,
   Segmented,
-  Select,
   TextField,
+  Toggle,
   useToast,
 } from "../ui";
 import { cn } from "../../utils/cn";
@@ -21,12 +20,15 @@ import {
   GATEWAY_FIELDS,
   PAYMENT_GATEWAYS,
   PAYMENT_GATEWAY_LABELS,
+  DEFAULT_METHOD_LABELS,
   connectGateway,
   disconnectGateway,
   fetchPayments,
   paymentsFailure,
   savePaymentSettings,
+  setGatewayEnabled,
   type GatewayStatus,
+  type MethodLabel,
   type PaymentGateway,
   type PaymentMode,
   type PaymentSettings,
@@ -169,6 +171,42 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
     [apply, overview, showToast, siteId]
   );
 
+  /** Show or hide a connected gateway at checkout. Instant, like every Toggle. */
+  const toggleEnabled = useCallback(
+    async (gateway: PaymentGateway, enabled: boolean) => {
+      if (!overview) return;
+      setBusyGateway(gateway);
+      const result = await setGatewayEnabled(siteId, gateway, overview.settings.mode, enabled);
+      setBusyGateway(null);
+      if (result.kind === "ok") {
+        apply(result.data);
+        showToast({ tone: "success", message: `${PAYMENT_GATEWAY_LABELS[gateway]} ${enabled ? "shown" : "hidden"} at checkout` });
+        return;
+      }
+      showToast({ tone: "error", message: shorten(paymentsFailure(result)) });
+    },
+    [apply, overview, showToast, siteId]
+  );
+
+  /** One gateway's checkout title and description. Empty fields use the defaults. */
+  const saveLabels = useCallback(
+    async (gateway: PaymentGateway, label: MethodLabel): Promise<boolean> => {
+      if (!overview) return false;
+      setBusyGateway(gateway);
+      const methodLabels = { ...(overview.settings.methodLabels ?? {}), [gateway]: label };
+      const result = await savePaymentSettings(siteId, { methodLabels });
+      setBusyGateway(null);
+      if (result.kind === "ok") {
+        apply(result.data);
+        showToast({ tone: "success", message: `${PAYMENT_GATEWAY_LABELS[gateway]} saved` });
+        return true;
+      }
+      showToast({ tone: "error", message: shorten(paymentsFailure(result)) });
+      return false;
+    },
+    [apply, overview, showToast, siteId]
+  );
+
   if (loadError) {
     return <Banner tone="warning" title="Payments could not load" message={loadError} />;
   }
@@ -195,6 +233,10 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
         <div className="section-header-row payments-header-row">
           <div className="payments-header-title">
             <h2 className="section-title">Gateways</h2>
+            <InfoTip label="Gateways">
+              Buyers choose from the gateways shown at checkout, with the one suiting their location preselected. With
+              one gateway shown, checkout opens directly.
+            </InfoTip>
             {!overview.publicApi ? (
               <InfoTip label="Webhook address">
                 Local API detected. Webhooks require a public https tunnel address to receive events during testing.
@@ -233,6 +275,11 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
               disabled={!overview.secretsAvailable}
               onConnect={(values) => connect(gateway, values)}
               onDisconnect={() => void disconnect(gateway)}
+              onToggleEnabled={(enabled) => void toggleEnabled(gateway, enabled)}
+              label={overview.settings.methodLabels?.[gateway] ?? {}}
+              // The plugin's own defaults, always: an older server sends older wording.
+              defaultLabel={DEFAULT_METHOD_LABELS[gateway]}
+              onSaveLabel={(label) => saveLabels(gateway, label)}
             />
           ))}
         </div>
@@ -244,34 +291,6 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
         </div>
 
         <FieldRows>
-          <FieldRow
-            label="Default gateway"
-            htmlFor="payments-default-gateway"
-            hint="Fallback when location routing is disabled or unavailable."
-          >
-            <Select
-              id="payments-default-gateway"
-              value={draft.defaultGateway}
-              options={[
-                { value: "", label: "First connected" },
-                ...PAYMENT_GATEWAYS.map((gateway) => ({ value: gateway, label: PAYMENT_GATEWAY_LABELS[gateway] })),
-              ]}
-              onChange={(value) => setDraft({ ...draft, defaultGateway: value as PaymentGateway | "" })}
-            />
-          </FieldRow>
-
-          <FieldRow
-            label="Route by buyer location"
-            htmlFor="payments-geo"
-            hint="Routes visitors to the best gateway based on country."
-          >
-            <Checkbox
-              id="payments-geo"
-              checked={draft.autoDetectGeolocation}
-              onChange={(checked) => setDraft({ ...draft, autoDetectGeolocation: checked })}
-            />
-          </FieldRow>
-
           <FieldRow
             label="Grace period"
             htmlFor="payments-grace"
@@ -366,9 +385,26 @@ interface GatewayCardProps {
   /** Resolves to a notice for the creator, or rejects with a message for the form. */
   onConnect: (values: Record<string, string>) => Promise<string | null>;
   onDisconnect: () => void;
+  /** Show or hide this gateway at checkout (29-checkout-methods.md). */
+  onToggleEnabled: (enabled: boolean) => void;
+  /** The creator's own checkout wording, and the default it falls back to. */
+  label: Partial<MethodLabel>;
+  defaultLabel: MethodLabel | null;
+  /** Resolves true when saved. */
+  onSaveLabel: (label: MethodLabel) => Promise<boolean>;
 }
 
-const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onConnect, onDisconnect }) => {
+const GatewayCard: React.FC<GatewayCardProps> = ({
+  status,
+  busy,
+  disabled,
+  onConnect,
+  onDisconnect,
+  onToggleEnabled,
+  label: methodLabel,
+  defaultLabel,
+  onSaveLabel,
+}) => {
   const fields = GATEWAY_FIELDS[status.gateway];
   const label = PAYMENT_GATEWAY_LABELS[status.gateway];
   const [open, setOpen] = useState(false);
@@ -377,6 +413,13 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [wording, setWording] = useState<MethodLabel>({ title: "", description: "" });
+  /** What the form opened with: Save only sends what changed. */
+  const [opened, setOpened] = useState<{ values: Record<string, string>; wording: MethodLabel }>({
+    values: {},
+    wording: { title: "", description: "" },
+  });
+  const shown = status.connected && status.enabled !== false;
   /** Remove is destructive, so the first press asks and the second acts. */
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -396,7 +439,15 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
     setValues(initial);
     setRevealed([]);
     setError(null);
-  }, [fields, status.options, status.publicId]);
+    // Prefilled with what buyers see today: the creator's own wording, else
+    // the gateway's default (its name, and what it takes).
+    const startWording = {
+      title: methodLabel.title || defaultLabel?.title || label,
+      description: methodLabel.description || defaultLabel?.description || "",
+    };
+    setWording(startWording);
+    setOpened({ values: initial, wording: startWording });
+  }, [defaultLabel, fields, label, methodLabel.description, methodLabel.title, status.options, status.publicId]);
 
   const toggle = () => {
     if (!open) reset();
@@ -411,10 +462,29 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
       return;
     }
     setError(null);
+
+    // One Save for the whole card (product owner, 2026-10-20). Keys go up only
+    // when one changed: reconnecting re-checks them and re-registers the
+    // webhook, which a wording edit should not do.
+    const keysChanged =
+      !status.connected ||
+      fields.some((field) =>
+        field.secret
+          ? (values[field.key] ?? "").trim() !== ""
+          : (values[field.key] ?? "").trim() !== (opened.values[field.key] ?? "").trim()
+      );
+    const nextWording = { title: wording.title.trim(), description: wording.description.trim() };
+    const wordingChanged =
+      status.connected &&
+      (nextWording.title !== opened.wording.title.trim() || nextWording.description !== opened.wording.description.trim());
+
     try {
-      const message = await onConnect(values);
-      setNotice(message);
-      setValues({});
+      if (keysChanged) {
+        const message = await onConnect(values);
+        setNotice(message);
+        setValues({});
+      }
+      if (wordingChanged && !(await onSaveLabel(nextWording))) return;
       setOpen(false);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Could not connect.");
@@ -460,13 +530,23 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
             <span className="integration-card-sub">{statusSubtitle}</span>
           </div>
         </div>
-        <div className="integration-card-bar-right">
+        {/* The Toggle acts on its own: a click on it must not open or close the card. */}
+        <div className="integration-card-bar-right" onClick={(event) => event.stopPropagation()}>
           {status.connected ? (
-            <Badge tone="success">Connected</Badge>
+            <Badge tone={shown ? "success" : "neutral"}>{shown ? "Connected" : "Off"}</Badge>
           ) : (
             <Badge tone="neutral">Not connected</Badge>
           )}
-          <span className={cn("integration-chevron", open && "is-open")}>
+          {status.connected ? (
+            <Toggle
+              id={`${id}-enabled`}
+              checked={shown}
+              disabled={busy || disabled}
+              label={`Show ${label} at checkout`}
+              onChange={onToggleEnabled}
+            />
+          ) : null}
+          <span className={cn("integration-chevron", open && "is-open")} onClick={toggle}>
             <ChevronDown aria-hidden={true} />
           </span>
         </div>
@@ -542,12 +622,53 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
             </FieldRow>
           </FieldRows>
 
+          {status.connected ? (
+            <>
+              {/* How buyers see this gateway in the checkout chooser (29-checkout-methods.md). */}
+              <FieldRows>
+                <FieldRow
+                  label="Checkout title"
+                  htmlFor={`${id}-title`}
+                  hint="What buyers see in the payment method list. Leave it empty for the default."
+                  fill
+                >
+                  <TextField
+                    id={`${id}-title`}
+                    fill
+                    maxLength={60}
+                    value={wording.title}
+                    placeholder={defaultLabel?.title ?? label}
+                    disabled={busy || disabled}
+                    onChange={(title) => setWording((current) => ({ ...current, title }))}
+                  />
+                </FieldRow>
+                <FieldRow
+                  label="Checkout description"
+                  htmlFor={`${id}-description`}
+                  hint="One line under the title, for example the cards or wallets it takes."
+                  fill
+                >
+                  <TextField
+                    id={`${id}-description`}
+                    fill
+                    maxLength={140}
+                    value={wording.description}
+                    placeholder={defaultLabel?.description ?? ""}
+                    disabled={busy || disabled}
+                    onChange={(description) => setWording((current) => ({ ...current, description }))}
+                  />
+                </FieldRow>
+              </FieldRows>
+            </>
+          ) : null}
+
           {error ? (
             <p className="integration-field-problem" role="alert">
               {error}
             </p>
           ) : null}
 
+          {/* At the bottom: one Save for the keys and the checkout wording. */}
           <div className="integration-card-actions">
             {status.connected ? (
               <Button
@@ -561,7 +682,7 @@ const GatewayCard: React.FC<GatewayCardProps> = ({ status, busy, disabled, onCon
               </Button>
             ) : null}
             <Button variant="secondary" size="sm" disabled={busy || disabled} onClick={() => void submit()}>
-              {busy ? "Checking keys" : status.connected ? "Update keys" : `Connect ${label}`}
+              {busy ? "Saving" : status.connected ? "Save changes" : `Connect ${label}`}
             </Button>
           </div>
         </div>

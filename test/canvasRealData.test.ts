@@ -78,8 +78,19 @@ describe("the shared helper", () => {
 describe("each component on the canvas", () => {
   it("Pricing shows the site's plans, and keeps the samples when there are none", () => {
     expect(sources.MemberPricing).toContain("mfCanvasPreview(base, CONFIG.siteKey)");
-    expect(sources.MemberPricing).toContain("pricing.tiers.length > 0");
+    expect(sources.MemberPricing).toContain("pricing.tiers.length === 0) return;");
     expect(sources.MemberPricing).toContain('onCanvas ? { phase: "ready", pricing: PREVIEW_PRICING }');
+  });
+
+  it("Pricing and the Dashboard pick up a tier created after they were inserted", () => {
+    // The canvas keeps a component mounted, so one read on mount would never
+    // show a tier added later in the plugin.
+    for (const name of ["MemberPricing", "MemberDashboard"] as const) {
+      expect(sources[name], name).toContain("window.setInterval(refresh, MF_PREVIEW_TTL_MS);");
+      expect(sources[name], name).toContain('window.addEventListener("focus", refresh);');
+      expect(sources[name], name).toContain("window.clearInterval(timer);");
+      expect(sources[name], name).toContain("if (next === shown) return;");
+    }
   });
 
   it("the Dashboard shows the site's own questions", () => {

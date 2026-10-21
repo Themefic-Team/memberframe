@@ -206,3 +206,21 @@ Added on request so the button and the tray can match a site's design. Every def
 | Icon Size | Number 12 to 48 px | 18 | Through `--mf-tray-icon` |
 
 Tests: `test/bookmarkCustomization.test.ts`. Needs human verification: each style in both themes, and the drawer at 280px and 640px.
+
+## A Button in the Navigation Bar, 2026-10-20
+
+A Bookmark Button with Item Slug empty saves the page it is on. In a shared navigation bar it saved the first page the visitor opened on every page. Framer moves between pages with `history.pushState` and never remounts the bar, and the button read the page once, at mount. The tray then listed several items with the site's title and no way to tell them apart.
+
+- **Follows the page:** `mfOnLocationChange` wraps `pushState` and `replaceState` once per window, and listens to `popstate`. The button re-renders on each navigation, so its filled state is for the page shown. The item is also built again at the click.
+- **The title, in order:**
+  1. Item Title.
+  2. The page's first `h1` outside `header` and `nav`.
+  3. `document.title`, unless the same title was seen on another path. That is the site-wide title Framer gives pages without an SEO title of their own, and it names only `/`.
+  4. The last path segment in words: `/article/artificial-intelligence` becomes "Artificial Intelligence".
+- **A bound Item Slug with no title:** the slug in words, not the listing page's title.
+- **The tray:** each item's meta line also shows its path, for example "Saved today · /article/artificial-intelligence".
+- **Bookmarks saved before this fix** keep the wrong page and title. Remove them from the tray.
+- **Saved too soon after a navigation (2026-10-20, later the same day):** Framer swaps the page first and sets its title a moment later, so a quick click took the previous page's title.
+  - The history wrapper records the title of the page being left (`__mfNav`). A title still equal to it is treated as stale and never used: the button uses the shown `h1` (hidden breakpoint copies are skipped) or the path in words.
+  - It then watches for up to 5 seconds and sends the real title once Framer sets it (`watchTitle`, `retitle`). The server keeps the newest title for a slug.
+- **Repair:** on a saved page, a bookmark titled with the site-wide title (one seen on another path, or carried by another saved page) or with the path in words is re-sent with the page's title. Bookmarks saved wrongly before this fix correct themselves on the visitor's next visit.
