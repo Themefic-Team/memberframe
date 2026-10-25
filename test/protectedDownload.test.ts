@@ -11,8 +11,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { generateProtectedDownloadCode } from "../src/services/canvasComponentCodeGenerator";
 import { DEFAULT_PROTECTED_DOWNLOAD_CONFIG } from "../src/types/canvas";
-import { assetSummary, formatBytes } from "../src/services/assetsService";
-import { fileTierOptions } from "../src/components/manage/FilesPanel";
 
 const source = readFileSync(path.join(process.cwd(), "src", "canvas-components", "ProtectedDownload.tsx"), "utf-8");
 
@@ -63,41 +61,96 @@ describe("the generated file", () => {
   });
 });
 
-describe("Manage, Files", () => {
-  it("offers any signed-in member, then the site's tiers by rank", () => {
-    expect(
-      fileTierOptions([
-        { key: "vip", name: "VIP", rank: 3 },
-        { key: "free_member", name: "Free", rank: 0 },
-        { key: "tier_2", name: "Gold", rank: 2 },
-      ])
-    ).toEqual([
-      { value: "signed_in", label: "Any signed in member" },
-      { value: "free_member", label: "Free or higher" },
-      { value: "tier_2", label: "Gold or higher" },
-      { value: "vip", label: "VIP only" },
-    ]);
+describe("uploaded on the canvas, stored by Framer (32-canvas-downloads.md)", () => {
+  const controls = source.slice(source.indexOf("addPropertyControls(ProtectedDownload"));
+  const destructure = source.slice(source.indexOf("export default function ProtectedDownload("), source.indexOf("} = props;"));
+
+  it("takes the file, its name, and who may download it in the sidebar, like the other content blocks", () => {
+    expect(controls).toMatch(/file: \{\s*type: ControlType\.File,\s*title: "File",\s*allowedFileTypes: \[/);
+    expect(controls).toMatch(/access: \{\s*type: ControlType\.Enum,\s*title: "Access",\s*options: \["members", "password"\],/);
+    expect(controls).toContain('options: ["signed_in", "any_paid", "tier_1", "tier_2", "vip", "chosen"],');
+    expect(controls).toMatch(/whoCanDownload: \{[\s\S]*?hidden: \(props\) => props\.access === "password",/);
+    expect(controls).toMatch(/chosenTiers: \{[\s\S]*?hidden: \(props\) => props\.access === "password" \|\| props\.whoCanDownload !== "chosen",/);
+    expect(controls).toMatch(/password: \{[\s\S]*?hidden: \(props\) => props\.access !== "password",/);
+    // No help text under File, Who Can Download, or Password (2026-10-22).
+    for (const name of ["file", "whoCanDownload", "password"]) {
+      const start = controls.indexOf(`  ${name}: {`);
+      expect(controls.slice(start, controls.indexOf("\n  },", start)), name).not.toContain("description:");
+    }
+    // Typed as dots in the sidebar, like any password field.
+    expect(controls).toMatch(/password: \{[\s\S]*?obscured: true,/);
+    // Set by the plugin; never typed.
+    expect(controls).toMatch(/assetId: \{[\s\S]*?hidden: \(\) => true,/);
   });
 
-  it("labels sizes and files the way the button does", () => {
-    expect(formatBytes(0)).toBe("");
-    expect(formatBytes(512)).toBe("512 B");
-    expect(formatBytes(1536)).toBe("1.5 KB");
-    expect(formatBytes(44_040_192)).toBe("42 MB");
-    expect(
-      assetSummary({
-        id: "ast_x",
-        name: "Kit",
-        fileName: "kit.zip",
-        mimeType: "application/zip",
-        sizeBytes: 44_040_192,
-        source: "url",
-        remoteUrl: "https://cdn.example.com/kit.zip",
-        requiredTier: "tier_1",
-        downloadCount: 0,
-        lastDownloadAt: null,
-        createdAt: "",
-      })
-    ).toBe("ZIP, 42 MB, linked");
+  it("never sends or links the file's address or the sidebar's password", () => {
+    // The password prop is not even read; only what the visitor typed is sent.
+    expect(destructure).not.toMatch(/\bpassword\b/);
+    expect(source).toContain('body: JSON.stringify(load.access === "password" ? { assetId: id, password: typedPassword } : { assetId: id }),');
+    // The file prop is read only to tell whether it still waits for the plugin.
+    expect(source).toContain('const unsecured = typeof file === "string" && file.trim() !== "";');
+    expect(source).not.toMatch(/href=\{file\}|assign\(file\)|fetch\(file/);
+  });
+
+  it("warns on the canvas until the plugin secures the file, and stays shut on the site", () => {
+    expect(source).toContain('if (unsecured) return { ...base, meta: fileMetaLabel || "", note: t(savedButShown ? "clearFile" : "unsecured"), noteError: true };');
+    expect(source).toContain('if (id === "" && unsecured) return { ...base, title: t("notReady"), disabled: true, locked: true };');
+  });
+
+  it("never sends a visitor to sign in for a file set to Password that the server has not switched yet", () => {
+    expect(source).toContain('if (accessChoice === "password" && (access === "sign_in" || access === "upgrade")) {');
+    const guard = source.indexOf('if (accessChoice === "password" && (access === "sign_in"');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(source.indexOf('    if (access === "sign_in") {'));
+  });
+
+  it("asks for the password in a popup opened by the button, rendered into the page's body (2026-10-22)", () => {
+    expect(source).toContain('import { createPortal } from "react-dom";');
+    expect(source).toContain("setAsking(true);");
+    expect(source).toMatch(/className="mf-download-dialog"\s*role="dialog"\s*aria-modal=\{true\}/);
+    expect(source).toContain("document.body");
+    // No password field next to the button any more.
+    const main = source.slice(source.indexOf("  return (\n    <div className={`mf-download "));
+    expect(main.slice(0, main.indexOf("{popup}"))).not.toContain('type="password"');
+    // Right password: the popup closes as the download starts. Wrong: the error shows in the popup.
+    expect(source).toContain('setAction({ phase: "started" });\n      setAsking(false);');
+    expect(source).toMatch(/className="mf-download-dialog-error" role="alert"/);
+    // Escape and the backdrop close it, never mid-request.
+    expect(source).toContain('if (event.key === "Escape" && !busy.current) setAsking(false);');
+  });
+
+  it("asks a password file's visitor for the password, and says when it is wrong", () => {
+    expect(source).toContain('type="password"');
+    expect(source).toContain('if (response.status === 401 && load.access === "password") {');
+    expect(source).toContain('setAction({ phase: "error", message: t("wrongPassword") });');
+  });
+
+  it("lists the site's own tiers in Who Can Download and Chosen Tiers", () => {
+    const { code } = generateProtectedDownloadCode(DEFAULT_PROTECTED_DOWNLOAD_CONFIG, undefined, {
+      apiBaseUrl: "https://api.example.com",
+      siteKey: "k1",
+      afterLoginPath: "",
+      loginPath: "/login",
+      afterLogoutPath: "/",
+      tiers: [
+        { key: "free_member", name: "Free", rank: 0 },
+        { key: "tier_gold", name: "Gold", rank: 2 },
+        { key: "tier_silver", name: "Silver", rank: 1 },
+      ],
+    });
+    expect(code).toContain('    options: ["signed_in", "any_paid", "tier_silver", "tier_gold", "chosen"],');
+    expect(code).toContain('    optionTitles: ["Any signed-in member", "Any paid plan", "Silver members or higher", "Gold members or higher", "Only chosen tiers…"],');
+    expect(code).toContain('options: ["free_member", "tier_silver", "tier_gold"],');
+  });
+});
+
+describe("no Files in Manage", () => {
+  it("has no Files segment and no file picker in the Builder", () => {
+    const manage = readFileSync(path.join(process.cwd(), "src", "components", "tabs", "ManageTab.tsx"), "utf-8");
+    const builder = readFileSync(path.join(process.cwd(), "src", "components", "tabs", "BuilderTab.tsx"), "utf-8");
+    expect(manage).not.toContain("FilesPanel");
+    expect(manage).not.toContain('"files"');
+    expect(builder).not.toContain("Attach file");
+    expect(builder).not.toContain("fetchAssets");
   });
 });

@@ -134,6 +134,7 @@ export type { FramerProjectPage } from "./framerPagesService";
 
 export {
   MAX_SECTION_LOCKS,
+  LEGACY_SECTION_LOCKS_FILE_NAME,
   SECTION_LOCKS_FILE_NAME,
   SECTION_LOCK_NAME_PATTERN,
   newSectionLock,
@@ -143,6 +144,7 @@ export {
   sectionLockOverrideNames,
   sectionLockSlug,
   sectionLocksCode,
+  sectionLocksFilesToWrite,
   whoSeesOptions,
   whoSeesValue,
 } from "./sectionLocks";

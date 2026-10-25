@@ -14,8 +14,8 @@ import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
 
 const DIR = path.join(process.cwd(), "src", "canvas-components");
-const LICENSED = ["MemberAuth", "MemberDashboard", "MemberPricing", "MeteredPaywall", "ProtectedDownload"] as const;
-const UNLICENSED = ["BookmarkButton", "BookmarksTray"] as const;
+/** Every canvas component; the bookmarks joined on 2026-10-25. */
+const LICENSED = ["MemberAuth", "MemberDashboard", "MemberPricing", "MeteredPaywall", "ProtectedDownload", "BookmarkButton", "BookmarksTray"] as const;
 const read = (name: string) => readFileSync(path.join(DIR, `${name}.tsx`), "utf-8");
 
 const START = "// @memberframe-license-start";
@@ -36,7 +36,7 @@ describe("the shared license block", () => {
   });
 
   it("names no component, so it stays shareable", () => {
-    for (const name of [...LICENSED, ...UNLICENSED]) expect(reference).not.toContain(name);
+    for (const name of LICENSED) expect(reference).not.toContain(name);
   });
 
   it("is drawn last in each licensed component, from the server's answer for this sealed instance", () => {
@@ -58,12 +58,14 @@ describe("the shared license block", () => {
     }
   });
 
-  it("is absent from the bookmarks, which show neither the mark nor the lock", () => {
-    for (const name of UNLICENSED) {
-      const source = read(name);
-      expect(source, name).not.toContain(START);
-      expect(source, name).not.toMatch(/MfLicenseLayer|-watermark|prolock/);
-    }
+  it("shrinks the mark and the lock to an icon on a small component, such as a bookmark button", () => {
+    expect(reference).toContain("@container (max-height: 64px) or (max-width: 200px) { .mf-wm {");
+    expect(reference).toContain("@container (max-height: 64px) or (max-width: 140px) { .mf-lock {");
+    expect(reference).toContain('<div className="mf-wm-frame">');
+  });
+
+  it("keeps a locked tray shut, since its drawer opens outside the lock card", () => {
+    expect(read("BookmarksTray")).toContain('const showDrawer = usable && (onCanvas ? canvasPreview === "open" : open);');
   });
 
   it("copies the BEAF watermark: bottom right, the Framefic mark, linking to framefic.com", () => {
@@ -91,6 +93,51 @@ describe("what the block reads from the server", () => {
       mfBakedLicense(): string;
       mfFetchLicense(base: string, key: string): Promise<string | null>;
     };
+
+  const helpers = (locked: boolean) =>
+    // eslint-disable-next-line no-new-func
+    new Function("IS_LOCKED", "IS_TRIAL", "React", "useState", "useEffect", `${js}\nreturn { mfEffectiveLicense, mfControls };`)(
+      locked,
+      false,
+      { createElement: () => null },
+      () => [null, () => undefined],
+      () => undefined
+    ) as {
+      mfEffectiveLicense(baked: string, answer: string, onCanvas: boolean): string;
+      mfControls(controls: Record<string, Record<string, unknown>>): Record<string, Record<string, unknown>>;
+    };
+
+  it("on the canvas keeps the stricter of the file and the server; on the site the server wins", () => {
+    const { mfEffectiveLicense } = helpers(false);
+    // Signed out of the plugin: the file says locked, the server still says paid.
+    expect(mfEffectiveLicense("locked", "active", true)).toBe("locked");
+    expect(mfEffectiveLicense("locked", "active", false)).toBe("active");
+    // A trial that ended while the plugin was closed: the server knows first.
+    expect(mfEffectiveLicense("trial", "locked", true)).toBe("locked");
+    expect(mfEffectiveLicense("active", "trial", true)).toBe("trial");
+    expect(mfEffectiveLicense("active", "active", true)).toBe("active");
+    // A copy or a foreign domain shows its own card everywhere.
+    expect(mfEffectiveLicense("locked", "copied", true)).toBe("copied");
+    expect(mfEffectiveLicense("active", "domain", false)).toBe("domain");
+  });
+
+  it("hides every setting while locked, keeping the seal", () => {
+    const controls = {
+      mfSeal: { type: "string", hidden: () => true },
+      headline: { type: "string", title: "Headline" },
+      mode: { type: "enum", hidden: () => false },
+    };
+    expect(helpers(false).mfControls(controls)).toBe(controls);
+    const locked = helpers(true).mfControls(controls);
+    expect(locked.mfSeal).toBe(controls.mfSeal);
+    expect((locked.headline!.hidden as () => boolean)()).toBe(true);
+    expect((locked.mode!.hidden as () => boolean)()).toBe(true);
+    expect(locked.headline!.title).toBe("Headline");
+  });
+
+  it("wraps every licensed component's controls, so a locked file hides them", () => {
+    for (const name of LICENSED) expect(read(name), name).toContain(`addPropertyControls(${name}, mfControls({`);
+  });
 
   it("starts from the four baked lines", () => {
     expect(load({ locked: true, trial: false }).mfBakedLicense()).toBe("locked");

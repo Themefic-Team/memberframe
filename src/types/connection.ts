@@ -86,6 +86,8 @@ export type GatedPageTier = "signed_in" | "free_member" | "tier_1" | "tier_2" | 
 export interface GatedPageRule {
   path: string;
   enabled: boolean;
+  /** "members" when absent: the page is for those the tier choice lets in. "others": for everyone else. */
+  audience?: "members" | "others";
   requiredTier: GatedPageTier;
   fallbackAction: GatedPageFallbackAction;
   redirectPath?: string;

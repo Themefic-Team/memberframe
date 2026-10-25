@@ -34,7 +34,7 @@ Seven known conflicts are already resolved in PRD section 17. Never silently re-
 
 ```
 read status row -> read PRD section -> write/update development doc -> code
-  -> npm run lint:css && npm run lint:design && npx tsc --noEmit && npm test && npm run build
+  -> npm run lint:css && npm run lint:design && npx tsc --noEmit && npm test && npm run build && npm run check:no-cdn
   -> set the status row to "awaiting review"
   -> PROPOSE a commit message and stop
 ```
@@ -74,6 +74,7 @@ The user commits, so the agent cannot know the SHA in the same turn. Backfill it
 | `npx tsc --noEmit` | Types in `src` and `test` |
 | `npm test` | `vitest run` over `test/**/*.test.ts` |
 | `npm run build` | `tsc && vite build` |
+| `npm run check:no-cdn` | After build: nothing in `dist` loads from a CDN (fonts are bundled), canvas components import nothing from a URL. Only allowed outside load: Stripe.js from js.stripe.com |
 | `npm run dev` | HTTPS on :5173, self-signed cert |
 
 `vitest` 5.0.3 arrived with task 0.8 and covers layer 1 of the PRD section 16 triad: pure logic, node environment, no DOM. **`jsdom` and a testing library are still not installed**, so no test renders a React component yet. Adding them is unscheduled work: ask first.

@@ -27,9 +27,9 @@ import type { AuthSettings, GatedPageRule, SectionLockRule } from "../../types/c
 import { deployBaseUrl } from "../../config/backend";
 import { framer } from "framer-plugin";
 import {
-  SECTION_LOCKS_FILE_NAME,
   normalizeSectionLockName,
   sectionLocksCode,
+  sectionLocksFilesToWrite,
   writeCodeFile,
   type DeployContext,
 } from "../../services";
@@ -337,7 +337,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     if (!siteId) {
       showToast({
         tone: "neutral",
-        message: "Connect this project from Account, top right, before saving page locks.",
+        message: "Connect this project in Account first",
       });
       return;
     }
@@ -352,18 +352,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       setFailure(null);
 
       // Keep Framer's Code overrides list in step with the locks: one override
-      // per lock in MemberLocks. Written when there are locks, or when the file
-      // is already there and a lock was removed. Never created for nothing.
+      // per lock in MemberFrameLocks. Written when there are locks, or when the
+      // file is already there and a lock was removed. Never created for nothing.
+      // A project from before the rename also keeps MemberLocks up to date, so
+      // layers picked from it stay locked.
       const fileNames = await framer
         .getCodeFiles()
         .then((files) => files.map((file) => file.name))
         .catch((): string[] => []);
-      if (savedLocks.length > 0 || fileNames.includes(SECTION_LOCKS_FILE_NAME)) {
-        const written = await writeCodeFile(framer, SECTION_LOCKS_FILE_NAME, sectionLocksCode(savedLocks));
+      for (const fileName of sectionLocksFilesToWrite(fileNames, savedLocks.length)) {
+        const written = await writeCodeFile(framer, fileName, sectionLocksCode(savedLocks));
         if (!written.ok) {
           setSaving(false);
-          setFailure({ title: "Locks saved, MemberLocks not updated", message: written.message });
-          showToast({ tone: "error", message: "Locks saved, MemberLocks not updated" });
+          setFailure({ title: "Locks saved, MemberFrameLocks not updated", message: written.message });
+          showToast({ tone: "error", message: "Locks saved, file not updated" });
           return;
         }
       }

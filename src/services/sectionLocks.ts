@@ -2,17 +2,39 @@
  * Section locks: rules a creator writes, picked per layer in Framer's sidebar.
  * Development doc: `docs/development-docs/19-section-locks.md`.
  *
- * Saving the rules writes `MemberLocks.tsx` into the creator's project, with
- * one code override per rule, named after it. In Framer the creator selects a
- * layer and picks the rule under Code overrides, File MemberLocks. The override
- * only tags the layer; the Route Shield enforces the rule from the site
- * settings, so changing who sees a rule needs no republish.
+ * Saving the rules writes `MemberFrameLocks.tsx` into the creator's project,
+ * with one code override per rule, named after it. In Framer the creator
+ * selects a layer and picks the rule under Code overrides, File
+ * MemberFrameLocks. The override only tags the layer; the Route Shield
+ * enforces the rule from the site settings, so changing who sees a rule needs
+ * no republish.
  */
 
 import type { SectionLockRule } from "../types/connection";
+import { accessOptions, accessValue, parseAccess } from "./accessChoices";
 
-/** The code file the overrides live in. Framer lists it as "MemberLocks". */
-export const SECTION_LOCKS_FILE_NAME = "MemberLocks.tsx";
+/** The code file the overrides live in. Framer lists it as "MemberFrameLocks". */
+export const SECTION_LOCKS_FILE_NAME = "MemberFrameLocks.tsx";
+
+/**
+ * The file's name before 2026-10-25. A layer keeps pointing at the file its
+ * override was picked from, and a plugin cannot re-point it, so a project that
+ * already has this file keeps it, written with the same overrides, and its
+ * locked layers keep working. New projects never get it.
+ */
+export const LEGACY_SECTION_LOCKS_FILE_NAME = "MemberLocks.tsx";
+
+/**
+ * Which locks files a save writes, given the project's code files: the
+ * current one when there are locks or it already exists (never created for
+ * nothing), and the legacy one only where it already exists.
+ */
+export function sectionLocksFilesToWrite(existing: ReadonlyArray<string>, lockCount: number): string[] {
+  const files: string[] = [];
+  if (lockCount > 0 || existing.includes(SECTION_LOCKS_FILE_NAME)) files.push(SECTION_LOCKS_FILE_NAME);
+  if (existing.includes(LEGACY_SECTION_LOCKS_FILE_NAME)) files.push(LEGACY_SECTION_LOCKS_FILE_NAME);
+  return files;
+}
 
 /**
  * The server's rule, held to it: letters, digits, spaces, and - _ . only.
@@ -73,7 +95,8 @@ export function sectionLockOverrideNames(rules: ReadonlyArray<Pick<SectionLockRu
 }
 
 /**
- * The whole `MemberLocks.tsx`, from the rules.
+ * The whole `MemberFrameLocks.tsx`, from the rules. The legacy
+ * `MemberLocks.tsx` gets the same content.
  *
  * Every rule gets an override, switched off or not, so a layer never loses its
  * override because a rule was paused. Names and slugs go in through JSON, so
@@ -102,7 +125,7 @@ export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string 
     "// file is replaced on every save.",
     "//",
     "// To lock a layer, select it, then in the right sidebar open Code overrides,",
-    "// choose File MemberLocks and the lock by name. The override only marks the",
+    "// choose File MemberFrameLocks and the lock by name. The override only marks the",
     "// layer; the MemberFrame Route Shield on your published site decides who",
     "// sees it, from the rules saved in the plugin.",
     "",
@@ -124,7 +147,7 @@ export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string 
 }
 
 /**
- * Whether a project's MemberLocks.tsx was written by an older plugin: one
+ * Whether a project's locks file was written by an older plugin: one
  * whose overrides drop the layer's ref, so Framer's appear effects never run
  * and a locked layer stays invisible. Only that is rewritten on open; a file
  * that merely lists other rules waits for Save locks, as before.
@@ -143,42 +166,27 @@ export interface SectionLockTier {
 export interface WhoSeesOption {
   value: string;
   label: string;
+  group?: string;
 }
 
 /**
- * Every "Who sees it" choice for this site, from its own tiers.
- *
- * Free is left out: "Free or higher" is every member, which is "Any signed-in
- * member" already. Each paid tier gets the pair, its members and everyone else.
+ * "Who sees it": the shared list, the same as page locks and the paywall
+ * (services/accessChoices.ts, 19-section-locks.md 9).
  */
 export function whoSeesOptions(tiers: ReadonlyArray<SectionLockTier>): WhoSeesOption[] {
-  const options: WhoSeesOption[] = [
-    { value: "members:signed_in", label: "Any signed-in member" },
-    { value: "others:signed_in", label: "Signed-out visitors only" },
-  ];
-
-  // The Free tier is rank 0, whatever its key (23-dynamic-tiers.md).
-  const paid = [...tiers].filter((tier) => tier.rank !== 0).sort((a, b) => a.rank - b.rank);
-  for (const tier of paid) {
-    options.push(
-      { value: `members:${tier.key}`, label: `${tier.name} members or higher` },
-      { value: `others:${tier.key}`, label: `Everyone without ${tier.name}` }
-    );
-  }
-
-  return options;
+  return accessOptions(tiers, { others: true });
 }
 
 export function whoSeesValue(rule: Pick<SectionLockRule, "audience" | "requiredTier">): string {
-  return `${rule.audience}:${rule.requiredTier}`;
+  return accessValue(rule);
 }
 
-export function parseWhoSees(value: string): Pick<SectionLockRule, "audience" | "requiredTier"> {
-  const [audience, ...rest] = value.split(":");
-  return {
-    audience: audience === "others" ? "others" : "members",
-    requiredTier: rest.join(":") || "signed_in",
-  };
+export function parseWhoSees(
+  value: string,
+  current?: Pick<SectionLockRule, "requiredTier">,
+  tiers: ReadonlyArray<SectionLockTier> = []
+): Pick<SectionLockRule, "audience" | "requiredTier"> {
+  return parseAccess(value, current, tiers);
 }
 
 /** A new rule with a name no other rule has: "Section lock 1", "Section lock 2"... */

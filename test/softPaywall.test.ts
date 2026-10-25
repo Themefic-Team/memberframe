@@ -194,7 +194,8 @@ describe("the counter is optional, the meter is not (criterion 5)", () => {
   it("decides lock and open without reading showCounterPill", () => {
     const decide = paywall.slice(paywall.indexOf("async function decide("), paywall.indexOf("void decide(false);"));
     expect(decide).not.toContain("showCounterPill");
-    expect(paywall).toContain("if (!showCounterPill || pillClosed || meter.position === null) return null;");
+    // And only the first paywall on a page shows it.
+    expect(paywall).toContain("if (!showCounterPill || pillClosed || meter.position === null || !leadsPage) return null;");
   });
 });
 
@@ -231,7 +232,7 @@ describe("F08: Schema.org paywall markup", () => {
 
   it("keeps the article in the page for every visitor: cut with CSS, never removed", () => {
     // Crawler and person receive the same markup (F08 criterion 3).
-    expect(paywall).toContain("max-height: ${cutAt}px !important; overflow: hidden !important;");
+    expect(paywall).toContain("clip-path: inset(0 0 calc(100% - ${cutAt}px) 0) !important;");
     expect(paywall).not.toContain("removeChild");
   });
 
@@ -271,7 +272,16 @@ describe("the generated paywall", () => {
 
   it("lists the site's tiers, by rank and escaped, under Full Access For", () => {
     const { code } = generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, context);
-    expect(code).toContain('    options: ["any_paid", "signed_in", "free_member", "tier_1", "pro_plus"],');
-    expect(code).toContain('    optionTitles: ["Any Paid Plan", "Any Signed In", "Free", "Silver", "Pro \\"Plus\\""],');
+    // The locks' first group, same words and order; Free is any signed-in member.
+    expect(code).toContain('    options: ["signed_in", "any_paid", "tier_1", "pro_plus", "chosen"],');
+    expect(code).toContain(
+      '    optionTitles: ["Any signed-in member", "Any paid plan", "Silver members or higher", "Pro \\"Plus\\" members or higher", "Only chosen tiers…"],'
+    );
+  });
+
+  it("lists the site's tiers under Full Access Tiers, for Chosen Tiers", () => {
+    const { code } = generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, context);
+    expect(code).toContain('    options: ["free_member", "tier_1", "pro_plus"],');
+    expect(code).toContain("hidden: (props) => props.unlimitedTier !== \"chosen\",");
   });
 });

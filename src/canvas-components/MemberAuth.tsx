@@ -66,12 +66,15 @@ const IS_TRIAL = false;
 // `test/canvasLicenseParity.test.ts`. F19, 19-pro-lock-and-trial.md.
 //
 // The four lines above are this file's state when it was written, and they are
-// rewritten in place by the plugin whenever the license changes. On the canvas
-// and the published site the component also asks the server, and its answer
-// wins: trial shows the "Made with Framefic" mark, the bottom right corner
-// copied from the BEAF slider; an ended plan blurs the component behind an
-// Upgrade card. The server refuses an unlicensed site's member requests on its
-// own, so removing these lines unlocks nothing.
+// rewritten in place by the plugin whenever the license changes, and set to
+// locked when the creator signs out of the plugin. The component also asks the
+// server: trial shows the "Made with Framefic" mark, the bottom right corner
+// copied from the BEAF slider; an ended trial or plan blurs the component
+// behind an Upgrade card. On the published site the server's answer wins. On
+// the canvas the stricter of the two wins, so a signed-out plugin locks the
+// canvas even though the site's plan is still paid, and a locked component
+// hides its settings in Framer's right panel. The server refuses an unlicensed
+// site's member requests on its own, so removing these lines unlocks nothing.
 //
 // The server is asked once when the component mounts, and again only when the
 // tab comes back after ten minutes or more: nothing polls. On the canvas the
@@ -131,15 +134,45 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   return answer;
 }
 
+const MF_STRICTNESS: Record<string, number> = { active: 0, trial: 1, locked: 2 };
+
+/**
+ * What to draw from the file's lines and the server's answer. A copy or a
+ * foreign domain always shows its own card. On the published site the server
+ * wins, so a paid site never locks because its creator signed out. On the
+ * canvas the stricter one wins: the plugin's sign-out lock holds there, and so
+ * does a lapse the server knows about before the plugin is next opened.
+ */
+function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boolean): MfLicense {
+  if (answer === "copied" || answer === "domain" || !onCanvas) return answer;
+  return (MF_STRICTNESS[baked] ?? 0) > (MF_STRICTNESS[answer] ?? 0) ? baked : answer;
+}
+
+/**
+ * The component's property controls, or, while the file is locked, the same
+ * controls all hidden from Framer's right panel: nothing can be set until the
+ * creator signs in or upgrades. The seal stays, so the instance keeps it.
+ */
+function mfControls<T extends object>(controls: T): T {
+  if (!IS_LOCKED) return controls;
+  const locked: Record<string, unknown> = {};
+  for (const [key, control] of Object.entries(controls)) {
+    locked[key] = key === "mfSeal" ? control : { ...(control as object), hidden: () => true };
+  }
+  return locked as T;
+}
+
 function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLicense {
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
     let checkedAt = 0;
+    const target = RenderTarget.current();
+    const onCanvas = target === RenderTarget.canvas || target === RenderTarget.thumbnail;
     const check = () => {
       checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
-        if (live && answer) setLicense(answer);
+        if (live && answer) setLicense(mfEffectiveLicense(mfBakedLicense(), answer, onCanvas));
       });
     };
     check();
@@ -168,19 +201,22 @@ const MF_LICENSE_CSS = `
 .mf-wm-text { color: #94a3b8; font-weight: 500; letter-spacing: 0.1px; transition: color 0.2s ease; }
 .mf-wm:hover .mf-wm-text { color: rgba(255, 255, 255, 0.85); }
 .mf-wm-brand { color: #ffffff; font-weight: 600; letter-spacing: 0.2px; }
-.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: inherit; container-type: size; }
+.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: inherit; container-type: size; }
 .mf-lock-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
 .mf-lock-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
 .mf-lock-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
 .mf-lock-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
 @container (max-height: 150px) { .mf-lock-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lock-icon { width: 24px; height: 24px; } .mf-lock-icon svg { width: 14px; height: 14px; } .mf-lock-text { display: none; } .mf-lock-title { font-size: 12px; } }
+@container (max-height: 64px) or (max-width: 140px) { .mf-lock { padding: 0; } .mf-lock-card { padding: 0; background: transparent; border: 0; box-shadow: none; } .mf-lock-title, .mf-lock-text { display: none; } .mf-lock-icon { width: 24px; height: 24px; background: rgba(18, 18, 20, 0.85); } .mf-lock-icon svg { width: 14px; height: 14px; } }
+.mf-wm-frame { position: absolute; inset: 0; z-index: 30; pointer-events: none; container-type: size; }
+@container (max-height: 64px) or (max-width: 200px) { .mf-wm { bottom: 2px; right: 2px; padding: 3px; gap: 0; } .mf-wm-text, .mf-wm-brand { display: none; } }
 `;
 
 function MfWatermark(): React.ReactElement {
   return (
     <a className="mf-wm" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
       <span className="mf-wm-icon" aria-hidden={true}>
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" data-brand="framefic">
           <path d="M2.2 5V3.4C2.2 2.74 2.74 2.2 3.4 2.2H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M11 2.2H12.6C13.26 2.2 13.8 2.74 13.8 3.4V5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M2.2 11V12.6C2.2 13.26 2.74 13.8 3.4 13.8H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -195,7 +231,7 @@ function MfWatermark(): React.ReactElement {
 }
 
 const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
-  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  locked: { title: "Upgrade to Pro", text: "MemberFrame is locked: the trial or plan has ended, or the plugin is signed out. Open the MemberFrame plugin to sign in or upgrade." },
   copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
   domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
 };
@@ -206,9 +242,9 @@ function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.R
     <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="11" width="16" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-lucide="lock">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </span>
         <p className="mf-lock-title">{copy.title}</p>
@@ -224,7 +260,15 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
+      {props.license === "trial" ? (
+        // A frame the size of the component, so the mark can shrink to the
+        // Framefic icon alone on a small one (a bookmark button).
+        <div className="mf-wm-frame">
+          <MfWatermark />
+        </div>
+      ) : (
+        <MfLockOverlay kind={props.license} />
+      )}
     </>
   );
 }
@@ -954,6 +998,19 @@ function noteAfterLoginPath(data: Record<string, unknown>): void {
 
 function afterLoginTarget(): string {
   return (siteAfterLoginPath ?? CONFIG.afterLoginPath) || "/dashboard";
+}
+
+/**
+ * A member already signed in, on a page meant for signing in: straight to the
+ * site's After sign in page. Not to a remembered return page or plan: those
+ * belong to a sign in that just happened, and a stale one sent members to
+ * whatever page they last pressed Sign in on.
+ */
+function leaveForAfterLogin(): void {
+  const path = afterLoginTarget();
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return;
+  if (typeof window === "undefined" || window.location.pathname === path) return;
+  window.location.assign(path);
 }
 
 function redirectAfterAuth(): void {
@@ -2043,7 +2100,7 @@ const cssContent = `
 
 const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
   google: (
-    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false" data-brand="google">
       <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
       <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
       <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
@@ -2051,7 +2108,7 @@ const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
     </svg>
   ),
   apple: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-brand="apple">
       <path
         fill="currentColor"
         d="M16.3 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.2-2.9.9-3.7.9-.8 0-2-.8-3.2-.8-1.7 0-3.4 1.4-3.4 4 0 1.6.6 3.3 1.4 4.4.7 1 1.4 1.9 2.4 1.9.9 0 1.3-.6 2.5-.6s1.5.6 2.5.6c1 0 1.7-.9 2.4-1.9.5-.8.8-1.5 1-1.9-1.9-.7-2.1-2.5-2.1-3.3zM14.3 6c.6-.7 1-1.6.9-2.6-.9.1-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.5 1 .1 2-.5 2.5-1.2z"
@@ -2059,7 +2116,7 @@ const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
     </svg>
   ),
   github: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-brand="github">
       <path
         fill="currentColor"
         d="M12 2a10 10 0 00-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.8-4.6 5 .4.3.7 1 .7 2v2.9c0 .3.2.6.7.5A10 10 0 0012 2z"
@@ -2067,7 +2124,7 @@ const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
     </svg>
   ),
   discord: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-brand="discord">
       <path
         fill="currentColor"
         d="M19.3 5.6A16 16 0 0015.2 4.3l-.3.7a12 12 0 00-5.8 0l-.3-.7a16 16 0 00-4.1 1.3C2.2 9.3 1.5 12.9 1.9 16.4a16 16 0 004.8 2.4l.6-1a10 10 0 01-1.6-.8l.4-.3a11.4 11.4 0 009.8 0l.4.3c-.5.3-1 .6-1.6.8l.6 1a16 16 0 004.8-2.4c.5-4-.6-7.6-2.8-10.8zM8.7 14.3c-.9 0-1.7-.9-1.7-1.9s.8-1.9 1.7-1.9 1.7.9 1.7 1.9-.8 1.9-1.7 1.9zm6.6 0c-.9 0-1.7-.9-1.7-1.9s.8-1.9 1.7-1.9 1.7.9 1.7 1.9-.8 1.9-1.7 1.9z"
@@ -2096,6 +2153,8 @@ const AUTH_LABELS: Record<string, readonly [string, string]> = {
   emailPlaceholder: ["Email placeholder", "you@example.com"],
   passwordLabel: ["Password label", "Password"],
   newPasswordLabel: ["New password label", "New password"],
+  confirmPasswordLabel: ["Confirm password label", "Confirm new password"],
+  passwordsDiffer: ["Passwords differ", "The passwords do not match."],
   nameLabel: ["Name label", "Name (optional)"],
   remember: ["Remember me", "Remember me for 30 days"],
   signIn: ["Sign in button", "Sign in"],
@@ -2197,7 +2256,7 @@ function isModalTrigger(target: EventTarget | null, id: string): boolean {
 /** Drawn here: Framer's bundled lucide-react may lack `X`. */
 function MfCloseMark(): React.ReactElement {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="x">
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
     </svg>
@@ -2430,6 +2489,8 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
    * that is avoidable and avoided.
    */
   const [password, setPassword] = useState("");
+  /** The reset form's second entry. Held and cleared exactly as `password` is. */
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -2493,6 +2554,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
    */
   useEffect(() => {
     setPassword("");
+    setConfirmPassword("");
     setShowPassword(false);
     setSubmitted(false);
   }, [view]);
@@ -2660,6 +2722,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       setCodeError(null);
       setUnverifiedSignIn(false);
       setPassword("");
+      setConfirmPassword("");
 
       if (dedicated && screen !== "login" && linkablePath(loginPath, false)) {
         try {
@@ -2851,6 +2914,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 
         // Whatever happened, the plaintext has served its purpose.
         setPassword("");
+        setConfirmPassword("");
         setShowPassword(false);
 
         if (response.ok) {
@@ -2907,6 +2971,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         });
       } catch {
         setPassword("");
+        setConfirmPassword("");
         setShowPassword(false);
         if (silentFail) {
           setState({ phase: "idle" });
@@ -2928,8 +2993,9 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   // --------------------------------------------------------------------------
   useEffect(() => {
     // A handoff is being finished by the effect below; a 401 from this check
-    // landing after it would reset the form under the visitor.
-    if (onCanvas || handoff) return;
+    // landing after it would reset the form under the visitor. A reset link
+    // is for setting a password, signed in or not: the member stays.
+    if (onCanvas || handoff || readResetToken() !== null) return;
 
     void submitCredentials(
       SESSION_PATH,
@@ -2939,7 +3005,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         notifySessionUpdated(true);
         // Not back to a page the shield just turned this member away from:
         // that page would send them here again, and round it would go.
-        if (!recentlyDenied(afterLoginTarget())) redirectAfterAuth();
+        if (!recentlyDenied(afterLoginTarget())) leaveForAfterLogin();
       },
       true
     );
@@ -3087,6 +3153,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 
     if (resetToken === null) return;
     if (passwordProblems(password, email, policy).length > 0) return;
+    if (confirmPassword !== password) return;
 
     void submitCredentials(RESET_PASSWORD_PATH, { token: resetToken, newPassword: password }, () => {
       // Strip the token from the address bar. It is spent now, and leaving it
@@ -3106,7 +3173,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       notifySessionUpdated(true);
       redirectAfterAuth();
     });
-  }, [email, password, policy, resetToken, submitCredentials]);
+  }, [confirmPassword, email, password, policy, resetToken, submitCredentials]);
 
   // --------------------------------------------------------------------------
   // Modal keyboard behaviour. F05 requires Escape and a focus trap.
@@ -3218,6 +3285,8 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   const emailProblem = submitted && !looksLikeEmail(email);
   const passwordProblem = submitted && problems.length > 0;
   const emptyPasswordProblem = submitted && view === "password_signin" && password === "";
+  const confirmProblem =
+    view === "reset" && confirmPassword !== password && (submitted || (confirmPassword !== "" && confirmPassword.length >= password.length));
 
   /**
    * The creator's headline, except where it would be wrong.
@@ -3541,6 +3610,25 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       return (
         <>
           {passwordField(t("newPasswordLabel"), "new-password")}
+          <label className="memberframe-auth-label" htmlFor={`${scope}-confirm`}>
+            {t("confirmPasswordLabel")}
+          </label>
+          <input
+            id={`${scope}-confirm`}
+            className={`memberframe-auth-input${confirmProblem ? " is-invalid" : ""}`}
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            value={confirmPassword}
+            disabled={busy}
+            aria-invalid={confirmProblem || undefined}
+            aria-describedby={confirmProblem ? `${scope}-confirm-error` : undefined}
+            onChange={(event) => setConfirmPassword(event.currentTarget.value)}
+          />
+          {confirmProblem ? (
+            <p id={`${scope}-confirm-error`} className="memberframe-auth-error">
+              {t("passwordsDiffer")}
+            </p>
+          ) : null}
           {submitButton(
             t("setPassword"),
             t("saving"),
@@ -3812,7 +3900,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 const PROVIDERS_ALLOWED =
   CONFIG.screen === "all" || CONFIG.screen === "login" || CONFIG.screen === "register";
 
-addPropertyControls(MemberAuth, {
+addPropertyControls(MemberAuth, mfControls({
   // The Builder's seal for this instance (27-instance-seal.md). Hidden: it is
   // set on insert and a pasted copy loses it.
   mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },
@@ -3972,4 +4060,4 @@ addPropertyControls(MemberAuth, {
 
   ...mfAppearanceControls({ padding: 24, gap: 14, shadow: true }),
   labels: mfLabelControls(AUTH_LABELS),
-});
+}));

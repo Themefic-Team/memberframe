@@ -40,11 +40,225 @@ const IS_LOCKED = false;
 const IS_TRIAL = false;
 // @plugin-lock-state: unlocked
 // @plugin-trial-state: paid
-// Bookmarks never show the trial watermark or the lock (product owner,
-// 2026-10-18): they are too small to carry either. The lines stay because the
-// generator asserts them in every file, and the patcher skips this one.
-void IS_LOCKED;
-void IS_TRIAL;
+// Every canvas component is licensed (2026-10-25, replacing the 2026-10-18
+// decision that left the bookmarks out): locked when the trial or plan ends or
+// the plugin is signed out, the Framefic mark while a trial runs, shrunk to fit.
+
+// @memberframe-license-start
+// ============================================================================
+// LICENSE: THE TRIAL WATERMARK AND THE LOCK
+// ============================================================================
+// Byte-identical in every licensed component, held so by
+// `test/canvasLicenseParity.test.ts`. F19, 19-pro-lock-and-trial.md.
+//
+// The four lines above are this file's state when it was written, and they are
+// rewritten in place by the plugin whenever the license changes, and set to
+// locked when the creator signs out of the plugin. The component also asks the
+// server: trial shows the "Made with Framefic" mark, the bottom right corner
+// copied from the BEAF slider; an ended trial or plan blurs the component
+// behind an Upgrade card. On the published site the server's answer wins. On
+// the canvas the stricter of the two wins, so a signed-out plugin locks the
+// canvas even though the site's plan is still paid, and a locked component
+// hides its settings in Framer's right panel. The server refuses an unlicensed
+// site's member requests on its own, so removing these lines unlocks nothing.
+//
+// The server is asked once when the component mounts, and again only when the
+// tab comes back after ten minutes or more: nothing polls. On the canvas the
+// open plugin hears every license change from the server and rewrites the
+// four lines above, which remounts the component with the new state. Each
+// instance also sends
+// the seal the Builder gave it (27-instance-seal.md): a pasted copy, or one
+// that never came from the Builder, is answered "copied" and shows an insert
+// card instead. An instance from before seals sends none and is held to the
+// license alone.
+
+type MfLicense = "trial" | "active" | "locked" | "copied" | "domain";
+
+const MF_LICENSE_CACHE_MS = 60000;
+const MF_LICENSE_STALE_MS = 600000;
+
+function mfBakedLicense(): MfLicense {
+  return IS_LOCKED ? "locked" : IS_TRIAL ? "trial" : "active";
+}
+
+function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | undefined): Promise<MfLicense | null> {
+  if (typeof window === "undefined" || !apiBaseUrl || !siteKey) return Promise.resolve(null);
+  const host = window as unknown as { __mfLicense?: Record<string, { at: number; answer: Promise<MfLicense | null> }> };
+  const cache = (host.__mfLicense = host.__mfLicense || {});
+  const base = String(apiBaseUrl).replace(/\/+$/, "");
+  // The baked state is part of the key: once the plugin rewrites it, the
+  // remounted component asks afresh instead of reusing the old answer.
+  const key = base + "|" + siteKey + "|" + (seal === undefined ? "-" : seal) + "|" + mfBakedLicense();
+  const hit = cache[key];
+  if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
+  const headers: Record<string, string> = {};
+  if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  const query = "?site=" + encodeURIComponent(siteKey) + (seal === undefined ? "" : "&seal=" + encodeURIComponent(seal));
+  const answer = fetch(base + "/api/license" + query, { credentials: "omit", headers, cache: "no-store" })
+    .then((response) => {
+      // No such site on this server: built against another server, or the
+      // site is gone. Lock it rather than trust the state baked into the file.
+      // Only the server's own answer counts: a proxy's 404 page says nothing.
+      if (response.status === 404) {
+        return response
+          .json()
+          .then((body: { reason?: unknown } | null) => (body && body.reason === "site_not_found" ? { state: "copied" } : null))
+          .catch(() => null);
+      }
+      return response.ok ? response.json() : null;
+    })
+    .then((data: { state?: unknown } | null): MfLicense | null => {
+      const state = data ? data.state : null;
+      if (state === "copied") return "copied";
+      // Published at an address the site does not allow yet. Not a copy: the
+      // plugin adds the address the next time it is open in this project.
+      if (state === "foreign") return "domain";
+      return state === "active" ? "active" : state === "trial" ? "trial" : state === "expired" ? "locked" : null;
+    })
+    .catch(() => null);
+  cache[key] = { at: Date.now(), answer };
+  return answer;
+}
+
+const MF_STRICTNESS: Record<string, number> = { active: 0, trial: 1, locked: 2 };
+
+/**
+ * What to draw from the file's lines and the server's answer. A copy or a
+ * foreign domain always shows its own card. On the published site the server
+ * wins, so a paid site never locks because its creator signed out. On the
+ * canvas the stricter one wins: the plugin's sign-out lock holds there, and so
+ * does a lapse the server knows about before the plugin is next opened.
+ */
+function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boolean): MfLicense {
+  if (answer === "copied" || answer === "domain" || !onCanvas) return answer;
+  return (MF_STRICTNESS[baked] ?? 0) > (MF_STRICTNESS[answer] ?? 0) ? baked : answer;
+}
+
+/**
+ * The component's property controls, or, while the file is locked, the same
+ * controls all hidden from Framer's right panel: nothing can be set until the
+ * creator signs in or upgrades. The seal stays, so the instance keeps it.
+ */
+function mfControls<T extends object>(controls: T): T {
+  if (!IS_LOCKED) return controls;
+  const locked: Record<string, unknown> = {};
+  for (const [key, control] of Object.entries(controls)) {
+    locked[key] = key === "mfSeal" ? control : { ...(control as object), hidden: () => true };
+  }
+  return locked as T;
+}
+
+function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLicense {
+  const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
+  useEffect(() => {
+    let live = true;
+    let checkedAt = 0;
+    const target = RenderTarget.current();
+    const onCanvas = target === RenderTarget.canvas || target === RenderTarget.thumbnail;
+    const check = () => {
+      checkedAt = Date.now();
+      void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
+        if (live && answer) setLicense(mfEffectiveLicense(mfBakedLicense(), answer, onCanvas));
+      });
+    };
+    check();
+    if (typeof window === "undefined") return () => undefined;
+    // Instances on one page share the cached answer, so a return to the tab is
+    // at most one request per page, not one per component.
+    const onReturn = () => {
+      if (document.visibilityState === "visible" && Date.now() - checkedAt >= MF_LICENSE_STALE_MS) check();
+    };
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, [apiBaseUrl, siteKey, seal]);
+  return license;
+}
+
+const MF_LICENSE_CSS = `
+.mf-wm { position: absolute; bottom: 10px; right: 12px; z-index: 30; display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 5px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(17, 17, 20, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; font-size: 11px; line-height: 1; cursor: pointer; user-select: none; pointer-events: auto; transform: translateY(0) scale(1); transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.mf-wm:hover { transform: translateY(-1px) scale(1.02); border-color: rgba(82, 113, 255, 0.45); }
+.mf-wm-icon { width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(135deg, #5271ff 0%, #3557ff 100%); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 3px rgba(82, 113, 255, 0.35), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.4); transition: transform 0.22s ease, box-shadow 0.22s ease; }
+.mf-wm:hover .mf-wm-icon { transform: scale(1.06); box-shadow: 0 2px 6px rgba(82, 113, 255, 0.55), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.6); }
+.mf-wm-text { color: #94a3b8; font-weight: 500; letter-spacing: 0.1px; transition: color 0.2s ease; }
+.mf-wm:hover .mf-wm-text { color: rgba(255, 255, 255, 0.85); }
+.mf-wm-brand { color: #ffffff; font-weight: 600; letter-spacing: 0.2px; }
+.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: inherit; container-type: size; }
+.mf-lock-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
+.mf-lock-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
+.mf-lock-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.mf-lock-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
+@container (max-height: 150px) { .mf-lock-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lock-icon { width: 24px; height: 24px; } .mf-lock-icon svg { width: 14px; height: 14px; } .mf-lock-text { display: none; } .mf-lock-title { font-size: 12px; } }
+@container (max-height: 64px) or (max-width: 140px) { .mf-lock { padding: 0; } .mf-lock-card { padding: 0; background: transparent; border: 0; box-shadow: none; } .mf-lock-title, .mf-lock-text { display: none; } .mf-lock-icon { width: 24px; height: 24px; background: rgba(18, 18, 20, 0.85); } .mf-lock-icon svg { width: 14px; height: 14px; } }
+.mf-wm-frame { position: absolute; inset: 0; z-index: 30; pointer-events: none; container-type: size; }
+@container (max-height: 64px) or (max-width: 200px) { .mf-wm { bottom: 2px; right: 2px; padding: 3px; gap: 0; } .mf-wm-text, .mf-wm-brand { display: none; } }
+`;
+
+function MfWatermark(): React.ReactElement {
+  return (
+    <a className="mf-wm" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
+      <span className="mf-wm-icon" aria-hidden={true}>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" data-brand="framefic">
+          <path d="M2.2 5V3.4C2.2 2.74 2.74 2.2 3.4 2.2H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M11 2.2H12.6C13.26 2.2 13.8 2.74 13.8 3.4V5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2.2 11V12.6C2.2 13.26 2.74 13.8 3.4 13.8H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M11 13.8H12.6C13.26 13.8 13.8 13.26 13.8 12.6V11" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="4.4" y="4.6" width="7.2" height="6.8" rx="1.6" fill="#ffffff" />
+        </svg>
+      </span>
+      <span className="mf-wm-text">Made with</span>
+      <span className="mf-wm-brand">Framefic</span>
+    </a>
+  );
+}
+
+const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
+  locked: { title: "Upgrade to Pro", text: "MemberFrame is locked: the trial or plan has ended, or the plugin is signed out. Open the MemberFrame plugin to sign in or upgrade." },
+  copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
+  domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
+};
+
+function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
+  const copy = MF_LOCK_COPY[props.kind];
+  return (
+    <div className="mf-lock" role="note" aria-label={copy.title}>
+      <div className="mf-lock-card">
+        <span className="mf-lock-icon" aria-hidden={true}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-lucide="lock">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </span>
+        <p className="mf-lock-title">{copy.title}</p>
+        <p className="mf-lock-text">{copy.text}</p>
+      </div>
+    </div>
+  );
+}
+
+/** What a licensed component renders last inside its root: the mark, the lock, or nothing. */
+function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | null {
+  if (props.license === "active") return null;
+  return (
+    <>
+      <style>{MF_LICENSE_CSS}</style>
+      {props.license === "trial" ? (
+        // A frame the size of the component, so the mark can shrink to the
+        // Framefic icon alone on a small one (a bookmark button).
+        <div className="mf-wm-frame">
+          <MfWatermark />
+        </div>
+      ) : (
+        <MfLockOverlay kind={props.license} />
+      )}
+    </>
+  );
+}
+// @memberframe-license-end
 
 // @memberframe-appearance-start
 // ============================================================================
@@ -965,23 +1179,24 @@ function ShapeIcon({ shape, filled }: { shape: IconShape; filled: boolean }) {
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
   };
+  // Lucide shapes, copied exactly (a canvas file may import nothing); test/canvasIcons.test.ts checks them.
   if (shape === "heart") {
     return (
-      <svg {...common}>
-        <path d="M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" />
+      <svg {...common} data-lucide="heart">
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
       </svg>
     );
   }
   if (shape === "star") {
     return (
-      <svg {...common}>
-        <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
+      <svg {...common} data-lucide="star">
+        <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
       </svg>
     );
   }
   return (
-    <svg {...common}>
-      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    <svg {...common} data-lucide="bookmark">
+      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
     </svg>
   );
 }
@@ -1057,6 +1272,8 @@ const BOOKMARK_LABELS: Record<string, readonly [string, string]> = {
 };
 
 export interface BookmarkButtonProps extends MfAppearanceProps {
+  /** 27-instance-seal.md: written by the Builder on insert, read only by the license check. */
+  mfSeal?: string;
   itemSlug?: string;
   itemTitle?: string;
   itemUrl?: string;
@@ -1084,6 +1301,7 @@ const BUTTON_STYLES: ReadonlyArray<ButtonStyle> = ["outline", "soft", "ghost"];
  * @framerSupportedLayoutHeight any-prefer-fixed
  */
 export default function BookmarkButton(props: BookmarkButtonProps) {
+  const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey, props.mfSeal);
   const {
     itemSlug = "",
     itemTitle = "",
@@ -1282,6 +1500,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
           <p>{t("failed")}</p>
         </div>
       ) : null}
+      <MfLicenseLayer license={license} />
     </div>
   );
 }
@@ -1290,7 +1509,8 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
 // PROPERTY CONTROLS, PRD F14
 // ============================================================================
 
-addPropertyControls(BookmarkButton, {
+addPropertyControls(BookmarkButton, mfControls({
+  mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },
   itemSlug: {
     type: ControlType.String,
     title: "Item Slug",
@@ -1392,4 +1612,4 @@ addPropertyControls(BookmarkButton, {
   },
   ...mfAppearanceControls({ padding: 10, gap: 6, shadow: false }),
   labels: mfLabelControls(BOOKMARK_LABELS),
-});
+}));

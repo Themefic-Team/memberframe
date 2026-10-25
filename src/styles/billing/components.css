@@ -111,3 +111,29 @@
 
 /* ── Signed-out profile ── */
 .beaf-profile-auth-section { margin-top: 8px; }
+
+/* ── Lucide icons (design-system.md section 12: Lucide only, sized by CSS) ──
+   Each replaces a typed glyph or a hand-drawn svg from the BEAF copy, at the
+   size the glyph had. Colour stays currentColor from the rules above. */
+.beaf-auth-close svg { width: 12px; height: 12px; }
+.beaf-external-feature-check { display: inline-flex; align-items: center; }
+.beaf-external-feature-check svg { width: 12px; height: 12px; }
+.beaf-success-box .beaf-success-icon svg { width: 28px; height: 28px; }
+.beaf-payment-support { gap: 4px; }
+.beaf-payment-support svg { width: 12px; height: 12px; }
+.beaf-coupon-success-badge svg { width: 12px; height: 12px; flex-shrink: 0; }
+.beaf-plan-card .checkmark { width: 14px; height: 14px; flex-shrink: 0; }
+.beaf-trial-perk-bullet svg { width: 11px; height: 11px; }
+.beaf-trial-status-icon-bubble--success svg { width: 22px; height: 22px; }
+.beaf-trial-status-icon-bubble--locked svg { width: 20px; height: 20px; }
+.beaf-trial-upgrade-callout { display: flex; align-items: flex-start; gap: 6px; }
+.beaf-trial-upgrade-star { width: 12px; height: 12px; flex-shrink: 0; margin-top: 2px; color: #facc15; fill: currentColor; }
+.beaf-subpage-back-button-wide svg { width: 16px; height: 16px; }
+.beaf-cancel-warning-icon { width: 14px; height: 14px; }
+.beaf-cancel-status-icon-wrapper svg { width: 24px; height: 24px; }
+.beaf-profile-field-icon { width: 16px; height: 16px; }
+.beaf-logout-icon { width: 16px; height: 16px; }
+.beaf-avatar-badge svg { width: 13px; height: 13px; }
+.beaf-avatar-badge--trial svg { color: #000000; }
+.beaf-trial-sticky-upgrade-btn .beaf-crown { width: 12px; height: 12px; }
+.beaf-watermark-notice-icon { width: 16px; height: 16px; }

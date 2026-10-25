@@ -70,7 +70,12 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState<PaymentSettings | null>(null);
   const [saving, setSaving] = useState(false);
-  const [pendingLive, setPendingLive] = useState(false);
+  /**
+   * Which keys the gateway cards show. Separate from the mode the site sells
+   * in, so live keys can be connected while the site still sells in test:
+   * going live is refused until they are.
+   */
+  const [viewMode, setViewMode] = useState<PaymentMode | null>(null);
   const [busyGateway, setBusyGateway] = useState<PaymentGateway | null>(null);
 
   const apply = useCallback((next: PaymentsOverview) => {
@@ -84,6 +89,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
       if (!active) return;
       if (result.kind === "ok") {
         apply(result.data);
+        setViewMode((current) => current ?? result.data.settings.mode);
         setLoadError(null);
       } else {
         setLoadError(paymentsFailure(result));
@@ -94,17 +100,11 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
     };
   }, [apply, siteId]);
 
+  /** Switch the mode the site sells in. Only ever called from a banner's action. */
   const changeMode = useCallback(
     async (mode: PaymentMode) => {
-      if (!overview || mode === overview.settings.mode) return;
+      if (!overview || saving || mode === overview.settings.mode) return;
 
-      // Going live ends every test purchase, so it asks first.
-      if (mode === "live" && !pendingLive) {
-        setPendingLive(true);
-        return;
-      }
-
-      setPendingLive(false);
       setSaving(true);
       const result = await savePaymentSettings(siteId, { mode });
       setSaving(false);
@@ -116,7 +116,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
       }
       showToast({ tone: "error", message: shorten(paymentsFailure(result)) });
     },
-    [apply, overview, pendingLive, showToast, siteId]
+    [apply, overview, saving, showToast, siteId]
   );
 
   const pathProblem = (path: string | undefined) =>
@@ -139,9 +139,9 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
 
   const connect = useCallback(
     async (gateway: PaymentGateway, values: Record<string, string>): Promise<string | null> => {
-      if (!overview) return null;
+      if (!overview || !viewMode) return null;
       setBusyGateway(gateway);
-      const result = await connectGateway(siteId, gateway, overview.settings.mode, values);
+      const result = await connectGateway(siteId, gateway, viewMode, values);
       setBusyGateway(null);
 
       if (result.kind === "ok") {
@@ -151,14 +151,14 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
       }
       throw new Error(paymentsFailure(result));
     },
-    [apply, overview, showToast, siteId]
+    [apply, overview, showToast, siteId, viewMode]
   );
 
   const disconnect = useCallback(
     async (gateway: PaymentGateway) => {
-      if (!overview) return;
+      if (!overview || !viewMode) return;
       setBusyGateway(gateway);
-      const result = await disconnectGateway(siteId, gateway, overview.settings.mode);
+      const result = await disconnectGateway(siteId, gateway, viewMode);
       setBusyGateway(null);
 
       if (result.kind === "ok") {
@@ -168,15 +168,15 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
       }
       showToast({ tone: "error", message: shorten(paymentsFailure(result)) });
     },
-    [apply, overview, showToast, siteId]
+    [apply, overview, showToast, siteId, viewMode]
   );
 
   /** Show or hide a connected gateway at checkout. Instant, like every Toggle. */
   const toggleEnabled = useCallback(
     async (gateway: PaymentGateway, enabled: boolean) => {
-      if (!overview) return;
+      if (!overview || !viewMode) return;
       setBusyGateway(gateway);
-      const result = await setGatewayEnabled(siteId, gateway, overview.settings.mode, enabled);
+      const result = await setGatewayEnabled(siteId, gateway, viewMode, enabled);
       setBusyGateway(null);
       if (result.kind === "ok") {
         apply(result.data);
@@ -185,7 +185,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
       }
       showToast({ tone: "error", message: shorten(paymentsFailure(result)) });
     },
-    [apply, overview, showToast, siteId]
+    [apply, overview, showToast, siteId, viewMode]
   );
 
   /** One gateway's checkout title and description. Empty fields use the defaults. */
@@ -215,9 +215,14 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
     return <p className="settings-help">Loading payments.</p>;
   }
 
-  const mode = overview.settings.mode;
+  const siteMode = overview.settings.mode;
+  const mode = viewMode ?? siteMode;
   const gateways = overview.gateways.filter((entry) => entry.mode === mode);
   const connected = gateways.filter((entry) => entry.connected);
+  /** The server refuses Live without one of these (no_live_gateway). */
+  const liveReady = overview.gateways.some(
+    (entry) => entry.mode === "live" && entry.connected && entry.enabled !== false
+  );
 
   return (
     <>
@@ -247,22 +252,40 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
             <Segmented
               label="Payment mode"
               options={MODE_OPTIONS}
-              value={pendingLive ? "live" : mode}
-              onChange={(next) => void changeMode(next)}
+              value={mode}
+              onChange={setViewMode}
             />
           </div>
         </div>
 
-        {pendingLive ? (
+        {/* The switch picks which keys are shown. The site's own mode changes only from these banners. */}
+        {mode === "live" && siteMode === "test" ? (
+          liveReady ? (
+            <Banner
+              tone="warning"
+              title="Switch to live payments?"
+              message={
+                overview.activeSubscriptions.test > 0
+                  ? `Buyers will be charged for real. The ${overview.activeSubscriptions.test} test purchase(s) stop granting access.`
+                  : "Buyers will be charged for real through connected live keys."
+              }
+              action={{ label: "Go live", onClick: () => void changeMode("live") }}
+            />
+          ) : (
+            <Banner
+              tone="info"
+              title="Your site takes test payments"
+              message="Connect a gateway below with its live keys. Then you can go live."
+            />
+          )
+        ) : null}
+
+        {mode === "test" && siteMode === "live" ? (
           <Banner
-            tone="warning"
-            title="Switch to live payments?"
-            message={
-              overview.activeSubscriptions.test > 0
-                ? `Buyers will be charged for real. The ${overview.activeSubscriptions.test} test purchase(s) stop granting access.`
-                : "Buyers will be charged for real through connected live keys."
-            }
-            action={{ label: "Go live", onClick: () => void changeMode("live") }}
+            tone="info"
+            title="Your site takes live payments"
+            message="These are your test keys. Checkout uses the live ones."
+            action={{ label: "Switch to test", onClick: () => void changeMode("test") }}
           />
         ) : null}
 

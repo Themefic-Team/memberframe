@@ -84,7 +84,8 @@
   inset: 0;
   z-index: 20;
   background: var(--beaf-overlay);
-  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-backdrop));
+  backdrop-filter: blur(var(--px-glass-blur-backdrop));
   display: flex;
   align-items: center;
   justify-content: center;

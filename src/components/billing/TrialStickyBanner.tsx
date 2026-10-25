@@ -17,7 +17,7 @@ export const TrialStickyBanner: React.FC<{ onUpgrade: () => void }> = ({ onUpgra
     <div className="beaf-trial-sticky-banner">
       <span>{trialBannerText(secondsLeft)}</span>
       <button type="button" className="beaf-trial-sticky-upgrade-btn" onClick={onUpgrade}>
-        <Crown size={12} className="beaf-crown" />
+        <Crown className="beaf-crown" aria-hidden={true} />
         Upgrade
       </button>
     </div>

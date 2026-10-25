@@ -20,6 +20,8 @@ export interface TextFieldProps
   /** Stretches to the row instead of the kit's 160px default. */
   fill?: boolean;
   invalid?: boolean;
+  /** A value kept but switched off (an excluded tier feature): secondary text. */
+  muted?: boolean;
 }
 
 /**
@@ -39,12 +41,13 @@ export const TextField: React.FC<TextFieldProps> = ({
   type = "text",
   fill = false,
   invalid = false,
+  muted = false,
   className,
   ...rest
 }) => (
   <input
     type={type}
-    className={cn("framefic-input", fill && "fill", invalid && "is-invalid", className)}
+    className={cn("framefic-input", fill && "fill", invalid && "is-invalid", muted && "is-muted", className)}
     value={value}
     aria-invalid={invalid || undefined}
     onChange={(event) => onChange(event.currentTarget.value)}

@@ -682,3 +682,32 @@ Supersedes the **Strong Password** control.
   3. Then After sign in.
 
   So a visitor who pressed Sign in on a component goes back to that page, which is intended.
+
+## 15. Reset Asks for the New Password Twice (2026-10-22)
+
+- **The field:** the new-password form (`view === "reset"`) has a second field, **Confirm new password**. It shares the eye button with the first.
+- **When it refuses:**
+  - The reset is not sent until both entries match.
+  - "The passwords do not match." shows after a submit, or once the second entry is as long as the first, so it does not nag while the member types.
+- **Clearing:** the second entry is cleared wherever the first is (FP-02 section 3.4 rule 1): on a view change, and after every submit.
+- **Wording:** both texts are in Labels (`confirmPasswordLabel`, `passwordsDiffer`).
+- **Sign up keeps a single field** with the eye button, the usual practice. A typo there costs nothing that "Forgot password?" does not fix.
+
+## 16. Signed-in Members Are Moved Off Sign-in Pages (2026-10-22)
+
+A signed-in member who opened `/login`, `/auth` (a page with MemberAuth), or `/reset-password` was sometimes sent to the wrong page.
+
+- **The cause:** on load, MemberAuth sees an existing session and redirects. It redirected through `redirectAfterAuth`, which first takes a remembered checkout intent or return page, so a page saved by an earlier Sign in click won over After sign in. Components published before section 14 also carried a stale `afterLoginPath`.
+- **The component now:** `leaveForAfterLogin` sends an already signed-in member straight to the site's After sign in page, taken from the session answer (section 14). It never uses a remembered page. A reset link (`?token=`) is left alone, signed in or not.
+- **The Route Shield now:** the reset page is a guest page too (`resetPath`, unless the URL carries `token=`). So on the login, sign-up, and reset pages from Settings, a signed-in member is moved before the page shows.
+- **Any other page holding a sign-in form** (`/auth` here) is handled by the component once its session check answers.
+- **To skip the brief flash there:** point Settings, Membership's Sign up page at that page.
+
+### 16.1. The shield no longer depends on the components (2026-10-22)
+
+- **What happened:** a signed-in member on `/login` or `/reset-password` was sent to `/sign-in`, a 404.
+  - The published login component was still the version from before section 14. It redirects through a page remembered in the tab's `sessionStorage` (`memberframe:return-to`, `memberframe:checkout-intent`), and that tab held `/sign-in` from an earlier test.
+  - The shield, which would have sent the member to After sign in, checked the session only when the browser's signed-in hint was set.
+- **Now, on a guest page:**
+  - The shield always asks for the session. Without a hint the form shows at once and the check runs behind it; a member is moved on when it answers.
+  - Moving a member on also clears both remembered-page keys, so no component version can send them anywhere but After sign in.

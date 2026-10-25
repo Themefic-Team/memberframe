@@ -62,6 +62,13 @@ declare module "framer" {
      * Padding), 2026-10-17.
      */
     readonly Padding: "padding";
+    /**
+     * Framer's file picker: the creator drops a file in the sidebar and
+     * Framer stores it. The value is the file's URL, a string. Widened for
+     * Protected Download uploaded on the canvas, 2026-10-22
+     * (32-canvas-downloads.md).
+     */
+    readonly File: "file";
   };
 
   /**
@@ -93,6 +100,8 @@ declare module "framer" {
     /** String only. */
     placeholder?: string;
     displayTextArea?: boolean;
+    /** String only: shows the value as dots, for a password. Widened 2026-10-22. */
+    obscured?: boolean;
     /** Array only: the control each row uses, and the most rows allowed. */
     control?: PropertyControlDescription;
     maxCount?: number;
@@ -100,6 +109,8 @@ declare module "framer" {
     hidden?: (props: Record<string, unknown>) => boolean;
     /** Help text Framer shows under the control. */
     description?: string;
+    /** File only: the extensions the picker accepts, without the dot. */
+    allowedFileTypes?: ReadonlyArray<string>;
   }
 
   export function addPropertyControls(

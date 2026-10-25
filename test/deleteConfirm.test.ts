@@ -17,7 +17,6 @@ const read = (path: string) => readFileSync(join(__dirname, "..", "src", path), 
 /** Each file with a destructive action, and the button handler that must only open the popup. */
 const DESTRUCTIVE: ReadonlyArray<{ file: string; opens: ReadonlyArray<string> }> = [
   { file: "components/manage/MemberFlyout.tsx", opens: ['setConfirming("revoke")', 'setConfirming("delete")'] },
-  { file: "components/manage/FilesPanel.tsx", opens: ["setConfirmDeleteId(asset.id)"] },
   { file: "components/manage/PaymentsPanel.tsx", opens: ["setConfirmRemove(true)"] },
   { file: "components/manage/TierEditor.tsx", opens: ["setConfirmDelete(true)", "setRemovingIndex(index)"] },
   { file: "components/settings/WebhooksPanel.tsx", opens: ["setConfirmingDelete(true)"] },

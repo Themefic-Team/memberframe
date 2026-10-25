@@ -6,6 +6,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canvasLicense,
+  canvasStateFor,
+  signedOutOfPlugin,
   formatCountdown,
   licenseNotice,
   panelUnlocked,
@@ -44,6 +46,24 @@ describe("the license in the panel", () => {
       expect(canvasLicense(state)).toBe("locked");
     }
     expect(canvasLicense("trial")).toBe("trial");
+  });
+
+  it("locks the canvas when the plugin is signed out, but not while loading or offline", () => {
+    expect(signedOutOfPlugin("disconnected", false, false)).toBe(true);
+    // Waiting for the emailed code is still signed out.
+    expect(signedOutOfPlugin("code_sent", false, false)).toBe(true);
+    expect(signedOutOfPlugin("loading", false, false)).toBe(false);
+    expect(signedOutOfPlugin("connected", false, false)).toBe(false);
+    // The server could not be reached: a paid canvas is not locked for that.
+    expect(signedOutOfPlugin("disconnected", true, false)).toBe(false);
+    // The browser preview has no project.
+    expect(signedOutOfPlugin("disconnected", false, true)).toBe(false);
+
+    expect(canvasStateFor("active", true)).toBe("locked");
+    expect(canvasStateFor(null, true)).toBe("locked");
+    expect(canvasStateFor(null, false)).toBeNull();
+    expect(canvasStateFor("trial", false)).toBe("trial");
+    expect(canvasStateFor("expired", false)).toBe("locked");
   });
 
   it("switches the countdown format at exactly 24 hours", () => {
@@ -99,12 +119,18 @@ describe("the lock patcher", () => {
       file("MemberPricing.tsx", patchLockState(AUTHORED, "trial")!),
       file("BookmarkButton.tsx", AUTHORED),
       file("MemberDashboard.tsx", "edited by hand"),
+      file("SomeoneElses.tsx", AUTHORED),
     ];
     const result = await enforceLockState("trial", async () => files);
-    expect(result).toEqual({ patched: ["MemberAuth.tsx"], skipped: ["MemberDashboard.tsx"] });
+    expect(result).toEqual({ patched: ["MemberAuth.tsx", "BookmarkButton.tsx"], skipped: ["MemberDashboard.tsx"] });
     expect(files[0]!.setFileContent).toHaveBeenCalledWith(patchLockState(AUTHORED, "trial"));
-    expect(files[2]!.setFileContent).not.toHaveBeenCalled();
-    expect(LICENSED_FILE_NAMES).not.toContain("BookmarkButton.tsx");
+    expect(files[4]!.setFileContent).not.toHaveBeenCalled();
+  });
+
+  it("covers every canvas component, the bookmarks included", () => {
+    for (const name of ["BookmarkButton.tsx", "BookmarksTray.tsx", "MemberAuth.tsx", "MemberDashboard.tsx", "MemberPricing.tsx", "MeteredPaywall.tsx", "ProtectedDownload.tsx"]) {
+      expect(LICENSED_FILE_NAMES).toContain(name);
+    }
   });
 });
 
@@ -118,9 +144,9 @@ describe("the generator", () => {
     expect(readLockState(login.code)).toBe("locked");
   });
 
-  it("never locks the bookmarks", () => {
+  it("locks the bookmarks like every other component", () => {
     const bookmark = generateComponentCode(BOOKMARK_BUTTON_DESCRIPTOR, DEFAULT_BOOKMARK_BUTTON_CONFIG, undefined, { ...context, license: "locked" });
-    expect(readLockState(bookmark.code)).toBe("active");
+    expect(readLockState(bookmark.code)).toBe("locked");
   });
 });
 

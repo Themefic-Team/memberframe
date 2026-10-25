@@ -79,12 +79,14 @@ describe("Bookmarks Tray", () => {
   });
 
   it("draws the same three icons as the Bookmark Button", () => {
-    const heart = "M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z";
-    const star = "m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z";
-    for (const shape of [heart, star]) {
-      expect(button).toContain(shape);
-      expect(tray).toContain(shape);
+    // The exact Lucide shapes (test/canvasIcons.test.ts checks them against Lucide itself).
+    for (const name of ["heart", "star", "bookmark"]) {
+      expect(button).toContain(`data-lucide="${name}"`);
+      expect(tray).toContain(`data-lucide="${name}"`);
     }
+    const heart = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
+    expect(button).toContain(heart);
+    expect(tray).toContain(heart);
   });
 });
 

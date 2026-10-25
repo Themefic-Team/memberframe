@@ -178,3 +178,15 @@ The Integration view was trimmed on request, as Page Locks was (`19-section-lock
 - The `.onpage-guide-card`, `-title`, `-text`, and `-steps` CSS went with the last cards that used them. `.onpage-guide-actions` stays, for the form buttons.
 
 Needs human verification: the view at 360px in both themes.
+
+## Redirects Count as Received; No Delivery Status in the Plugin (2026-10-25)
+
+**The bug:** beta.crmfic.com stored each member, then answered `302`. MemberFrame counted only 2xx as delivered, so it showed "Failed: The service answered 302." It also retried for about 9 hours, which could store the same member again.
+
+**The fix:**
+- **Backend:** `sendWebhook` (`memberframe-backend/src/services/webhookService.ts`) counts 2xx and 3xx as delivered. A redirect after a POST means the service took the request. The redirect is still not followed (`redirect: "manual"`), since following it would send the data twice. 4xx, 5xx, a timeout, and a refused connection still retry.
+- **Plugin:** the product owner asked for no delivery status. Services answer in their own ways, so a status read from the answer misled more than it helped. Removed:
+  - the "Working / Failing" badge on each webhook card
+  - the Recent deliveries list, and the fetch behind it
+- Send test now reads "Test sent", or the error when the address cannot be reached or refuses with 4xx or 5xx.
+- The backend still records deliveries and retries; the endpoints stay.

@@ -37,13 +37,6 @@
   box-sizing: border-box;
 }
 
-.members-toolbar .framefic-select {
-  width: auto;
-  min-width: 90px;
-  max-width: 115px;
-  flex-shrink: 0;
-}
-
 .members-pills {
   display: flex;
   flex-wrap: wrap;
@@ -60,7 +53,7 @@
   border-radius: var(--radius-full);
   border: 1px solid var(--framer-color-divider);
   background: var(--framer-color-bg-tertiary);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font: var(--text-body-sm);
   font-weight: 500;
   cursor: pointer;
@@ -70,7 +63,7 @@
 
 .member-pill:hover {
   background: var(--framer-color-bg-secondary);
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .member-pill.is-active {
@@ -101,7 +94,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 500;
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-secondary);
 }
 
 /* --------------------------------------------------------------------------
@@ -192,7 +185,7 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 /* The name, and the provider the account was made with (31-sign-in-methods.md). */
@@ -212,19 +205,19 @@
 .member-row-provider {
   display: inline-flex;
   flex-shrink: 0;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 .member-row-email {
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 .member-row-meta {
   font-size: 11px;
   line-height: 16px;
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-secondary);
 }
 
 .member-row-trailing {
@@ -257,9 +250,9 @@
 .member-flyout {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-12);
   width: 100%;
-  padding: 12px;
+  padding: var(--space-12);
   box-sizing: border-box;
   border: 1px solid var(--px-color-border-brand);
   border-radius: var(--radius-14);
@@ -267,37 +260,78 @@
   box-shadow: var(--px-shadow-card);
 }
 
+/* The member at a glance: initials, name, email, plan and status. */
 .member-flyout-head {
   display: flex;
+  align-items: flex-start;
+  gap: var(--space-10);
+}
+
+.member-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--px-brand-subtle);
+  color: var(--px-color-text-brand);
+  font: var(--text-body-strong);
+}
+
+.member-flyout-identity {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .member-flyout-title {
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--title);
+  font: var(--text-title-sm);
+  color: var(--framer-color-text);
 }
 
+.member-flyout-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-secondary);
+}
+
+.member-flyout-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+/* Send magic link and Revoke or Restore, side by side. */
 .member-flyout-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+/* Delete last, apart from everything else. */
+.member-flyout-danger {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--framer-color-divider);
 }
 
 .member-flyout-note {
   margin: 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--framefic-text-muted);
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-tertiary);
+  text-align: center;
 }
 
 /* --------------------------------------------------------------------------
@@ -315,7 +349,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 500;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 /* --------------------------------------------------------------------------
@@ -385,13 +419,13 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .tier-row-prices {
   font-size: 11px;
   line-height: 16px;
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-secondary);
 }
 
 .tier-form {
@@ -423,7 +457,7 @@
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .tier-form-cta,
@@ -443,47 +477,64 @@
    does not fit a 160px control column, and truncating a member's answer hides
    exactly what the creator opened the flyout to read. */
 
+/* Each section is an inner well (bg/secondary), its rows a label and value pair. */
 .member-profile {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 8px;
-  border-top: 1px solid var(--framer-color-divider);
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-10);
+  background: var(--framer-color-bg-secondary);
+}
+
+.member-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
 }
 
 .member-profile-title {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--title);
+  font: var(--text-body-strong);
+  color: var(--framer-color-text);
+}
+
+.member-section-meta,
+.member-section-empty {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-tertiary);
+}
+
+.member-section-empty {
+  color: var(--framer-color-text-secondary);
 }
 
 .member-profile-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-8);
   margin: 0;
 }
 
+/* Label left, value right. A long answer wraps under its own column. */
 .member-profile-row {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: baseline;
+  gap: var(--space-8);
 }
 
 .member-profile-label {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--paragraph);
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-secondary);
 }
 
 .member-profile-value {
   margin: 0;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--title);
+  font: var(--text-body);
+  color: var(--framer-color-text);
+  text-align: right;
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
@@ -495,7 +546,7 @@
 }
 
 .member-profile-value.is-empty {
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-tertiary);
 }
 
 .member-profile-value a {
@@ -514,127 +565,6 @@
 .tier-extra-add {
   display: flex;
   justify-content: flex-start;
-}
-
-/* --------------------------------------------------------------------------
-   FILES, FP-12: the protected file vault behind Protected Download
-   -------------------------------------------------------------------------- */
-.files-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* The native picker stays in the DOM for the browser's file dialog; the kit
-   button opens it. */
-.files-input-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-.files-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.file-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 52px;
-  padding: 8px 10px;
-  box-sizing: border-box;
-  border: 1px solid var(--framer-color-divider);
-  border-radius: var(--radius-12);
-  background: var(--px-color-bg-raised);
-  box-shadow: var(--px-shadow-card);
-}
-
-.file-row.is-editing {
-  flex-direction: column;
-  align-items: stretch;
-  border-color: var(--px-color-border-brand);
-}
-
-.file-row-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: var(--radius-8);
-  background: var(--framer-color-bg-tertiary);
-  color: var(--framer-color-text-tertiary);
-}
-
-.file-row-icon svg {
-  width: 14px;
-  height: 14px;
-  stroke: currentColor;
-}
-
-.file-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.file-row-name,
-.file-row-meta,
-.file-row-id {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-row-name {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--framer-color-text);
-}
-
-.file-row-meta {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--framefic-text-muted);
-}
-
-.file-row-id {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--framer-color-text-tertiary);
-  user-select: all;
-}
-
-.file-row-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.file-row-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 /* --------------------------------------------------------------------------
@@ -658,7 +588,7 @@
 
 .tier-features-title {
   font: var(--text-body-sm-strong);
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .tier-feature-row {
@@ -666,21 +596,6 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-8);
-}
-
-/* The kit's input is 160px outside a field row; here it takes the row's middle column. */
-.tier-feature-row .framefic-input {
-  width: 100%;
-  min-width: 0;
-}
-
-.tier-feature-row .framefic-checkbox {
-  display: inline-flex;
-  align-items: center;
-}
-
-.tier-feature-row.is-excluded .framefic-input {
-  color: var(--framefic-text-muted);
 }
 
 .tier-features-actions {

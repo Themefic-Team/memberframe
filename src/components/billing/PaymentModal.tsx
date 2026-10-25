@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Check } from "lucide-react";
 import { loadStripe, type Stripe, type StripeElementsOptions } from "@stripe/stripe-js";
 import { Elements, LinkAuthenticationElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { applyCoupon, type CheckoutResponse, type PlanId } from "../../services/licenseService";
@@ -76,7 +77,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = (props) => {
           </p>
           <div className="beaf-payment-button beaf-payment-unavailable-actions">
             <a href="https://framefic.com/support/" target="_blank" rel="noreferrer" className="beaf-payment-support">
-              Contact Support →
+              Contact Support
+              <ArrowRight aria-hidden={true} />
             </a>
             <button
               type="button"
@@ -276,7 +278,8 @@ const CheckoutForm: React.FC<PaymentModalProps> = ({ onClose, onSuccess, plan, s
 
       {couponApplied ? (
         <div className="beaf-coupon-success-badge">
-          <span>✓ Coupon applied successfully!</span>
+          <Check aria-hidden={true} />
+          <span>Coupon applied successfully!</span>
         </div>
       ) : null}
 

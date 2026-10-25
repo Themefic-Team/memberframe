@@ -374,9 +374,22 @@ function replaceConfigBlock(source: string, block: string): string {
 function rewriteTierOptions(
   code: string,
   context: DeployContext,
-  spec: { optionsLine: string; titlesLine: string; leading: ReadonlyArray<readonly [string, string]>; what: string }
+  spec: {
+    optionsLine: string;
+    titlesLine: string;
+    leading: ReadonlyArray<readonly [string, string]>;
+    /** After the tiers, such as the paywall's "Only chosen tiers…". */
+    trailing?: ReadonlyArray<readonly [string, string]>;
+    /** A tier's option title from its name; the name itself when absent. */
+    titleOf?: (name: string) => string;
+    /** Leave out the Free tier (rank 0): "Free or higher" is any signed-in member. */
+    paidOnly?: boolean;
+    what: string;
+  }
 ): string {
-  const tiers = (context.tiers ?? []).filter((tier) => CUSTOM_TIER_KEY_PATTERN.test(tier.key));
+  const tiers = (context.tiers ?? []).filter(
+    (tier) => CUSTOM_TIER_KEY_PATTERN.test(tier.key) && !(spec.paidOnly && tier.rank === 0)
+  );
   if (tiers.length === 0) return code;
 
   if (occurrences(code, spec.optionsLine) !== 1 || occurrences(code, spec.titlesLine) !== 1) {
@@ -386,10 +399,15 @@ function rewriteTierOptions(
   }
 
   const ordered = [...tiers].sort((a, b) => a.rank - b.rank);
-  const keys = [...spec.leading.map(([key]) => key), ...ordered.map((tier) => tier.key)];
+  const trailing = spec.trailing ?? [];
+  const keys = [...spec.leading.map(([key]) => key), ...ordered.map((tier) => tier.key), ...trailing.map(([key]) => key)];
   const titles = [
     ...spec.leading.map(([, title]) => title),
-    ...ordered.map((tier) => sanitizeText(tier.name, 60) || tier.key),
+    ...ordered.map((tier) => {
+      const name = sanitizeText(tier.name, 60) || tier.key;
+      return spec.titleOf ? spec.titleOf(name) : name;
+    }),
+    ...trailing.map(([, title]) => title),
   ];
 
   return code
@@ -800,8 +818,11 @@ export function normalizeMeteredPaywallConfig(config: MeteredPaywallConfig): Met
   };
 }
 
-const PAYWALL_TIER_OPTIONS_LINE = `    options: ["any_paid", "signed_in", "free_member", "tier_1", "tier_2", "vip"],`;
-const PAYWALL_TIER_TITLES_LINE = `    optionTitles: ["Any Paid Plan", "Any Signed In", "Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],`;
+const PAYWALL_TIER_OPTIONS_LINE = `    options: ["signed_in", "any_paid", "tier_1", "tier_2", "vip", "chosen"],`;
+const PAYWALL_TIER_TITLES_LINE = `    optionTitles: ["Any signed-in member", "Any paid plan", "Silver members or higher", "Gold members or higher", "VIP members or higher", "Only chosen tiers…"],`;
+/** Full Access Tiers, the list Chosen Tiers picks from: the site's tiers only. */
+const PAYWALL_CHOSEN_OPTIONS_LINE = `      options: ["free_member", "tier_1", "tier_2", "vip"],`;
+const PAYWALL_CHOSEN_TITLES_LINE = `      optionTitles: ["Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],`;
 
 export const METERED_PAYWALL_DESCRIPTOR: CanvasComponentDescriptor<MeteredPaywallConfig> = {
   id: "metered_paywall",
@@ -826,17 +847,38 @@ export const METERED_PAYWALL_DESCRIPTOR: CanvasComponentDescriptor<MeteredPaywal
     `  pricingPath: ${encodeLiteral(context.pricingPath && isSafeSitePath(context.pricingPath) ? context.pricingPath : "/pricing")},`,
   ],
   // Full Access For lists the site's own tiers after Any Paid Plan and Any Signed In.
-  transform: (code, context) =>
+  transform: (code, context) => rewriteAccessTierLists(code, context, "The paywall's Full Access For"),
+};
+
+/**
+ * A "who gets in" Enum with the site's own tiers, and the exact-tier list its
+ * "Only chosen tiers…" reveals: the paywall's Full Access For and Protected
+ * Download's Who Can Download. The same words and order as page and section
+ * locks (services/accessChoices.ts).
+ */
+function rewriteAccessTierLists(code: string, context: DeployContext, what: string): string {
+  return rewriteTierOptions(
     rewriteTierOptions(code, context, {
       optionsLine: PAYWALL_TIER_OPTIONS_LINE,
       titlesLine: PAYWALL_TIER_TITLES_LINE,
       leading: [
-        ["any_paid", "Any Paid Plan"],
-        ["signed_in", "Any Signed In"],
+        ["signed_in", "Any signed-in member"],
+        ["any_paid", "Any paid plan"],
       ],
-      what: "The paywall's Full Access For options",
+      trailing: [["chosen", "Only chosen tiers…"]],
+      titleOf: (name) => `${name} members or higher`,
+      paidOnly: true,
+      what: `${what} options`,
     }),
-};
+    context,
+    {
+      optionsLine: PAYWALL_CHOSEN_OPTIONS_LINE,
+      titlesLine: PAYWALL_CHOSEN_TITLES_LINE,
+      leading: [],
+      what: `${what} chosen tiers`,
+    }
+  );
+}
 
 export function generateMeteredPaywallCode(
   config: MeteredPaywallConfig,
@@ -876,6 +918,8 @@ export const PROTECTED_DOWNLOAD_DESCRIPTOR: CanvasComponentDescriptor<ProtectedD
     `  pricingPath: ${encodeLiteral("/pricing")},`,
     `  defaultAssetId: ${encodeLiteral(config.defaultAssetId ?? "")},`,
   ],
+  // Who Can Download lists the site's own tiers, as the paywall's Full Access For does.
+  transform: (code, context) => rewriteAccessTierLists(code, context, "Protected Download's Who Can Download"),
 };
 
 export function generateProtectedDownloadCode(

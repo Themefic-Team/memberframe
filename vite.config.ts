@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import framer from "vite-plugin-framer";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { devProxyTarget } from "./src/config/devProxy";
+import { stripRemoteCssImports } from "./src/config/stripRemoteCssImports";
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
@@ -18,6 +19,11 @@ export default defineConfig(({ command, mode }) => {
     plugins: [react(), framer(), basicSsl()],
     define: {
       __MF_DEV_API_PROXY__: JSON.stringify(apiProxyTarget !== null),
+    },
+    // Nothing loads from a CDN: drops remote @imports, such as the Google
+    // Fonts one inside Framer's framer.css. Fonts are bundled (styles/fonts.css).
+    css: {
+      postcss: { plugins: [stripRemoteCssImports()] },
     },
     build: {
       target: "esnext",

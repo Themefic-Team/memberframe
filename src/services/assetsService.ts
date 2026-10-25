@@ -1,9 +1,11 @@
 /**
- * The plugin's half of FP-12 protected files: upload, link, edit, delete.
+ * The plugin's half of protected downloads: the server's record of a file
+ * uploaded on the canvas (32-canvas-downloads.md).
  *
- * Mirrors `memberframe-backend/src/routes/content.ts`, creator section. A
- * file's storage key never comes back; the creator sees the asset id to paste
- * into `<ProtectedDownload>`, the plan it needs, and how often it was taken.
+ * Mirrors `memberframe-backend/src/routes/content.ts`, creator section. The
+ * canvas guard creates a linked asset from the Framer address of a file
+ * dropped into Protected Download, and updates its rule, name, file, or
+ * password. A password goes up once and is hashed there; it never comes back.
  */
 
 import type { ApiClient, ApiResult } from "./apiClient";
@@ -15,42 +17,21 @@ export interface SiteAsset {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
-  /** upload: stored by MemberFrame. url: a private link MemberFrame fetches. */
+  /** upload: stored by MemberFrame (older files). url: an address MemberFrame fetches, such as Framer's. */
   source: "upload" | "url";
   remoteUrl: string | null;
-  /** "signed_in" or a tier key. */
+  /** signed_in, any_paid, a tier key, only:a,b, or password. */
   requiredTier: string;
+  /** Whether a shared password is set. Never the password. */
+  hasPassword?: boolean;
   downloadCount: number;
   lastDownloadAt: string | null;
   createdAt: string;
 }
 
-export interface AssetList {
-  assets: SiteAsset[];
-  maxBytes: number;
-  storage: "local" | "s3";
-}
-
-export function fetchAssets(siteId: string, client: ApiClient = apiClient): Promise<ApiResult<AssetList>> {
-  return client.get("/api/site/assets", { siteId });
-}
-
-export function uploadAsset(
-  siteId: string,
-  file: File,
-  meta: { name: string; requiredTier: string },
-  client: ApiClient = apiClient
-): Promise<ApiResult<{ asset: SiteAsset }>> {
-  return client.upload(
-    "/api/site/assets/upload",
-    { siteId, name: meta.name, fileName: file.name, requiredTier: meta.requiredTier },
-    file
-  );
-}
-
 export function linkAsset(
   siteId: string,
-  input: { name: string; url: string; fileName?: string; requiredTier: string },
+  input: { name: string; url: string; fileName?: string; requiredTier: string; password?: string },
   client: ApiClient = apiClient
 ): Promise<ApiResult<{ asset: SiteAsset }>> {
   return client.post("/api/site/assets", { siteId, ...input });
@@ -59,14 +40,10 @@ export function linkAsset(
 export function updateAsset(
   siteId: string,
   assetId: string,
-  patch: { name?: string; fileName?: string; requiredTier?: string; url?: string },
+  patch: { name?: string; fileName?: string; requiredTier?: string; url?: string; password?: string },
   client: ApiClient = apiClient
 ): Promise<ApiResult<{ asset: SiteAsset }>> {
   return client.patch(`/api/site/assets/${encodeURIComponent(assetId)}`, { siteId, ...patch });
-}
-
-export function deleteAsset(siteId: string, assetId: string, client: ApiClient = apiClient): Promise<ApiResult<void>> {
-  return client.delete(`/api/site/assets/${encodeURIComponent(assetId)}`, { siteId });
 }
 
 /** Plain-language copy for a failure, with the server's own words where it sent some. */
@@ -74,40 +51,19 @@ export function assetsFailure(result: Exclude<ApiResult<unknown>, { kind: "ok" }
   if (result.kind === "unavailable") {
     if (result.message) return result.message;
     switch (result.reason) {
-      case "file_too_large":
-        return "That file is too large.";
       case "unknown_tier":
-        return "That plan no longer exists. Pick another.";
+        return "That plan no longer exists. Pick another in Who Can Download.";
       case "invalid_link":
-        return "Paste a full https address to the file.";
+        return "Framer did not give the file a public address. Upload it again.";
       case "too_many_assets":
-        return "This site has reached 500 files. Delete some to add more.";
-      case "upload_failed":
-        return "The upload did not finish. Try again.";
+        return "This site has reached 500 protected files.";
+      case "password_required":
+        return "Type a password for the download.";
+      case "invalid_password":
+        return "Use a password of 4 to 200 characters.";
       default:
         break;
     }
   }
   return failureMessage(result).message;
-}
-
-/** 42 MB, 980 KB, 1.2 GB. Empty for an unknown size. */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
-}
-
-/** What an asset row reads under its name: "ZIP, 42 MB, linked". */
-export function assetSummary(asset: SiteAsset): string {
-  const extension = /\.([A-Za-z0-9]{1,8})$/.exec(asset.fileName);
-  return [extension ? extension[1].toUpperCase() : "", formatBytes(asset.sizeBytes), asset.source === "url" ? "linked" : ""]
-    .filter(Boolean)
-    .join(", ");
 }

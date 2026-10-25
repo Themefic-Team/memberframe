@@ -2,9 +2,13 @@
  * `<ProtectedDownload>`, Upgrade to Download. PRD feature F10, feature plan
  * FP-12, task 5.5.
  *
- * A download button for a file kept in MemberFrame's vault. The page holds
- * only the file's opaque Asset ID; the file itself, its storage, and any link
- * the creator gave it stay on the server.
+ * A download button for a protected file. The creator drops the file into
+ * File in Framer's sidebar, and Framer stores it (32-canvas-downloads.md).
+ * While the MemberFrame plugin is open it moves the file's address, and any
+ * password, to MemberFrame's server, writes the opaque Asset ID here, and
+ * clears both from this component. The published page then holds only the
+ * Asset ID: the server checks access and streams the file, so its Framer
+ * address never reaches a visitor.
  *
  *   - Signed out: the button reads "Sign in to Download" and takes the visitor
  *     to the sign in page, then back here.
@@ -13,14 +17,15 @@
  *   - On the plan: "Download", with the file type and size. Pressing it asks
  *     the server to check again and sign a link that works for 60 seconds; the
  *     browser downloads through it, and the link is dead a minute later.
+ *   - Access set to Password: a password field. Anyone who types it gets the
+ *     same 60 second link, with no account.
  *
- * ## The plan rule is on the server
+ * ## The rule is enforced on the server
  *
- * Which plan a file needs is set on the file, in the plugin's Manage tab,
- * Files. PRD F10 put an `allowedTiers` control on the component; a rule in
- * published page code is one any visitor can edit, so the component shows the
- * server's answer and the server enforces it on every download. Conflict noted
- * in `docs/development-docs/18-content-features.md`.
+ * Access, Who Can Download, and Password are set here, like a page or section
+ * lock, and the plugin copies them to the file on the server. A rule in
+ * published page code is one any visitor can edit, so the component only
+ * shows the server's answer and the server enforces it on every download.
  *
  * ## This file leaves the repository
  *
@@ -29,6 +34,7 @@
  */
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
 import { Loader2, Lock } from "lucide-react";
 
@@ -49,12 +55,15 @@ const IS_TRIAL = false;
 // `test/canvasLicenseParity.test.ts`. F19, 19-pro-lock-and-trial.md.
 //
 // The four lines above are this file's state when it was written, and they are
-// rewritten in place by the plugin whenever the license changes. On the canvas
-// and the published site the component also asks the server, and its answer
-// wins: trial shows the "Made with Framefic" mark, the bottom right corner
-// copied from the BEAF slider; an ended plan blurs the component behind an
-// Upgrade card. The server refuses an unlicensed site's member requests on its
-// own, so removing these lines unlocks nothing.
+// rewritten in place by the plugin whenever the license changes, and set to
+// locked when the creator signs out of the plugin. The component also asks the
+// server: trial shows the "Made with Framefic" mark, the bottom right corner
+// copied from the BEAF slider; an ended trial or plan blurs the component
+// behind an Upgrade card. On the published site the server's answer wins. On
+// the canvas the stricter of the two wins, so a signed-out plugin locks the
+// canvas even though the site's plan is still paid, and a locked component
+// hides its settings in Framer's right panel. The server refuses an unlicensed
+// site's member requests on its own, so removing these lines unlocks nothing.
 //
 // The server is asked once when the component mounts, and again only when the
 // tab comes back after ten minutes or more: nothing polls. On the canvas the
@@ -114,15 +123,45 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   return answer;
 }
 
+const MF_STRICTNESS: Record<string, number> = { active: 0, trial: 1, locked: 2 };
+
+/**
+ * What to draw from the file's lines and the server's answer. A copy or a
+ * foreign domain always shows its own card. On the published site the server
+ * wins, so a paid site never locks because its creator signed out. On the
+ * canvas the stricter one wins: the plugin's sign-out lock holds there, and so
+ * does a lapse the server knows about before the plugin is next opened.
+ */
+function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boolean): MfLicense {
+  if (answer === "copied" || answer === "domain" || !onCanvas) return answer;
+  return (MF_STRICTNESS[baked] ?? 0) > (MF_STRICTNESS[answer] ?? 0) ? baked : answer;
+}
+
+/**
+ * The component's property controls, or, while the file is locked, the same
+ * controls all hidden from Framer's right panel: nothing can be set until the
+ * creator signs in or upgrades. The seal stays, so the instance keeps it.
+ */
+function mfControls<T extends object>(controls: T): T {
+  if (!IS_LOCKED) return controls;
+  const locked: Record<string, unknown> = {};
+  for (const [key, control] of Object.entries(controls)) {
+    locked[key] = key === "mfSeal" ? control : { ...(control as object), hidden: () => true };
+  }
+  return locked as T;
+}
+
 function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLicense {
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
     let checkedAt = 0;
+    const target = RenderTarget.current();
+    const onCanvas = target === RenderTarget.canvas || target === RenderTarget.thumbnail;
     const check = () => {
       checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
-        if (live && answer) setLicense(answer);
+        if (live && answer) setLicense(mfEffectiveLicense(mfBakedLicense(), answer, onCanvas));
       });
     };
     check();
@@ -151,19 +190,22 @@ const MF_LICENSE_CSS = `
 .mf-wm-text { color: #94a3b8; font-weight: 500; letter-spacing: 0.1px; transition: color 0.2s ease; }
 .mf-wm:hover .mf-wm-text { color: rgba(255, 255, 255, 0.85); }
 .mf-wm-brand { color: #ffffff; font-weight: 600; letter-spacing: 0.2px; }
-.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: inherit; container-type: size; }
+.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: inherit; container-type: size; }
 .mf-lock-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
 .mf-lock-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
 .mf-lock-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
 .mf-lock-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
 @container (max-height: 150px) { .mf-lock-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lock-icon { width: 24px; height: 24px; } .mf-lock-icon svg { width: 14px; height: 14px; } .mf-lock-text { display: none; } .mf-lock-title { font-size: 12px; } }
+@container (max-height: 64px) or (max-width: 140px) { .mf-lock { padding: 0; } .mf-lock-card { padding: 0; background: transparent; border: 0; box-shadow: none; } .mf-lock-title, .mf-lock-text { display: none; } .mf-lock-icon { width: 24px; height: 24px; background: rgba(18, 18, 20, 0.85); } .mf-lock-icon svg { width: 14px; height: 14px; } }
+.mf-wm-frame { position: absolute; inset: 0; z-index: 30; pointer-events: none; container-type: size; }
+@container (max-height: 64px) or (max-width: 200px) { .mf-wm { bottom: 2px; right: 2px; padding: 3px; gap: 0; } .mf-wm-text, .mf-wm-brand { display: none; } }
 `;
 
 function MfWatermark(): React.ReactElement {
   return (
     <a className="mf-wm" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
       <span className="mf-wm-icon" aria-hidden={true}>
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" data-brand="framefic">
           <path d="M2.2 5V3.4C2.2 2.74 2.74 2.2 3.4 2.2H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M11 2.2H12.6C13.26 2.2 13.8 2.74 13.8 3.4V5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M2.2 11V12.6C2.2 13.26 2.74 13.8 3.4 13.8H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -178,7 +220,7 @@ function MfWatermark(): React.ReactElement {
 }
 
 const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
-  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  locked: { title: "Upgrade to Pro", text: "MemberFrame is locked: the trial or plan has ended, or the plugin is signed out. Open the MemberFrame plugin to sign in or upgrade." },
   copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
   domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
 };
@@ -189,9 +231,9 @@ function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.R
     <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="11" width="16" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-lucide="lock">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </span>
         <p className="mf-lock-title">{copy.title}</p>
@@ -207,7 +249,15 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
+      {props.license === "trial" ? (
+        // A frame the size of the component, so the mark can shrink to the
+        // Framefic icon alone on a small one (a bookmark button).
+        <div className="mf-wm-frame">
+          <MfWatermark />
+        </div>
+      ) : (
+        <MfLockOverlay kind={props.license} />
+      )}
     </>
   );
 }
@@ -726,7 +776,7 @@ interface PublicAsset {
   requiredTierName: string;
 }
 
-type Access = "granted" | "upgrade" | "sign_in";
+type Access = "granted" | "upgrade" | "sign_in" | "password";
 
 type Load =
   | { phase: "loading" }
@@ -788,6 +838,19 @@ function fileMeta(asset: PublicAsset): string {
   return parts.join(", ");
 }
 
+/**
+ * FNV-1a of a file's address: the plugin's `shortHash` in
+ * services/downloadVault.ts, held to it by test.
+ */
+function mfFileHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 /** One request per Asset ID per page, however many buttons share it. */
 const assetRequests = new Map<string, Promise<Load>>();
 
@@ -833,32 +896,40 @@ function FileTypeIcon({ type }: { type: IconType }) {
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
   };
+  // Lucide shapes, copied exactly; test/canvasIcons.test.ts checks them.
   if (type === "file") {
     return (
-      <svg {...common}>
-        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-        <path d="M14 3v5h5M9 13h6M9 17h6" />
+      <svg {...common} data-lucide="file-text">
+        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+        <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+        <path d="M10 9H8" />
+        <path d="M16 13H8" />
+        <path d="M16 17H8" />
       </svg>
     );
   }
   if (type === "archive") {
     return (
-      <svg {...common}>
-        <rect x="3" y="4" width="18" height="5" rx="1" />
-        <path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4" />
+      <svg {...common} data-lucide="archive">
+        <rect width="20" height="5" x="2" y="3" rx="1" />
+        <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+        <path d="M10 12h4" />
       </svg>
     );
   }
   if (type === "code") {
     return (
-      <svg {...common}>
-        <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+      <svg {...common} data-lucide="code">
+        <polyline points="16 18 22 12 16 6" />
+        <polyline points="8 6 2 12 8 18" />
       </svg>
     );
   }
   return (
-    <svg {...common}>
-      <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+    <svg {...common} data-lucide="arrow-down-to-line">
+      <path d="M12 17V3" />
+      <path d="m6 11 6 6 6-6" />
+      <path d="M19 21H5" />
     </svg>
   );
 }
@@ -908,6 +979,49 @@ const cssContent = `
 .mf-download-label { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .mf-download-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mf-download-meta { font-size: calc(12px * var(--mf-text-scale, 1)); opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-download-layer {
+  position: fixed; inset: 0; z-index: 2147483000; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  color: var(--mf-c-text); font-family: var(--mf-c-font); font-size: calc(14px * var(--mf-text-scale, 1)); line-height: 1.45;
+}
+.mf-download-backdrop {
+  position: absolute; inset: 0; background: var(--mf-c-backdrop);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: mf-download-fade 0.18s ease-out;
+}
+.mf-download-dialog {
+  position: relative; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: min(380px, 100%); margin: 0; padding: 28px 24px 22px; text-align: center;
+  background: var(--mf-c-surface); border: 1px solid var(--mf-c-border); border-radius: max(12px, var(--mf-c-radius));
+  box-shadow: 0 24px 60px rgba(16, 24, 40, 0.28); animation: mf-download-rise 0.2s ease-out;
+}
+.mf-download-dialog-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: 4px;
+  border-radius: 999px; color: var(--mf-c-accent); background: color-mix(in srgb, var(--mf-c-accent) 12%, transparent);
+}
+.mf-download-dialog-icon svg { width: 20px; height: 20px; }
+.mf-download-dialog-title { margin: 0; font-size: calc(17px * var(--mf-text-scale, 1)); font-weight: 600; line-height: 1.3; }
+.mf-download-dialog-text { margin: 0 0 6px; color: var(--mf-c-muted); }
+.mf-download-password {
+  box-sizing: border-box; width: 100%; margin: 0; padding: 11px 12px;
+  border: 1px solid var(--mf-c-border); border-radius: max(8px, calc(var(--mf-c-radius) * 0.7));
+  background: var(--mf-c-field); color: var(--mf-c-text); font: inherit;
+}
+.mf-download-password:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 1px; }
+.mf-download-password.is-error { border-color: var(--mf-c-danger); }
+.mf-download-dialog-error { margin: 0; width: 100%; text-align: left; color: var(--mf-c-danger); font-size: calc(13px * var(--mf-text-scale, 1)); }
+.mf-download-dialog-actions { display: flex; gap: 10px; width: 100%; margin-top: 6px; }
+.mf-download-dialog-cancel, .mf-download-dialog-submit {
+  appearance: none; flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 14px; border-radius: max(8px, calc(var(--mf-c-radius) * 0.7)); font: inherit; font-weight: 600; cursor: pointer;
+}
+.mf-download-dialog-cancel { border: 1px solid var(--mf-c-border); background: transparent; color: var(--mf-c-text); }
+.mf-download-dialog-submit { border: 1px solid var(--mf-c-accent); background: var(--mf-c-accent); color: var(--mf-c-on-accent); }
+.mf-download-dialog-submit svg { width: 16px; height: 16px; }
+.mf-download-dialog-cancel:disabled, .mf-download-dialog-submit:disabled { opacity: 0.6; cursor: default; }
+.mf-download-dialog-cancel:focus-visible, .mf-download-dialog-submit:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
+@keyframes mf-download-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mf-download-rise { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mf-download-backdrop, .mf-download-dialog { animation: none; } }
 .mf-download-note { margin: 0; font-size: calc(12px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); text-align: center; }
 .mf-download-note.is-error { color: var(--mf-c-danger); }
 .mf-download-spin { animation: mf-download-spin 0.9s linear infinite; }
@@ -930,11 +1044,37 @@ const DOWNLOAD_LABELS: Record<string, readonly [string, string]> = {
   failed: ["Load failed", "Could not check access. Refresh to try again."],
   error: ["Download failed", "The download could not start. Try again."],
   tooMany: ["Too many", "Too many downloads. Try again in a minute."],
-  noAsset: ["No asset", "Paste an Asset ID from Manage, Files"],
+  noAsset: ["No file", "Upload a file in the sidebar"],
+  unsecured: ["Not secured", "Open MemberFrame to secure this file before publishing"],
+  clearFile: ["Saved, clear File", "Saved. Clear the File field before publishing, so its address stays private"],
+  notReady: ["Not ready", "This file is not ready yet"],
+  passwordTitle: ["Password title", "Enter the password"],
+  passwordText: ["Password text", "This file is password protected. Enter the password to download it."],
+  passwordField: ["Password field", "Password"],
+  passwordSubmit: ["Password button", "Download"],
+  passwordCancel: ["Cancel button", "Cancel"],
+  wrongPassword: ["Wrong password", "Incorrect password. Try again."],
 };
 
 export interface ProtectedDownloadProps extends MfAppearanceProps {
+  /**
+   * The file Framer stores, dropped in the sidebar. Read only to tell whether
+   * it still waits for the plugin; never put in a link or a request.
+   */
+  file?: string;
+  /** What the visitor's browser saves it as. Automatic when empty. */
+  fileName?: string;
+  access?: "members" | "password";
+  /** With Members: the same choices as page and section locks. */
+  whoCanDownload?: string;
+  /** With Only chosen tiers: exactly these. */
+  chosenTiers?: ReadonlyArray<string>;
+  /** With Password. Moved to the server by the plugin, then cleared; never sent from here. */
+  password?: string;
+  /** Set by the plugin once the file is secured. */
   assetId?: string;
+  /** Set by the plugin: a fingerprint of the file it saved, to tell it from a newly dropped one. */
+  fileSecured?: string;
   buttonText?: string;
   lockedButtonText?: string;
   fileMetaLabel?: string;
@@ -962,7 +1102,10 @@ interface MfSealProps {
  */
 export default function ProtectedDownload(props: ProtectedDownloadProps & MfSealProps) {
   const {
+    file = "",
+    access: accessChoice = "members",
     assetId = "",
+    fileSecured = "",
     buttonText = CONFIG.buttonText,
     lockedButtonText = CONFIG.lockedButtonText,
     fileMetaLabel = "",
@@ -1015,6 +1158,15 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
   }, [onCanvas, id]);
   const [action, setAction] = useState<Action>({ phase: "idle" });
   const busy = useRef(false);
+  /** What the visitor typed for a password file. Sent only to sign this one download. */
+  const [typedPassword, setTypedPassword] = useState("");
+  /** The password popup, opened by the button of a password file. */
+  const [asking, setAsking] = useState(false);
+  const passwordInput = useRef<HTMLInputElement | null>(null);
+  /** A file still in the sidebar: its address is in this component's props until it is cleared. */
+  const unsecured = typeof file === "string" && file.trim() !== "";
+  /** That file is the one the plugin saved: only clearing the field is left. */
+  const savedButShown = unsecured && fileSecured !== "" && mfFileHash(file.trim()) === fileSecured;
 
   useEffect(() => {
     if (onCanvas) return;
@@ -1061,9 +1213,13 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
         method: "POST",
         credentials: "include",
         headers: apiHeaders(true),
-        body: JSON.stringify({ assetId: id }),
+        body: JSON.stringify(load.access === "password" ? { assetId: id, password: typedPassword } : { assetId: id }),
       });
 
+      if (response.status === 401 && load.access === "password") {
+        setAction({ phase: "error", message: t("wrongPassword") });
+        return;
+      }
       if (response.status === 401) {
         setLoad({ ...load, access: "sign_in" });
         setAction({ phase: "idle" });
@@ -1088,6 +1244,8 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
       // stays where it is and the browser saves the file.
       window.location.assign(body.signedUrl);
       setAction({ phase: "started" });
+      setAsking(false);
+      setTypedPassword("");
     } catch {
       setAction({ phase: "error", message: t("error") });
     } finally {
@@ -1095,7 +1253,7 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
     }
     // `t` reads the labels prop; the copy is read when each message is set.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, load]);
+  }, [id, load, typedPassword]);
 
   // ---- What to show ----
 
@@ -1114,16 +1272,22 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
     const base: Shown = { title: buttonText, meta: "", note: "", noteError: false, locked: false, disabled: false, spinning: false, onPress: null };
 
     if (onCanvas) {
-      const locked = canvasPreview === "locked";
+      // Dropped in the sidebar but not secured yet: its address is still in
+      // this component, so say so before the creator publishes.
+      if (unsecured) return { ...base, meta: fileMetaLabel || "", note: t(savedButShown ? "clearFile" : "unsecured"), noteError: true };
+      if (id === "") return { ...base, meta: t("noAsset") };
+      const locked = canvasPreview === "locked" && accessChoice !== "password";
       return {
         ...base,
         title: locked ? lockedButtonText : buttonText,
-        meta: fileMetaLabel || (id === "" ? t("noAsset") : canvasAsset ? fileMeta(canvasAsset) : "ZIP, 42 MB"),
+        meta: fileMetaLabel || (canvasAsset ? fileMeta(canvasAsset) : "ZIP, 42 MB"),
         note: locked ? t("upgradeNote", { tier: canvasAsset ? canvasAsset.requiredTierName : "Gold" }) : "",
         locked,
       };
     }
 
+    // Never secured: the component has no Asset ID, and never uses the file's address.
+    if (id === "" && unsecured) return { ...base, title: t("notReady"), disabled: true, locked: true };
     if (load.phase === "loading") return { ...base, title: t("checking"), disabled: true, spinning: true };
     if (load.phase === "missing") return { ...base, title: t("missing"), disabled: true, locked: true };
     if (load.phase === "failed") {
@@ -1132,6 +1296,12 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
 
     const { asset, access } = load;
     const meta = fileMetaLabel || fileMeta(asset);
+
+    // Set to Password here, still a members file on the server: the plugin has
+    // not sent the password yet. Never send a visitor to sign in for it.
+    if (accessChoice === "password" && (access === "sign_in" || access === "upgrade")) {
+      return { ...base, title: t("notReady"), meta, disabled: true, locked: true };
+    }
 
     if (access === "sign_in") {
       return {
@@ -1143,6 +1313,20 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
         onPress: () => {
           window.dispatchEvent(new CustomEvent("memberframe:open-auth", { detail: { reason: "download" } }));
           goTo(loginPath, CONFIG.loginPath);
+        },
+      };
+    }
+
+    if (access === "password") {
+      // The password is asked for in a popup; its errors show there.
+      return {
+        ...base,
+        meta,
+        note: action.phase === "started" ? t("started") : "",
+        onPress: () => {
+          setTypedPassword("");
+          setAction({ phase: "idle" });
+          setAsking(true);
         },
       };
     }
@@ -1191,6 +1375,89 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
     .filter(Boolean)
     .join(" ");
 
+  // Escape closes the popup, and the field takes focus when it opens.
+  useEffect(() => {
+    if (!asking) return;
+    passwordInput.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy.current) setAsking(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [asking]);
+
+  const signing = action.phase === "signing";
+  const closePopup = () => {
+    if (!busy.current) setAsking(false);
+  };
+  /*
+    The password popup. Rendered into the page's body, so a transformed or
+    clipped ancestor (a Framer appear effect, a stack with overflow hidden)
+    cannot trap or cut it; its own copy of the theme and the instance's
+    variables travels with it.
+  */
+  const popup =
+    asking && !onCanvas && typeof document !== "undefined"
+      ? createPortal(
+          <div className={`mf-download-layer ${mfThemeClass(theme)}`} data-mf-download={styled.scope}>
+            <style>{mfThemeCss(".mf-download-layer")}</style>
+            <style>{cssContent}</style>
+            <style>{styled.css}</style>
+            <div className="mf-download-backdrop" onClick={closePopup} />
+            <form
+              className="mf-download-dialog"
+              role="dialog"
+              aria-modal={true}
+              aria-labelledby={`${scope}-password-title`}
+              aria-describedby={`${scope}-password-text`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (typedPassword !== "" && !signing) void download();
+              }}
+            >
+              <span className="mf-download-dialog-icon">
+                <Lock aria-hidden={true} />
+              </span>
+              <h3 className="mf-download-dialog-title" id={`${scope}-password-title`}>
+                {t("passwordTitle")}
+              </h3>
+              <p className="mf-download-dialog-text" id={`${scope}-password-text`}>
+                {t("passwordText")}
+              </p>
+              <input
+                ref={passwordInput}
+                type="password"
+                className={`mf-download-password${action.phase === "error" ? " is-error" : ""}`}
+                placeholder={t("passwordField")}
+                aria-label={t("passwordField")}
+                aria-invalid={action.phase === "error" ? true : undefined}
+                autoComplete="off"
+                value={typedPassword}
+                onChange={(event) => {
+                  setTypedPassword(event.target.value);
+                  if (action.phase === "error") setAction({ phase: "idle" });
+                }}
+              />
+              {action.phase === "error" ? (
+                <p className="mf-download-dialog-error" role="alert">
+                  {action.message}
+                </p>
+              ) : null}
+              <div className="mf-download-dialog-actions">
+                <button type="button" className="mf-download-dialog-cancel" onClick={closePopup} disabled={signing}>
+                  {t("passwordCancel")}
+                </button>
+                <button type="submit" className="mf-download-dialog-submit" disabled={typedPassword === "" || signing} aria-busy={signing ? true : undefined}>
+                  {signing ? <Loader2 className="mf-download-spin" aria-hidden={true} /> : null}
+                  {signing ? t("preparing") : t("passwordSubmit")}
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div className={`mf-download ${mfThemeClass(theme)}`} data-mf-download={styled.scope}>
       <style>{mfThemeCss(".mf-download")}</style>
@@ -1224,6 +1491,7 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
           {view.note}
         </p>
       ) : null}
+      {popup}
       <MfLicenseLayer license={license} />
     </div>
   );
@@ -1233,17 +1501,71 @@ export default function ProtectedDownload(props: ProtectedDownloadProps & MfSeal
 // PROPERTY CONTROLS, PRD F10
 // ============================================================================
 
-addPropertyControls(ProtectedDownload, {
+addPropertyControls(ProtectedDownload, mfControls({
   // The Builder's seal for this instance (27-instance-seal.md). Hidden: it is
   // set on insert and a pasted copy loses it.
   mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },
+  file: {
+    type: ControlType.File,
+    title: "File",
+    allowedFileTypes: [
+      "zip", "pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp3", "wav", "mp4", "mov", "txt", "csv", "json", "epub",
+      "psd", "ai", "fig", "sketch", "xd", "rar", "7z", "tar", "gz", "docx", "xlsx", "pptx", "key", "ttf", "otf", "woff2",
+    ],
+  },
+  fileName: {
+    type: ControlType.String,
+    title: "File Name",
+    placeholder: "Automatic, e.g. brand-kit.zip",
+    defaultValue: "",
+  },
+  access: {
+    type: ControlType.Enum,
+    title: "Access",
+    options: ["members", "password"],
+    optionTitles: ["Members", "Password"],
+    displaySegmentedControl: true,
+    defaultValue: "members",
+  },
+  whoCanDownload: {
+    type: ControlType.Enum,
+    title: "Who Can Download",
+    // The generator replaces these two lines with the site's own tiers, by
+    // rank, after the first two. Keep them on one line each.
+    options: ["signed_in", "any_paid", "tier_1", "tier_2", "vip", "chosen"],
+    optionTitles: ["Any signed-in member", "Any paid plan", "Silver members or higher", "Gold members or higher", "VIP members or higher", "Only chosen tiers…"],
+    defaultValue: "signed_in",
+    hidden: (props) => props.access === "password",
+  },
+  chosenTiers: {
+    type: ControlType.Array,
+    title: "Chosen Tiers",
+    control: {
+      type: ControlType.Enum,
+      // The generator replaces these two lines with the site's tiers. Keep them on one line each.
+      options: ["free_member", "tier_1", "tier_2", "vip"],
+      optionTitles: ["Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],
+    },
+    defaultValue: [],
+    hidden: (props) => props.access === "password" || props.whoCanDownload !== "chosen",
+  },
+  password: {
+    type: ControlType.String,
+    title: "Password",
+    placeholder: "Any letters, numbers, or symbols",
+    // Shown as dots, like any password field.
+    obscured: true,
+    defaultValue: "",
+    hidden: (props) => props.access !== "password",
+  },
+  // Set by the plugin once the file is secured; an older instance's pasted ID still works.
   assetId: {
     type: ControlType.String,
     title: "Asset ID",
-    placeholder: "ast_...",
-    description: "From the MemberFrame plugin: Manage, Files. The plan a file needs is set there.",
     defaultValue: CONFIG.defaultAssetId || "",
+    hidden: () => true,
   },
+  fileSecured: { type: ControlType.String, title: "Saved File", defaultValue: "", hidden: () => true },
   buttonText: {
     type: ControlType.String,
     title: "Download Text",
@@ -1320,4 +1642,4 @@ addPropertyControls(ProtectedDownload, {
   },
   ...mfAppearanceControls({ padding: 12, gap: 6, shadow: false }),
   labels: mfLabelControls(DOWNLOAD_LABELS),
-});
+}));

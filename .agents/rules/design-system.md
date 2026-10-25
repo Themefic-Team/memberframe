@@ -100,7 +100,9 @@ Contrast facts that drive rules: white on the gradient is at least 5.2:1 at the 
 
 ### 3.4 Legacy Aliases
 
-`--title`, `--paragraph`, `--paragraph-faint`, `--framefic-*`, `--bg-card*`, `--secondary-default` still resolve and existing code may keep them. New code uses the Figma names above. Never use `--secondary-default` as a text colour: the linter rejects it.
+`--title`, `--paragraph`, `--paragraph-faint`, `--framefic-*`, `--bg-card*`, `--secondary-default` still resolve and the reference slices keep them. New code uses the Figma names above. Never use `--secondary-default` as a text colour: the linter rejects it.
+
+Since v0.4.6 the six aliases with an exact twin in both themes are gone from the kit and feature CSS, and `lint:design` rejects them: `--title` (text/primary), `--paragraph` and `--framefic-text-muted` (text/secondary), `--paragraph-faint` (text/tertiary), `--framefic-surface-border` (border/divider), `--framefic-page-bg` (bg/default). `--bg-card-inner` stays in two places (`settings.css`): it is bg/tertiary in dark but bg/secondary in light, so no single Figma token matches it.
 
 ---
 
@@ -121,6 +123,8 @@ Inter everywhere, the Framer plugin font. JetBrains Mono for code. Use the `font
 | Mono/Default | `--text-mono` | Regular 12/18 | Formulas, event IDs, code. 11px inside chips |
 
 **Enforced:** font-size is 11, 12, 14, 15, or 20px. Weight is 400, 500, or 600. No uppercase labels: everything is sentence case. No literal font stacks.
+
+**Fonts are bundled, never loaded from a CDN.** Inter and JetBrains Mono are declared in `src/styles/fonts.css` from the `@fontsource` packages; Vite ships the files in `dist/assets`. `--font-body` is an alias of `--font-sans` (it was DM Sans until v0.4.6). Framer's own `framer.css` imports Inter from Google Fonts; the build drops that import (`src/config/stripRemoteCssImports.ts`). `npm run check:no-cdn` fails the build output if any font, script, or stylesheet comes from another host.
 
 ---
 
@@ -171,7 +175,22 @@ The surface ladder from the Foundations "How to use" note. Pick the rung, do not
 Rules:
 - Open or selected never changes the fill to bg/secondary; it changes the edge to border/brand.
 - Focus is always the pair: 1px focus/ring plus `--px-focus-halo`. Never a 2px outline, never a different colour.
-- Composite tokens (`--px-shadow-*`, `--px-focus-halo`, `--space-*`, `--radius-*`, `--text-*`) are declared on `body`, not `:root`, so they resolve against the active theme.
+- Composite tokens (`--px-shadow-*`, `--px-focus-halo`, `--px-glass-blur-*`, `--space-*`, `--radius-*`, `--text-*`) are declared on `body`, not `:root`, so they resolve against the active theme.
+
+### 6.1 Glass
+
+Frosted glass (a translucent fill plus a backdrop blur) is used on exactly three kinds of surface. Everything else, cards and popovers included, is opaque and sits on the ladder above.
+
+| Surface | Fill (theme token) | Blur token | Value |
+| :--- | :--- | :--- | :--- |
+| Dialog and modal backdrop: `Modal`, every `ConfirmDialog`, the billing dialogs, canvas dialogs | `--px-color-overlay` (billing: `--beaf-overlay`) | `--px-glass-blur-backdrop` | 4px. Not in Figma yet: confirm in Dev Mode |
+| Frosted lock banner and overlay (`.framefic-locked-overlay`, the canvas `.mf-lock`) | `--framefic-frosted-bg` | `--px-glass-blur-surface` | 8px |
+| Toast | `--px-toast-bg`, 82% in both themes | `--px-glass-blur-toast` | 16px |
+
+Rules:
+- `backdrop-filter` is always `blur(var(--px-glass-blur-*))`, with the `-webkit-` twin. `lint:design` rejects a literal blur, billing included.
+- Canvas components cannot read panel tokens, so they repeat the values (4px backdrop, 8px lock). The canvas watermark pill keeps BEAF's 6px: it is a byte-for-byte copy (`canvasLicenseParity.test.ts`). MeteredPaywall's frost over gated content is a creator setting, not UI glass.
+- Never add glass to a new kind of surface without adding it here first.
 
 ---
 
@@ -310,7 +329,9 @@ Don't: toast for errors that need a decision; more than 2 banners; blank areas; 
 - Labels, badges, tabs, table headers: sentence case. Never uppercase.
 - No emoji, no typed bullets or arrows as icons (use a list or a Lucide icon), no en-dash or em-dash anywhere.
 - Never show raw enum values (`past_due` becomes "Payment failed").
-- Icons: Lucide React or Framer SVG only, `stroke="currentColor"`, sized by CSS (16px in buttons, 14 to 16 elsewhere). No `size={13}` props.
+- Icons: Lucide React or Framer SVG only, `stroke="currentColor"`, sized by CSS (16px in buttons, 14 to 16 elsewhere). No `size={13}` props. This holds everywhere, the billing screens included (the user's rule, 2026-10-25). `lint:design` rejects a typed glyph used as an icon (✓ ✕ → ★ and the like), a hand-drawn `<svg>` in `src/components`, and a numeric size on a Lucide icon.
+- Exceptions, and only these: brand logos Lucide does not have (`providerMarks.tsx`: Google, Apple, GitHub, Discord), the Reports chart, and the billing avatar ring.
+- Canvas components cannot import Lucide (Framer compiles each file alone, and an npm import loads from a CDN), so they draw the Lucide icon inline, tagged `data-lucide="<name>"`; a logo is tagged `data-brand`. `test/canvasIcons.test.ts` fails on an untagged svg or a shape that differs from the installed Lucide.
 - Busy labels have no trailing ellipsis: "Saving", "Sending", "Adding".
 
 ---
@@ -320,7 +341,7 @@ Don't: toast for errors that need a decision; more than 2 banners; blank areas; 
 Run, in order, and all must pass:
 
 ```
-npm run lint:css && npm run lint:design && npx tsc --noEmit && npm test && npm run build
+npm run lint:css && npm run lint:design && npx tsc --noEmit && npm test && npm run build && npm run check:no-cdn
 ```
 
 If you edited the reference CSS, run `npm run sync:tokens` first; it regenerates the slices and proves zero drift.
@@ -347,7 +368,7 @@ Then self-review against this list, and say in your report which items you check
 - **Write CSS files atomically.** A truncate-then-write (`> file`) lets a running Vite dev server cache an empty stylesheet; every token vanishes until the file changes again. The sync script renames from a `.tmp` file. Symptom to recognise: components look right (they have fallbacks) but every kit.css surface is unstyled.
 - **Resolved: tabs.** Was conflict C26 (five tabs). The user chose 4 tabs with Connect behind the Account icon on 2026-10-15. Never re-split Manage.
 - **Resolved: header.** The Figma Plugin header is not built (see section 7).
-- **Resolved: billing screens follow BEAF, not this kit.** The user chose on 2026-10-18 that every Framefic plugin bills the same way, so the F19 screens (sign in modal, trial modals and sticky bar, Profile, Manage Subscription, plans, payment, cancel) are a copy of the BEAF plugin's. They live only in `src/components/billing/` and `src/styles/billing/`, use their own `--beaf-*` tokens keyed by `data-framer-theme`, and are skipped by `lint:design` (`BILLING_DIRS` in `lint-design-system.js`). `lint:css` still applies: no inline styles. Everything else in the panel stays on this kit. Change the billing screens only to follow BEAF.
+- **Resolved: billing screens follow BEAF, not this kit.** The user chose on 2026-10-18 that every Framefic plugin bills the same way, so the F19 screens (sign in modal, trial modals and sticky bar, Profile, Manage Subscription, plans, payment, cancel) are a copy of the BEAF plugin's. They live only in `src/components/billing/` and `src/styles/billing/`, use their own `--beaf-*` tokens keyed by `data-framer-theme`, and are skipped by `lint:design`'s token, type, and copy rules (`BILLING_DIRS` in `lint-design-system.js`). Its icon rules (12 to 14) and glass rule (15) do apply to them since v0.4.6, and so does `lint:css`: no inline styles. Everything else in the panel stays on this kit. Change the billing screens only to follow BEAF.
 - **Open: heading case.** Figma section headings are sentence case ("More from Pixelfic"); `instruction/INSTRUCTION.md` says Title Case for headings. The code follows the writing rule until the user decides.
 
 ---
@@ -360,4 +381,5 @@ Then self-review against this list, and say in your report which items you check
 - v0.4.2 · 2026-10-18 · Shell: five tabs (Reports added at the creator's request, chosen over an icon beside Account). Tab gap 12px in kit.css so five labels and the Account icon fit 360px. Kit: `SearchSelect` for long lists. See docs/development-docs/24-reports.md and 23-dynamic-tiers.md.
 - v0.4.3 · 2026-10-18 · Kit: `Modal` for dialogs over the panel, added for F19 (plugin billing): the Stripe payment form, the upgrade confirmation, and the cancel steps. See docs/development-docs/19-pro-lock-and-trial.md.
 - v0.4.4 · 2026-10-18 · Billing exemption: the F19 billing screens are a copy of the BEAF plugin's (company-wide billing standard, the user's decision), in `components/billing` and `styles/billing`, exempt from `lint:design`. See section 14. `Modal` stays in the kit, but billing no longer uses it.
+- v0.4.6 · 2026-10-25 · Full review at the user's request: icons, no CDN, glass, design accuracy. Fonts bundled (Inter, JetBrains Mono, billing's Mulish and Sora) and every Google Fonts load removed, including the one inside Framer's framer.css; new gate `check:no-cdn` (only Stripe.js may load from outside). `--font-body` is Inter (was DM Sans). Lucide everywhere: billing glyphs and hand-drawn icons replaced, canvas icons made exact and tagged; lint rules 12 to 14. Glass tokens and section 6.1; modal and billing backdrops unified at 4px, toast 82% in light too; lint rule 15.
 - v0.4.5 · 2026-10-19 · `.primary-cta` gets the product owner's 2px gradient border (reference CSS, synced). Kit: `ConfirmDialog`, and every delete, remove, revoke, and disconnect in the panel now asks in it first (members, files, tiers, gateways, webhooks, fields, page and section locks). Review fixes: Integration cards open one at a time (one primary per view), icons sized by CSS, busy labels without ellipses, verb plus object Save labels, sentence-case "Page locks", "Attach file", "Copy asset ID". Canvas: the auth card fills its frame (fixed 400px width, no padding band) and the trial mark sits inside it.

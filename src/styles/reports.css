@@ -20,6 +20,13 @@
   gap: var(--space-16);
 }
 
+/* Export CSV and Export PDF, side by side, on every report view (Button `fill`). */
+.report-export {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
 /* --------------------------------------------------------------------------
    KPI tiles: two columns at 360px
    -------------------------------------------------------------------------- */
@@ -42,13 +49,13 @@
 
 .report-kpi-label {
   font: var(--text-body-sm);
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
 }
 
 .report-kpi-value {
   font: var(--text-title-md);
   letter-spacing: var(--text-title-md-tracking);
-  color: var(--title);
+  color: var(--framer-color-text);
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -57,7 +64,7 @@
 
 .report-kpi-sub {
   font: var(--text-body-sm);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -83,7 +90,7 @@
   padding: var(--space-6) var(--space-12);
   border-top: 1px solid var(--framer-color-divider);
   font: var(--text-body-sm);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   text-align: left;
 }
 
@@ -93,7 +100,7 @@
 
 .report-row.is-head {
   min-height: 30px;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
 }
 
 button.report-row {
@@ -117,14 +124,14 @@ button.report-row:hover {
 }
 
 .report-cell-title {
-  color: var(--title);
+  color: var(--framer-color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .report-cell-sub {
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -132,7 +139,7 @@ button.report-row:hover {
 
 .report-cell-figure {
   flex: 0 0 auto;
-  color: var(--title);
+  color: var(--framer-color-text);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -141,7 +148,7 @@ button.report-row:hover {
   margin: 0;
   padding: var(--space-12);
   font: var(--text-body-sm);
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
 }
 
 /* --------------------------------------------------------------------------
@@ -160,7 +167,7 @@ button.report-row:hover {
 .report-chart-readout {
   min-height: 18px;
   font: var(--text-body-sm);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -190,7 +197,7 @@ button.report-row:hover {
 }
 
 .report-chart-tick {
-  fill: var(--paragraph-faint);
+  fill: var(--framer-color-text-tertiary);
   font-size: 11px;
 }
 
@@ -204,7 +211,7 @@ button.report-row:hover {
   margin-left: calc(var(--space-6) * -1);
 }
 
-.report-back .section-title {
+.report-back-title {
   margin: 0;
   min-width: 0;
   overflow: hidden;

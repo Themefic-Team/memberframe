@@ -3,7 +3,7 @@
  *
  * The rules are enforced by the Route Shield in the backend, which has its own
  * tests. What is proved here is the part the creator touches: the override
- * names Framer will list, the MemberLocks file those come from (compiled and
+ * names Framer will list, the MemberFrameLocks file those come from (compiled and
  * run), the name validation the server repeats, and the "Who sees it" choices
  * built from the site's own tiers.
  */
@@ -13,7 +13,10 @@ import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
+  LEGACY_SECTION_LOCKS_FILE_NAME,
+  SECTION_LOCKS_FILE_NAME,
   SECTION_LOCK_NAME_PATTERN,
+  sectionLocksFilesToWrite,
   newSectionLock,
   normalizeSectionLockName,
   parseWhoSees,
@@ -81,7 +84,7 @@ describe("the override names Framer lists", () => {
   });
 });
 
-describe("the MemberLocks file", () => {
+describe("the MemberFrameLocks file", () => {
   const RULES = [rule("Experience"), rule("Gold article", false), rule('bad"name')];
   const code = sectionLocksCode(RULES);
 
@@ -131,21 +134,50 @@ describe("the MemberLocks file", () => {
 
   it("says where to edit, and is still a valid file with no locks", () => {
     expect(code).toContain("Edit your");
+    expect(code).toContain("choose File MemberFrameLocks");
     expect(sectionLocksCode([])).toContain("No section locks yet");
     expect(sectionLocksCode([])).not.toContain("export function");
   });
 });
 
+describe("the locks file's name", () => {
+  it("is MemberFrameLocks, and MemberLocks is only the old name", () => {
+    expect(SECTION_LOCKS_FILE_NAME).toBe("MemberFrameLocks.tsx");
+    expect(LEGACY_SECTION_LOCKS_FILE_NAME).toBe("MemberLocks.tsx");
+  });
+
+  it("a save writes MemberFrameLocks when there are locks, never creating it for nothing", () => {
+    expect(sectionLocksFilesToWrite([], 2)).toEqual(["MemberFrameLocks.tsx"]);
+    expect(sectionLocksFilesToWrite([], 0)).toEqual([]);
+    // A lock was removed: the existing file is rewritten so its override goes too.
+    expect(sectionLocksFilesToWrite(["MemberFrameLocks.tsx"], 0)).toEqual(["MemberFrameLocks.tsx"]);
+  });
+
+  it("keeps an older project's MemberLocks in step, so layers picked from it stay locked", () => {
+    expect(sectionLocksFilesToWrite(["MemberLocks.tsx"], 1)).toEqual(["MemberFrameLocks.tsx", "MemberLocks.tsx"]);
+    expect(sectionLocksFilesToWrite(["MemberLocks.tsx", "MemberFrameLocks.tsx"], 0)).toEqual(["MemberFrameLocks.tsx", "MemberLocks.tsx"]);
+  });
+});
+
 describe("whoSeesOptions", () => {
-  it("offers signed in and out, then a pair per paid tier by rank, never Free", () => {
-    expect(whoSeesOptions(TIERS).map((option) => option.label)).toEqual([
-      "Any signed-in member",
-      "Signed-out visitors only",
-      "Silver members or higher",
-      "Everyone without Silver",
-      "Gold members or higher",
-      "Everyone without Gold",
+  it("offers the shared list: who gets in, then who is kept out, never Free", () => {
+    expect(whoSeesOptions(TIERS).map((option) => `${option.group}: ${option.label}`)).toEqual([
+      "Who gets in: Any signed-in member",
+      "Who gets in: Any paid plan",
+      "Who gets in: Silver members or higher",
+      "Who gets in: Gold members or higher",
+      "Who gets in: Only chosen tiers…",
+      "Who is kept out: Signed-out visitors only",
+      "Who is kept out: Everyone without Silver",
+      "Who is kept out: Everyone without Gold",
+      "Who is kept out: Everyone except chosen tiers…",
     ]);
+  });
+
+  it("carries exact tiers through the choice, keeping the ticks, else ticking the lowest paid tier", () => {
+    expect(whoSeesValue({ audience: "others", requiredTier: "only:tier_silver,tier_gold" })).toBe("others:__only__");
+    expect(parseWhoSees("members:__only__", { requiredTier: "only:tier_gold" }, TIERS)).toEqual({ audience: "members", requiredTier: "only:tier_gold" });
+    expect(parseWhoSees("members:__only__", { requiredTier: "signed_in" }, TIERS).requiredTier).toMatch(/^only:/);
   });
 
   it("round-trips a rule's audience and tier", () => {

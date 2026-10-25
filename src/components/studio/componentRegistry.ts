@@ -159,8 +159,8 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "Free articles each week or month, or a Read more teaser. On a CMS post, give the post body the PaywallArticle override.",
-    placement: "Articles and posts",
+      "Free articles each week or month, or a Read more teaser. Place it right below what it protects, on any page. No code override needed.",
+    placement: "Any page or CMS page",
   },
   // { id: "cms_gated_template", name: "CMS Gated Template", features: "F09", task: "5.3", previewReady: false, deployable: false },
   {
@@ -171,7 +171,7 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "A download button for a file in Manage, Files. Only the plan you choose can download it.",
+      "Upload the file in Framer's sidebar, then choose members or a password. Keep MemberFrame open so it can secure the file.",
     placement: "Any page",
   },
   // { id: "course_progress", name: "Course Progress", features: "F11", task: "4.1", previewReady: false, deployable: false },

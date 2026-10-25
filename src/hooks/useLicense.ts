@@ -12,7 +12,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { framer } from "framer-plugin";
 import { useConnection } from "./useConnection";
-import { canvasLicense, fetchLicense, panelUnlocked, type LicenseView } from "../services/licenseService";
+import {
+  canvasStateFor,
+  fetchLicense,
+  panelUnlocked,
+  signedOutOfPlugin,
+  type CanvasLicense,
+  type LicenseView,
+} from "../services/licenseService";
 import { enforceLockState, type PatchableCodeFile } from "../utils/lockPatcher";
 import { openLicenseStream } from "../services/licenseStream";
 
@@ -38,10 +45,10 @@ export function useLicense(): LicenseValue {
 }
 
 /** Rewrite the deployed files, when Framer lets this plugin. Never throws. */
-async function syncCanvasFiles(view: LicenseView): Promise<void> {
+async function syncCanvasFiles(state: CanvasLicense): Promise<void> {
   try {
     if (!framer.isAllowedTo("CodeFile.setFileContent")) return;
-    await enforceLockState(canvasLicense(view.state), async () =>
+    await enforceLockState(state, async () =>
       (await framer.getCodeFiles()) as unknown as ReadonlyArray<PatchableCodeFile>
     );
   } catch {
@@ -51,8 +58,9 @@ async function syncCanvasFiles(view: LicenseView): Promise<void> {
 }
 
 export function useLicenseState(): LicenseValue {
-  const { connection } = useConnection();
+  const { connection, state: connectionState, failure, project } = useConnection();
   const siteId = connection?.siteId ?? null;
+  const signedOut = signedOutOfPlugin(connectionState.status, failure !== null, project?.unavailable === true);
   const [view, setView] = useState<LicenseView | null>(null);
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -100,14 +108,15 @@ export function useLicenseState(): LicenseValue {
     if (view?.state === "trial" && view.trialEndsAt && Date.parse(view.trialEndsAt) <= now) void refresh();
   }, [now, refresh, view]);
 
-  // Keep the deployed components' four lines in step with the license.
+  // Keep the deployed components' four lines in step with the license, and
+  // locked while the plugin is signed out: no one can use or set up a
+  // MemberFrame component on the canvas without an account behind it.
   useEffect(() => {
-    if (!view) return;
-    const state = canvasLicense(view.state);
-    if (synced.current === state) return;
+    const state = canvasStateFor(view?.state ?? null, signedOut);
+    if (state === null || synced.current === state) return;
     synced.current = state;
-    void syncCanvasFiles(view);
-  }, [view]);
+    void syncCanvasFiles(state);
+  }, [view, signedOut]);
 
   const apply = useCallback((next: LicenseView) => setView(next), []);
 

@@ -34,6 +34,9 @@ Technical development specification, user flow, architectural wiring, and testin
 6. **Canvas Preview: Locked** shows the cut, frost, and lock card while designing.
 
 **Upgrade to Download**
+
+> **Replaced 2026-10-22** by uploads on the canvas: see `32-canvas-downloads.md`. Manage, Files and the steps below are gone; files uploaded this way keep working by Asset ID.
+
 1. Manage, **Files**. Upload a file (or link one hosted elsewhere; Google Drive and Dropbox share links are converted to the file itself), name it, and choose **Who can download**.
 2. Copy the file's Asset ID from its row.
 3. Builder, pick **Protected Download**, Add to canvas, paste the Asset ID.
@@ -93,7 +96,7 @@ Technical development specification, user flow, architectural wiring, and testin
 
 ### 3.1. Decisions and conflicts
 
-- **C33, the download's plan lives on the file, not the component.** PRD F10 gives `<ProtectedDownload>` an `allowedTiers` control. A rule in published page code is one any visitor can edit, so the plan is set on the file in Manage, Files, enforced on every sign, and the component shows the server's answer.
+- **C33** (superseded 2026-10-22 by `32-canvas-downloads.md`: the rule is set on the component and copied to the file by the plugin, still enforced by the server). **The download's plan lives on the file, not the component.** PRD F10 gives `<ProtectedDownload>` an `allowedTiers` control. A rule in published page code is one any visitor can edit, so the plan is set on the file in Manage, Files, enforced on every sign, and the component shows the server's answer.
 - **C34, downloads stream through the API.** The plan's example returns a storage presigned URL, which names the bucket and the object; PRD S5 says the raw bucket path never appears in a client response. The signed link is MemberFrame's own `/api/assets/download/<token>`, and the API streams the file. A storage presigned URL is only ever used by the server.
 - **C35, meter and schema code live in the component.** Tasks 3.5 and 3.6 name `utils/meteredStorage.ts` and `utils/schemaInjector.ts`. Code on a published site cannot import from this repository, so both are marked blocks inside the components, executed by the tests the same way as the appearance block.
 - **"Any Paid Plan"** is every tier above the site's lowest rank. A member whose tier the ladder does not know counts as unpaid, which fails toward the meter.
@@ -198,7 +201,7 @@ Added on request so the button and the tray can match a site's design. Every def
 | Control | Type | Default | Effect |
 | :--- | :--- | :--- | :--- |
 | Drawer Width | Number 280 to 640 px | 400 | Never wider than the screen |
-| Backdrop | Segmented: Dim, Blur, None | Dim | Blur adds a 6px backdrop blur over the dim |
+| Backdrop | Segmented: Dim, Blur, None | Dim | Blur adds a 4px backdrop blur over the dim, the same frost as every dialog backdrop (design-system.md section 6.1) |
 | Badge Color | Optional colour | unset, the accent | Sanitized by `mfSafeColor` |
 | Saved Date | Boolean | On | The "Saved 3 days ago" line under each item |
 | Button Style | Enum: Outline, Soft, Icon Only | Outline | The same three as the button |

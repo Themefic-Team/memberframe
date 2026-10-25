@@ -11,7 +11,8 @@
   inset: 0;
   z-index: 50;
   background: var(--beaf-overlay, rgba(14, 14, 14, 0.85));
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-backdrop));
+  backdrop-filter: blur(var(--px-glass-blur-backdrop));
   display: flex;
   align-items: center;
   justify-content: center;

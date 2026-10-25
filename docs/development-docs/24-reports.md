@@ -32,9 +32,11 @@ A fifth tab that answers what a membership business asks: how many members, on w
 | View | Contents |
 | :--- | :--- |
 | **Overview** | KPI tiles: members, new members in the period, paying members, MRR, net revenue in the period, subscriptions ended in the period. Members by tier. Top bookmarked items and top downloads |
-| **Revenue** | Net revenue, gross, refunds. Revenue by month (12 months, a column chart with a month table). By tier. By gateway. Payment history with member, tier, amount, status, date, receipt; Export CSV |
-| **Subscriptions** | Counts by status and by interval. The subscription list, filtered by status and tier: member, tier, interval, amount, status, renews or ended; Export CSV |
+| **Revenue** | Net revenue, gross, refunds. Revenue by month (12 months, a column chart with a month table). By tier. By gateway. Payment history with member, tier, amount, status, date, receipt |
+| **Subscriptions** | Counts by status and by interval. The subscription list, filtered by status and tier: member, tier, interval, amount, status, renews or ended |
 | **Members** | Per tier: members, paying, net revenue. A tier opens its member list; a member opens their history: every subscription and payment, with lifetime spend |
+
+Every view, including the two Members drill downs, has **Export CSV** and **Export PDF** at its top (section 9).
 
 ### 1.3. Definitions
 
@@ -53,7 +55,7 @@ A fifth tab that answers what a membership business asks: how many members, on w
 
 ### 2.1. In-Plugin Flow
 
-Reports tab, pick Live or Test and a period, then Overview, Revenue, Subscriptions, or Members. In Members, a tier opens its members, and a member opens their history. Export CSV on Revenue and Subscriptions downloads the full filtered list.
+Reports tab, pick Live or Test and a period, then Overview, Revenue, Subscriptions, or Members. In Members, a tier opens its members, and a member opens their history. Export CSV or Export PDF on any of them downloads that report, with its lists in full for the current filters.
 
 ### 2.2. Visitor / Member Runtime Flow
 
@@ -64,7 +66,7 @@ None. Reports read what the site already records.
 ## 3. Architecture and File Inventory
 
 - **Backend**: `src/services/reportService.ts` (queries and arithmetic, no HTTP), `src/routes/reports.ts` mounted at `/api/site/reports`, creator authentication as the rest of `/api/site`.
-- **Plugin**: `src/services/reportsService.ts` (API client), `src/components/tabs/ReportsTab.tsx`, `src/components/reports/*` (views, stat tile, column chart), `src/styles/reports.css`.
+- **Plugin**: `src/services/reportsService.ts` (API client), `src/components/tabs/ReportsTab.tsx`, `src/components/reports/*` (views, stat tile, column chart, export bar, `reportDocuments.ts`), `src/services/reportExport.ts` (CSV, file names, download), `src/utils/pdf.ts` (the PDF writer), `src/styles/reports.css`.
 - **Shell**: `tabs.ts` gains Reports; `kit.css` narrows the tab gap.
 
 ---
@@ -94,6 +96,7 @@ interface OverviewReport {
 // GET /api/site/reports/subscriptions?siteId&mode&status&tier&page&pageSize
 // GET /api/site/reports/payments?siteId&mode&period&tier&memberId&page&pageSize
 // GET /api/site/reports/members/:memberId?siteId&mode
+// GET /api/site/members?siteId&tier&page&pageSize   pageSize 1 to 500, default 25: the tier export's pages
 ```
 
 ---
@@ -105,6 +108,8 @@ interface OverviewReport {
 - [x] Every report query run against the development database on all four sites. Tabfolio (copy), test mode: 4 members, 2 paying, 2 payments of 9.99 USD on Gold, so net 19.98 and MRR 19.98, payments attributed to Gold. Matches the rows.
 - [x] Gates: plugin lint, design lint, tsc, 890 tests, build; backend tsc, 393 tests.
 - [ ] Needs human verification: the tab bar fits at 360px with five tabs in both themes; the chart's hover; Export CSV downloads from inside Framer's plugin frame.
+- [x] Exports (section 9): CSV layout, BOM, formula guard, CSV only columns; PDF structure (cross reference offsets, 7-bit bytes, page breaks with repeated headers, ellipsis, landscape, escaping, WinAnsi fallback); every view's document in both formats; in `test/reportExport.test.ts`. Sample Overview and Revenue PDFs opened and read back page by page.
+- [ ] Needs human verification: Export CSV and Export PDF download from inside Framer's plugin frame on every view, and the PDF opens in Acrobat, Preview, and a browser.
 
 ---
 
@@ -122,3 +127,16 @@ Reported as inconsistent with the rest of the panel. Three causes, each fixed by
 - **A tier's members** were table rows; they are now Manage's own `MemberRow` (avatar, name, email, tier, joined, lifetime spend, status badge), under the members list's count line, paged by the members list's pager (`members-pager`, now also used by Revenue and Plans).
 - **Back** was a loose ghost button on its own line; it is an icon button in one row with the drill-down's title (`report-back`).
 - **Currency**: the tier list read BDT 0.00 and the member list $0.00. A member with no payments was given USD by the members API (`routes/site.ts`, list and update); it now falls back to the site currency from Payments, which fixes Manage, Members too.
+
+---
+
+## 9. Export CSV and Export PDF on Every Report, 2026-10-25
+
+Asked for: every report exports as CSV and as PDF. Before, only Revenue and Plans had Export CSV, and it held the list alone.
+
+- **One document, two formats.** Each view builds a ReportDocument (components/reports/reportDocuments.ts): a title, lines saying what it covers (Live or Test, period, filters, export date), and titled tables. KPI tiles become a Measure, Value, Detail table. eportCsv and enderPdf render the same document, so the two files always agree.
+- **What each holds.** Overview: summary, members by tier, sign ups by month, most saved and most downloaded when not empty. Revenue: summary (other currencies listed apart, never added), by month, by tier, by gateway, every payment for the tier filter. Plans: summary, paying by tier, every subscription for the status and tier filters. Members: the tier list; a tier's members; a member's details, subscriptions, and payments. Lists are fetched in full up to the server's export cap of 5000, and a cut list says so in its note.
+- **CSV.** One sheet: each table under its title, a blank line between. UTF-8 with a byte order mark so Excel keeps accents. The formula guard from 	oCsv still applies. Amounts in list columns stay plain digits with a separate currency column, for sums in a spreadsheet; receipt links are CSV only.
+- **PDF.** Written by utils/pdf.ts, no dependency: A4 (landscape for the wide lists), Helvetica, grey header band, hairline rows, a long table carries its header onto each page, page numbers in the footer, and a cell too wide ends in an ellipsis. Money is "INR 1,250.00", a code and never a symbol. Known limit: the standard fonts cover WinAnsi (Latin, accents, euro), so text in other scripts prints as "?" in the PDF. The CSV keeps every character. Embedding a Unicode font would add hundreds of kilobytes to the plugin; revisit if creators ask.
+- **Members export paging.** GET /api/site/members takes pageSize up to 500 (default 25, so Manage is unchanged). The plugin pages at whatever size the server answers with, so a server without this change still exports, 25 at a time.
+- **Placement.** Two secondary buttons side by side at the top of each view (eport-export), so the export is found without scrolling a long list. Success and failure are toasts.

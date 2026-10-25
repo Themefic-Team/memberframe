@@ -1,4 +1,5 @@
 import React from "react";
+import { Check, Lock, Star } from "lucide-react";
 
 export type TrialModalStatus = "started" | "expired" | "plan_ended" | "trial_claimed_other_site";
 
@@ -10,11 +11,7 @@ export interface TrialStatusModalProps {
   onLogout: () => void;
 }
 
-const CHECK = (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
+const CHECK = <Check aria-hidden={true} />;
 
 const PERKS = [
   { title: "Every Membership Component", text: "Sign in, sign up, dashboard, pricing, paywalls, downloads and bookmarks" },
@@ -40,9 +37,7 @@ export const TrialStatusModal: React.FC<TrialStatusModalProps> = ({ status, clai
           {started ? (
             <>
               <div className="beaf-trial-status-icon-bubble beaf-trial-status-icon-bubble--success">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <Check aria-hidden={true} />
               </div>
               <h3>You&apos;re all set!</h3>
               <p className="beaf-trial-status-description">Your 7-day free trial has started. Here is what is included:</p>
@@ -58,8 +53,9 @@ export const TrialStatusModal: React.FC<TrialStatusModalProps> = ({ status, clai
                 ))}
               </div>
               <div className="beaf-trial-upgrade-callout">
+                <Star className="beaf-trial-upgrade-star" aria-hidden={true} />
                 <span>
-                  ⭐ Upgrade to PRO anytime to keep <strong>everything running</strong> and remove the watermark.
+                  Upgrade to PRO anytime to keep <strong>everything running</strong> and remove the watermark.
                 </span>
               </div>
               <button type="button" className="beaf-trial-status-btn" onClick={onClose}>
@@ -70,10 +66,7 @@ export const TrialStatusModal: React.FC<TrialStatusModalProps> = ({ status, clai
           ) : (
             <>
               <div className="beaf-trial-status-icon-bubble beaf-trial-status-icon-bubble--locked">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+                <Lock aria-hidden={true} />
               </div>
               <h3>{claimed ? "Trial Already Claimed" : status === "plan_ended" ? "Your plan has ended" : "Your trial has ended"}</h3>
               <p className="beaf-trial-status-description">

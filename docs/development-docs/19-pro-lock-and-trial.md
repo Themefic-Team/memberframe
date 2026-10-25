@@ -214,3 +214,35 @@ The product owner asked for BEAF's billing and registration screens and flow to 
      - Member sign in answers 402.
      - Within a minute, the job sends "trial ended" and the team notice.
 - **Verified**: backend tsc, 462 tests (new `envBilling.test.ts`). `pluginTrialHandoff.test.ts` now pins the 7-day default, since it read the developer's `.env`.
+
+## 8. Signed Out Locks The Canvas, 2026-10-25
+
+Asked for: when the trial has ended, the plan is cancelled, or the creator signs out of the plugin, no MemberFrame component on the canvas can be used or set up, and the state comes from the backend; a trial shows the BEAF watermark bottom right.
+
+Already true before this change: the server's `/api/license` answers `expired` for an ended trial, a cancelled or lapsed plan, and no plan, and the component draws the Upgrade card; `trial` draws the "Made with Framefic" mark, the BEAF slider's bottom right corner.
+
+What changed:
+
+- **Sign-out locks the canvas files.** `useLicenseState` writes `IS_LOCKED = true` into every licensed component (`enforceLockState`) when the plugin is really signed out: disconnected or waiting for an emailed code, with no failure set (`signedOutOfPlugin`). Loading, an unreachable server, and the browser preview never lock. Signing in rewrites the lines from the license again (`canvasStateFor`).
+- **On the canvas the stricter state wins** (`mfEffectiveLicense` in the shared license block). The server still says a paid site is active after a sign-out, so letting it win would undo the lock. The order is locked, trial, active; a copy or a foreign domain keeps its own card. On the published site the server wins, as before: a creator signing out of the plugin never locks a paid live site. Framer reports the published site and the editor preview as the same render target, so only the canvas and its thumbnails use the stricter rule.
+- **A locked component hides its settings.** Every licensed component's controls go through `mfControls`: while `IS_LOCKED` is true each control is hidden in Framer's right panel, except the hidden seal, which the instance must keep.
+- **Lock card copy** covers all three causes: "MemberFrame is locked: the trial or plan has ended, or the plugin is signed out. Open the MemberFrame plugin to sign in or upgrade."
+
+Limits:
+
+- Code files belong to the project, so a collaborator who opens the plugin signed out locks the canvas for everyone until a signed-in owner opens it again.
+- A site published while the canvas is locked shows the lock for a moment on load, until the server's answer (active) arrives.
+- Components inserted before this change keep the old license block until each type is inserted once more from the Builder, which rewrites that code file for every instance.
+
+- [x] Tests: `signedOutOfPlugin` and `canvasStateFor` in `test/pluginLicense.test.ts`; `mfEffectiveLicense`, `mfControls`, and the wrapped controls in every licensed file in `test/canvasLicenseParity.test.ts`.
+- [ ] Needs human verification: sign out in the plugin and see every component on the canvas show the lock with no settings in the right panel; sign in and see them return; a trial project shows the watermark bottom right on canvas and live site; a paid live site stays unlocked after a sign-out.
+
+### 8.1 Every Canvas Component, 2026-10-25
+
+The creator asked for the lock to apply to every canvas component, not only the sign in one. This replaces the 2026-10-18 decision that kept the Bookmark Button and the Bookmarks Tray out ("too small for either").
+
+- Both now carry the shared license block, byte-identical with the other five (`canvasLicenseParity.test.ts`), read `useMfLicense` with a hidden seal, draw `MfLicenseLayer` last in their root, and hide their settings while locked (`mfControls`).
+- `LICENSED_FILE_NAMES` (the patcher) and `SEALED_COMPONENTS` (the Builder) include them, so sign-out, an ended trial, and a lapsed plan rewrite their lines too, and new inserts are sealed.
+- Small sizes: the block's container queries shrink the watermark to the Framefic icon in the corner below 200px wide or 64px tall, and the lock card to its lock icon over the blur below 140px wide or 64px tall. Larger components look as before.
+- A locked tray never opens its drawer, which renders outside the trigger where the lock card does not reach.
+- Bookmark instances inserted before this change have no seal and are held to the license alone, like any pre-seal instance. Inserting each bookmark component once from the Builder updates its code file for every instance.

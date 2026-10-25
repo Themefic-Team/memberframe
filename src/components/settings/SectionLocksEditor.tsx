@@ -13,6 +13,9 @@ import {
   whoSeesValue,
 } from "../../services";
 import { cn } from "../../utils/cn";
+import { TierChecklist } from "./TierChecklist";
+import { isOnlyChoice } from "../../services/tierChoice";
+import { accessOptionsFor, type AccessOption } from "../../services/accessChoices";
 
 export interface SectionLocksEditorProps {
   rules: SectionLockRule[];
@@ -30,7 +33,7 @@ const LOCKED_ACTION_OPTIONS: ReadonlyArray<{ value: SectionLockRule["lockedActio
  * Section locks: rules the creator writes here and picks per layer in Framer.
  * Development doc: docs/development-docs/19-section-locks.md
  *
- * Save locks writes MemberLocks into the project, one code override per rule,
+ * Save locks writes MemberFrameLocks into the project, one code override per rule,
  * named after it. In Framer the creator selects a layer and picks the rule in
  * the right sidebar, under Code overrides. The Route Shield enforces the rule
  * on the live site, so changing one needs no republish.
@@ -38,7 +41,7 @@ const LOCKED_ACTION_OPTIONS: ReadonlyArray<{ value: SectionLockRule["lockedActio
 export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, onChange, saving, tiers }) => {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
-  const options = useMemo(() => whoSeesOptions(tiers), [tiers]);
+  const options = useMemo(() => whoSeesOptions(tiers) as AccessOption[], [tiers]);
   const problems = rules.map((_, index) => sectionLockNameProblem(rules, index));
   const anyProblem = problems.some((problem) => problem !== null);
 
@@ -81,7 +84,7 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
       <div className="section-header">
         <h2 className="section-title">Section Locks</h2>
         <p className="section-subtitle">
-          Hide or blur part of a page. In Framer, pick a lock under Code overrides, File MemberLocks.
+          Hide or blur part of a page. In Framer, pick a lock under Code overrides, File MemberFrameLocks.
         </p>
       </div>
 
@@ -95,9 +98,7 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
           const problem = problems[index];
           const overrideName = overrideNames.get(rule);
           const current = whoSeesValue(rule);
-          const ruleOptions = options.some((option) => option.value === current)
-            ? options
-            : [...options, { value: current, label: `${rule.requiredTier} (deleted tier)` }];
+          const ruleOptions = accessOptionsFor(rule, options);
 
           return (
             <div key={index} className={cn("page-rule-card", isOpen && "is-open")}>
@@ -143,7 +144,7 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
                       htmlFor={`section-lock-name-${index}`}
                       hint={
                         problem ??
-                        `In Framer: Code overrides, File MemberLocks, Override ${overrideName ?? ""}. Renaming it later means picking it again on each section.`
+                        `In Framer: Code overrides, File MemberFrameLocks, Override ${overrideName ?? ""}. Renaming it later means picking it again on each section.`
                       }
                     >
                       <TextField
@@ -162,9 +163,20 @@ export const SectionLocksEditor: React.FC<SectionLocksEditorProps> = ({ rules, o
                         value={current}
                         options={ruleOptions}
                         disabled={saving}
-                        onChange={(value) => update(index, parseWhoSees(value))}
+                        onChange={(value) => update(index, parseWhoSees(value, rule, tiers))}
                       />
                     </FieldRow>
+
+                    {isOnlyChoice(rule.requiredTier) ? (
+                      <TierChecklist
+                        value={rule.requiredTier}
+                        tiers={tiers}
+                        idPrefix={`section-lock-only-${index}`}
+                        disabled={saving}
+                        excluding={rule.audience === "others"}
+                        onChange={(next) => update(index, { requiredTier: next })}
+                      />
+                    ) : null}
 
                     <FieldRow
                       label="Everyone else"

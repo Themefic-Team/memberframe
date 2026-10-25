@@ -41,6 +41,8 @@ export interface MemberQuery {
   search?: string;
   tier?: TierKey;
   status?: MemberStatus;
+  /** Larger pages for a report export. The server caps it, and an older one ignores it. */
+  pageSize?: number;
 }
 
 /** PRD section 10.3: `GET /api/site/members`, paginated at 25. */
@@ -51,7 +53,7 @@ export function fetchMembers(
   return client.get<MemberPage>("/api/site/members", {
     siteId: query.siteId,
     page: query.page,
-    pageSize: MEMBER_PAGE_SIZE,
+    pageSize: query.pageSize ?? MEMBER_PAGE_SIZE,
     search: query.search,
     tier: query.tier,
     status: query.status,

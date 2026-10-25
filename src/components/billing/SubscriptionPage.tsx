@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, Ban, X } from "lucide-react";
 import { useConnection } from "../../hooks/useConnection";
 import { useLicense } from "../../hooks/useLicense";
 import { failureMessage, type ApiFailure } from "../../services/apiClient";
@@ -213,9 +214,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
   return (
     <div className="beaf-subscription-page">
       <button type="button" className="beaf-subpage-back-button-wide" onClick={handleBack} aria-label="Back">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ArrowLeft aria-hidden={true} />
         <span>Back</span>
       </button>
 
@@ -380,7 +379,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
                 <div className="beaf-cancel-warnings">
                   {CANCEL_WARNINGS.map((warning) => (
                     <div key={warning} className="beaf-cancel-warning-item">
-                      <span className="beaf-cancel-warning-icon">✕</span>
+                      <X className="beaf-cancel-warning-icon" aria-hidden={true} />
                       <span>{warning}</span>
                     </div>
                   ))}
@@ -415,10 +414,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
             {cancelStep === 3 ? (
               <div className="beaf-cancel-step-content beaf-cancel-step-content--center">
                 <div className="beaf-cancel-status-icon-wrapper">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                  </svg>
+                  <Ban aria-hidden={true} />
                 </div>
                 <h3>Subscription canceled</h3>
                 <p className="beaf-cancel-intro">

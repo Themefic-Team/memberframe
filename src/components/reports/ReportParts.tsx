@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { IconButton } from "../ui";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText } from "lucide-react";
+import { Button, IconButton, useToast } from "../ui";
 import { cn } from "../../utils/cn";
 import { formatMinorWithCurrency } from "../../utils/money";
 import { currencyExponent } from "../../utils/currencies";
 import { GATEWAY_LABELS, type GatewayId } from "../../types/site";
 import type { Money, RevenueTotals } from "../../services/reportsService";
+import { saveReport, type ExportFormat, type ReportDocument } from "../../services/reportExport";
 
 /* ==========================================================================
    FORMATTERS
@@ -119,6 +120,49 @@ export const Pager: React.FC<{ page: number; pageSize: number; total: number; on
       <IconButton label="Next page" variant="secondary" disabled={page >= last} onClick={() => onPage(page + 1)}>
         <ChevronRight aria-hidden={true} />
       </IconButton>
+    </div>
+  );
+};
+
+/**
+ * Export CSV and Export PDF, on every report view. `build` assembles the whole
+ * report, fetching full lists where the view shows a page of one, and throws
+ * an Error with a sentence for the creator when it cannot.
+ */
+export const ReportExport: React.FC<{
+  build: () => Promise<ReportDocument>;
+  fileParts: ReadonlyArray<string>;
+  disabled?: boolean;
+}> = ({ build, fileParts, disabled = false }) => {
+  const showToast = useToast();
+  const [busy, setBusy] = useState<ExportFormat | null>(null);
+
+  const run = async (format: ExportFormat) => {
+    setBusy(format);
+    try {
+      const report = await build();
+      if (!saveReport(report, fileParts, format)) {
+        showToast({ tone: "error", message: "The download was blocked" });
+        return;
+      }
+      showToast({ tone: "success", message: format === "csv" ? "CSV exported" : "PDF exported" });
+    } catch (failure) {
+      showToast({ tone: "error", message: failure instanceof Error ? failure.message : "Could not export" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="report-export">
+      <Button variant="secondary" className="fill" disabled={disabled || busy !== null} onClick={() => void run("csv")}>
+        <FileSpreadsheet aria-hidden={true} />
+        {busy === "csv" ? "Preparing" : "Export CSV"}
+      </Button>
+      <Button variant="secondary" className="fill" disabled={disabled || busy !== null} onClick={() => void run("pdf")}>
+        <FileText aria-hidden={true} />
+        {busy === "pdf" ? "Preparing" : "Export PDF"}
+      </Button>
     </div>
   );
 };

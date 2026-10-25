@@ -565,7 +565,7 @@ Test and Live keep separate keys and separate webhooks, so going live is a secon
 | "Connected. Add the webhook in your Razorpay dashboard and paste its secret..." | No webhook secret stored yet | Do [5.7](#57-add-the-webhook-in-razorpay) and [5.8](#58-paste-the-webhook-secret) |
 | Razorpay is never offered at checkout | **Show at checkout** is off on the Razorpay card | Turn Show at checkout on |
 | "That payment method could not start" after choosing Razorpay | Razorpay refused the price, usually a non-INR currency without International Payments | Turn on International Payments in Razorpay, or price the tier in INR |
-| "Subscriptions is not enabled on this Razorpay account, so only lifetime prices can be sold." | Subscriptions is not enabled on the Razorpay account. Monthly and yearly tiers go to another gateway until it is | Enable [Subscriptions](https://dashboard.razorpay.com/app/subscriptions), then click **Update keys** |
+| "Subscriptions is not enabled on this Razorpay account, so only lifetime prices can be sold." | Subscriptions is not enabled on the Razorpay account. Monthly and yearly tiers go to another gateway until it is | Enable [Subscriptions](https://dashboard.razorpay.com/app/subscriptions). MemberFrame checks again on its own, at most every ten minutes, and offers Razorpay for monthly and yearly plans once it is on. No **Update keys** needed |
 | Webhook form: searching `subscription.charged` shows "0 search results" | Subscriptions is not enabled, so its events are hidden | Enable [Subscriptions](https://dashboard.razorpay.com/app/subscriptions), then edit the webhook and tick the seven events |
 | Payment succeeds but the plan never unlocks | The webhook is missing, points at an old address, or its secret differs, and the buyer left the page before it confirmed | Check the webhook's URL and recent deliveries in Razorpay; paste the same secret into the plugin and click **Update keys** |
 | Webhook deliveries fail with `400` and `invalid_signature` | The secret in Razorpay and in the plugin differ | Set a new secret in Razorpay, paste the same one in the plugin, **Update keys** |
@@ -609,7 +609,7 @@ If a chosen gateway cannot take the payment, the buyer sees "That payment method
 | :--- | :--- |
 | "Your Lemon Squeezy store charges in BDT, but this plan is priced in USD..." | A store charges only in its own currency (a $10 plan through a BDT store would charge 10 taka), so this one is refused. Set the store currency to the plan's in Lemon Squeezy, Settings, Stores, then **Update keys** |
 | "No yearly variant is linked..." (or monthly, one-time) | Add the variant ID on the Lemon Squeezy card |
-| "Subscriptions is not enabled on your Razorpay account..." | Enable Subscriptions in Razorpay, then **Update keys** |
+| "Subscriptions is not enabled on your Razorpay account..." | Enable Subscriptions in Razorpay, then wait up to ten minutes and reload the pricing page: MemberFrame checks again on its own. Then tick the seven `subscription.*` events on the webhook |
 | "...Turn on International Payments in your Razorpay account, or price this plan in INR." | Razorpay refused the currency: turn on International Payments, or price in INR |
 | "MemberFrame could not read this gateway's keys..." | Open the gateway in Manage, Payments, and click **Update keys** |
 

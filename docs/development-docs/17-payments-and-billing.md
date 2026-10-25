@@ -30,7 +30,7 @@ Technical development specification, user flow, architectural wiring, and testin
    - **Razorpay**: Key ID, Key Secret, and a Webhook Secret. Razorpay does not let apps register webhooks, so the card shows the URL and the event list to add in the Razorpay dashboard.
 4. **Manage, Payments, Checkout**: default gateway, routing by buyer location, grace period days, the pricing page path, the after purchase path, the default currency.
 5. **Builder**: insert **Member Pricing** on the pricing page. Its prices are read live, so changing a price needs no redeploy.
-6. Going live: switch Mode to Live. Refused until a gateway has live keys. Every test purchase stops granting access at that moment.
+6. Going live: switch Mode to Live. That only shows the live keys: connect at least one gateway there, then press **Go live** in the banner. The server refuses Live until a gateway has live keys and is shown at checkout. Every test purchase stops granting access at that moment. Viewing Test while the site is live offers **Switch to test** the same way.
 
 ### 2.2. Visitor / Member Runtime Flow
 

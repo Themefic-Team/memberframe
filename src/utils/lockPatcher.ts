@@ -18,8 +18,10 @@
 
 import type { CanvasLicense } from "../services/licenseService";
 
-/** Every component that shows the watermark or the lock. The bookmarks are not among them. */
+/** Every component that shows the watermark or the lock: all of them, the bookmarks included since 2026-10-25. */
 export const LICENSED_FILE_NAMES: ReadonlyArray<string> = [
+  "BookmarkButton.tsx",
+  "BookmarksTray.tsx",
   "MemberAuth.tsx",
   "MemberLogin.tsx",
   "MemberRegister.tsx",

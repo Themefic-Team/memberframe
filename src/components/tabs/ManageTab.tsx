@@ -4,7 +4,6 @@ import { EmptyState, Segmented, useToast } from "../ui";
 import { MembersTable } from "../manage/MembersTable";
 import { TierEditor } from "../manage/TierEditor";
 import { PaymentsPanel } from "../manage/PaymentsPanel";
-import { FilesPanel } from "../manage/FilesPanel";
 import type { MemberAction } from "../manage/MemberFlyout";
 import { NO_MEMBER_FILTERS, type MemberFilters } from "../manage/memberFilters";
 import { FREE_TIER_RANK, type TierFormDraft } from "../manage/tierValidation";
@@ -32,19 +31,18 @@ import { readDefinitions } from "../../utils/customFields";
 import { rememberSiteTiers } from "../../types/member";
 import { resolvedTierKey } from "../manage/tierValidation";
 
-type Segment = "members" | "tiers" | "payments" | "files";
+type Segment = "members" | "tiers" | "payments";
 
 /**
  * Payments sits beside Tiers, FP-16 section 9.4: a tier's prices only sell
- * once a gateway is connected, so the two are one job and one tab. Files,
- * FP-12, is the vault behind Protected Download: each file names the tier it
- * needs, which is the same tier list.
+ * once a gateway is connected, so the two are one job and one tab. Protected
+ * Download files are uploaded on the canvas and set up there
+ * (32-canvas-downloads.md), so there is no Files segment.
  */
 const SEGMENTS = [
   { value: "members", label: "Members" },
   { value: "tiers", label: "Tiers" },
   { value: "payments", label: "Payments" },
-  { value: "files", label: "Files" },
 ] as const satisfies ReadonlyArray<{ value: Segment; label: string }>;
 
 /**
@@ -309,8 +307,6 @@ export const ManageTab: React.FC = () => {
         />
       ) : segment === "payments" ? (
         <PaymentsPanel siteId={siteId} />
-      ) : segment === "files" ? (
-        <FilesPanel siteId={siteId} />
       ) : (
         <TierEditor
           tiers={tiers}

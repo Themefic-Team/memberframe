@@ -203,3 +203,28 @@ describe("lockReason", () => {
     expect(lockReason(failed, "tier_1", DEFAULT_SITE_TIERS, NOW)).toMatch(/payment/i);
   });
 });
+
+describe("exact tiers: only:a,b (19-section-locks.md 8)", () => {
+  const ladder = [
+    { key: "free_member", rank: 0, name: "Free" },
+    { key: "standard", rank: 1, name: "Standard" },
+    { key: "premium", rank: 2, name: "Premium" },
+    { key: "vip", rank: 3, name: "VIP" },
+  ];
+  const member = (activeTier: string, status = "active") =>
+    ({ memberId: "m", email: "a@b.c", activeTier, status, currentPeriodEnd: 0, gracePeriodEndsAt: 0 }) as never;
+
+  it("lets in exactly the listed tiers, not the ones above them", () => {
+    expect(isEntitled(member("standard"), "only:standard,vip" as never, ladder as never)).toBe(true);
+    expect(isEntitled(member("vip"), "only:standard,vip" as never, ladder as never)).toBe(true);
+    expect(isEntitled(member("premium"), "only:standard,vip" as never, ladder as never)).toBe(false);
+    expect(isEntitled(member("free_member"), "only:standard,vip" as never, ladder as never)).toBe(false);
+    expect(isEntitled(null, "only:standard,vip" as never, ladder as never)).toBe(false);
+  });
+
+  it("keeps the status rules, and a deleted tier matches nobody", () => {
+    expect(isEntitled(member("standard", "past_due"), "only:standard" as never, ladder as never, 10)).toBe(false);
+    expect(isEntitled(member("gone"), "only:gone" as never, ladder as never)).toBe(false);
+    expect(isEntitled(member("standard"), "only:" as never, ladder as never)).toBe(false);
+  });
+});

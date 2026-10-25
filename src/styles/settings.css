@@ -72,7 +72,7 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .gateway-section-note {
@@ -82,22 +82,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--framefic-text-muted);
-}
-
-/* The verified badge carries an icon, which the kit's .badge does not size. */
-.gateway-section-head .badge svg {
-  width: 10px;
-  height: 10px;
-  stroke: currentColor;
-}
-
-/* A disabled key field is a gateway that arrives in a later phase. It stays
-   visible so the vault does not present the product as Stripe-only, which is
-   the competitor limitation F03 exists to beat. */
-.gateway-section .framefic-input:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+  color: var(--framer-color-text-secondary);
 }
 
 .settings-help {
@@ -105,7 +90,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-secondary);
 }
 
 .settings-cta {
@@ -127,7 +112,7 @@
 }
 
 .settings-cta-note.is-info {
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 /*
@@ -231,7 +216,7 @@
 
 .integration-card-title {
   margin: 0;
-  color: var(--title);
+  color: var(--framer-color-text);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -243,7 +228,7 @@
 
 .integration-card-sub {
   margin: 0;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 14px;
@@ -281,7 +266,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
   transition: transform 0.2s ease, color 0.15s ease;
 }
 
@@ -293,7 +278,7 @@
 
 .integration-chevron.is-open {
   transform: rotate(180deg);
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 /* Expanded Tier-style Edit Form (Screenshot 2) */
@@ -325,7 +310,7 @@
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .integration-tier-form .tier-form-cta {
@@ -339,7 +324,7 @@
 
 .integration-card-desc {
   margin: 0;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -352,7 +337,7 @@
 .integration-card-pending {
   margin: 0;
   padding: 0 12px 10px;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font-size: 11px;
   line-height: 1.45;
   font-style: italic;
@@ -374,7 +359,7 @@
   padding: 8px 10px;
   border-radius: var(--radius-8);
   background: var(--framer-color-bg-secondary);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -408,8 +393,8 @@
 
 .integration-card .framefic-input,
 .integration-card .framefic-text-field {
-  border-color: var(--framefic-surface-border);
-  background-color: var(--framefic-page-bg);
+  border-color: var(--framer-color-divider);
+  background-color: var(--framer-color-bg);
 }
 
 .integration-card .framefic-input:focus,
@@ -418,11 +403,10 @@
   box-shadow: var(--px-focus-halo);
 }
 
+/* Disabled keeps the kit's 50% and not-allowed cursor; only the focus ring goes. */
 .integration-card .framefic-input:disabled,
 .integration-card .framefic-text-field:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  border-color: var(--framefic-surface-border);
+  border-color: var(--framer-color-divider);
   box-shadow: none;
 }
 
@@ -437,12 +421,6 @@
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-width: 0;
-}
-
-.integration-input .framefic-input,
-.integration-input .framefic-text-field {
-  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -494,7 +472,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 16px;
-  color: var(--title);
+  color: var(--framer-color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -580,7 +558,7 @@
 
 .page-rule-title {
   font: var(--text-body-strong);
-  color: var(--title);
+  color: var(--framer-color-text);
   white-space: nowrap;
 }
 
@@ -593,7 +571,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 18px;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -612,7 +590,7 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
   transition: transform 0.2s ease, color 0.15s ease;
 }
 
@@ -624,7 +602,7 @@
 
 .page-rule-chevron.is-open {
   transform: rotate(180deg);
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .page-rule-card-body {
@@ -633,6 +611,125 @@
   gap: var(--space-12);
   padding: var(--space-12);
   border-top: 1px solid var(--framer-color-divider);
+}
+
+/* The exact tiers a lock names (19-section-locks.md 8 and 9): tiles in a two-column grid. */
+.tier-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  border: 1px solid var(--px-color-border-subtle);
+  border-radius: var(--radius-10);
+  background: var(--framer-color-bg-secondary);
+}
+
+.tier-checklist-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.tier-checklist-title {
+  font: var(--text-body-sm-strong);
+  color: var(--framer-color-text);
+}
+
+.tier-checklist-count {
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-secondary);
+}
+
+.tier-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.tier-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--px-color-border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--framer-color-bg);
+  color: var(--framer-color-text);
+  font: var(--text-body-sm-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.tier-option:hover {
+  border-color: var(--px-color-border-highlight);
+}
+
+.tier-option:focus-visible {
+  outline: none;
+  box-shadow: var(--px-focus-halo);
+}
+
+.tier-option.is-checked {
+  border-color: var(--px-color-border-selected);
+  background: var(--px-color-bg-selected);
+}
+
+.tier-option.is-locked {
+  cursor: default;
+}
+
+.tier-option.is-deleted .tier-option-name {
+  color: var(--framer-color-text-secondary);
+  text-decoration: line-through;
+}
+
+.tier-option-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--framer-color-divider);
+  border-radius: var(--radius-4);
+  background: var(--framer-color-bg-tertiary);
+  color: var(--px-brand-on-primary);
+}
+
+.tier-option.is-checked .tier-option-box {
+  border-color: var(--px-brand-action);
+  background: var(--px-brand-action);
+}
+
+.tier-option-icon {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+}
+
+.tier-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tier-option-note {
+  flex-shrink: 0;
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-secondary);
+}
+
+.tier-checklist-hint {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-secondary);
 }
 
 /* Hint under a field row: Body/Small, text/tertiary. */
@@ -659,14 +756,14 @@
 .onpage-tier-table th {
   padding: var(--space-6) var(--space-8);
   font-weight: 600;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   border-bottom: 1px solid var(--framer-color-divider);
 }
 
 .onpage-tier-table td {
   padding: var(--space-6) var(--space-8);
   border-bottom: 1px solid var(--framer-color-divider);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   vertical-align: middle;
 }
 
@@ -686,13 +783,13 @@
 
 .onpage-example-title {
   font: var(--text-body-strong);
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .onpage-example-text {
   margin: 0;
   font: var(--text-body-sm);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 .onpage-example-list {
@@ -702,12 +799,12 @@
   flex-direction: column;
   gap: var(--space-4);
   font: var(--text-body-sm);
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 .onpage-example-list strong {
   font-weight: 600;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .onpage-guide-actions {
@@ -809,7 +906,7 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
-  color: var(--title);
+  color: var(--framer-color-text);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -820,7 +917,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -829,7 +926,7 @@
   display: inline-flex;
   grid-column: 2;
   grid-row: 1 / span 2;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
   transition: transform 0.2s ease;
 }
 
@@ -841,7 +938,7 @@
 
 .custom-field-chevron.is-open {
   transform: rotate(180deg);
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .custom-field-actions {
@@ -864,7 +961,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-secondary);
 }
 
 .custom-field-options {
@@ -877,7 +974,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .custom-field-option {
@@ -897,58 +994,109 @@
 /* ---------------------------------------------------------------------------
    Webhooks, docs/development-docs/20-webhooks.md
    --------------------------------------------------------------------------- */
-.webhook-checks {
+/* Each part of a webhook is a titled well, drawn as a lock's tier checklist is (2026-10-22). */
+.webhook-section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
-  padding: var(--space-8) 0;
+  gap: var(--space-10);
+  padding: var(--space-12);
+  border: 1px solid var(--px-color-border-subtle);
+  border-radius: var(--radius-10);
+  background: var(--framer-color-bg-secondary);
 }
 
-.webhook-checks-title {
+.webhook-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.webhook-section-title {
   font: var(--text-body-sm-strong);
-  color: var(--title);
+  color: var(--framer-color-text);
+}
+
+.webhook-section-meta,
+.webhook-section-hint {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-tertiary);
+}
+
+.webhook-section-hint {
+  color: var(--framer-color-text-secondary);
+}
+
+/* Tick tiles: two to a row for plans, one to a row for the longer event names. */
+.webhook-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.webhook-tiles.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.webhook-tiles .tier-option-name {
+  white-space: normal;
+}
+
+/* Under a card's name: the address it sends to. */
+.webhook-card-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.webhook-card-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-tertiary);
+}
+
+.webhook-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.webhook-secret-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .webhook-secret {
-  max-width: 160px;
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-6) var(--space-8);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.webhook-deliveries {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  padding-top: var(--space-8);
-  border-top: 1px solid var(--framer-color-divider);
-}
-
-.webhook-delivery-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-8);
-}
-
-.webhook-delivery-text {
-  min-width: 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--framefic-text-muted);
-  overflow-wrap: anywhere;
-}
-
+/* Fields sent: value, arrow, key, remove, under two column heads. */
+.webhook-map-head,
 .webhook-map-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 28px;
   align-items: center;
   gap: var(--space-6);
 }
 
+.webhook-map-head {
+  font: var(--text-body-sm);
+  color: var(--framer-color-text-tertiary);
+}
+
 .webhook-map-arrow {
   display: inline-flex;
-  color: var(--framefic-text-muted);
+  color: var(--framer-color-text-tertiary);
 }
 
 .webhook-map-arrow svg {
@@ -956,8 +1104,45 @@
   height: 14px;
 }
 
+.webhook-preview-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.webhook-preview-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font: var(--text-body-sm-strong);
+  color: var(--px-color-text-brand);
+  cursor: pointer;
+  list-style: none;
+}
+
+.webhook-preview-summary::-webkit-details-marker {
+  display: none;
+}
+
+.webhook-preview-summary svg {
+  width: 12px;
+  height: 12px;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.webhook-preview-details[open] .webhook-preview-summary svg {
+  transform: none;
+}
+
+.webhook-preview-summary:focus-visible {
+  outline: 1px solid var(--px-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-4);
+}
+
 .webhook-preview {
-  margin: 0;
+  margin: var(--space-8) 0 0;
   padding: var(--space-8) var(--space-10);
   max-height: 200px;
   overflow: auto;
@@ -966,7 +1151,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

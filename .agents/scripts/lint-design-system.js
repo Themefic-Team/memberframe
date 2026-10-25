@@ -18,10 +18,20 @@
  *      Use --px-color-text-brand.
  *   8. font-family is a var(--font-*) token, never a literal stack.
  *   9. No text-transform: uppercase. Labels are sentence case.
+ *  9b. No legacy alias that has an exact Figma twin (--title, --paragraph, ...).
  *
  * TS/TSX (every .ts and .tsx under the target):
  *  10. No unicode emoji or pictographs.
  *  11. No en-dash or em-dash characters, per instruction/INSTRUCTION.md.
+ *
+ * Icons (section 12: Lucide React or Framer SVG only), billing included:
+ *  12. No typed glyph used as an icon (check, cross, arrows, star). Use Lucide.
+ *  13. No hand-drawn <svg> in src/components, except brand marks and charts
+ *      (ICON_SVG_ALLOWED). Canvas components are checked by canvasIcons.test.ts.
+ *  14. No numeric size, width, or height prop on a Lucide icon: size by CSS.
+ *
+ * Glass (section 6.1), billing included:
+ *  15. backdrop-filter is blur(var(--px-glass-blur-backdrop | surface | toast)).
  *
  * Usage:
  *   node .agents/scripts/lint-design-system.js [directory]
@@ -58,6 +68,16 @@ const FONT_SIZES = new Set([11, 12, 14, 15, 20]);
 const FONT_WEIGHTS = new Set(["400", "500", "600", "inherit"]);
 const RADII = new Set([0, 4, 6, 8, 10, 12, 14, 16, 20, 999]);
 const SPACING = new Set([0, 1, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]);
+
+/* Legacy alias -> the Figma token with the same value in both themes. */
+const LEGACY_TWIN = {
+  "--title": "--framer-color-text",
+  "--paragraph": "--framer-color-text-secondary",
+  "--paragraph-faint": "--framer-color-text-tertiary",
+  "--framefic-text-muted": "--framer-color-text-secondary",
+  "--framefic-surface-border": "--framer-color-divider",
+  "--framefic-page-bg": "--framer-color-bg",
+};
 
 const cssFiles = [];
 const codeFiles = [];
@@ -104,10 +124,19 @@ for (const file of cssFiles) {
   if (VERBATIM_SLICES.has(rel) || inBilling(rel)) continue;
 
   const lines = stripCssComments(fs.readFileSync(file, "utf8")).split("\n");
+  // Inside @font-face, font-family names the face being declared and
+  // font-weight is its range ("100 900"): neither is a style choice.
+  let inFontFace = false;
 
   lines.forEach((line, index) => {
     const n = index + 1;
     const decl = line.match(/^\s*([a-z-]+)\s*:\s*(.+?);?\s*$/);
+    if (/@font-face\b/.test(line)) inFontFace = true;
+    if (inFontFace && /\}/.test(line)) {
+      inFontFace = false;
+      return;
+    }
+    if (inFontFace && decl && (decl[1] === "font-family" || decl[1] === "font-weight")) return;
 
     if (/#[0-9a-fA-F]{3,8}\b/.test(line) || /\b(rgba?|hsla?)\(/.test(line)) {
       report(file, n, "colour literal, use a token", line);
@@ -157,6 +186,13 @@ for (const file of cssFiles) {
       report(file, n, "no uppercase labels, use sentence case", line);
     }
   });
+
+  // Legacy aliases with an exact Figma twin in both themes (section 3.4):
+  // new code, and everything outside the slices since v0.4.6, uses the twin.
+  lines.forEach((line, index) => {
+    const legacy = line.match(/var\(\s*(--(?:title|paragraph|paragraph-faint|framefic-text-muted|framefic-surface-border|framefic-page-bg))\s*[,)]/);
+    if (legacy) report(file, index + 1, `legacy token ${legacy[1]}, use its Figma name (${LEGACY_TWIN[legacy[1]]})`, line);
+  });
 }
 
 // Pass 3: TS/TSX copy rules.
@@ -170,6 +206,58 @@ for (const file of codeFiles) {
     if (EMOJI.test(line)) report(file, index + 1, "unicode emoji, use a Lucide icon", line);
     if (DASHES.test(line)) report(file, index + 1, "en-dash or em-dash, use a comma, colon, or new sentence", line);
   });
+}
+
+// Pass 4: icon rules, every code file, billing included (the user's rule:
+// Lucide and Framer icons everywhere, 2026-10-25).
+const GLYPH_ICONS = /[✓✔✕✖×→←↑↓↗↘★⭐☆]/u;
+/* Hand-drawn svg allowed only where Lucide has nothing to offer. */
+const ICON_SVG_ALLOWED = new Set([
+  path.join("components", "providerMarks.tsx"), // sign-in brand logos
+  path.join("components", "reports", "ReportParts.tsx"), // the column chart
+  path.join("components", "billing", "ProfilePage.tsx"), // the avatar progress ring
+]);
+
+for (const file of codeFiles) {
+  const rel = path.relative(targetDir, file);
+  const source = fs.readFileSync(file, "utf8");
+  // Comments may name a glyph to forbid it; only code and copy count.
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " ")).replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+  const lucideNames = new Set(
+    [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']lucide-react["']/g)].flatMap((m) =>
+      m[1].split(",").map((name) => name.trim().split(/\s+as\s+/).pop()).filter(Boolean)
+    )
+  );
+
+  code.split("\n").forEach((line, index) => {
+    const n = index + 1;
+    if (GLYPH_ICONS.test(line)) report(file, n, "typed glyph as an icon, use a Lucide icon (Check, X, ArrowRight, Star)", line);
+
+    if (rel.startsWith("components" + path.sep) && /<svg\b/.test(line) && !ICON_SVG_ALLOWED.has(rel)) {
+      report(file, n, "hand-drawn svg, use a Lucide icon (brand marks go in providerMarks.tsx)", line);
+    }
+
+    for (const match of line.matchAll(/<([A-Z]\w*)\b([^>]*)>/g)) {
+      if (lucideNames.has(match[1]) && /\b(size|width|height)=\{?["']?\d/.test(match[2])) {
+        report(file, n, `numeric size on Lucide <${match[1]}>, size it in CSS`, line);
+      }
+    }
+  });
+}
+
+// Pass 5: glass (section 6.1), billing included. A frosted surface takes its
+// blur from a --px-glass-blur-* token, so every glass surface frosts alike.
+for (const file of cssFiles) {
+  const rel = path.relative(targetDir, file);
+  if (VERBATIM_SLICES.has(rel)) continue;
+  stripCssComments(fs.readFileSync(file, "utf8"))
+    .split("\n")
+    .forEach((line, index) => {
+      const decl = line.match(/^\s*(-webkit-)?backdrop-filter\s*:\s*(.+?);?\s*$/);
+      if (decl && decl[2].trim() !== "none" && !/^blur\(var\(--px-glass-blur-(backdrop|surface|toast)\)\)$/.test(decl[2].trim())) {
+        report(file, index + 1, "backdrop-filter must be blur(var(--px-glass-blur-backdrop | surface | toast))", line);
+      }
+    });
 }
 
 console.log(

@@ -6,6 +6,7 @@
  */
 
 import { apiClient, type ApiClient, type ApiResult } from "./apiClient";
+import type { ConnectionState } from "../types/connection";
 
 export type LicenseState = "trial" | "active" | "expired" | "trial_claimed_other_site" | "none";
 export type PlanId = "monthly" | "yearly" | "lifetime";
@@ -110,6 +111,26 @@ export type CanvasLicense = "trial" | "active" | "locked";
 
 export function canvasLicense(state: LicenseState | null | undefined): CanvasLicense {
   return state === "active" ? "active" : state === "trial" ? "trial" : "locked";
+}
+
+/**
+ * Whether the creator is really signed out of the plugin, as opposed to not
+ * known yet or offline. Loading is not signed out; a server that could not be
+ * reached (a failure is set) is not either, so an offline open never locks a
+ * paid canvas. Waiting for an emailed sign-in code is still signed out. The
+ * standalone browser preview has no project to lock.
+ */
+export function signedOutOfPlugin(status: ConnectionState["status"], failed: boolean, noProject: boolean): boolean {
+  return (status === "disconnected" || status === "code_sent") && !failed && !noProject;
+}
+
+/**
+ * What the canvas files should say: locked while signed out, else the
+ * license's state, or null while it is not known yet (leave the files alone).
+ */
+export function canvasStateFor(state: LicenseState | null, signedOut: boolean): CanvasLicense | null {
+  if (signedOut) return "locked";
+  return state === null ? null : canvasLicense(state);
 }
 
 /** Whether the panel works, or shows only Account. BEAF: locked when not trial or paid. */

@@ -11,6 +11,8 @@ export interface CheckboxProps {
   disabled?: boolean;
   /** The accessible name when there is no visible label beside the box. */
   ariaLabel?: string;
+  /** Takes the row's width, so a long label beside the box can truncate. */
+  fill?: boolean;
   children?: React.ReactNode;
 }
 
@@ -25,6 +27,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   indeterminate = false,
   disabled = false,
   ariaLabel,
+  fill = false,
   children,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +45,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       className={cn(
         "framefic-checkbox",
         indeterminate && "is-indeterminate",
-        disabled && "is-disabled"
+        disabled && "is-disabled",
+        fill && "fill"
       )}
     >
       <input

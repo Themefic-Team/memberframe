@@ -901,7 +901,7 @@ describe("email confirmation after password sign up", () => {
 
 describe("no redirect loop with the Route Shield", () => {
   it("does not send a signed-in member back to a page the shield just denied them", () => {
-    expect(code).toContain("if (!recentlyDenied(afterLoginTarget())) redirectAfterAuth();");
+    expect(code).toContain("if (!recentlyDenied(afterLoginTarget())) leaveForAfterLogin();");
   });
 
   it("keeps the shield's hint in step with every sign in and sign out", () => {
@@ -964,5 +964,31 @@ describe("after sign in, the site's setting now, not the one the file was writte
     expect(code).toContain("noteAfterLoginPath(data);");
     expect(code).toContain('return (siteAfterLoginPath ?? CONFIG.afterLoginPath) || "/dashboard";');
     expect(code).toContain("const path = checkoutIntentPath() ?? returnPath() ?? afterLoginTarget();");
+  });
+});
+
+describe("reset asks for the new password twice (2026-10-22)", () => {
+  it("has a confirm field that shares show and hide, and blocks a mismatch", () => {
+    expect(code).toContain('{t("confirmPasswordLabel")}');
+    expect(code).toContain('type={showPassword ? "text" : "password"}\n            autoComplete="new-password"\n            value={confirmPassword}');
+    expect(code).toContain("if (confirmPassword !== password) return;");
+    expect(code).toContain('confirmPasswordLabel: ["Confirm password label", "Confirm new password"],');
+  });
+
+  it("clears the second entry wherever the first is cleared", () => {
+    expect(code.split('setPassword("");').length).toBe(code.split('setConfirmPassword("");').length);
+  });
+});
+
+describe("a signed-in member on a sign-in page (2026-10-22)", () => {
+  it("goes straight to the site's After sign in page, never a remembered page", () => {
+    expect(code).toContain("if (!recentlyDenied(afterLoginTarget())) leaveForAfterLogin();");
+    const leave = code.slice(code.indexOf("function leaveForAfterLogin(): void {"), code.indexOf("function redirectAfterAuth(): void {"));
+    expect(leave).toContain("const path = afterLoginTarget();");
+    expect(leave).not.toContain("returnPath()");
+  });
+
+  it("stays on a reset link to set a password", () => {
+    expect(code).toContain("if (onCanvas || handoff || readResetToken() !== null) return;");
   });
 });

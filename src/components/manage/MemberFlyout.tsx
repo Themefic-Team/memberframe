@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link2, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
-import { Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Select } from "../ui";
+import { Badge, Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Select } from "../ui";
 import type { SiteMemberRecord } from "../../types/site";
 import { siteTiers, type TierKey } from "../../types/member";
-import { formatJoinedDate, tierLabel } from "./memberFilters";
+import { formatJoinedDate, statusLabel, statusTone, tierLabel } from "./memberFilters";
 import { ProviderMark, SIGN_IN_PROVIDER_NAMES, isSignInProvider } from "../providerMarks";
 import {
   displayValue,
@@ -74,15 +74,17 @@ const MemberPurchasesList: React.FC<{ siteId: string; memberId: string }> = ({ s
     };
   }, [memberId, siteId]);
 
-  if (failed) return <p className="member-flyout-note">Purchases could not be loaded.</p>;
-  if (!data) return <p className="member-flyout-note">Loading purchases.</p>;
-  if (data.subscriptions.length === 0 && data.payments.length === 0) {
-    return <p className="member-flyout-note">No purchases yet.</p>;
+  const empty = failed ? "Purchases could not be loaded." : !data ? "Loading purchases." : null;
+  if (empty !== null || !data || (data.subscriptions.length === 0 && data.payments.length === 0)) {
+    return (
+      <MemberSection title="Purchases">
+        <p className="member-section-empty">{empty ?? "No purchases yet."}</p>
+      </MemberSection>
+    );
   }
 
   return (
-    <div className="member-profile" role="group" aria-label="Purchases">
-      <span className="member-profile-title">Purchases</span>
+    <MemberSection title="Purchases">
       <dl className="member-profile-list">
         {data.subscriptions.map((subscription, index) => (
           <div className="member-profile-row" key={`plan-${index}`}>
@@ -116,9 +118,20 @@ const MemberPurchasesList: React.FC<{ siteId: string; memberId: string }> = ({ s
           </div>
         ))}
       </dl>
-    </div>
+    </MemberSection>
   );
 };
+
+/** One titled well in the member panel: Sign-in methods, Profile, Purchases. */
+const MemberSection: React.FC<{ title: string; meta?: string; children: React.ReactNode }> = ({ title, meta, children }) => (
+  <div className="member-profile" role="group" aria-label={title}>
+    <div className="member-section-head">
+      <span className="member-profile-title">{title}</span>
+      {meta ? <span className="member-section-meta">{meta}</span> : null}
+    </div>
+    {children}
+  </div>
+);
 
 /**
  * The member's answers to the site's profile fields. FP-09 section 3.3, PRD
@@ -145,33 +158,39 @@ const MemberProfileValues: React.FC<{
   }
 
   const visible = fields.filter((field) => isFieldVisible(field, metadata));
+  const answered = visible.filter((field) => displayValue(field, metadata[field.key]) !== "Not answered");
+  const unanswered = visible.filter((field) => !answered.includes(field));
 
+  // A wall of "Not answered" hides the few answers there are: list what was
+  // answered, and name the rest in one line.
   return (
-    <div className="member-profile" role="group" aria-label="Profile">
-      <span className="member-profile-title">Profile</span>
-      <dl className="member-profile-list">
-        {visible.map((field) => {
-          const value = metadata[field.key];
-          const text = displayValue(field, value);
-          const answered = text !== "Not answered";
-
-          return (
-            <div className="member-profile-row" key={field.key}>
-              <dt className="member-profile-label">{field.label}</dt>
-              <dd className={cn("member-profile-value", !answered && "is-empty")}>
-                {field.type === "url" && typeof value === "string" && isSafeUrl(value) ? (
-                  <a href={value} target="_blank" rel="noopener noreferrer">
-                    {value}
-                  </a>
-                ) : (
-                  text
-                )}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-    </div>
+    <MemberSection title="Profile" meta={`${answered.length} of ${visible.length} answered`}>
+      {answered.length === 0 ? <p className="member-section-empty">No answers yet.</p> : null}
+      {answered.length > 0 ? (
+        <dl className="member-profile-list">
+          {answered.map((field) => {
+            const value = metadata[field.key];
+            return (
+              <div className="member-profile-row" key={field.key}>
+                <dt className="member-profile-label">{field.label}</dt>
+                <dd className="member-profile-value">
+                  {field.type === "url" && typeof value === "string" && isSafeUrl(value) ? (
+                    <a href={value} target="_blank" rel="noopener noreferrer">
+                      {value}
+                    </a>
+                  ) : (
+                    displayValue(field, value)
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      ) : null}
+      {answered.length > 0 && unanswered.length > 0 ? (
+        <p className="member-section-empty">{`Not answered: ${unanswered.map((field) => field.label).join(", ")}`}</p>
+      ) : null}
+    </MemberSection>
   );
 };
 
@@ -199,8 +218,7 @@ export const MemberSignInMethods: React.FC<{ member: SiteMemberRecord }> = ({ me
   const known = member.signupMethod !== null && member.signupMethod !== undefined;
 
   return (
-    <div className="member-profile" role="group" aria-label="Sign-in methods">
-      <span className="member-profile-title">Sign-in methods</span>
+    <MemberSection title="Sign-in methods">
       <dl className="member-profile-list">
         <div className="member-profile-row">
           <dt className="member-profile-label">Signed up with</dt>
@@ -211,7 +229,7 @@ export const MemberSignInMethods: React.FC<{ member: SiteMemberRecord }> = ({ me
         {identities.map((identity) => (
           <div className="member-profile-row" key={`${identity.provider}-${identity.createdAt}`}>
             <dt className="member-profile-label member-signin-provider">
-              {isSignInProvider(identity.provider) ? <ProviderMark provider={identity.provider} size={12} /> : null}
+              {isSignInProvider(identity.provider) ? <ProviderMark provider={identity.provider} small /> : null}
               {isSignInProvider(identity.provider) ? SIGN_IN_PROVIDER_NAMES[identity.provider] : identity.provider}
             </dt>
             <dd className="member-profile-value">{`${identity.email}. Last used ${formatJoinedDate(identity.lastUsedAt)}`}</dd>
@@ -226,13 +244,22 @@ export const MemberSignInMethods: React.FC<{ member: SiteMemberRecord }> = ({ me
         {member.hasPassword !== undefined ? (
           <div className="member-profile-row">
             <dt className="member-profile-label">Password</dt>
-            <dd className={cn("member-profile-value", !member.hasPassword && "is-empty")}>{member.hasPassword ? "Set" : "Not set"}</dd>
+            <dd className="member-profile-value">
+              <Badge tone={member.hasPassword ? "success" : "neutral"}>{member.hasPassword ? "Set" : "Not set"}</Badge>
+            </dd>
           </div>
         ) : null}
       </dl>
-    </div>
+    </MemberSection>
   );
 };
+
+/** "SR" for Sydur Rahman, "S" for sydur@example.com. */
+function initialsOf(name: string | null, email: string): string {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return `${words[0]![0]}${words[words.length - 1]![0]}`.toUpperCase();
+  return (words[0]?.[0] ?? email[0] ?? "?").toUpperCase();
+}
 
 /** The site's own tiers, read when the flyout renders, so custom tiers are offered too. */
 function tierOptions(): ReadonlyArray<{ value: TierKey; label: string }> {
@@ -294,7 +321,17 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
       onKeyDown={handleKeyDown}
     >
       <div className="member-flyout-head">
-        <span className="member-flyout-title">{member.name ?? member.email}</span>
+        <span className="member-avatar" aria-hidden={true}>
+          {initialsOf(member.name, member.email)}
+        </span>
+        <div className="member-flyout-identity">
+          <span className="member-flyout-title">{member.name ?? member.email}</span>
+          {member.name ? <span className="member-flyout-email">{member.email}</span> : null}
+          <span className="member-flyout-badges">
+            <Badge tone="brand">{tierLabel(member.tier)}</Badge>
+            <Badge tone={statusTone(member.status)}>{statusLabel(member.status)}</Badge>
+          </span>
+        </div>
         <IconButton label="Close actions" variant="ghost" onClick={onClose}>
           <X aria-hidden={true} />
         </IconButton>
@@ -349,17 +386,6 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
             Revoke access
           </Button>
         )}
-
-        <Button
-          variant="secondary"
-          size="md"
-          className="fill"
-          disabled={busy}
-          onClick={() => setConfirming("delete")}
-        >
-          <Trash2 aria-hidden={true} />
-          Delete member
-        </Button>
       </div>
 
       {confirming === "revoke" ? (
@@ -414,9 +440,13 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
 
       {siteId ? <MemberPurchasesList siteId={siteId} memberId={member.id} /> : null}
 
-      <p className="member-flyout-note">
-        {`Changes apply on this member's next session check. Currently ${tierLabel(member.tier)}.`}
-      </p>
+      <div className="member-flyout-danger">
+        <Button variant="danger" size="md" className="fill" disabled={busy} onClick={() => setConfirming("delete")}>
+          <Trash2 aria-hidden={true} />
+          Delete member
+        </Button>
+        <p className="member-flyout-note">Changes apply on this member's next session check.</p>
+      </div>
     </div>
   );
 };

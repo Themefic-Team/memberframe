@@ -7,7 +7,9 @@
    Rules for using these tokens: .agents/rules/design-system.md
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+/* Fonts are not imported here. A plugin bundles them (Inter and JetBrains
+   Mono from the @fontsource packages, declared in src/styles/fonts.css), so
+   the panel loads nothing from Google Fonts or any other CDN. */
 
 /* --------------------------------------------------------------------------
    1. COLOR TOKENS: DARK THEME (DEFAULT)
@@ -21,8 +23,11 @@
    -------------------------------------------------------------------------- */
 :root,
 html[data-user-theme="dark"] body {
-  --font-body: "DM Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+  /* Inter everywhere (design-system.md section 4). --font-body was DM Sans,
+     which put a second typeface under every element not set by a --text-*
+     token; it stays as an alias so existing rules keep resolving. */
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: var(--font-sans);
   --font-mono: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
 
   /* Brand Tokens (Pixelfic / Calfic Accent). Brand mode, same in both themes. */
@@ -198,7 +203,7 @@ html[data-user-theme="light"] body {
   --px-color-warning: #b45309;
   --px-color-warning-subtle: #fffbeb;
   --px-color-text-brand: #4761db;
-  --px-toast-bg: rgba(255, 255, 255, 0.88);
+  --px-toast-bg: rgba(255, 255, 255, 0.82); /* 82%, as in dark: the toast frosts the same in both themes. */
   --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 28px -10px rgba(0, 0, 0, 0.05), inset 0 1px 0 #ffffff;
 
   /* Light Theme Surfaces & Cards */
@@ -307,6 +312,14 @@ body {
   --px-shadow-primary: 0 2px 6px -2px var(--px-color-glow-brand), inset 0 1px 0 rgba(255, 255, 255, 0.20);
   /* Focus/Halo: add to focused controls together with the 1px focus/ring stroke. */
   --px-focus-halo: 0 0 0 3px var(--px-color-focus-halo);
+
+  /* Glass (design-system.md section 6.1). Frosted blur on exactly three kinds
+     of surface; everything else is opaque. The tint each one blurs behind is
+     a theme token (--px-color-overlay, --framefic-frosted-bg, --px-toast-bg),
+     so light and dark frost the same way. */
+  --px-glass-blur-backdrop: 4px; /* Dialog and modal backdrops. Not in Figma yet: confirm in Dev Mode. */
+  --px-glass-blur-surface: 8px; /* Frosted lock banners and overlays. */
+  --px-glass-blur-toast: 16px; /* Toasts. */
 }
 
 /* --------------------------------------------------------------------------
@@ -904,8 +917,8 @@ select option {
   align-items: center;
   justify-content: center;
   background: var(--framefic-frosted-bg, rgba(43, 48, 59, 0.35));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--px-glass-blur-surface));
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-surface));
   color: #ffffff;
   z-index: 999;
   padding: 16px;
@@ -973,8 +986,8 @@ select option {
   padding: 3px 8px;
   border-radius: var(--radius-pill, 999px);
   background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(var(--px-glass-blur-surface));
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-surface));
   border: 1px solid rgba(255, 255, 255, 0.15);
   text-decoration: none;
   font-family: var(--font-sans, "Inter", sans-serif);
@@ -1037,7 +1050,7 @@ select option {
 }
 
 .framefic-limit-desc {
-  font-family: var(--font-body, "DM Sans", sans-serif);
+  font-family: var(--font-body);
   font-size: 12px;
   line-height: 1.5;
   color: var(--paragraph, #c7ccd6);
@@ -2589,8 +2602,8 @@ html[data-user-theme="light"] body .empty-state-desc {
   background-color: var(--px-toast-bg, rgba(41, 40, 40, 0.82));
   border: 1px solid var(--framer-color-divider, rgba(255, 255, 255, 0.07));
   box-shadow: var(--px-toast-shadow, 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(var(--px-glass-blur-toast));
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-toast));
   pointer-events: auto;
   user-select: none;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;

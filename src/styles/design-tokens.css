@@ -8,11 +8,11 @@
    src/styles/components.css and the per-component CSS files, not here.
    See PRD section 6.3. This file holds variables only.
 
-   Recopied 2026-10-19 for Foundations v0.4.0 (was v0.3.7),
-   reference lines 1 to 311.
+   Recopied 2026-10-25 for Foundations v0.4.0 (was v0.3.7),
+   reference lines 1 to 324.
    Check for drift:
      diff <(tail -n +17 src/styles/design-tokens.css) \
-          <(sed -n '1,311p' .agents/skills/framer-plugin-suite/references/design-tokens.css)
+          <(sed -n '1,324p' .agents/skills/framer-plugin-suite/references/design-tokens.css)
    ========================================================================== */
 /* ==========================================================================
    FRAMER framefic UNIFIED DESIGN SYSTEM TOKENS & STYLE GUIDELINE
@@ -23,7 +23,9 @@
    Rules for using these tokens: .agents/rules/design-system.md
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+/* Fonts are not imported here. A plugin bundles them (Inter and JetBrains
+   Mono from the @fontsource packages, declared in src/styles/fonts.css), so
+   the panel loads nothing from Google Fonts or any other CDN. */
 
 /* --------------------------------------------------------------------------
    1. COLOR TOKENS: DARK THEME (DEFAULT)
@@ -37,8 +39,11 @@
    -------------------------------------------------------------------------- */
 :root,
 html[data-user-theme="dark"] body {
-  --font-body: "DM Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+  /* Inter everywhere (design-system.md section 4). --font-body was DM Sans,
+     which put a second typeface under every element not set by a --text-*
+     token; it stays as an alias so existing rules keep resolving. */
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: var(--font-sans);
   --font-mono: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
 
   /* Brand Tokens (Pixelfic / Calfic Accent). Brand mode, same in both themes. */
@@ -214,7 +219,7 @@ html[data-user-theme="light"] body {
   --px-color-warning: #b45309;
   --px-color-warning-subtle: #fffbeb;
   --px-color-text-brand: #4761db;
-  --px-toast-bg: rgba(255, 255, 255, 0.88);
+  --px-toast-bg: rgba(255, 255, 255, 0.82); /* 82%, as in dark: the toast frosts the same in both themes. */
   --px-toast-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 28px -10px rgba(0, 0, 0, 0.05), inset 0 1px 0 #ffffff;
 
   /* Light Theme Surfaces & Cards */
@@ -323,5 +328,13 @@ body {
   --px-shadow-primary: 0 2px 6px -2px var(--px-color-glow-brand), inset 0 1px 0 rgba(255, 255, 255, 0.20);
   /* Focus/Halo: add to focused controls together with the 1px focus/ring stroke. */
   --px-focus-halo: 0 0 0 3px var(--px-color-focus-halo);
+
+  /* Glass (design-system.md section 6.1). Frosted blur on exactly three kinds
+     of surface; everything else is opaque. The tint each one blurs behind is
+     a theme token (--px-color-overlay, --framefic-frosted-bg, --px-toast-bg),
+     so light and dark frost the same way. */
+  --px-glass-blur-backdrop: 4px; /* Dialog and modal backdrops. Not in Figma yet: confirm in Dev Mode. */
+  --px-glass-blur-surface: 8px; /* Frosted lock banners and overlays. */
+  --px-glass-blur-toast: 16px; /* Toasts. */
 }
 

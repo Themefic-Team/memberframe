@@ -5,17 +5,17 @@
      .agents/skills/framer-plugin-suite/references/design-tokens.css
 
    Two slices, concatenated in order:
-     reference lines  312 to  618   sections 3 and 4, buttons
-     reference lines  645 to 2720   sections 6 to 20, every other component
+     reference lines  325 to  631   sections 3 and 4, buttons
+     reference lines  658 to 2733   sections 6 to 20, every other component
 
-   The gap is deliberate. Reference section 5 (lines 619 to 644) is the base
+   The gap is deliberate. Reference section 5 (lines 632 to 657) is the base
    reset and app container, which PRD section 6.3 assigns to src/App.css.
-   The variable layers (reference lines 1 to 311) live in design-tokens.css.
+   The variable layers (reference lines 1 to 324) live in design-tokens.css.
 
-   Recopied 2026-10-19 for Foundations v0.4.0.
+   Recopied 2026-10-25 for Foundations v0.4.0.
    Check for drift:
      diff <(tail -n +21 src/styles/components.css) \
-          <(sed -n '312,618p;645,2720p' \
+          <(sed -n '325,631p;658,2733p' \
             .agents/skills/framer-plugin-suite/references/design-tokens.css)
    ========================================================================== */
 /* --------------------------------------------------------------------------
@@ -587,8 +587,8 @@ select option {
   align-items: center;
   justify-content: center;
   background: var(--framefic-frosted-bg, rgba(43, 48, 59, 0.35));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--px-glass-blur-surface));
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-surface));
   color: #ffffff;
   z-index: 999;
   padding: 16px;
@@ -656,8 +656,8 @@ select option {
   padding: 3px 8px;
   border-radius: var(--radius-pill, 999px);
   background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(var(--px-glass-blur-surface));
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-surface));
   border: 1px solid rgba(255, 255, 255, 0.15);
   text-decoration: none;
   font-family: var(--font-sans, "Inter", sans-serif);
@@ -720,7 +720,7 @@ select option {
 }
 
 .framefic-limit-desc {
-  font-family: var(--font-body, "DM Sans", sans-serif);
+  font-family: var(--font-body);
   font-size: 12px;
   line-height: 1.5;
   color: var(--paragraph, #c7ccd6);
@@ -2272,8 +2272,8 @@ html[data-user-theme="light"] body .empty-state-desc {
   background-color: var(--px-toast-bg, rgba(41, 40, 40, 0.82));
   border: 1px solid var(--framer-color-divider, rgba(255, 255, 255, 0.07));
   box-shadow: var(--px-toast-shadow, 0 1px 3px rgba(0, 0, 0, 0.18), 0 10px 28px -10px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(var(--px-glass-blur-toast));
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-toast));
   pointer-events: auto;
   user-select: none;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;

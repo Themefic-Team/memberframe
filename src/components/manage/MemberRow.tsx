@@ -69,7 +69,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({ member, selected, onSelect
             aria-label={`Signed up with ${SIGN_IN_PROVIDER_NAMES[member.signupMethod]}`}
             role="img"
           >
-            <ProviderMark provider={member.signupMethod} size={12} />
+            <ProviderMark provider={member.signupMethod} small />
           </span>
         ) : null}
       </span>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, Crown } from "lucide-react";
+import { Clock, Crown, Globe, LogOut, Mail, User } from "lucide-react";
 import { useConnection } from "../../hooks/useConnection";
 import { useLicense } from "../../hooks/useLicense";
 import { failureMessage } from "../../services/apiClient";
@@ -14,24 +14,9 @@ export interface ProfilePageProps {
   onSignIn: () => void;
 }
 
-const USER_ICON = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M20 21C20 18.2386 16.4183 16 12 16C7.58172 16 4 18.2386 4 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M12 13C14.2091 13 16 11.2091 16 9C16 6.79086 14.2091 5 12 5C9.79086 5 8 6.79086 8 9C8 11.2091 9.79086 13 12 13Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-const MAIL_ICON = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M22 6L12 13L2 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-const GLOBE_ICON = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-);
+const USER_ICON = <User className="beaf-profile-field-icon" aria-hidden={true} />;
+const MAIL_ICON = <Mail className="beaf-profile-field-icon" aria-hidden={true} />;
+const GLOBE_ICON = <Globe className="beaf-profile-field-icon" aria-hidden={true} />;
 
 /**
  * Profile, behind the account icon. F19: a clone of the BEAF plugin's
@@ -152,12 +137,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
 
           {isProUser ? (
             <div className="beaf-avatar-badge beaf-avatar-badge--pro" title="Pro Member">
-              <Crown fill="currentColor" width={13} height={13} />
+              <Crown fill="currentColor" aria-hidden={true} />
               <span>PRO</span>
             </div>
           ) : isTrialUser ? (
             <div className="beaf-avatar-badge beaf-avatar-badge--trial" title="7-Day Free Trial Active">
-              <Clock width={13} height={13} color="black" />
+              <Clock aria-hidden={true} />
               <span>TRIAL</span>
             </div>
           ) : null}
@@ -295,11 +280,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
           }}
         >
           Sign Out
-          <svg className="beaf-logout-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path className="beaf-logout-door" d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path className="beaf-logout-arrow" d="M16 17L21 12L16 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path className="beaf-logout-arrow" d="M21 12H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <LogOut className="beaf-logout-icon" aria-hidden={true} />
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Check, X } from "lucide-react";
 import { useConnection } from "../../hooks/useConnection";
 import { failureMessage } from "../../services/apiClient";
 import { accountPageUrl, newSessionId, pollHandoff } from "../../services/connectService";
@@ -151,8 +152,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "reg
   return (
     <div className="beaf-auth-overlay" onClick={onClose}>
       <div className="beaf-auth-panel beaf-external-auth-panel" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-        <button type="button" className="beaf-auth-close" onClick={onClose} aria-label="Close">
-          ✕
+        <button type="button" className="beaf-auth-close" onClick={onClose} aria-label="Close" title="Close">
+          <X aria-hidden={true} />
         </button>
 
         <div className="beaf-external-auth-icon-wrap">
@@ -175,7 +176,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "reg
           <div className="beaf-external-auth-features">
             {FEATURES.map((feature) => (
               <div key={feature} className="beaf-external-feature-item">
-                <span className="beaf-external-feature-check">✓</span>
+                <span className="beaf-external-feature-check">
+                  <Check aria-hidden={true} />
+                </span>
                 <span>{feature}</span>
               </div>
             ))}

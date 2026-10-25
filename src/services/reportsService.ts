@@ -128,7 +128,7 @@ export interface MemberHistory {
   payments: Array<{ id: string; amountMinor: number; currency: string; gateway: string; status: string; paidAt: string; receiptUrl: string | null; tierName: string }>;
 }
 
-/** Export CSV asks for this many rows at once, the server's cap. */
+/** An export asks for this many rows at once, the server's cap. */
 export const REPORT_EXPORT_MAX = 5000;
 
 export function fetchOverview(
@@ -179,13 +179,13 @@ export function toCsv(header: ReadonlyArray<string>, rows: ReadonlyArray<Readonl
 }
 
 /**
- * Save CSV text as a file. A link with `download`, the one way a page in an
+ * Save text as a file. A link with `download`, the one way a page in an
  * iframe can hand the browser a file; it answers false where the plugin frame
  * refuses, so the caller can say so.
  */
-export function downloadCsv(fileName: string, csv: string): boolean {
+export function downloadFile(fileName: string, content: string, type: string): boolean {
   try {
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([content], { type }));
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;

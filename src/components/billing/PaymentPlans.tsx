@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import type { PlanId, PlansResponse } from "../../services/licenseService";
 import { PLAN_FEATURES } from "./billingHelpers";
 
@@ -21,11 +22,7 @@ const money = (minor: number, currency = "usd"): string => {
   }
 };
 
-const CHECK = (
-  <svg className="checkmark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
+const CHECK = <Check className="checkmark" aria-hidden={true} />;
 
 /**
  * Monthly or Yearly, then "or, pay once" and Lifetime. F19: a clone of the

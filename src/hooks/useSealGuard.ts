@@ -20,8 +20,28 @@ import { deployBaseUrl } from "../config/backend";
 import { missingPublishedOrigins } from "../services/framerProjectService";
 import { addAllowedOrigins } from "../services/siteSettingsService";
 import { syncSiteConfig, type PatchableFile } from "../utils/configPatcher";
-import { SECTION_LOCKS_FILE_NAME, sectionLocksCode, staleSectionLocksFile } from "../services/sectionLocks";
+import {
+  LEGACY_SECTION_LOCKS_FILE_NAME,
+  SECTION_LOCKS_FILE_NAME,
+  sectionLocksCode,
+  staleSectionLocksFile,
+} from "../services/sectionLocks";
+import { writeCodeFile } from "../services/framerCanvasService";
 import { ARTICLE_TAG_FILE_NAME, articleTagCode } from "../services/articleTag";
+import { PROTECTED_DOWNLOAD_FILE_NAME } from "../services/canvasComponentCodeGenerator";
+import { assetsFailure } from "../services/assetsService";
+import {
+  DOWNLOAD_RULES_KEY,
+  fileUrlOf,
+  parseDownloadRules,
+  planDownload,
+  readDownloadControls,
+  ruleOf,
+  SAVED_PASSWORD,
+  securePlan,
+  shortHash,
+  type DownloadState,
+} from "../services/downloadVault";
 import {
   LICENSE_MARKER,
   SEAL_CONTROL,
@@ -61,6 +81,9 @@ interface GuardState {
   settled: string | null;
   seals: Backoff;
   origins: Backoff;
+  downloads: Backoff;
+  /** Messages already shown this session, so a waiting download does not repeat its toast. */
+  told: Set<string>;
 }
 
 function waiting(backoff: Backoff): boolean {
@@ -187,6 +210,105 @@ async function guardOnce(siteId: string, siteKey: string, state: GuardState): Pr
   return cleared;
 }
 
+/**
+ * Empty a Protected Download's File control. Framer documents no "no file"
+ * value, and ignored `null` on 2026-10-22, so each likely one is tried and the
+ * layer read back after it. True once the control reads empty.
+ */
+async function clearFileControl(node: InstanceNode): Promise<boolean> {
+  for (const empty of [undefined, null, ""]) {
+    try {
+      await node.setAttributes({ controls: { file: empty } });
+      const fresh = (await framer.getNode(node.id)) as unknown as InstanceNode | null;
+      if (fresh && fileUrlOf(fresh.controls?.["file"]) === "") return true;
+    } catch {
+      // Refused: try the next.
+    }
+  }
+  return false;
+}
+
+/** A password file whose password is saved on the server, while its field reads empty. */
+function showsNoPassword(node: InstanceNode, controls: DownloadState, synced: Readonly<Record<string, string>>): boolean {
+  return (
+    controls.assetId !== "" &&
+    ruleOf(controls) === "password" &&
+    (synced[controls.assetId] ?? "").startsWith("password|") &&
+    node.controls?.["password"] !== SAVED_PASSWORD
+  );
+}
+
+/**
+ * Move each Protected Download's canvas file, and any password, to the server,
+ * then clear them from the component (32-canvas-downloads.md). Until then the
+ * file's Framer address is in the component's props, which a published page
+ * carries. Only changes are sent; a server failure leaves the canvas as it is
+ * and waits before trying again. Returns how many files were secured.
+ */
+async function secureDownloadsOnce(siteId: string, state: GuardState): Promise<number> {
+  if (waiting(state.downloads)) return 0;
+  const file = (await framer.getCodeFiles()).find((candidate) => candidate.name === PROTECTED_DOWNLOAD_FILE_NAME);
+  if (!file) return 0;
+
+  const nodes = (await framer.getNodesWithType("ComponentInstanceNode")) as unknown as InstanceNode[];
+  const instances = nodes.filter((node) => !node.isReplica && !node.originalId && instanceOfFile(node, file));
+  if (instances.length === 0) return 0;
+
+  const synced = parseDownloadRules(await framer.getPluginData(DOWNLOAD_RULES_KEY));
+  const next = { ...synced };
+  let secured = 0;
+
+  for (const node of instances) {
+    const controls = readDownloadControls(node.controls);
+    const plan = planDownload(controls, synced);
+    if (plan.kind === "none") {
+      // Saved before the mark existed, or the field was emptied: show it as set again.
+      if (showsNoPassword(node, controls, synced)) await node.setAttributes({ controls: { password: SAVED_PASSWORD } });
+      continue;
+    }
+    const outcome = await securePlan(siteId, plan, controls);
+
+    if (outcome.kind === "blocked") {
+      if (!state.told.has(outcome.message)) {
+        state.told.add(outcome.message);
+        framer.notify(outcome.message, { variant: "warning" });
+      }
+      continue;
+    }
+    if (outcome.kind === "failed") {
+      failed(state.downloads);
+      framer.notify(`A download file could not be secured: ${assetsFailure(outcome.result)}`, { variant: "error" });
+      break;
+    }
+    if (outcome.kind === "none") continue;
+
+    next[outcome.assetId] = outcome.fingerprint;
+    if (outcome.kind === "adopted") continue;
+
+    // The asset id first, with which file it holds, so a failure clearing the
+    // file never loses it and the component can tell a saved file from a new one.
+    await node.setAttributes({
+      controls: {
+        assetId: outcome.assetId,
+        // A password file keeps a fixed mark, so the field reads as set; never the password.
+        password: ruleOf(controls) === "password" ? SAVED_PASSWORD : "",
+        ...(controls.fileUrl ? { fileSecured: shortHash(controls.fileUrl) } : {}),
+      },
+    });
+    if (controls.fileUrl && !(await clearFileControl(node)) && !state.told.has(`clear:${outcome.assetId}`)) {
+      state.told.add(`clear:${outcome.assetId}`);
+      framer.notify("The file is saved. Clear the File field in the sidebar before publishing, so its address stays private.", {
+        variant: "warning",
+      });
+    }
+    secured += 1;
+  }
+
+  if (JSON.stringify(next) !== JSON.stringify(synced)) await framer.setPluginData(DOWNLOAD_RULES_KEY, JSON.stringify(next));
+  if (secured > 0) succeeded(state.downloads);
+  return secured;
+}
+
 /** Record the node the Builder just inserted, so it is the one that keeps its seal. */
 export async function recordSeal(seal: string, nodeId: string): Promise<void> {
   try {
@@ -238,7 +360,13 @@ export function useSealGuard(): void {
     let again = false;
     let stopped = false;
     let debounce: number | null = null;
-    const state: GuardState = { settled: null, seals: { failures: 0, retryAt: 0 }, origins: { failures: 0, retryAt: 0 } };
+    const state: GuardState = {
+      settled: null,
+      seals: { failures: 0, retryAt: 0 },
+      origins: { failures: 0, retryAt: 0 },
+      downloads: { failures: 0, retryAt: 0 },
+      told: new Set(),
+    };
 
     const run = async () => {
       if (stopped) return;
@@ -258,13 +386,24 @@ export function useSealGuard(): void {
           if (updated > 0 && !stopped) {
             framer.notify(`Updated ${updated} MemberFrame component file${updated === 1 ? "" : "s"} for this site. Publish to update your live site.`, { variant: "info" });
           }
-          // MemberLocks.tsx as the saved rules and the current generator say,
+          // The locks files as the saved rules and the current generator say,
           // so a fix to the overrides reaches projects without a Save locks click.
+          // That is MemberFrameLocks.tsx, and MemberLocks.tsx where a project
+          // still has it from before the rename (its layers point at it).
           const rules = settingsRef.current?.sectionLocks;
-          const locksFile = files.find((file) => file.name === SECTION_LOCKS_FILE_NAME);
-          if (rules && locksFile && staleSectionLocksFile(locksFile.content, rules) && !stopped) {
-            await locksFile.setFileContent(sectionLocksCode(rules));
-            framer.notify("Updated MemberLocks for this site. Publish to update your live site.", { variant: "info" });
+          for (const name of [SECTION_LOCKS_FILE_NAME, LEGACY_SECTION_LOCKS_FILE_NAME]) {
+            const locksFile = files.find((file) => file.name === name);
+            if (rules && locksFile && staleSectionLocksFile(locksFile.content, rules) && !stopped) {
+              await locksFile.setFileContent(sectionLocksCode(rules));
+              framer.notify("Updated MemberFrameLocks for this site. Publish to update your live site.", { variant: "info" });
+            }
+          }
+          // A project from before the rename gets the new file once, so Code
+          // overrides lists MemberFrameLocks for the next layer it locks.
+          const hasLegacy = files.some((file) => file.name === LEGACY_SECTION_LOCKS_FILE_NAME);
+          const hasCurrent = files.some((file) => file.name === SECTION_LOCKS_FILE_NAME);
+          if (rules && rules.length > 0 && hasLegacy && !hasCurrent && !stopped) {
+            await writeCodeFile(framer, SECTION_LOCKS_FILE_NAME, sectionLocksCode(rules));
           }
           // MemberArticle.tsx holds no creator input: any other content is an older plugin's.
           const articleFile = files.find((file) => file.name === ARTICLE_TAG_FILE_NAME);
@@ -277,6 +416,15 @@ export function useSealGuard(): void {
           const current = connectionRef.current;
           if (current && !stopped) await applyConnection({ ...current, allowedOrigins: origins });
         }).catch(() => undefined);
+        const securedFiles = await secureDownloadsOnce(siteId, state).catch(() => 0);
+        if (securedFiles > 0 && !stopped) {
+          framer.notify(
+            securedFiles === 1
+              ? "Secured 1 download file. Publish to update your live site."
+              : `Secured ${securedFiles} download files. Publish to update your live site.`,
+            { variant: "success" }
+          );
+        }
         const cleared = await guardOnce(siteId, siteKey, state);
         if (cleared > 0 && !stopped) {
           framer.notify(

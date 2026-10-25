@@ -7,8 +7,6 @@ import { canvasLicense } from "../../services/licenseService";
 import { cn } from "../../utils/cn";
 import {
   AUTH_SCREEN_DEFAULTS,
-  ARTICLE_TAG_FILE_NAME,
-  articleTagCode,
   deployCanvasComponent,
   writeCodeFile,
   generateAuthScreenCode,
@@ -38,9 +36,12 @@ import {
 
 /**
  * The components that carry the license block, and so a seal from the server
- * (27-instance-seal.md). The bookmark pair has neither, by the F19 decision.
+ * (27-instance-seal.md). Every canvas component since 2026-10-25, the bookmark
+ * pair included.
  */
 const SEALED_COMPONENTS = new Set([
+  "bookmark_button",
+  "bookmarks_tray",
   "member_auth",
   "member_login",
   "member_register",
@@ -115,7 +116,6 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   bookmark_button: { width: "44px", height: "44px", position: "relative", top: null, centerX: null },
   bookmarks_tray: { width: "44px", height: "44px", position: "relative", top: null, centerX: null },
 };
-import { assetSummary, fetchAssets, type AssetList, type SiteAsset } from "../../services/assetsService";
 import { fetchPayments } from "../../services/paymentsService";
 import { useConnection } from "../../hooks/useConnection";
 import { recordSeal } from "../../hooks/useSealGuard";
@@ -163,10 +163,8 @@ export const BuilderTab: React.FC = () => {
   const { connection, settings } = useConnection();
   const siteTierList = useSiteTiers(connection?.siteId ?? null);
   const [componentId, setComponentId] = useState<CanvasComponentId>(DEFAULT_COMPONENT_ID);
-  const [assetsList, setAssetsList] = useState<AssetList | null>(null);
   // The site's pricing page, from Payments, for the paywall's buttons.
   const [pricingPath, setPricingPath] = useState<string | undefined>(undefined);
-  const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [scaffolding, setScaffolding] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
@@ -182,35 +180,6 @@ export const BuilderTab: React.FC = () => {
       active = false;
     };
   }, [connection?.siteId]);
-
-  useEffect(() => {
-    if (!connection?.siteId) return;
-    let active = true;
-    void fetchAssets(connection.siteId).then((result) => {
-      if (active && result.kind === "ok") {
-        setAssetsList(result.data);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [connection?.siteId]);
-
-  const assetOptions = useMemo(() => {
-    const list = assetsList?.assets ?? [];
-    return [
-      { value: "", label: "Default (configure in Framer)" },
-      ...list.map((asset) => ({
-        value: asset.id,
-        label: `${asset.name} (${assetSummary(asset)})`,
-      })),
-    ];
-  }, [assetsList]);
-
-  const chosenAsset = useMemo(
-    () => (componentId === "protected_download" ? assetsList?.assets.find((a) => a.id === selectedAssetId) ?? null : null),
-    [assetsList, componentId, selectedAssetId]
-  );
 
   /**
    * What the generator bakes into every deployed component.
@@ -491,7 +460,7 @@ export const BuilderTab: React.FC = () => {
         in Framer's own properties panel. One generator core, one deploy path,
         no special case.
       */
-      const generated = generateForComponent(entry.id, deployContext, chosenAsset);
+      const generated = generateForComponent(entry.id, deployContext);
       const layoutAttrs = COMPONENT_LAYOUT_DEFAULTS[entry.id] ?? {
         width: "100%",
         height: "fit-content",
@@ -502,7 +471,6 @@ export const BuilderTab: React.FC = () => {
 
       const seal = await sealForInsert(entry.id, connection?.siteId);
       const controls: Record<string, unknown> = {
-        ...(chosenAsset ? { assetId: chosenAsset.id, buttonText: `Download ${chosenAsset.name || "File"}` } : {}),
         ...(seal ? { [SEAL_CONTROL]: seal } : {}),
       };
       const outcome = await deployCanvasComponent(framer, generated, {
@@ -513,16 +481,9 @@ export const BuilderTab: React.FC = () => {
       });
       if (outcome.ok && seal) await recordSeal(seal, outcome.nodeId);
 
-      // The Soft Paywall's linked mode needs the PaywallArticle override for a
-      // CMS post body, so it arrives with the component. Docs: 21-blog-paywalls.md
-      const tagWritten =
-        outcome.ok && entry.id === "metered_paywall"
-          ? await writeCodeFile(framer, ARTICLE_TAG_FILE_NAME, articleTagCode())
-          : null;
-
-      if (tagWritten && !tagWritten.ok) {
-        setFailure({ title: "Soft Paywall added, MemberArticle not written", message: tagWritten.message });
-      } else if (outcome.ok) {
+      // The Soft Paywall finds its article itself (21-blog-paywalls.md 8), so
+      // no MemberArticle override file is written any more.
+      if (outcome.ok) {
         showToast({
           tone: "success",
           message: `${entry.name} ${outcome.action === "created" ? "added" : "updated"}`,
@@ -541,7 +502,7 @@ export const BuilderTab: React.FC = () => {
     } finally {
       setDeploying(false);
     }
-  }, [chosenAsset, connection?.siteId, deployContext, entry, showToast]);
+  }, [connection?.siteId, deployContext, entry, showToast]);
 
   return (
     <MemberSessionProvider>
@@ -557,26 +518,6 @@ export const BuilderTab: React.FC = () => {
             />
           </FieldRow>
 
-          {componentId === "protected_download" ? (
-            <FieldRow
-              label="Attach file"
-              htmlFor="builder-asset"
-              fill
-              hint={
-                assetsList && assetsList.assets.length > 0
-                  ? "Pre-fills this button with your uploaded file."
-                  : "Upload files in Manage > Files, or configure later on the canvas."
-              }
-            >
-              <Select
-                id="builder-asset"
-                value={selectedAssetId}
-                options={assetOptions}
-                onChange={setSelectedAssetId}
-                fill
-              />
-            </FieldRow>
-          ) : null}
         </FieldRows>
 
         {/*
@@ -618,7 +559,7 @@ export const BuilderTab: React.FC = () => {
             <Plus aria-hidden={true} />
             {deploying ? "Adding" : "Add to canvas"}
           </Button>
-          <p className="studio-cta-note">{ctaNote(entry, Boolean(chosenAsset))}</p>
+          <p className="studio-cta-note">{ctaNote(entry)}</p>
         </div>
 
         <section className="builder-scaffold-section">
@@ -656,6 +597,7 @@ export const BuilderTab: React.FC = () => {
                       checked={alreadyExists ? true : isSelected}
                       disabled={alreadyExists}
                       onChange={() => handleTogglePage(page.id)}
+                      fill
                     >
                       <div className="builder-page-text">
                         <span className="builder-page-title">{page.title}</span>
@@ -698,22 +640,16 @@ export const BuilderTab: React.FC = () => {
 /**
  * The line under the CTA.
  */
-function ctaNote(entry: CanvasComponentEntry, hasAsset: boolean): string {
+function ctaNote(entry: CanvasComponentEntry): string {
   if (!entry.deployable) return `${entry.name} arrives with task ${entry.task}.`;
-  if (entry.id === "protected_download" && hasAsset) {
-    return "Adds the button for your chosen file.";
-  }
+  if (entry.id === "protected_download") return "Then upload the file in Framer's right sidebar.";
   return "Then style and set it up in Framer's right sidebar.";
 }
 
 /**
  * The file to deploy for a picker entry, with its authored defaults.
  */
-function generateForComponent(
-  id: CanvasComponentId,
-  context: DeployContext,
-  asset?: SiteAsset | null
-): GeneratedCanvasFile {
+function generateForComponent(id: CanvasComponentId, context: DeployContext): GeneratedCanvasFile {
   switch (id) {
     case "member_auth":
       return generateMemberAuthCode(DEFAULT_MEMBER_AUTH_CONFIG, undefined, context);
@@ -729,15 +665,7 @@ function generateForComponent(
     case "metered_paywall":
       return generateMeteredPaywallCode(DEFAULT_METERED_PAYWALL_CONFIG, undefined, context);
     case "protected_download":
-      return generateProtectedDownloadCode(
-        {
-          ...DEFAULT_PROTECTED_DOWNLOAD_CONFIG,
-          defaultAssetId: asset?.id ?? "",
-          buttonText: asset?.name ? `Download ${asset.name}` : DEFAULT_PROTECTED_DOWNLOAD_CONFIG.buttonText,
-        },
-        undefined,
-        context
-      );
+      return generateProtectedDownloadCode(DEFAULT_PROTECTED_DOWNLOAD_CONFIG, undefined, context);
     case "bookmark_button":
       return generateBookmarkButtonCode(DEFAULT_BOOKMARK_BUTTON_CONFIG, undefined, context);
     case "bookmarks_tray":

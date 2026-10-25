@@ -17,7 +17,7 @@ export const WatermarkNotice: React.FC<{ onUpgrade?: () => void }> = ({ onUpgrad
       title={onUpgrade ? "Click to view upgrade plans" : undefined}
     >
       <div className="beaf-watermark-notice-icon-col">
-        <Info size={16} className="beaf-watermark-notice-icon" />
+        <Info className="beaf-watermark-notice-icon" aria-hidden={true} />
       </div>
       <div className="beaf-watermark-notice-text-col">
         <div className="beaf-watermark-notice-title">Notice</div>

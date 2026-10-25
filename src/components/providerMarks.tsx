@@ -7,6 +7,7 @@
  */
 
 import React from "react";
+import { cn } from "../utils/cn";
 
 export type SignInProvider = "google" | "apple" | "github" | "discord";
 
@@ -28,8 +29,17 @@ export function isSignInProvider(value: unknown): value is SignInProvider {
   return value === "google" || value === "apple" || value === "github" || value === "discord";
 }
 
-export const ProviderMark: React.FC<{ provider: SignInProvider; size?: number; className?: string }> = ({ provider, size = 16, className }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false" className={className}>
+/**
+ * Brand marks, the one place the panel draws its own svg: Lucide has no
+ * brand logos (design-system.md section 12). Sized by CSS (`.provider-mark`,
+ * 16px; `small` is 12px, for inline beside text), like every icon.
+ */
+export const ProviderMark: React.FC<{ provider: SignInProvider; small?: boolean; className?: string }> = ({
+  provider,
+  small = false,
+  className,
+}) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className={cn("provider-mark", small && "is-small", className)}>
     <path fill="currentColor" d={PATHS[provider]} />
   </svg>
 );

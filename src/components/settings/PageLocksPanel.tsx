@@ -25,6 +25,9 @@ import {
 } from "../../services";
 import { useToast } from "../ui";
 import { SectionLocksEditor } from "./SectionLocksEditor";
+import { TierChecklist } from "./TierChecklist";
+import { isOnlyChoice } from "../../services/tierChoice";
+import { accessOptions, accessOptionsFor, accessValue, parseAccess } from "../../services/accessChoices";
 import { cn } from "../../utils/cn";
 
 export interface PageLocksPanelProps {
@@ -40,22 +43,6 @@ export interface PageLocksPanelProps {
   siteConnected?: boolean;
   /** The site's tiers, for the Required tier picker. Custom tiers included. */
   tiers?: ReadonlyArray<TierLadderEntry>;
-}
-
-/**
- * "Any signed in member", then the site's own tiers by rank, custom ones
- * included (conflict C9). The highest rank reads "only", the rest "or higher".
- */
-function tierOptions(tiers: ReadonlyArray<TierLadderEntry>): ReadonlyArray<{ value: GatedPageTier; label: string }> {
-  const ordered = [...tiers].sort((a, b) => a.rank - b.rank);
-  const top = ordered[ordered.length - 1]?.key;
-  return [
-    { value: "signed_in", label: "Any signed in member" },
-    ...ordered.map((tier) => ({
-      value: tier.key,
-      label: tier.key === top ? `${tier.name} only` : `${tier.name} or higher`,
-    })),
-  ];
 }
 
 export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
@@ -143,6 +130,9 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
     onChangeRules(next);
   };
 
+  // The same list section locks and the paywall use (services/accessChoices.ts).
+  const pageAccessOptions = useMemo(() => accessOptions(tiers, { others: true }), [tiers]);
+
   const handleUpdate = <K extends keyof GatedPageRule>(
     index: number,
     key: K,
@@ -150,6 +140,15 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
   ) => {
     const next = [...rules];
     next[index] = { ...next[index], [key]: val };
+    onChangeRules(next);
+  };
+
+  /** Who the page is for: the audience and the tier choice change together. */
+  const handleAccess = (index: number, value: string) => {
+    const next = [...rules];
+    const access = parseAccess(value, next[index], tiers);
+    const { audience: _old, ...rest } = next[index]!;
+    next[index] = access.audience === "others" ? { ...rest, ...access } : { ...rest, requiredTier: access.requiredTier };
     onChangeRules(next);
   };
 
@@ -347,15 +346,26 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
                         </FieldRow>
                       ) : null}
 
-                      <FieldRow label="Required tier" htmlFor={`rule-tier-${index}`}>
+                      <FieldRow label="Who can open it" htmlFor={`rule-tier-${index}`}>
                         <Select
                           id={`rule-tier-${index}`}
-                          value={rule.requiredTier}
-                          options={tierOptions(tiers)}
+                          value={accessValue(rule)}
+                          options={accessOptionsFor(rule, pageAccessOptions)}
                           disabled={saving || !rule.enabled}
-                          onChange={(val) => handleUpdate(index, "requiredTier", val)}
+                          onChange={(val) => handleAccess(index, val)}
                         />
                       </FieldRow>
+
+                      {isOnlyChoice(rule.requiredTier) ? (
+                        <TierChecklist
+                          value={rule.requiredTier}
+                          tiers={tiers}
+                          idPrefix={`rule-only-${index}`}
+                          disabled={saving || !rule.enabled}
+                          excluding={rule.audience === "others"}
+                          onChange={(next) => handleUpdate(index, "requiredTier", next)}
+                        />
+                      ) : null}
 
                       <>
                           <FieldRow

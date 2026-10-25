@@ -36,7 +36,7 @@
   padding: 16px;
   border-radius: var(--radius-8);
   border: 1px solid var(--framer-color-divider);
-  background-color: var(--framefic-page-bg);
+  background-color: var(--framer-color-bg);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -54,7 +54,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
 }
 
 .studio-session-meta {
@@ -81,7 +81,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
   text-align: center;
 }
 
@@ -119,7 +119,7 @@
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .studio-pending-body {
@@ -128,7 +128,7 @@
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 16px;
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
 }
 
 /* --------------------------------------------------------------------------
@@ -215,11 +215,11 @@
   background: var(--framer-color-bg-tertiary);
   font: var(--text-body);
   font-variant-numeric: tabular-nums;
-  color: var(--title);
+  color: var(--framer-color-text);
 }
 
 .framefic-slider-unit {
-  color: var(--paragraph-faint);
+  color: var(--framer-color-text-tertiary);
 }
 
 /* ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@
 .builder-scaffold-heading {
   font-size: 14px;
   font-weight: 600;
-  color: var(--title);
+  color: var(--framer-color-text);
   margin: 0;
 }
 
@@ -297,10 +297,6 @@
   flex: 1;
 }
 
-.builder-page-left .framefic-checkbox {
-  width: 100%;
-}
-
 .builder-page-text {
   display: flex;
   flex-direction: column;
@@ -309,7 +305,7 @@
 }
 
 .builder-page-title {
-  color: var(--title);
+  color: var(--framer-color-text);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -320,7 +316,7 @@
 }
 
 .builder-page-path {
-  color: var(--paragraph);
+  color: var(--framer-color-text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 14px;

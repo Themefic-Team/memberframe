@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 
 // Order matters.
+//   fonts.css         Inter and JetBrains Mono, bundled: nothing loads from a CDN
 //   framer-base.css   framer.css inside a cascade layer, so every kit class beats
 //                     its bare-element rules (see the file header)
 //   design-tokens.css aliases and overrides them per theme
@@ -16,6 +17,7 @@ import { App } from "./App";
 //   billing/*         F19 billing screens, copied from the BEAF plugin so every
 //                     Framefic plugin bills the same way. Own --beaf-* tokens,
 //                     exempt from lint:design (design-system.md v0.4.4)
+import "./styles/fonts.css";
 import "./styles/framer-base.css";
 import "./styles/design-tokens.css";
 import "./App.css";

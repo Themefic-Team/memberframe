@@ -530,6 +530,7 @@ const TierFeatures: React.FC<{
             disabled={disabled}
             onChange={(text) => setRow(index, { text })}
             fill
+            muted={!feature.included}
           />
           <IconButton label="Remove feature" variant="ghost" disabled={disabled} onClick={() => setRemovingIndex(index)}>
             <X aria-hidden={true} />

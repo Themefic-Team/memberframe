@@ -15,11 +15,13 @@
  *
  * ## Where the article is
  *
- * Nothing to set (2026-10-20): place the component below the article. On the
- * published site it takes the nearest shown text block above it with two or
- * more paragraphs, or a layer given the `PaywallArticle` override (file
- * MemberArticle), cuts and frosts it with CSS, and shows its own card. A
- * tagged layer is cut from the first paint; a found one once the page runs.
+ * Nothing to set and no code override, on any page (2026-10-22): the paywall
+ * locks the layer right above it in its stack, a CMS post body, a text block,
+ * a stack, a grid, or a list. With nothing right above, it takes the nearest
+ * shown text block above it with two or more paragraphs, down to the paywall
+ * before it. So several paywalls on a page each protect their own layer. It
+ * cuts and frosts that layer with CSS scoped to this instance, and shows its
+ * own card.
  *
  * ## Where the count lives
  *
@@ -69,12 +71,15 @@ const IS_TRIAL = false;
 // `test/canvasLicenseParity.test.ts`. F19, 19-pro-lock-and-trial.md.
 //
 // The four lines above are this file's state when it was written, and they are
-// rewritten in place by the plugin whenever the license changes. On the canvas
-// and the published site the component also asks the server, and its answer
-// wins: trial shows the "Made with Framefic" mark, the bottom right corner
-// copied from the BEAF slider; an ended plan blurs the component behind an
-// Upgrade card. The server refuses an unlicensed site's member requests on its
-// own, so removing these lines unlocks nothing.
+// rewritten in place by the plugin whenever the license changes, and set to
+// locked when the creator signs out of the plugin. The component also asks the
+// server: trial shows the "Made with Framefic" mark, the bottom right corner
+// copied from the BEAF slider; an ended trial or plan blurs the component
+// behind an Upgrade card. On the published site the server's answer wins. On
+// the canvas the stricter of the two wins, so a signed-out plugin locks the
+// canvas even though the site's plan is still paid, and a locked component
+// hides its settings in Framer's right panel. The server refuses an unlicensed
+// site's member requests on its own, so removing these lines unlocks nothing.
 //
 // The server is asked once when the component mounts, and again only when the
 // tab comes back after ten minutes or more: nothing polls. On the canvas the
@@ -134,15 +139,45 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   return answer;
 }
 
+const MF_STRICTNESS: Record<string, number> = { active: 0, trial: 1, locked: 2 };
+
+/**
+ * What to draw from the file's lines and the server's answer. A copy or a
+ * foreign domain always shows its own card. On the published site the server
+ * wins, so a paid site never locks because its creator signed out. On the
+ * canvas the stricter one wins: the plugin's sign-out lock holds there, and so
+ * does a lapse the server knows about before the plugin is next opened.
+ */
+function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boolean): MfLicense {
+  if (answer === "copied" || answer === "domain" || !onCanvas) return answer;
+  return (MF_STRICTNESS[baked] ?? 0) > (MF_STRICTNESS[answer] ?? 0) ? baked : answer;
+}
+
+/**
+ * The component's property controls, or, while the file is locked, the same
+ * controls all hidden from Framer's right panel: nothing can be set until the
+ * creator signs in or upgrades. The seal stays, so the instance keeps it.
+ */
+function mfControls<T extends object>(controls: T): T {
+  if (!IS_LOCKED) return controls;
+  const locked: Record<string, unknown> = {};
+  for (const [key, control] of Object.entries(controls)) {
+    locked[key] = key === "mfSeal" ? control : { ...(control as object), hidden: () => true };
+  }
+  return locked as T;
+}
+
 function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLicense {
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
   useEffect(() => {
     let live = true;
     let checkedAt = 0;
+    const target = RenderTarget.current();
+    const onCanvas = target === RenderTarget.canvas || target === RenderTarget.thumbnail;
     const check = () => {
       checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
-        if (live && answer) setLicense(answer);
+        if (live && answer) setLicense(mfEffectiveLicense(mfBakedLicense(), answer, onCanvas));
       });
     };
     check();
@@ -171,19 +206,22 @@ const MF_LICENSE_CSS = `
 .mf-wm-text { color: #94a3b8; font-weight: 500; letter-spacing: 0.1px; transition: color 0.2s ease; }
 .mf-wm:hover .mf-wm-text { color: rgba(255, 255, 255, 0.85); }
 .mf-wm-brand { color: #ffffff; font-weight: 600; letter-spacing: 0.2px; }
-.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: inherit; container-type: size; }
+.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: inherit; container-type: size; }
 .mf-lock-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
 .mf-lock-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
 .mf-lock-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
 .mf-lock-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
 @container (max-height: 150px) { .mf-lock-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lock-icon { width: 24px; height: 24px; } .mf-lock-icon svg { width: 14px; height: 14px; } .mf-lock-text { display: none; } .mf-lock-title { font-size: 12px; } }
+@container (max-height: 64px) or (max-width: 140px) { .mf-lock { padding: 0; } .mf-lock-card { padding: 0; background: transparent; border: 0; box-shadow: none; } .mf-lock-title, .mf-lock-text { display: none; } .mf-lock-icon { width: 24px; height: 24px; background: rgba(18, 18, 20, 0.85); } .mf-lock-icon svg { width: 14px; height: 14px; } }
+.mf-wm-frame { position: absolute; inset: 0; z-index: 30; pointer-events: none; container-type: size; }
+@container (max-height: 64px) or (max-width: 200px) { .mf-wm { bottom: 2px; right: 2px; padding: 3px; gap: 0; } .mf-wm-text, .mf-wm-brand { display: none; } }
 `;
 
 function MfWatermark(): React.ReactElement {
   return (
     <a className="mf-wm" href="https://framefic.com" target="_blank" rel="noopener noreferrer">
       <span className="mf-wm-icon" aria-hidden={true}>
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" data-brand="framefic">
           <path d="M2.2 5V3.4C2.2 2.74 2.74 2.2 3.4 2.2H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M11 2.2H12.6C13.26 2.2 13.8 2.74 13.8 3.4V5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M2.2 11V12.6C2.2 13.26 2.74 13.8 3.4 13.8H5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -198,7 +236,7 @@ function MfWatermark(): React.ReactElement {
 }
 
 const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
-  locked: { title: "Upgrade to Pro", text: "This site's MemberFrame plan has ended. Upgrade in the MemberFrame plugin to restore it." },
+  locked: { title: "Upgrade to Pro", text: "MemberFrame is locked: the trial or plan has ended, or the plugin is signed out. Open the MemberFrame plugin to sign in or upgrade." },
   copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
   domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
 };
@@ -209,9 +247,9 @@ function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.R
     <div className="mf-lock" role="note" aria-label={copy.title}>
       <div className="mf-lock-card">
         <span className="mf-lock-icon" aria-hidden={true}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="11" width="16" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-lucide="lock">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </span>
         <p className="mf-lock-title">{copy.title}</p>
@@ -227,7 +265,15 @@ function MfLicenseLayer(props: { license: MfLicense }): React.ReactElement | nul
   return (
     <>
       <style>{MF_LICENSE_CSS}</style>
-      {props.license === "trial" ? <MfWatermark /> : <MfLockOverlay kind={props.license} />}
+      {props.license === "trial" ? (
+        // A frame the size of the component, so the mark can shrink to the
+        // Framefic icon alone on a small one (a bookmark button).
+        <div className="mf-wm-frame">
+          <MfWatermark />
+        </div>
+      ) : (
+        <MfLockOverlay kind={props.license} />
+      )}
     </>
   );
 }
@@ -667,10 +713,12 @@ function mfStyleScope(prefix: string, rule: string): { scope: string; css: strin
 const MF_GATED_BODY_CLASS = "memberframe-gated-body";
 /** Added by the PaywallArticle override in MemberArticle.tsx. One per page. */
 const MF_LINKED_ARTICLE_CLASS = "mf-paywall-article";
-/** Marks the article this paywall found, tagged or not. One paywall per page. */
+/** Marks the layer a paywall protects, with that paywall's id. */
 const MF_ARTICLE_ATTR = "data-mf-paywall-article";
+/** Marks a layer after a paywall set to hide what is below it, with that paywall's id. */
+const MF_BELOW_ATTR = "data-mf-paywall-below";
 const MF_SCHEMA_ID = "memberframe-paywall-schema";
-const MF_SCHEMA_TYPES = ["Article", "NewsArticle", "BlogPosting", "CreativeWork"];
+const MF_SCHEMA_TYPES = ["Article", "NewsArticle", "BlogPosting", "CreativeWork", "WebPage"];
 
 /** The JSON-LD for a page whose `.memberframe-gated-body` is paid content. */
 function mfPaywallSchema(type: string, headline: string, url: string): string {
@@ -882,19 +930,300 @@ function mfShown(element: Element): boolean {
   return typeof element.getClientRects !== "function" || element.getClientRects().length > 0;
 }
 
+/** A Framer text block. */
+const MF_TEXT_BLOCK = '[data-framer-component-type="RichTextContainer"]';
+
+/** Markup beside layers, never a layer. */
+function mfIsMarkup(element: Element): boolean {
+  const tag = element.tagName;
+  return tag === "STYLE" || tag === "SCRIPT" || tag === "LINK" || tag === "TEMPLATE";
+}
+
 /**
- * The article this paywall protects, with no setting to make: the shown
- * PaywallArticle layer nearest above it, else the nearest shown Framer text
- * block above it with two or more paragraphs, which skips a heading block.
+ * Framer's breakpoint wrapper (`.ssr-variant`) has no box of its own
+ * (`display: contents`), so the browser reports no rectangles for it. It is
+ * looked through, never taken for a copy hidden for another breakpoint.
  */
-function findArticle(root: Element | null): HTMLElement | null {
-  if (typeof document === "undefined") return null;
-  const above = (element: Element) => !root || Boolean(element.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING);
-  const tagged = Array.from(document.querySelectorAll<HTMLElement>(`.${MF_LINKED_ARTICLE_CLASS}`)).filter(mfShown);
-  const taggedAbove = tagged.filter(above);
-  if (taggedAbove.length > 0 || tagged.length > 0) return taggedAbove[taggedAbove.length - 1] ?? tagged[0] ?? null;
-  const blocks = Array.from(document.querySelectorAll<HTMLElement>('[data-framer-component-type="RichTextContainer"]')).filter(
-    (element) => above(element) && mfShown(element) && element.querySelectorAll("p").length >= 2 && !(root && element.contains(root))
+function mfBoxless(element: Element): boolean {
+  return typeof window !== "undefined" && window.getComputedStyle(element).display === "contents";
+}
+
+/**
+ * The layers directly in `parent`, as the Layers panel shows them: boxless
+ * wrappers looked through, markup and copies hidden for another breakpoint
+ * left out.
+ */
+function mfLayersIn(parent: Element): Element[] {
+  const layers: Element[] = [];
+  for (const child of Array.from(parent.children)) {
+    if (mfIsMarkup(child)) continue;
+    if (mfBoxless(child)) layers.push(...mfLayersIn(child));
+    else if (mfShown(child)) layers.push(child);
+  }
+  return layers;
+}
+
+/** Two separate elements, neither inside the other. */
+function mfApart(a: Element, b: Element): boolean {
+  return a !== b && !a.contains(b) && !b.contains(a);
+}
+
+/**
+ * The paywall's own place in its stack: the outermost of the wrappers Framer
+ * puts round a component (its container, a breakpoint's variant). Never out
+ * of a stack holding other layers.
+ */
+function ownSlot(root: Element): Element {
+  let node = root;
+  for (let depth = 0; depth < 8; depth += 1) {
+    const parent = node.parentElement;
+    if (!parent || parent === document.body) break;
+    const from = node;
+    if (mfLayersIn(parent).some((layer) => mfApart(layer, from))) break;
+    node = parent;
+  }
+  return node;
+}
+
+/** The layers in the paywall's stack before it, nearest last. */
+function layersBefore(slot: Element): Element[] {
+  const parent = slot.parentElement;
+  if (!parent) return [];
+  return mfLayersIn(parent).filter(
+    (layer) => mfApart(layer, slot) && Boolean(layer.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING)
+  );
+}
+
+/** Shorter than this, a layer is a "View all" row, a divider, or a button, not content to lock. */
+const MF_MIN_LAYER_PX = 120;
+
+/** Content worth locking: a text block of two or more paragraphs, or a layer of some height. */
+function mfSubstantial(element: Element): boolean {
+  if (element.matches(MF_TEXT_BLOCK) && element.querySelectorAll("p").length >= 2) return true;
+  return element.getBoundingClientRect().height >= MF_MIN_LAYER_PX;
+}
+
+/**
+ * The layer right above the paywall in its stack (21-blog-paywalls.md 9),
+ * skipping copies hidden for another breakpoint and up to three small layers
+ * such as a "View all" row (9.3). A paywall first in its stack takes nothing
+ * from the section before it.
+ */
+function layerAbove(root: Element): HTMLElement | null {
+  const before = layersBefore(ownSlot(root));
+  let skipped = 0;
+  for (let index = before.length - 1; index >= 0; index -= 1) {
+    if (mfSubstantial(before[index]!)) return before[index] as HTMLElement;
+    skipped += 1;
+    if (skipped > 3) return null;
+  }
+  return null;
+}
+
+/** The small layers skipped between the protected layer and the paywall: hidden while it is locked. */
+function layersBetween(layer: Element, root: Element): HTMLElement[] {
+  const before = layersBefore(ownSlot(root));
+  const at = before.indexOf(layer);
+  return at === -1 ? [] : (before.slice(at + 1) as HTMLElement[]);
+}
+
+/** A footer: kept by Below Paywall: Hide. Framer publishes one as a `footer` element. */
+const MF_FOOTER = 'footer, [data-framer-name*="footer" i]';
+
+/**
+ * What Below Paywall: Hide hides (21-blog-paywalls.md 9.3): everything on the
+ * page after the paywall that starts at or below it, from its own stack up to
+ * the page. A column beside it, a footer, and anything fixed or sticky (a
+ * navigation bar, a badge) are kept. Copies hidden for another breakpoint are
+ * included, so a breakpoint change never shows them.
+ */
+function layersBelow(root: Element): HTMLElement[] {
+  const slot = ownSlot(root);
+  const top = slot.getBoundingClientRect().top;
+  const below: HTMLElement[] = [];
+  const take = (element: Element) => {
+    if (mfIsMarkup(element) || element.matches(MF_FOOTER)) return;
+    // A breakpoint wrapper has no box to measure: decide for what is in it.
+    if (mfBoxless(element)) {
+      Array.from(element.children).forEach(take);
+      return;
+    }
+    if (mfShown(element)) {
+      const position = window.getComputedStyle(element).position;
+      if (position === "fixed" || position === "sticky") return;
+      if (element.getBoundingClientRect().top < top - 1) return;
+    }
+    // A wrapper round the footer: hide what is in it, keep the footer.
+    if (element.querySelector(MF_FOOTER)) {
+      Array.from(element.children).forEach(take);
+      return;
+    }
+    below.push(element as HTMLElement);
+  };
+  let node: Element = slot;
+  for (let depth = 0; depth < 16; depth += 1) {
+    for (let next = node.nextElementSibling; next; next = next.nextElementSibling) take(next);
+    const parent = node.parentElement;
+    if (!parent || parent === document.body || parent.id === "main" || parent.hasAttribute("data-framer-root")) break;
+    node = parent;
+  }
+  return below;
+}
+
+/**
+ * A layer's parts: a text block's paragraphs, else the items of a stack,
+ * grid, or list, looking through breakpoint wrappers and wrappers that hold a
+ * single layer.
+ */
+function previewItems(layer: Element): Element[] {
+  let box = layer;
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (box.matches(MF_TEXT_BLOCK)) return Array.from(box.querySelectorAll("p"));
+    const items = mfLayersIn(box);
+    if (items.length !== 1) return items;
+    box = items[0]!;
+  }
+  return [];
+}
+
+/**
+ * What Free Preview counts in the protected layer. With too few parts to cut
+ * after `wanted` of them, the last part is opened: a section of a heading and
+ * a grid counts the heading, then the grid's cards.
+ */
+function previewUnits(layer: Element, wanted = 0): Element[] {
+  let units = previewItems(layer);
+  for (let depth = 0; depth < 4 && units.length > 0 && units.length <= wanted; depth += 1) {
+    const inner = previewItems(units[units.length - 1]!);
+    if (inner.length < 2) break;
+    units = units.slice(0, -1).concat(inner);
+  }
+  return units;
+}
+
+// @memberframe-redact-start
+/*
+  Locked content out of the live page (2026-10-22). CSS alone keeps the words
+  past the cut, and the layers hidden below, in the page, where unticking a
+  style in the browser's tools shows them. So while the paywall is locked,
+  their text is scrambled in place (letters and digits swapped, spaces and
+  punctuation kept, so the frosted part still looks like text) and their
+  images, videos, and frames lose their sources, alt text, and titles. The
+  real values stay in this file's memory and come back on access.
+
+  In place, never removed: the nodes are React's, which updates and removes
+  them later; a node taken out makes that throw. And only once React has
+  taken a node over, which it marks on the node: text changed before then is
+  a hydration mismatch. The Route Shield does the same for section locks.
+  The page's HTML source still has what Framer wrote there.
+*/
+const MF_REDACT_SKIP: Record<string, true> = { STYLE: true, SCRIPT: true, NOSCRIPT: true, TEMPLATE: true };
+const MF_REDACT_ATTRS = ["src", "srcset", "poster", "alt", "title", "aria-label"];
+const MF_BLANK_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+const mfRedactions: WeakMap<Node, { real: string; fake: string } | Record<string, { real: string; fake: string }>> | null =
+  typeof WeakMap === "function" ? new WeakMap() : null;
+
+/** Letters and digits swapped for random ones; spaces and punctuation kept. */
+function mfScramble(text: string): string {
+  let out = "";
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code >= 65 && code <= 90) out += String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    else if (code >= 97 && code <= 122) out += String.fromCharCode(97 + Math.floor(Math.random() * 26));
+    else if (code >= 48 && code <= 57) out += String.fromCharCode(48 + Math.floor(Math.random() * 10));
+    else if (code > 127 && text.charAt(index).trim() !== "") out += "x";
+    else out += text.charAt(index);
+  }
+  return out;
+}
+
+/** React has taken this element over: it marks its nodes with its own keys. */
+function mfHydrated(element: Element): boolean {
+  return Object.keys(element).some((key) => key.indexOf("__reactFiber$") === 0 || key.indexOf("__reactInternalInstance$") === 0);
+}
+
+function mfBlankFor(element: Element, name: string): string {
+  if (name === "src" && element.nodeName === "IMG") return MF_BLANK_IMAGE;
+  if (name === "src" && element.nodeName === "IFRAME") return "about:blank";
+  return "";
+}
+
+/**
+ * Scramble what `hide` says, restore the rest, through a layer's hydrated
+ * nodes. Idempotent: a node already scrambled is left; new text React wrote
+ * since is kept as the real value and scrambled again.
+ */
+function mfRedactTree(root: Node, hide: (node: Node) => boolean): void {
+  const store = mfRedactions;
+  if (!store) return;
+  const visit = (node: Node) => {
+    if (node.nodeType === 3) {
+      const entry = store.get(node) as { real: string; fake: string } | undefined;
+      const text = node.nodeValue ?? "";
+      if (!hide(node)) {
+        if (entry && text === entry.fake) node.nodeValue = entry.real;
+        if (entry) store.delete(node);
+        return;
+      }
+      if (text.trim() === "" || (entry && entry.fake === text)) return;
+      const fake = mfScramble(text);
+      store.set(node, { real: text, fake });
+      node.nodeValue = fake;
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const element = node as Element;
+    if (MF_REDACT_SKIP[element.nodeName] || !mfHydrated(element)) return;
+    const saved = (store.get(element) as Record<string, { real: string; fake: string }> | undefined) ?? {};
+    if (hide(element)) {
+      for (const name of MF_REDACT_ATTRS) {
+        const value = element.getAttribute(name);
+        const blank = mfBlankFor(element, name);
+        if (value === null || value === blank) continue;
+        saved[name] = { real: value, fake: blank };
+        element.setAttribute(name, blank);
+      }
+      if (Object.keys(saved).length > 0) store.set(element, saved);
+    } else if (store.has(element)) {
+      for (const name of Object.keys(saved)) {
+        if (element.getAttribute(name) === saved[name]!.fake) element.setAttribute(name, saved[name]!.real);
+      }
+      store.delete(element);
+    }
+    for (let child = element.firstChild; child; child = child.nextSibling) visit(child);
+  };
+  visit(root);
+}
+// @memberframe-redact-end
+
+/**
+ * The layer this paywall protects, with no setting and no code override
+ * (21-blog-paywalls.md 8 and 9). A layer with the old PaywallArticle override
+ * comes first; then the layer right above it; then the nearest shown text
+ * block above it with two or more paragraphs (a heading block has none). The
+ * search stops at the paywall before it, and skips a layer another paywall has
+ * marked, so several paywalls on one page each take their own. A copy of the
+ * paywall hidden for another breakpoint takes nothing.
+ */
+function findArticle(root: Element | null, ownId: string): HTMLElement | null {
+  if (typeof document === "undefined" || !root || !mfShown(root)) return null;
+  const before = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  // The paywall before this one, in page order: the start of this one's range.
+  const roots = Array.from(document.querySelectorAll(".mf-meter")).filter((other) => other !== root && before(other, root));
+  const start = roots[roots.length - 1] ?? null;
+  const inRange = (element: HTMLElement) =>
+    before(element, root) && !element.contains(root) && (!start || (before(start, element) && !element.contains(start)));
+  const free = (element: HTMLElement) => {
+    const owner = element.getAttribute(MF_ARTICLE_ATTR);
+    return owner === null || owner === "" || owner === ownId;
+  };
+  const usable = (element: HTMLElement) => mfShown(element) && inRange(element) && free(element);
+  const tagged = Array.from(document.querySelectorAll<HTMLElement>(`.${MF_LINKED_ARTICLE_CLASS}`)).filter(usable);
+  if (tagged.length > 0) return tagged[tagged.length - 1]!;
+  const above = layerAbove(root);
+  if (above && free(above) && !above.matches(".mf-meter") && !above.querySelector(".mf-meter")) return above;
+  const blocks = Array.from(document.querySelectorAll<HTMLElement>(MF_TEXT_BLOCK)).filter(
+    (element) => usable(element) && element.querySelectorAll("p").length >= 2
   );
   return blocks[blocks.length - 1] ?? null;
 }
@@ -903,7 +1232,7 @@ type TierKey = "free_member" | "tier_1" | "tier_2" | "vip" | (string & {});
 type RequiredTier = "anyone" | "signed_in" | TierKey;
 type MemberStatus = "active" | "trialing" | "past_due" | "canceled";
 /** Who reads without a meter: any paid plan, any signed-in member, or a tier and up. */
-type UnlimitedTier = "any_paid" | "signed_in" | TierKey;
+type UnlimitedTier = "any_paid" | "signed_in" | "chosen" | TierKey;
 type PaywallMode = "metered" | "teaser";
 type QuotaPeriod = "weekly" | "monthly";
 
@@ -1004,6 +1333,20 @@ function isEntitled(
 
   if (!statusOk) return false;
   if (requiredTier === "signed_in") return true;
+  // "any_paid": any tier above the lowest one, which is Free.
+  if (requiredTier === "any_paid") {
+    const held = tiers.find((tier) => tier.key === session.activeTier);
+    return held !== undefined && tiers.some((tier) => tier.rank < held.rank);
+  }
+
+  // "only:a,b": exactly these tiers, not "or higher". A key the site no
+  // longer has matches nobody, so a deleted tier fails closed.
+  if (requiredTier.startsWith("only:")) {
+    return requiredTier
+      .slice(5)
+      .split(",")
+      .some((key) => key === session.activeTier && tiers.some((tier) => tier.key === key));
+  }
 
   const required = tiers.find((tier) => tier.key === requiredTier);
   const held = tiers.find((tier) => tier.key === session.activeTier);
@@ -1023,11 +1366,8 @@ function readsUnlimited(
   unlimited: UnlimitedTier,
   tiers: ReadonlyArray<TierLadderEntry>
 ): boolean {
-  if (unlimited !== "any_paid") return isEntitled(session, unlimited, tiers);
-  if (!session || !isEntitled(session, "signed_in", tiers)) return false;
-  const lowest = tiers.reduce((min, tier) => Math.min(min, tier.rank), Infinity);
-  const held = tiers.find((tier) => tier.key === session.activeTier);
-  return held !== undefined && held.rank > lowest;
+  // isEntitled knows "any_paid" and "only:a,b" (Chosen Tiers, built from Full Access Tiers).
+  return isEntitled(session, unlimited, tiers);
 }
 
 // ============================================================================
@@ -1171,9 +1511,9 @@ function rememberReturn(): void {
 
 const cssContent = `
 .mf-meter {
-  --mf-meter-blur: 8px;
-  --mf-meter-cut: 320px;
   box-sizing: border-box;
+  /* Its own block: the card's negative margin stays inside, never moves the root. */
+  display: flow-root;
   position: relative;
   width: 100%;
   min-width: 240px;
@@ -1181,18 +1521,38 @@ const cssContent = `
   font-size: calc(14px * var(--mf-text-scale, 1));
   line-height: 1.5;
 }
-/* On the canvas the frame always has a body to grab, even before an article is connected. */
-.mf-meter.is-canvas { min-height: 120px; }
 .mf-meter.is-linked { min-width: 0; }
-.mf-meter.is-linked .mf-meter-card { margin-top: 0; }
-.mf-meter.is-canvas.is-linked { display: flex; flex-direction: column; gap: 12px; }
+/*
+  The card is glass (2026-10-22): the surface colour at Card Opacity, what is
+  behind it blurred by Card Blur and a little saturated, a light inner edge.
+  On the site it rises over the frost at the bottom of the locked layer; on
+  the canvas it sits where it is.
+*/
 .mf-meter-card {
   box-sizing: border-box; position: relative; z-index: 2;
   display: flex; flex-direction: column; align-items: center; gap: var(--mf-gap, 10px);
-  max-width: 420px; margin: -48px auto 0; padding: var(--mf-pad, 24px);
-  text-align: center; color: var(--mf-c-text); background: var(--mf-c-surface);
-  border: var(--mf-border-width, 1px) solid var(--mf-c-border); border-radius: var(--mf-c-radius);
-  box-shadow: var(--mf-c-shadow);
+  max-width: 420px; margin: 0 auto; padding: var(--mf-pad, 24px);
+  text-align: center; color: var(--mf-c-text);
+  background: color-mix(in srgb, var(--mf-c-surface) var(--mf-card-alpha, 80%), transparent);
+  -webkit-backdrop-filter: blur(var(--mf-card-blur, 16px)) saturate(160%); backdrop-filter: blur(var(--mf-card-blur, 16px)) saturate(160%);
+  border: var(--mf-border-width, 1px) solid color-mix(in srgb, var(--mf-c-border) 70%, transparent);
+  border-radius: var(--mf-c-radius);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mf-c-surface) 60%, transparent), var(--mf-c-shadow);
+}
+.mf-meter:not(.is-canvas) .mf-meter-card { margin-top: var(--mf-card-shift, 0px); }
+/*
+  The frost band: blurs the locked content behind it, more towards the bottom,
+  and fades it into the page's colour, so the cut has no hard edge.
+*/
+.mf-meter-frost {
+  position: absolute; z-index: 1; pointer-events: none;
+  top: var(--mf-frost-top, 0px); left: var(--mf-frost-left, 0px);
+  width: var(--mf-frost-width, 100%); height: var(--mf-frost-height, 0px);
+  -webkit-backdrop-filter: blur(var(--mf-frost-blur, 10px)); backdrop-filter: blur(var(--mf-frost-blur, 10px));
+  background: linear-gradient(to bottom, transparent 0%,
+    color-mix(in srgb, var(--mf-frost-color, #ffffff) 45%, transparent) 50%,
+    color-mix(in srgb, var(--mf-frost-color, #ffffff) 92%, transparent) 88%, var(--mf-frost-color, #ffffff) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 35%); mask-image: linear-gradient(to bottom, transparent, #000 35%);
 }
 .mf-meter-icon {
   display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px;
@@ -1241,12 +1601,6 @@ const cssContent = `
 .mf-meter-close svg { width: 14px; height: 14px; }
 @keyframes mf-meter-rise { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .mf-meter-pill { animation: none; } }
-.mf-meter-placeholder {
-  box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 16px;
-  border: 1px dashed var(--mf-c-border); border-radius: 12px; background: var(--mf-c-surface); color: var(--mf-c-muted);
-  font-size: calc(12px * var(--mf-text-scale, 1));
-}
-.mf-meter-placeholder strong { color: var(--mf-c-text); font-size: calc(13px * var(--mf-text-scale, 1)); }
 `;
 
 // ============================================================================
@@ -1263,13 +1617,24 @@ const METER_LABELS: Record<string, readonly [string, string]> = {
   pillClose: ["Close counter", "Close"],
   periodWeek: ["Week word", "week"],
   periodMonth: ["Month word", "month"],
-  teaserTitle: ["Read More title", "Keep reading"],
-  teaserText: ["Read More text", "Join to unlock the rest of this article."],
   upgradeTitle: ["Upgrade title", "Upgrade to keep reading"],
   upgradeText: ["Upgrade text", "Your plan does not include this article."],
   signInLink: ["Sign in link", "Already a member? Sign in"],
-  checking: ["Checking", "Checking your access"],
 };
+
+/** The Read More Teaser's card, by default. Its words moved from Labels to Lock Title and Lock Message. */
+const TEASER_TITLE = "Keep reading";
+const TEASER_TEXT = "Join to unlock the rest of this article.";
+
+/**
+ * The teaser card's words: the sidebar's own, else what an older instance set
+ * under Labels (teaserTitle, teaserText), else the default.
+ */
+function teaserWords(own: string | undefined, older: unknown, standard: string): string {
+  if (typeof own === "string" && own.trim() !== "" && own !== standard) return own;
+  if (typeof older === "string" && older.trim() !== "") return older;
+  return standard;
+}
 
 /** The lock card's reason. */
 type LockReason = "meter" | "teaser" | "upgrade";
@@ -1281,36 +1646,66 @@ type View =
 
 /*
   The sidebar keeps what a creator changes (2026-10-20, 21-blog-paywalls.md).
-  Fixed instead of asked: the article is the text block above the paywall (or
-  the PaywallArticle layer); the article id is the page path; a 320px preview
-  for a short article; an 8px frost; the sign in link for signed-out visitors;
+  Fixed instead of asked: the protected layer is the one right above the
+  paywall (see findArticle); the article id is the page path; a 320px preview
+  for a short layer; an 8px frost; the sign in link for signed-out visitors;
   the sign in and pricing pages from the site's settings; the SEO markup on.
+  The canvas always shows the lock card, as visitors see it (2026-10-22).
 */
 export interface MeteredPaywallProps extends MfAppearanceProps {
   mode?: PaywallMode;
   freeQuotaCount?: number;
   quotaPeriod?: QuotaPeriod;
   unlimitedTier?: UnlimitedTier;
+  /** With Full Access For set to Chosen Tiers: exactly these tiers (19-section-locks.md 8). */
+  fullAccessTiers?: ReadonlyArray<string>;
   previewParagraphs?: number;
   showCounterPill?: boolean;
   ctaLabel?: string;
   cardTitle?: string;
   cardDescription?: string;
-  canvasPreview?: "open" | "locked";
+  /** The Read More Teaser's card, shown as Lock Title and Lock Message in that mode. */
+  teaserCardTitle?: string;
+  teaserCardDescription?: string;
+  /** Hide: while locked, everything below the paywall on the page is hidden too, but the footer. */
+  belowPaywall?: "show" | "hide";
+  /** The frost over the locked content, and the card's own glass (21-blog-paywalls.md 9.5). */
+  glass?: { contentBlur?: number; cardBlur?: number; cardOpacity?: number } | null;
   accentColor?: string;
   borderRadius?: number;
 }
 
-/** The preview for an article with no more paragraphs than Free Paragraphs. */
+/*
+  The frosted edge (2026-10-22): this much of the next paragraph or item shows
+  past the free ones, under a frost band up to MF_FROST_PX tall that blurs it
+  and fades it into the page, and the card rises up to MF_OVERLAP_PX over it.
+*/
+const MF_PEEK_PX = 120;
+const MF_FROST_PX = 260;
+const MF_OVERLAP_PX = 96;
+
+/** The colour the page shows behind a layer, for the frost to fade into. White when none is set. */
+function mfBackdropColor(element: Element): string {
+  for (let at: Element | null = element; at; at = at.parentElement) {
+    const color = window.getComputedStyle(at).backgroundColor || "";
+    const match = /^rgba?\(([\d.,\s/%]+)\)$/.exec(color);
+    if (!match) continue;
+    const parts = match[1]!.split(/[\s,/]+/).filter(Boolean);
+    if (parts.length >= 4 && parseFloat(parts[3]!) === 0) continue;
+    return color;
+  }
+  return "rgb(255, 255, 255)";
+}
+
+/** The preview for a layer with no more paragraphs or items than Free Preview. */
 const PREVIEW_FALLBACK_PX = 320;
 
-const BLUR_MIN = 2;
-const BLUR_MAX = 20;
 
 function CloseIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden={true}>
-      <path d="M18 6 6 18M6 6l12 12" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden={true} data-lucide="x">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
     </svg>
   );
 }
@@ -1334,13 +1729,17 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
     mode = "metered",
     freeQuotaCount = CONFIG.freeQuotaCount,
     quotaPeriod = CONFIG.quotaPeriod,
-    unlimitedTier = "any_paid",
+    unlimitedTier: unlimitedChoice = "any_paid",
+    fullAccessTiers,
     previewParagraphs = 2,
     showCounterPill = CONFIG.showCounterPill,
     ctaLabel = CONFIG.ctaLabel,
     cardTitle = CONFIG.cardTitle,
     cardDescription = CONFIG.cardDescription,
-    canvasPreview = "open",
+    teaserCardTitle,
+    teaserCardDescription,
+    belowPaywall = "show",
+    glass,
     accentColor = CONFIG.accentColor,
     borderRadius = CONFIG.borderRadius,
     theme = "light",
@@ -1362,6 +1761,11 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
     return target === RenderTarget.canvas || target === RenderTarget.thumbnail;
   }, []);
 
+  // Chosen Tiers: exactly the tiers picked, as "only:a,b"; none picked matches nobody.
+  const unlimitedTier: UnlimitedTier =
+    unlimitedChoice === "chosen"
+      ? (`only:${(Array.isArray(fullAccessTiers) ? fullAccessTiers : []).filter((key) => typeof key === "string" && key !== "").join(",")}` as UnlimitedTier)
+      : unlimitedChoice;
   const pricingPath = CONFIG.pricingPath;
   const loginPath = CONFIG.loginPath;
   const limit = Math.round(mfNumber(freeQuotaCount, 1, METER_MAX_QUOTA, 3));
@@ -1442,17 +1846,8 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
     };
   }, [onCanvas, slug, mode, limit, period, unlimitedTier]);
 
-  // ---- F08: the paywall markup, the same for every visitor ----
-  useEffect(() => {
-    if (onCanvas) return;
-    mfInjectPaywallSchema("Article");
-  }, [onCanvas]);
-
-  const effective: View = onCanvas
-    ? canvasPreview === "locked"
-      ? { phase: "locked", reason: mode === "teaser" ? "teaser" : "meter", signedIn: false }
-      : { phase: "open", meter: null }
-    : view;
+  // On the canvas: the lock card, as visitors will see it, to style there.
+  const effective: View = onCanvas ? { phase: "locked", reason: mode === "teaser" ? "teaser" : "meter", signedIn: false } : view;
   const cut = effective.phase !== "open";
 
   // ---- Where the preview ends: after N paragraphs, or at a fixed height ----
@@ -1461,29 +1856,82 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
   // Bumped when fonts or the page finish loading, so the cut is measured again.
   const [settled, setSettled] = useState(0);
 
-  // The article: the PaywallArticle layer nearest above this component, else
-  // the nearest shown text block above it with two or more paragraphs (so a
-  // heading block is skipped). Marked with an attribute React does not manage,
-  // so a re-render never drops it. Again on resize: another breakpoint shows
-  // other layers.
+  // This paywall's own id, made after mount so the server's HTML and the
+  // first render agree. Its article carries it, and its CSS names only it, so
+  // several paywalls on one page never cut each other's article.
+  const [instanceId, setInstanceId] = useState("");
+  // Only the first paywall on a page shows the meter's counter pill.
+  const [leadsPage, setLeadsPage] = useState(true);
+
+  // The article: see findArticle. Marked with an attribute React does not
+  // manage, so a re-render never drops it. Again on resize: another breakpoint
+  // shows other layers.
   useBrowserLayoutEffect(() => {
     if (onCanvas) {
       setLinkedArticle(null);
       return;
     }
-    const pick = () => setLinkedArticle(findArticle(rootRef.current));
+    const id = `mfp${Math.random().toString(36).slice(2, 10)}`;
+    setInstanceId(id);
+    const pick = () => {
+      setLinkedArticle(findArticle(rootRef.current, id));
+      // A copy hidden for another breakpoint never leads.
+      setLeadsPage(Array.from(document.querySelectorAll(".mf-meter")).find(mfShown) === rootRef.current);
+    };
     pick();
     window.addEventListener("resize", pick);
     return () => window.removeEventListener("resize", pick);
   }, [onCanvas]);
 
+  // The layer's own bottom margin, which the cut's margin is added to. Read
+  // before the mark, while this paywall's CSS does not reach the layer yet.
+  const [baseMargin, setBaseMargin] = useState(0);
+
   useBrowserLayoutEffect(() => {
-    if (!linkedArticle) return;
-    linkedArticle.setAttribute(MF_ARTICLE_ATTR, "");
+    if (!linkedArticle || !instanceId) return;
+    setBaseMargin(parseFloat(window.getComputedStyle(linkedArticle).marginBottom) || 0);
+    linkedArticle.setAttribute(MF_ARTICLE_ATTR, instanceId);
     // The class the SEO markup points at, on a found article as on a tagged one.
     linkedArticle.classList.add(MF_GATED_BODY_CLASS);
-    return () => linkedArticle.removeAttribute(MF_ARTICLE_ATTR);
-  }, [linkedArticle]);
+    // Only its own mark: another paywall may have taken the layer since.
+    return () => {
+      if (linkedArticle.getAttribute(MF_ARTICLE_ATTR) === instanceId) linkedArticle.removeAttribute(MF_ARTICLE_ATTR);
+    };
+  }, [linkedArticle, instanceId]);
+
+  // Hidden while it is not open: the small layers skipped between the locked
+  // layer and the paywall, and with Below Paywall: Hide everything below it
+  // on the page (21-blog-paywalls.md 9.3). They carry this paywall's id, and
+  // its CSS hides them. Found again on resize, where the layout changes; the
+  // old marks go first, so what was hidden is measured where it really is.
+  const hideBelow = belowPaywall === "hide";
+  useBrowserLayoutEffect(() => {
+    const root = rootRef.current;
+    if (onCanvas || !linkedArticle || !instanceId || !root) return;
+    let marked: HTMLElement[] = [];
+    const clear = () => {
+      for (const layer of marked) if (layer.getAttribute(MF_BELOW_ATTR) === instanceId) layer.removeAttribute(MF_BELOW_ATTR);
+      marked = [];
+    };
+    const mark = () => {
+      clear();
+      marked = layersBetween(linkedArticle, root).concat(hideBelow ? layersBelow(root) : []);
+      for (const layer of marked) layer.setAttribute(MF_BELOW_ATTR, instanceId);
+    };
+    mark();
+    window.addEventListener("resize", mark);
+    return () => {
+      window.removeEventListener("resize", mark);
+      clear();
+    };
+  }, [onCanvas, hideBelow, linkedArticle, instanceId]);
+
+  // ---- F08: the paywall markup, once a layer is protected ----
+  // Article for a text block, as a post body is; WebPage for anything else.
+  useEffect(() => {
+    if (onCanvas || !linkedArticle) return;
+    mfInjectPaywallSchema(linkedArticle.matches(MF_TEXT_BLOCK) ? "Article" : "WebPage");
+  }, [onCanvas, linkedArticle]);
 
   // A late web font changes paragraph heights; measure once it is in.
   useEffect(() => {
@@ -1495,7 +1943,20 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
     return () => window.removeEventListener("load", bump);
   }, [onCanvas]);
 
+  // So do images loading and a new breakpoint. The cut never changes the
+  // layer's own size, so this cannot feed itself.
+  useEffect(() => {
+    if (!linkedArticle || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setSettled((value) => value + 1));
+    observer.observe(linkedArticle);
+    return () => observer.disconnect();
+  }, [linkedArticle]);
+
   const [cutAt, setCutAt] = useState<number>(PREVIEW_FALLBACK_PX);
+  // The layer's full height, laid out as designed.
+  const [layerHeight, setLayerHeight] = useState(0);
+  // How far down the layer the free part ends: below it, content is scrambled while locked.
+  const [freeHeight, setFreeHeight] = useState(PREVIEW_FALLBACK_PX - MF_PEEK_PX);
 
   // Locked text is visible as a teaser but not reachable: `inert` keeps focus
   // and screen readers out of what the frost covers (F08), and the lock card
@@ -1514,22 +1975,115 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
       setCutAt(PREVIEW_FALLBACK_PX);
       return;
     }
+    // Free Preview: paragraphs of a text block, items of anything else.
+    // Measured on the layout as designed: the cut only hides, never resizes.
     const wanted = Math.round(mfNumber(previewParagraphs, 1, 20, 2));
-    const paragraphs = body.querySelectorAll("p");
-    const last = paragraphs[wanted - 1] as HTMLElement | undefined;
-    if (!last || paragraphs.length <= wanted) {
+    const box = body.getBoundingClientRect();
+    setLayerHeight(Math.round(box.height));
+    const units = previewUnits(body, wanted);
+    if (units.length <= wanted) {
       setCutAt(PREVIEW_FALLBACK_PX);
+      setFreeHeight(PREVIEW_FALLBACK_PX - MF_PEEK_PX);
       return;
     }
-    const top = body.getBoundingClientRect().top;
-    const bottom = last.getBoundingClientRect().bottom;
-    // A little of the next paragraph shows under the frost, as a teaser should.
-    setCutAt(Math.max(80, Math.round(bottom - top + 56)));
+    const top = box.top;
+    // The lowest of the free ones: grid items sit side by side.
+    const bottom = Math.max(...units.slice(0, wanted).map((unit) => unit.getBoundingClientRect().bottom));
+    setFreeHeight(Math.max(0, Math.round(bottom - top)));
+    // A little of the next one shows under the frost, as a teaser should.
+    setCutAt(Math.max(80, Math.round(bottom - top + MF_PEEK_PX)));
   }, [cut, previewParagraphs, linkedArticle, settled]);
 
-  const blur = Math.round(mfNumber(CONFIG.blurIntensity, BLUR_MIN, BLUR_MAX, 8));
+  // ---- While locked, take the locked content out of the live page ----
+  // Past the free part of the layer, and every layer hidden with it. Again
+  // when React writes into them; restored on access, or when the paywall goes.
+  useEffect(() => {
+    const layer = linkedArticle;
+    if (onCanvas || !layer || !instanceId || typeof window === "undefined") return;
+    const hidden = () => Array.from(document.querySelectorAll(`[${MF_BELOW_ATTR}="${instanceId}"]`));
+    const restoreAll = (extra: Element[] = []) => {
+      mfRedactTree(layer, () => false);
+      for (const element of extra.concat(hidden())) mfRedactTree(element, () => false);
+    };
+    if (!locked) {
+      restoreAll();
+      return;
+    }
+    let frame = 0;
+    let lastHidden: Element[] = [];
+    const pass = () => {
+      frame = 0;
+      const edge = layer.getBoundingClientRect().top + freeHeight;
+      mfRedactTree(layer, (node) => {
+        const element = node.nodeType === 3 ? node.parentElement : (node as Element);
+        return Boolean(element && element !== layer && element.getBoundingClientRect().top >= edge);
+      });
+      const now = hidden();
+      for (const element of lastHidden) if (now.indexOf(element) === -1) mfRedactTree(element, () => false);
+      for (const element of now) mfRedactTree(element, () => true);
+      lastHidden = now;
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(pass);
+    };
+    pass();
+    const observer = typeof MutationObserver === "function" ? new MutationObserver(schedule) : null;
+    const watch = { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: MF_REDACT_ATTRS };
+    observer?.observe(layer, watch);
+    for (const element of lastHidden) observer?.observe(element, watch);
+    // Hydration finishes in parts after the page loads: look again as it goes.
+    const timers = [800, 2000, 5000].map((delay) => window.setTimeout(schedule, delay));
+    return () => {
+      observer?.disconnect();
+      timers.forEach((timer) => window.clearTimeout(timer));
+      if (frame) window.cancelAnimationFrame(frame);
+      restoreAll(lastHidden);
+    };
+  }, [onCanvas, locked, linkedArticle, instanceId, freeHeight, settled, hideBelow]);
+
+  /*
+    The frost band (2026-10-22): this component's own element, laid over the
+    bottom of the locked layer, which blurs what is behind it and fades it
+    into the page's colour, so the cut never shows a hard edge. Its own
+    element, not a mask or ::after on the creator's layer, which Framer's own
+    styles can override. Placed from the layer's and this root's boxes, so a
+    stack's gap between them does not matter; measured after the cut is set.
+  */
+  const [frost, setFrost] = useState<{ edge: number; left: number; width: number; color: string } | null>(null);
+  useBrowserLayoutEffect(() => {
+    const root = rootRef.current;
+    if (onCanvas || !cut || !linkedArticle || !root) {
+      setFrost(null);
+      return;
+    }
+    const layerBox = linkedArticle.getBoundingClientRect();
+    const rootBox = root.getBoundingClientRect();
+    const next = {
+      edge: Math.round(layerBox.top + Math.min(cutAt, layerBox.height) - rootBox.top),
+      left: Math.round(layerBox.left - rootBox.left),
+      width: Math.round(layerBox.width),
+      color: mfBackdropColor(linkedArticle),
+    };
+    setFrost((previous) =>
+      previous && previous.edge === next.edge && previous.left === next.left && previous.width === next.width && previous.color === next.color
+        ? previous
+        : next
+    );
+  }, [onCanvas, cut, cutAt, layerHeight, linkedArticle, settled]);
+
+  // Glass: the frost's blur, and the card's blur and opacity.
+  const contentBlur = Math.round(mfNumber(glass?.contentBlur, 0, 30, CONFIG.blurIntensity));
+  const cardBlur = Math.round(mfNumber(glass?.cardBlur, 0, 40, 16));
+  const cardOpacity = Math.round(mfNumber(glass?.cardOpacity, 30, 100, 80));
+  const frostHeight = Math.min(MF_FROST_PX, Math.round(cutAt * 0.75));
+  const overlap = Math.min(MF_OVERLAP_PX, Math.round(cutAt * 0.4));
   const scopedCss =
-    `[data-mf-meter="${MF_SCOPE_SLOT}"] { --mf-meter-blur: ${blur}px; --mf-meter-cut: ${cutAt}px; ` +
+    `[data-mf-meter="${MF_SCOPE_SLOT}"] { --mf-card-blur: ${cardBlur}px; --mf-card-alpha: ${cardOpacity}%; ` +
+    (frost
+      ? `--mf-frost-top: ${frost.edge - frostHeight}px; --mf-frost-left: ${frost.left}px; --mf-frost-width: ${frost.width}px; ` +
+        `--mf-frost-height: ${frostHeight}px; --mf-frost-color: ${frost.color}; --mf-frost-blur: ${contentBlur}px; ` +
+        `--mf-card-shift: ${frost.edge - overlap}px; `
+      : "") +
     mfAppearanceVars({
       accent: accentColor,
       radius: borderRadius,
@@ -1544,22 +2098,17 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
   const styled = mfStyleScope("mfm", scopedCss);
 
   /*
-    Not open: cut the article at the preview, fade its last lines into
-    whatever is behind it, and frost them. A mask rather than a colour, so it
-    suits any page background without a setting. The PaywallArticle class is
-    in the selector too, so a tagged post is cut from the first paint, before
-    this component's effects run; a found one is cut once they have.
+    Not open: hide the protected layer below the preview. The layer keeps its
+    designed size and layout (a max-height squeezed a Framer grid's rows): it
+    is clipped, and a negative bottom margin, the hidden height, pulls what
+    follows up to the cut. The frost band above covers the edge.
   */
-  const target = `.${MF_LINKED_ARTICLE_CLASS}, [${MF_ARTICLE_ATTR}]`;
-  const afterTarget = `.${MF_LINKED_ARTICLE_CLASS}::after, [${MF_ARTICLE_ATTR}]::after`;
+  const target = `[${MF_ARTICLE_ATTR}="${instanceId}"]`;
+  const hiddenPx = Math.max(0, layerHeight - cutAt);
   const linkedCss =
-    !onCanvas && cut
-      ? `${target} { max-height: ${cutAt}px !important; overflow: hidden !important; position: relative !important; ` +
-        `-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent); ` +
-        `mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent); } ` +
-        `${afterTarget} { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: min(200px, 70%); ` +
-        `pointer-events: none; backdrop-filter: blur(${blur}px); -webkit-backdrop-filter: blur(${blur}px); ` +
-        `-webkit-mask-image: linear-gradient(to bottom, transparent, #000); mask-image: linear-gradient(to bottom, transparent, #000); }`
+    !onCanvas && cut && instanceId
+      ? `${target} { clip-path: inset(0 0 calc(100% - ${cutAt}px) 0) !important; margin-bottom: ${baseMargin - hiddenPx}px !important; }` +
+        ` [${MF_BELOW_ATTR}="${instanceId}"] { display: none !important; }`
       : "";
 
   const goPricing = () => {
@@ -1579,9 +2128,19 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
 
   function lockCard(reason: LockReason, signedIn: boolean) {
     const values = { period: periodWord, limit };
-    const title = reason === "meter" ? mfFill(cardTitle, values) : reason === "upgrade" ? t("upgradeTitle") : t("teaserTitle");
+    const older = labels as Record<string, unknown> | null | undefined;
+    const title =
+      reason === "meter"
+        ? mfFill(cardTitle, values)
+        : reason === "upgrade"
+          ? t("upgradeTitle")
+          : teaserWords(teaserCardTitle, older?.teaserTitle, TEASER_TITLE);
     const text =
-      reason === "meter" ? mfFill(cardDescription, values) : reason === "upgrade" ? t("upgradeText") : t("teaserText");
+      reason === "meter"
+        ? mfFill(cardDescription, values)
+        : reason === "upgrade"
+          ? t("upgradeText")
+          : teaserWords(teaserCardDescription, older?.teaserText, TEASER_TEXT);
     return (
       <div className="mf-meter-card" role="region" aria-label={title}>
         <span className="mf-meter-icon">
@@ -1602,7 +2161,7 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
   }
 
   function pill(meter: MeterAnswer) {
-    if (!showCounterPill || pillClosed || meter.position === null) return null;
+    if (!showCounterPill || pillClosed || meter.position === null || !leadsPage) return null;
     const values = { n: meter.position, limit: meter.limit, period: periodWord, remaining: meter.remaining };
     const keys = meterPillKeys(meter);
     const main = t(keys.main, values);
@@ -1635,27 +2194,15 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
   }
 
   function body(): React.ReactNode {
-    if (onCanvas) {
-      // The card the visitor will see, so it can be designed here with the
-      // sidebar's Theme, Colors, Typography, Layout, and Labels.
-      return (
-        <React.Fragment>
-          <div className="mf-meter-placeholder">
-            <strong>Paywall card</strong>
-            <span>
-              Place this below the article. On the published site the first paragraphs stay free, the rest is frosted,
-              and members with access read it all.
-            </span>
-          </div>
-          {lockCard(mode === "teaser" ? "teaser" : "meter", false)}
-        </React.Fragment>
-      );
-    }
-    // No article on this page: nothing to lock, so no card under a page
+    // On the canvas: only the card the visitor will see, so it can be designed
+    // here with the sidebar's Theme, Colors, Typography, Layout, and Labels.
+    if (onCanvas) return lockCard(mode === "teaser" ? "teaser" : "meter", false);
+    // Nothing to protect on this page: nothing to lock, so no card under a page
     // anyone can read in full, and no pill counting it.
     if (!linkedArticle) return null;
     return (
       <React.Fragment>
+        {cut && frost ? <div className="mf-meter-frost" aria-hidden={true} /> : null}
         {locked ? lockCard(effective.reason, effective.signedIn) : null}
         {effective.phase === "open" && effective.meter ? pill(effective.meter) : null}
       </React.Fragment>
@@ -1682,7 +2229,7 @@ export default function MeteredPaywall(props: MeteredPaywallProps & MfSealProps)
 // PROPERTY CONTROLS, PRD F07
 // ============================================================================
 
-addPropertyControls(MeteredPaywall, {
+addPropertyControls(MeteredPaywall, mfControls({
   // The Builder's seal for this instance (27-instance-seal.md). Hidden: it is
   // set on insert and a pasted copy loses it.
   mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },
@@ -1692,7 +2239,7 @@ addPropertyControls(MeteredPaywall, {
     options: ["metered", "teaser"],
     optionTitles: ["Free Articles Meter", "Read More Teaser"],
     defaultValue: "metered",
-    description: "Meter: a few free articles, then locked. Teaser: the start of every article is free.",
+    description: "Locks the layer right above it, on any page. Meter: a few free pages, then locked. Teaser: the start is always free.",
   },
   freeQuotaCount: {
     type: ControlType.Number,
@@ -1717,20 +2264,41 @@ addPropertyControls(MeteredPaywall, {
     title: "Full Access For",
     // The generator replaces these two lines with the site's own tiers, by
     // rank, after the first two. Keep them on one line each.
-    options: ["any_paid", "signed_in", "free_member", "tier_1", "tier_2", "vip"],
-    optionTitles: ["Any Paid Plan", "Any Signed In", "Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],
+    options: ["signed_in", "any_paid", "tier_1", "tier_2", "vip", "chosen"],
+    optionTitles: ["Any signed-in member", "Any paid plan", "Silver members or higher", "Gold members or higher", "VIP members or higher", "Only chosen tiers…"],
     defaultValue: "any_paid",
-    description: "Who reads every article in full.",
+    description: "Who reads every article in full. The same choices as page and section locks; Only chosen tiers means exactly the ones you pick.",
+  },
+  fullAccessTiers: {
+    type: ControlType.Array,
+    title: "Chosen Tiers",
+    control: {
+      type: ControlType.Enum,
+      // The generator replaces these two lines with the site's tiers. Keep them on one line each.
+      options: ["free_member", "tier_1", "tier_2", "vip"],
+      optionTitles: ["Free Member", "Tier 1: Silver", "Tier 2: Gold", "VIP Member"],
+    },
+    defaultValue: [],
+    hidden: (props) => props.unlimitedTier !== "chosen",
   },
   previewParagraphs: {
     type: ControlType.Number,
-    title: "Free Paragraphs",
+    title: "Free Preview",
     min: 1,
     max: 20,
     step: 1,
     displayStepper: true,
     defaultValue: 2,
-    description: "Shown before the frost. Place this paywall below the article.",
+    description: "Paragraphs of a text block, or items of a stack, grid, or list, shown before the frost.",
+  },
+  belowPaywall: {
+    type: ControlType.Enum,
+    title: "Below Paywall",
+    options: ["show", "hide"],
+    optionTitles: ["Show", "Hide"],
+    displaySegmentedControl: true,
+    defaultValue: "show",
+    description: "Hide: visitors without access see nothing below the paywall on the page, except the footer.",
   },
   showCounterPill: {
     type: ControlType.Boolean,
@@ -1754,20 +2322,24 @@ addPropertyControls(MeteredPaywall, {
     defaultValue: CONFIG.cardDescription,
     hidden: (props) => props.mode === "teaser",
   },
+  // The same two, for the Read More Teaser's card.
+  teaserCardTitle: {
+    type: ControlType.String,
+    title: "Lock Title",
+    defaultValue: TEASER_TITLE,
+    hidden: (props) => props.mode !== "teaser",
+  },
+  teaserCardDescription: {
+    type: ControlType.String,
+    title: "Lock Message",
+    displayTextArea: true,
+    defaultValue: TEASER_TEXT,
+    hidden: (props) => props.mode !== "teaser",
+  },
   ctaLabel: {
     type: ControlType.String,
     title: "Unlock Button",
     defaultValue: CONFIG.ctaLabel,
-  },
-
-  canvasPreview: {
-    type: ControlType.Enum,
-    title: "Canvas Preview",
-    options: ["open", "locked"],
-    optionTitles: ["Open", "Locked"],
-    displaySegmentedControl: true,
-    defaultValue: "open",
-    description: "How it looks here. The site decides for each visitor.",
   },
 
   /* ---- Style, then the shared appearance groups and Labels ---- */
@@ -1786,6 +2358,16 @@ addPropertyControls(MeteredPaywall, {
     unit: "px",
     defaultValue: CONFIG.borderRadius,
   },
+  glass: {
+    type: ControlType.Object,
+    title: "Glass",
+    buttonTitle: "Blur",
+    controls: {
+      contentBlur: { type: ControlType.Number, title: "Content Blur", min: 0, max: 30, step: 1, unit: "px", defaultValue: 10 },
+      cardBlur: { type: ControlType.Number, title: "Card Blur", min: 0, max: 40, step: 1, unit: "px", defaultValue: 16 },
+      cardOpacity: { type: ControlType.Number, title: "Card Opacity", min: 30, max: 100, step: 1, unit: "%", defaultValue: 80 },
+    },
+  },
   ...mfAppearanceControls({ padding: 24, gap: 10, shadow: true }),
   labels: mfLabelControls(METER_LABELS),
-});
+}));

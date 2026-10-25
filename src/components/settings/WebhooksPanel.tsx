@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronDown, Copy, Eye, EyeOff, Plus, Send, Trash2, Webhook, X } from "lucide-react";
-import { Banner, Button, Checkbox, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, Toggle, useToast } from "../ui";
+import { ArrowRight, Check, ChevronDown, Copy, Eye, EyeOff, Plus, Send, Trash2, Webhook, X } from "lucide-react";
+import { Banner, Button, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, Toggle, useToast } from "../ui";
 import { failureMessage } from "../../services/apiClient";
 import {
   FIELD_KEY_PATTERN,
@@ -15,15 +15,12 @@ import {
   WEBHOOK_EVENT_LABELS,
   createWebhook,
   deleteWebhook,
-  deliveryLabel,
   emptyWebhookDraft,
-  fetchWebhookDeliveries,
   fetchWebhooks,
   testWebhook,
   updateWebhook,
   webhookDraftProblem,
   type SiteWebhook,
-  type WebhookDelivery,
   type WebhookDraft,
   type WebhookEventType,
 } from "../../services/webhooksService";
@@ -50,6 +47,15 @@ const draftOf = (hook: SiteWebhook): WebhookDraft => ({
 
 const sameDraft = (a: WebhookDraft, b: WebhookDraft) => JSON.stringify(a) === JSON.stringify(b);
 
+/** "hooks.zapier.com" for a webhook's address, or "" for one that is not a URL yet. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+}
+
 /** Keep a toast inside the kit's 45 character limit. */
 const short = (text: string) => (text.length > 45 ? `${text.slice(0, 44)}.` : text);
 
@@ -58,8 +64,11 @@ const short = (text: string) => (text.length > 45 ? `${text.slice(0, 44)}.` : te
  * doc: docs/development-docs/20-webhooks.md
  *
  * Each webhook is a card: where to send, which events, which plans. Send test
- * proves the address works before a real member is involved, and Recent
- * deliveries shows what happened to each event.
+ * sends a sample member before a real one is involved.
+ *
+ * No delivery log or "Working / Failing" status (2026-10-25, the product
+ * owner): services answer in their own ways (a CRM that stores the member and
+ * answers 302), so a status read from the answer misled more than it helped.
  */
 export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, profileFields, siteName }) => {
   const showToast = useToast();
@@ -144,7 +153,7 @@ export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, pro
             <div className="page-rule-card-body">
               <WebhookForm idPrefix="webhook-new" draft={adding} tiers={tiers} profileFields={profileFields} siteName={siteName} disabled={busy} onChange={setAdding} />
               <FormProblem draft={adding} />
-              <div className="onpage-guide-actions">
+              <div className="webhook-actions">
                 <Button variant="secondary" size="sm" disabled={busy || webhookDraftProblem(adding) !== null} onClick={() => void handleCreate()}>
                   <span>{busy ? "Saving" : "Save webhook"}</span>
                 </Button>
@@ -184,6 +193,48 @@ export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, pro
   );
 };
 
+/** One titled well in a webhook's form, drawn as a lock's tier checklist is. */
+const WebhookSection: React.FC<{ title: string; meta?: string; children: React.ReactNode }> = ({ title, meta, children }) => (
+  <div className="webhook-section" role="group" aria-label={title}>
+    <div className="webhook-section-head">
+      <span className="webhook-section-title">{title}</span>
+      {meta ? <span className="webhook-section-meta">{meta}</span> : null}
+    </div>
+    {children}
+  </div>
+);
+
+/** Tick tiles, the same tiles as a lock's tier checklist. */
+const TickTiles: React.FC<{
+  idPrefix: string;
+  items: ReadonlyArray<{ key: string; label: string; checked: boolean }>;
+  single?: boolean;
+  disabled: boolean;
+  onToggle: (key: string) => void;
+}> = ({ idPrefix, items, single = false, disabled, onToggle }) => (
+  <div className={cn("webhook-tiles", single && "is-single")}>
+    {items.map((item) => (
+      <button
+        key={item.key}
+        id={`${idPrefix}-${item.key}`}
+        type="button"
+        role="checkbox"
+        aria-checked={item.checked}
+        aria-disabled={disabled || undefined}
+        className={cn("tier-option", item.checked && "is-checked", disabled && "is-locked")}
+        onClick={() => {
+          if (!disabled) onToggle(item.key);
+        }}
+      >
+        <span className="tier-option-box" aria-hidden={true}>
+          {item.checked ? <Check className="tier-option-icon" /> : null}
+        </span>
+        <span className="tier-option-name">{item.label}</span>
+      </button>
+    ))}
+  </div>
+);
+
 /** The shared fields of a new or an existing webhook. */
 const WebhookForm: React.FC<{
   idPrefix: string;
@@ -196,52 +247,57 @@ const WebhookForm: React.FC<{
 }> = ({ idPrefix, draft, tiers, profileFields, siteName, disabled, onChange }) => {
   const ordered = useMemo(() => [...tiers].sort((a, b) => a.rank - b.rank), [tiers]);
 
-  const toggleEvent = (event: WebhookEventType, on: boolean) =>
-    onChange({ ...draft, events: on ? [...draft.events, event] : draft.events.filter((entry) => entry !== event) });
-  const toggleTier = (key: string, on: boolean) =>
-    onChange({ ...draft, tiers: on ? [...draft.tiers, key] : draft.tiers.filter((entry) => entry !== key) });
+  const toggleEvent = (event: WebhookEventType) =>
+    onChange({ ...draft, events: draft.events.includes(event) ? draft.events.filter((entry) => entry !== event) : [...draft.events, event] });
+  // "All plans" is no plan ticked; ticking a plan narrows it, and "All plans" clears them.
+  const togglePlan = (key: string) => {
+    if (key === "__all__") return onChange({ ...draft, tiers: [] });
+    onChange({ ...draft, tiers: draft.tiers.includes(key) ? draft.tiers.filter((entry) => entry !== key) : [...draft.tiers, key] });
+  };
 
   return (
     <>
-      <FieldRows>
-        <FieldRow label="Name" htmlFor={`${idPrefix}-name`}>
-          <TextField id={`${idPrefix}-name`} value={draft.name} disabled={disabled} placeholder="Zoho CRM" onChange={(name) => onChange({ ...draft, name })} />
-        </FieldRow>
-        <FieldRow
-          label="URL"
-          htmlFor={`${idPrefix}-url`}
-          hint="A Zapier Catch Hook, Make Custom webhook, or Zoho Flow Webhook trigger. Failed sends retry for about 9 hours."
-        >
-          <TextField
-            id={`${idPrefix}-url`}
-            value={draft.url}
-            disabled={disabled}
-            placeholder="https://hooks.example.com/..."
-            onChange={(url) => onChange({ ...draft, url })}
-          />
-        </FieldRow>
-      </FieldRows>
+      <WebhookSection title="Destination">
+        <FieldRows>
+          <FieldRow label="Name" htmlFor={`${idPrefix}-name`}>
+            <TextField id={`${idPrefix}-name`} value={draft.name} disabled={disabled} placeholder="Zoho CRM" onChange={(name) => onChange({ ...draft, name })} />
+          </FieldRow>
+          <FieldRow label="URL" htmlFor={`${idPrefix}-url`}>
+            <TextField
+              id={`${idPrefix}-url`}
+              value={draft.url}
+              disabled={disabled}
+              placeholder="https://hooks.example.com/..."
+              onChange={(url) => onChange({ ...draft, url })}
+            />
+          </FieldRow>
+        </FieldRows>
+        <p className="webhook-section-hint">
+          A Zapier Catch Hook, Make Custom webhook, or Zoho Flow Webhook trigger. Failed sends retry for about 9 hours.
+        </p>
+      </WebhookSection>
 
-      <div className="webhook-checks" role="group" aria-label="Events">
-        <span className="webhook-checks-title">Send when</span>
-        {WEBHOOK_EVENTS.map((event) => (
-          <Checkbox key={event} checked={draft.events.includes(event)} disabled={disabled} onChange={(on) => toggleEvent(event, on)}>
-            {WEBHOOK_EVENT_LABELS[event]}
-          </Checkbox>
-        ))}
-      </div>
+      <WebhookSection title="Send when" meta={`${draft.events.length} of ${WEBHOOK_EVENTS.length} selected`}>
+        <TickTiles
+          idPrefix={`${idPrefix}-event`}
+          single
+          disabled={disabled}
+          items={WEBHOOK_EVENTS.map((event) => ({ key: event, label: WEBHOOK_EVENT_LABELS[event], checked: draft.events.includes(event) }))}
+          onToggle={(key) => toggleEvent(key as WebhookEventType)}
+        />
+      </WebhookSection>
 
-      <div className="webhook-checks" role="group" aria-label="Plans">
-        <span className="webhook-checks-title">For members on</span>
-        <Checkbox checked={draft.tiers.length === 0} disabled={disabled} onChange={(on) => on && onChange({ ...draft, tiers: [] })}>
-          All plans
-        </Checkbox>
-        {ordered.map((tier) => (
-          <Checkbox key={tier.key} checked={draft.tiers.includes(tier.key)} disabled={disabled} onChange={(on) => toggleTier(tier.key, on)}>
-            {tier.name}
-          </Checkbox>
-        ))}
-      </div>
+      <WebhookSection title="For members on" meta={draft.tiers.length === 0 ? "All plans" : `${draft.tiers.length} of ${ordered.length} plans`}>
+        <TickTiles
+          idPrefix={`${idPrefix}-plan`}
+          disabled={disabled}
+          items={[
+            { key: "__all__", label: "All plans", checked: draft.tiers.length === 0 },
+            ...ordered.map((tier) => ({ key: tier.key, label: tier.name, checked: draft.tiers.includes(tier.key) })),
+          ]}
+          onToggle={togglePlan}
+        />
+      </WebhookSection>
 
       <FieldMapEditor idPrefix={idPrefix} draft={draft} tiers={ordered} profileFields={profileFields} siteName={siteName} disabled={disabled} onChange={onChange} />
     </>
@@ -321,8 +377,7 @@ const FieldMapEditor: React.FC<{
     : { type: "member.tier_changed", site: { name: siteName }, member: { email: sample.email, name: sample.name, tier: sample.tier, profile: sample.profile }, previousTier: sample.previousTier };
 
   return (
-    <div className="webhook-checks" role="group" aria-label="Fields sent">
-      <span className="webhook-checks-title">Fields sent</span>
+    <WebhookSection title="Fields sent" meta={map ? `${map.length} of ${MAX_FIELD_MAP} fields` : undefined}>
       <Segmented
         label="Fields sent"
         options={FORMAT_OPTIONS}
@@ -332,7 +387,12 @@ const FieldMapEditor: React.FC<{
 
       {map ? (
         <>
-          <p className="settings-help">Each row sends one value under the key your service expects.</p>
+          <div className="webhook-map-head" aria-hidden={true}>
+            <span>MemberFrame value</span>
+            <span />
+            <span>Key in your service</span>
+            <span />
+          </div>
           {map.map((row, index) => (
             <div key={index} className="webhook-map-row">
               <Select
@@ -376,14 +436,19 @@ const FieldMapEditor: React.FC<{
           </div>
         </>
       ) : (
-        <p className="settings-help">
+        <p className="webhook-section-hint">
           The full member record, with every profile field. Map it in your service, or switch to Choose fields.
         </p>
       )}
 
-      <span className="webhook-checks-title">Preview, a plan change</span>
-      <pre className="webhook-preview">{JSON.stringify(preview, null, 2)}</pre>
-    </div>
+      <details className="webhook-preview-details">
+        <summary className="webhook-preview-summary">
+          <ChevronDown aria-hidden={true} />
+          Preview a plan change
+        </summary>
+        <pre className="webhook-preview">{JSON.stringify(preview, null, 2)}</pre>
+      </details>
+    </WebhookSection>
   );
 };
 
@@ -407,12 +472,10 @@ const WebhookCard: React.FC<{
   const [busy, setBusy] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deliveries, setDeliveries] = useState<WebhookDelivery[] | null>(null);
 
   useEffect(() => setDraft(draftOf(hook)), [hook]);
 
   const dirty = !sameDraft(draft, draftOf(hook));
-  const last = hook.lastDelivery;
 
   const save = async (patch: Partial<WebhookDraft>, message: string) => {
     setBusy(true);
@@ -426,11 +489,6 @@ const WebhookCard: React.FC<{
     }
   };
 
-  const loadDeliveries = async () => {
-    const result = await fetchWebhookDeliveries(siteId, hook.id);
-    if (result.kind === "ok") setDeliveries(result.data.deliveries);
-  };
-
   const sendTest = async () => {
     setBusy(true);
     const result = await testWebhook(siteId, hook.id);
@@ -439,9 +497,8 @@ const WebhookCard: React.FC<{
       showToast({ tone: "error", message: short(failureMessage(result).message) });
       return;
     }
-    const { ok, status, error } = result.data.result;
-    showToast({ tone: ok ? "success" : "error", message: short(ok ? `Test delivered (${status})` : error ?? "Test failed") });
-    void loadDeliveries();
+    const { ok, error } = result.data.result;
+    showToast({ tone: ok ? "success" : "error", message: short(ok ? "Test sent" : error ?? "Test could not be sent") });
   };
 
   const remove = async () => {
@@ -457,10 +514,7 @@ const WebhookCard: React.FC<{
     }
   };
 
-  const toggleOpen = () => {
-    setOpen((value) => !value);
-    if (!open && deliveries === null) void loadDeliveries();
-  };
+  const toggleOpen = () => setOpen((value) => !value);
 
   return (
     <div className={cn("page-rule-card", open && "is-open")}>
@@ -478,12 +532,10 @@ const WebhookCard: React.FC<{
       >
         <div className="page-rule-info">
           <span className="page-rule-status-dot" data-enabled={hook.enabled} />
-          <span className="page-rule-title">{hook.name}</span>
-          {last ? (
-            <span className={cn("badge", last.status === "failed" ? "badge-danger" : last.status === "delivered" ? "badge-success" : "badge-neutral")}>
-              {last.status === "failed" ? "Failing" : last.status === "delivered" ? "Working" : "Sending"}
-            </span>
-          ) : null}
+          <span className="webhook-card-name">
+            <span className="page-rule-title">{hook.name}</span>
+            {hostOf(hook.url) ? <span className="webhook-card-host">{hostOf(hook.url)}</span> : null}
+          </span>
         </div>
         <div className="page-rule-header-actions" onClick={(event) => event.stopPropagation()}>
           <Toggle
@@ -519,13 +571,7 @@ const WebhookCard: React.FC<{
           <WebhookForm idPrefix={`webhook-${hook.id}`} draft={draft} tiers={tiers} profileFields={profileFields} siteName={siteName} disabled={busy} onChange={setDraft} />
           <FormProblem draft={draft} />
 
-          <FieldRows>
-            <FieldRow label="Signing secret" hint="Your server can use it to check each request came from MemberFrame.">
-              <code className="code-chip webhook-secret">{revealed ? hook.secret : "whsec_••••••••••••"}</code>
-            </FieldRow>
-          </FieldRows>
-
-          <div className="onpage-guide-actions">
+          <div className="webhook-actions">
             <Button
               variant="secondary"
               size="sm"
@@ -538,40 +584,27 @@ const WebhookCard: React.FC<{
               <Send aria-hidden={true} />
               <span>Send test</span>
             </Button>
-            <IconButton label={revealed ? "Hide secret" : "Show secret"} variant="ghost" onClick={() => setRevealed((value) => !value)}>
-              {revealed ? <EyeOff aria-hidden={true} /> : <Eye aria-hidden={true} />}
-            </IconButton>
-            <IconButton
-              label="Copy secret"
-              variant="ghost"
-              onClick={() => {
-                void navigator.clipboard.writeText(hook.secret);
-                showToast({ tone: "success", message: "Secret copied" });
-              }}
-            >
-              <Copy aria-hidden={true} />
-            </IconButton>
           </div>
 
-          <div className="webhook-deliveries" aria-label="Recent deliveries">
-            <span className="webhook-checks-title">Recent deliveries</span>
-            {deliveries === null ? (
-              <p className="settings-help">Loading.</p>
-            ) : deliveries.length === 0 ? (
-              <p className="settings-help">Nothing sent yet. Send a test to check the address.</p>
-            ) : (
-              deliveries.slice(0, 8).map((delivery) => (
-                <div key={delivery.id} className="webhook-delivery-row">
-                  <span className={cn("badge", delivery.status === "failed" ? "badge-danger" : delivery.status === "delivered" ? "badge-success" : "badge-neutral")}>
-                    {delivery.status === "failed" ? "Failed" : delivery.status === "delivered" ? "Sent" : "Retrying"}
-                  </span>
-                  <span className="webhook-delivery-text">
-                    {`${WEBHOOK_EVENT_LABELS[delivery.event as WebhookEventType] ?? "Test"}. ${deliveryLabel(delivery)}`}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
+          <WebhookSection title="Signing secret">
+            <div className="webhook-secret-row">
+              <code className="code-chip webhook-secret">{revealed ? hook.secret : "whsec_••••••••••••"}</code>
+              <IconButton label={revealed ? "Hide secret" : "Show secret"} variant="ghost" onClick={() => setRevealed((value) => !value)}>
+                {revealed ? <EyeOff aria-hidden={true} /> : <Eye aria-hidden={true} />}
+              </IconButton>
+              <IconButton
+                label="Copy secret"
+                variant="ghost"
+                onClick={() => {
+                  void navigator.clipboard.writeText(hook.secret);
+                  showToast({ tone: "success", message: "Secret copied" });
+                }}
+              >
+                <Copy aria-hidden={true} />
+              </IconButton>
+            </div>
+            <p className="webhook-section-hint">Your server can use it to check each request came from MemberFrame.</p>
+          </WebhookSection>
         </div>
       ) : null}
     </div>

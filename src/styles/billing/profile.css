@@ -370,12 +370,14 @@
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.beaf-logout-door {
+/* Lucide LogOut: the door is its path, the arrow its polyline and line. */
+.beaf-logout-icon path {
   transition: transform 0.3s ease, opacity 0.3s ease;
   transform-origin: left center;
 }
 
-.beaf-logout-arrow {
+.beaf-logout-icon polyline,
+.beaf-logout-icon line {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -384,15 +386,17 @@
   transform: scale(1.05);
 }
 
-.beaf-profile-logout-btn:hover .beaf-logout-arrow {
+.beaf-profile-logout-btn:hover .beaf-logout-icon polyline,
+.beaf-profile-logout-btn:hover .beaf-logout-icon line {
   transform: translateX(3px);
 }
 
-.beaf-profile-logout-btn:hover .beaf-logout-door {
+.beaf-profile-logout-btn:hover .beaf-logout-icon path {
   opacity: 0.8;
 }
 
-.beaf-profile-logout-btn:active .beaf-logout-arrow {
+.beaf-profile-logout-btn:active .beaf-logout-icon polyline,
+.beaf-profile-logout-btn:active .beaf-logout-icon line {
   transform: translateX(5px);
 }
 

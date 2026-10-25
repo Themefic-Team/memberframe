@@ -101,6 +101,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           value={filters.tier}
           options={tierFilters(siteTiers())}
           onChange={(tier) => patchFilters({ tier: tier as TierFilter })}
+          compact
         />
 
         <Select
@@ -108,6 +109,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           value={filters.status}
           options={STATUS_FILTERS}
           onChange={(status) => patchFilters({ status: status as StatusFilter })}
+          compact
         />
       </div>
 

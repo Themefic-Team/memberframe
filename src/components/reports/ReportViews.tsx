@@ -1,16 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Crown, Download, Gift, Users } from "lucide-react";
-import { Badge, Banner, Button, EmptyState, IconButton, Select } from "../ui";
+import { ArrowLeft, ChevronRight, Crown, Gift, Users } from "lucide-react";
+import { Badge, Banner, EmptyState, IconButton, Select } from "../ui";
 import { MemberRow } from "../manage/MemberRow";
 import { failureMessage, type ApiFailure } from "../../services/apiClient";
 import { fetchMembers } from "../../services/siteService";
 import {
   REPORT_EXPORT_MAX,
-  downloadCsv,
   fetchMemberHistory,
   fetchPayments,
   fetchSubscriptions,
-  toCsv,
   type MemberHistory,
   type OverviewReport,
   type PaymentRow,
@@ -22,13 +20,12 @@ import {
 } from "../../services/reportsService";
 import type { SiteMemberRecord } from "../../types/site";
 import { MEMBER_PAGE_SIZE } from "../../types/site";
-import { formatMinorPlain } from "../../utils/money";
-import { currencyExponent } from "../../utils/currencies";
 import {
   ColumnChart,
   INTERVAL_LABEL,
   PAYMENT_STATUS,
   Pager,
+  ReportExport,
   ReportRow,
   SUBSCRIPTION_STATUS,
   StatTile,
@@ -39,6 +36,20 @@ import {
   monthLabel,
   totalsIn,
 } from "./ReportParts";
+import {
+  memberHistoryDocument,
+  overviewDocument,
+  revenueDocument,
+  subscriptionsDocument,
+  tierMembersDocument,
+  tiersDocument,
+} from "./reportDocuments";
+
+/** Members per request when exporting a tier's list. */
+const MEMBER_EXPORT_PAGE = 500;
+
+const labelOf = (options: ReadonlyArray<{ value: string; label: string }>, value: string) =>
+  options.find((option) => option.value === value)?.label ?? value;
 
 interface ViewProps {
   report: OverviewReport;
@@ -72,13 +83,14 @@ const Heading: React.FC<{ title: string; subtitle?: string; children?: React.Rea
    OVERVIEW
    ========================================================================== */
 
-export const OverviewView: React.FC<ViewProps> = ({ report, period }) => {
+export const OverviewView: React.FC<ViewProps> = ({ report, mode, period }) => {
   const currency = report.siteCurrency;
   const net = totalsIn(report.revenue.totals, currency);
   const { members, subscriptions, content } = report;
 
   return (
     <div className="report-stack">
+      <ReportExport build={async () => overviewDocument(report, mode, period)} fileParts={["overview", mode, period]} />
       <div className="report-kpis">
         <StatTile label="Members" value={String(members.total)} sub={`${members.newInPeriod} new ${PERIOD_WORDS[period]}`} />
         <StatTile label="Paying members" value={String(members.paying)} sub={`${percent(members.paying, members.total)} of members`} />
@@ -163,7 +175,6 @@ export const RevenueView: React.FC<ViewProps & { tierOptions: ReadonlyArray<{ va
   const [page, setPage] = useState(1);
   const [list, setList] = useState<(ReportPage<PaymentRow>) | null>(null);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   useEffect(() => setPage(1), [tier, mode, period]);
   useEffect(() => {
@@ -179,31 +190,23 @@ export const RevenueView: React.FC<ViewProps & { tierOptions: ReadonlyArray<{ va
     };
   }, [siteId, mode, period, tier, page]);
 
-  const exportCsv = async () => {
-    setExporting(true);
+  /** The whole report, with every payment for the filter up to the export cap. */
+  const buildExport = async () => {
     const result = await fetchPayments({ siteId, mode, period, tier, page: 1, pageSize: REPORT_EXPORT_MAX });
-    setExporting(false);
-    if (result.kind !== "ok") return setFailure(result);
-    const csv = toCsv(
-      ["Date", "Member", "Email", "Tier", "Plan", "Amount", "Currency", "Gateway", "Status", "Receipt"],
-      result.data.rows.map((row) => [
-        row.paidAt.slice(0, 10),
-        row.member.name,
-        row.member.email,
-        row.tierName,
-        row.interval ? INTERVAL_LABEL[row.interval] ?? row.interval : "",
-        formatMinorPlain(row.amountMinor, currencyExponent(row.currency)),
-        row.currency,
-        gatewayLabel(row.gateway),
-        PAYMENT_STATUS[row.status]?.label ?? row.status,
-        row.receiptUrl,
-      ])
-    );
-    if (!downloadCsv(`payments-${mode}-${period}.csv`, csv)) setFailure({ kind: "unavailable", status: null, detail: "download_blocked" });
+    if (result.kind !== "ok") throw new Error(failureMessage(result).message);
+    return revenueDocument({
+      report,
+      mode,
+      period,
+      tierLabel: labelOf(tierOptions, tier),
+      payments: result.data.rows,
+      paymentsTotal: result.data.total,
+    });
   };
 
   return (
     <div className="report-stack">
+      <ReportExport build={buildExport} fileParts={["revenue", mode, period]} />
       <div className="report-kpis">
         <StatTile label="Net revenue" value={money(totals.netMinor, currency)} sub={PERIOD_WORDS[period]} />
         <StatTile label="Payments" value={String(totals.payments)} sub={`Gross ${money(totals.grossMinor, currency)}`} />
@@ -273,10 +276,6 @@ export const RevenueView: React.FC<ViewProps & { tierOptions: ReadonlyArray<{ va
           ))}
         </div>
         {list ? <Pager page={list.page} pageSize={list.pageSize} total={list.total} onPage={setPage} /> : null}
-        <Button variant="secondary" disabled={exporting || !list || list.total === 0} onClick={() => void exportCsv()}>
-          <Download aria-hidden={true} />
-          {exporting ? "Preparing" : "Export CSV"}
-        </Button>
       </section>
     </div>
   );
@@ -308,7 +307,6 @@ export const SubscriptionsView: React.FC<ViewProps & { tierOptions: ReadonlyArra
   const [page, setPage] = useState(1);
   const [list, setList] = useState<ReportPage<SubscriptionRow> | null>(null);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   useEffect(() => setPage(1), [status, tier, mode]);
   useEffect(() => {
@@ -324,28 +322,19 @@ export const SubscriptionsView: React.FC<ViewProps & { tierOptions: ReadonlyArra
     };
   }, [siteId, mode, status, tier, page]);
 
-  const exportCsv = async () => {
-    setExporting(true);
+  /** The whole report, with every subscription for the filters up to the export cap. */
+  const buildExport = async () => {
     const result = await fetchSubscriptions({ siteId, mode, status, tier, page: 1, pageSize: REPORT_EXPORT_MAX });
-    setExporting(false);
-    if (result.kind !== "ok") return setFailure(result);
-    const csv = toCsv(
-      ["Member", "Email", "Tier", "Plan", "Status", "Amount", "Currency", "Gateway", "Started", "Renews or ends", "Ended"],
-      result.data.rows.map((row) => [
-        row.member.name,
-        row.member.email,
-        row.tierName,
-        INTERVAL_LABEL[row.interval] ?? row.interval,
-        SUBSCRIPTION_STATUS[row.status]?.label ?? row.status,
-        formatMinorPlain(row.amountMinor, currencyExponent(row.currency)),
-        row.currency,
-        gatewayLabel(row.gateway),
-        row.startedAt.slice(0, 10),
-        row.currentPeriodEnd ? row.currentPeriodEnd.slice(0, 10) : "",
-        row.endedAt ? row.endedAt.slice(0, 10) : "",
-      ])
-    );
-    if (!downloadCsv(`subscriptions-${mode}-${status}.csv`, csv)) setFailure({ kind: "unavailable", status: null, detail: "download_blocked" });
+    if (result.kind !== "ok") throw new Error(failureMessage(result).message);
+    return subscriptionsDocument({
+      report,
+      mode,
+      period,
+      statusLabel: labelOf(STATUS_OPTIONS, status),
+      tierLabel: labelOf(tierOptions, tier),
+      rows: result.data.rows,
+      total: result.data.total,
+    });
   };
 
   const when = (row: SubscriptionRow) =>
@@ -353,6 +342,7 @@ export const SubscriptionsView: React.FC<ViewProps & { tierOptions: ReadonlyArra
 
   return (
     <div className="report-stack">
+      <ReportExport build={buildExport} fileParts={["subscriptions", mode, status]} />
       <div className="report-kpis">
         <StatTile label="Active" value={String(subscriptions.active)} sub="Paid and running" />
         <StatTile label="Payment failed" value={String(subscriptions.pastDue)} sub="In the grace period" />
@@ -400,10 +390,6 @@ export const SubscriptionsView: React.FC<ViewProps & { tierOptions: ReadonlyArra
           ))}
         </div>
         {list ? <Pager page={list.page} pageSize={list.pageSize} total={list.total} onPage={setPage} /> : null}
-        <Button variant="secondary" disabled={exporting || !list || list.total === 0} onClick={() => void exportCsv()}>
-          <Download aria-hidden={true} />
-          {exporting ? "Preparing" : "Export CSV"}
-        </Button>
       </section>
     </div>
   );
@@ -428,10 +414,11 @@ export const MembersView: React.FC<ViewProps> = ({ report, siteId, mode, period 
   if (memberId) {
     return <MemberHistoryView siteId={siteId} memberId={memberId} mode={mode} currency={currency} onBack={() => setMemberId(null)} />;
   }
-  if (tier) return <TierMembersView siteId={siteId} tier={tier} onBack={() => setTier(null)} onMember={setMemberId} />;
+  if (tier) return <TierMembersView siteId={siteId} mode={mode} tier={tier} onBack={() => setTier(null)} onMember={setMemberId} />;
 
   return (
     <div className="report-stack">
+      <ReportExport build={async () => tiersDocument(report, mode, period)} fileParts={["members-by-tier", mode, period]} />
       <section className="section-group">
         <Heading title="By Tier" subtitle={`Members and paying members now, net revenue ${PERIOD_WORDS[period]}. Open a tier to see its members.`} />
         <div className="integration-grid">
@@ -479,10 +466,11 @@ export const MembersView: React.FC<ViewProps> = ({ report, siteId, mode, period 
 
 const TierMembersView: React.FC<{
   siteId: string;
+  mode: ReportMode;
   tier: { key: string; name: string; rank: number };
   onBack: () => void;
   onMember: (id: string) => void;
-}> = ({ siteId, tier, onBack, onMember }) => {
+}> = ({ siteId, mode, tier, onBack, onMember }) => {
   const [page, setPage] = useState(1);
   const [members, setMembers] = useState<{ rows: ReadonlyArray<SiteMemberRecord>; total: number } | null>(null);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
@@ -500,9 +488,28 @@ const TierMembersView: React.FC<{
     };
   }, [siteId, tier.key, page]);
 
+  /**
+   * Every member on the tier, up to the export cap. Page by page, at the size
+   * the server answers with: an older server ignores the larger size and
+   * sends 25, which still gets there.
+   */
+  const buildExport = async () => {
+    const rows: SiteMemberRecord[] = [];
+    let total = 0;
+    for (let next = 1; rows.length < REPORT_EXPORT_MAX; next += 1) {
+      const result = await fetchMembers({ siteId, page: next, tier: tier.key, pageSize: MEMBER_EXPORT_PAGE });
+      if (result.kind !== "ok") throw new Error(failureMessage(result).message);
+      total = result.data.totalCount;
+      rows.push(...result.data.members);
+      if (result.data.members.length === 0 || rows.length >= total) break;
+    }
+    return tierMembersDocument({ tierName: tier.name, mode, members: rows.slice(0, REPORT_EXPORT_MAX), total });
+  };
+
   return (
     <div className="report-stack">
       <BackHeader title={tier.name} backLabel="Back to all tiers" onBack={onBack} />
+      <ReportExport build={buildExport} fileParts={["members", tier.name]} disabled={members?.total === 0} />
       {failure ? <Banner tone="warning" title="Could not load members" message={failureMessage(failure).message} /> : null}
 
       {members === null && !failure ? (
@@ -561,6 +568,14 @@ const MemberHistoryView: React.FC<{ siteId: string; memberId: string; mode: Repo
   return (
     <div className="report-stack">
       <BackHeader title={history ? history.member.name ?? history.member.email : "Member"} backLabel="Back to the tier" onBack={onBack} />
+      <ReportExport
+        build={async () => {
+          if (!history) throw new Error("This member is still loading.");
+          return memberHistoryDocument(history, mode);
+        }}
+        fileParts={["member", history?.member.name ?? history?.member.email ?? "history", mode]}
+        disabled={history === null}
+      />
       {failure ? <Banner tone="warning" title="Could not load this member" message={failureMessage(failure).message} /> : null}
 
       {history === null && !failure ? (
@@ -622,6 +637,6 @@ const BackHeader: React.FC<{ title: string; backLabel: string; onBack: () => voi
     <IconButton label={backLabel} variant="ghost" onClick={onBack}>
       <ArrowLeft aria-hidden={true} />
     </IconButton>
-    <h2 className="section-title">{title}</h2>
+    <h2 className="section-title report-back-title">{title}</h2>
   </div>
 );
