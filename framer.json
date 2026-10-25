@@ -3,7 +3,7 @@
   "name": "MemberFrame",
   "version": "1.0.0",
   "description": "The ultimate native membership and recurring monetization suite for Framer.",
-  "icon": "icon.png",
+  "icon": "icon.svg",
   "main": "dist/index.html",
   "modes": [
     "canvas"

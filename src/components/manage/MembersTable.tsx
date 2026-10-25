@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Search, Users } from "lucide-react";
-import { Banner, Button, EmptyState, IconButton, Select, TextField } from "../ui";
+import { Banner, Button, EmptyState, IconButton, Select, SkeletonList, TextField } from "../ui";
 import { cn } from "../../utils/cn";
 import { MemberRow } from "./MemberRow";
 import { MemberFlyout, type MemberAction } from "./MemberFlyout";
@@ -127,11 +127,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           Row-shaped placeholders, not a spinner. Three rows of the right height
           means the toolbar above does not jump when the real rows arrive.
         */
-        <div className="members-list" aria-busy={true} aria-label="Loading members">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="member-row-skeleton" />
-          ))}
-        </div>
+        <SkeletonList label="Loading members" count={3} />
       ) : null}
 
       {!loading && !failure && shown.length === 0 ? (

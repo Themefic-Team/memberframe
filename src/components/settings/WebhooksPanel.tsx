@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, ChevronDown, Copy, Eye, EyeOff, Plus, Send, Trash2, Webhook, X } from "lucide-react";
-import { Banner, Button, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, TextField, Toggle, useToast } from "../ui";
+import { Banner, Button, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, SkeletonList, TextField, Toggle, useToast } from "../ui";
 import { failureMessage } from "../../services/apiClient";
 import {
   FIELD_KEY_PATTERN,
@@ -127,7 +127,7 @@ export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, pro
       </div>
 
       {failure ? <Banner tone="warning" title={failure.title} message={failure.message} /> : null}
-      {webhooks === null && !failure ? <p className="settings-help">Loading webhooks.</p> : null}
+      {webhooks === null && !failure ? <SkeletonList label="Loading webhooks" count={2} variant="card" /> : null}
 
       <div className="page-rules-list">
         {(webhooks ?? []).map((hook) => (

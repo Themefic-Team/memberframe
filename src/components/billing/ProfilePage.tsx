@@ -1,10 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, Crown, Globe, LogOut, Mail, User } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Clock, Crown, LogOut, Mail, User } from "lucide-react";
 import { useConnection } from "../../hooks/useConnection";
 import { useLicense } from "../../hooks/useLicense";
-import { failureMessage } from "../../services/apiClient";
-import { addAllowedOrigins } from "../../services/siteSettingsService";
-import { describeOrigin, looksLikeOrigin } from "../connect/connectValidation";
 import { getPlanName, getStatusLabel, notify } from "./billingHelpers";
 import { startTrial } from "../../services/licenseService";
 
@@ -16,22 +13,19 @@ export interface ProfilePageProps {
 
 const USER_ICON = <User className="beaf-profile-field-icon" aria-hidden={true} />;
 const MAIL_ICON = <Mail className="beaf-profile-field-icon" aria-hidden={true} />;
-const GLOBE_ICON = <Globe className="beaf-profile-field-icon" aria-hidden={true} />;
 
 /**
  * Profile, behind the account icon. F19: a clone of the BEAF plugin's
  * ProfilePage (avatar ring and PRO or TRIAL badge, Plan Type, Personal Info,
- * Sign Out), plus this project's site key and allowed domains, which a
- * MemberFrame site needs and BEAF does not have.
+ * Sign Out), and nothing more: the site key is internal, and the allowed
+ * domains are kept by the plugin itself from Framer's publish info
+ * (`syncPublishedOrigins` in useSealGuard), so the page shows neither.
  */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, onSignUp, onSignIn }) => {
-  const { state, applyConnection, disconnect } = useConnection();
+  const { state, disconnect } = useConnection();
   const { view, apply } = useLicense();
   const [avatarError, setAvatarError] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
-  const [newOrigin, setNewOrigin] = useState("");
-  const [originProblem, setOriginProblem] = useState<string | null>(null);
-  const [savingOrigin, setSavingOrigin] = useState(false);
 
   const connection = state.status === "connected" ? state.connection : null;
   const displayName = connection?.creatorName || "User";
@@ -45,25 +39,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
     if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
     return `${parts[0]![0]}${parts[1]![0]}`.toUpperCase();
   }, [displayName]);
-
-  const addOrigin = useCallback(async () => {
-    if (!connection) return;
-    if (!looksLikeOrigin(newOrigin)) {
-      setOriginProblem("Enter the full address, including https://.");
-      return;
-    }
-    setSavingOrigin(true);
-    setOriginProblem(null);
-    const result = await addAllowedOrigins(connection.siteId, [newOrigin.trim()]);
-    setSavingOrigin(false);
-    if (result.kind === "ok") {
-      await applyConnection({ ...connection, allowedOrigins: result.data.allowedOrigins });
-      setNewOrigin("");
-      void notify({ type: "Success", message: "Domain allowed" });
-      return;
-    }
-    setOriginProblem(failureMessage(result).message);
-  }, [applyConnection, connection, newOrigin]);
 
   if (!connection) {
     return (
@@ -227,46 +202,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
               {MAIL_ICON}
               <input type="email" value={displayEmail} readOnly />
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="beaf-profile-section beaf-profile-project">
-        <h4 className="beaf-profile-section-title">This Project</h4>
-        <div className="beaf-profile-fields-card">
-          <div className="beaf-profile-field">
-            <label>Site Key</label>
-            <div className="beaf-profile-input-wrapper">
-              <input type="text" value={connection.siteKey} readOnly />
-            </div>
-          </div>
-          <div className="beaf-profile-field">
-            <label>Allowed Domains</label>
-            {connection.allowedOrigins.length === 0 ? (
-              <p className="beaf-profile-hint">No domain yet. Publish the site, then reopen the plugin, or add one below.</p>
-            ) : (
-              <ul className="beaf-profile-domain-list">
-                {connection.allowedOrigins.map((origin) => (
-                  <li key={origin}>{describeOrigin(origin)}</li>
-                ))}
-              </ul>
-            )}
-            <div className="beaf-profile-input-wrapper">
-              {GLOBE_ICON}
-              <input
-                type="url"
-                value={newOrigin}
-                placeholder="https://yoursite.com"
-                onChange={(event) => {
-                  setNewOrigin(event.target.value);
-                  setOriginProblem(null);
-                }}
-              />
-            </div>
-            {originProblem ? <p className="beaf-profile-error">{originProblem}</p> : null}
-            <button type="button" className="beaf-profile-primary-button" disabled={savingOrigin || newOrigin.trim() === ""} onClick={() => void addOrigin()}>
-              {savingOrigin ? "Adding..." : "Add Domain"}
-            </button>
           </div>
         </div>
       </div>

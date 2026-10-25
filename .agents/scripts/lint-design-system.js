@@ -33,6 +33,9 @@
  * Glass (section 6.1), billing included:
  *  15. backdrop-filter is blur(var(--px-glass-blur-backdrop | surface | toast)).
  *
+ * Feedback (section 10), outside billing:
+ *  16. No "Loading ..." text in a panel component: a wait shows <SkeletonList>.
+ *
  * Usage:
  *   node .agents/scripts/lint-design-system.js [directory]
  */
@@ -232,6 +235,17 @@ for (const file of codeFiles) {
   code.split("\n").forEach((line, index) => {
     const n = index + 1;
     if (GLYPH_ICONS.test(line)) report(file, n, "typed glyph as an icon, use a Lucide icon (Check, X, ArrowRight, Star)", line);
+
+    // 16. A wait shows a skeleton (<SkeletonList>), never "Loading ..." text.
+    // The skeleton's own `label` and an aria-label say it for screen readers.
+    if (
+      rel.startsWith("components" + path.sep) &&
+      !inBilling(rel) &&
+      /(["'`>]\s*)Loading [A-Za-z]/.test(line) &&
+      !/\b(aria-label|label)=["{]/.test(line)
+    ) {
+      report(file, n, "loading text, show a <SkeletonList> instead", line);
+    }
 
     if (rel.startsWith("components" + path.sep) && /<svg\b/.test(line) && !ICON_SVG_ALLOWED.has(rel)) {
       report(file, n, "hand-drawn svg, use a Lucide icon (brand marks go in providerMarks.tsx)", line);

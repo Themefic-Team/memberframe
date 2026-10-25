@@ -11,6 +11,7 @@ import {
   InfoTip,
   SearchSelect,
   Segmented,
+  SkeletonList,
   TextField,
   Toggle,
   useToast,
@@ -212,7 +213,7 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
   }
 
   if (!overview || !draft) {
-    return <p className="settings-help">Loading payments.</p>;
+    return <SkeletonList label="Loading payments" count={3} variant="card" heading />;
   }
 
   const siteMode = overview.settings.mode;

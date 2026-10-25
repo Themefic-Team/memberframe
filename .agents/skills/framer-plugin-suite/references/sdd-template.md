@@ -3,7 +3,7 @@
 > **Document Status**: Draft / Approved / Implemented  
 > **Author**: AI Pair Programmer & Lead Developer  
 > **Ecosystem**: Company Framer Plugin Standard  
-> **Date**: YYYY-MM-DD  
+> **Date**: YYYY-MM-DD
 
 ---
 
@@ -21,6 +21,7 @@ Briefly describe what this Framer plugin accomplishes, the pain point it solves 
 ## 2. Framer Canvas Architecture & Permissions
 
 ### 2.1. Plugin Configuration (`framer.json`)
+
 ```json
 {
   "id": "my-plugin-id",
@@ -35,11 +36,12 @@ Briefly describe what this Framer plugin accomplishes, the pain point it solves 
     "Node.remove",
     "setPluginData"
   ],
-  "icon": "/icon.png"
+  "icon": "/icon.svg"
 }
 ```
 
 ### 2.2. Generated Code Component Schema
+
 - **File Name**: `MyPluginComponent.tsx`
 - **Prefix**: `MyPlugin_*`
 - **Property Controls**:
@@ -53,24 +55,24 @@ Briefly describe what this Framer plugin accomplishes, the pain point it solves 
 
 Window Dimensions: `framer.showUI({ position: "top right", width: 360, height: 640 })`
 
-| Tab | Title | Purpose |
-| :--- | :--- | :--- |
-| **Tab 1** | `Home` | Welcome banner, quick guide links, docs, cross-promo cards |
-| **Tab 2** | `Editor / Builder` | Interactive configurator, real-time preview, 'Add to Canvas' CTA |
-| **Tab 3** | `Settings` | Analytics tracking toggle, theme switcher (Light / Dark / System) |
-| **Profile** | `Profile / Subscription` | User badge, active plan status, trial countdown, Stripe checkout |
+| Tab         | Title                    | Purpose                                                           |
+| :---------- | :----------------------- | :---------------------------------------------------------------- |
+| **Tab 1**   | `Home`                   | Welcome banner, quick guide links, docs, cross-promo cards        |
+| **Tab 2**   | `Editor / Builder`       | Interactive configurator, real-time preview, 'Add to Canvas' CTA  |
+| **Tab 3**   | `Settings`               | Analytics tracking toggle, theme switcher (Light / Dark / System) |
+| **Profile** | `Profile / Subscription` | User badge, active plan status, trial countdown, Stripe checkout  |
 
 ---
 
 ## 4. Pro-Lock & Licensing Engine Integration
 
-| Requirement | Implementation Detail |
-| :--- | :--- |
-| **UI Button Gating** | If `!isLoggedIn` -> "Sign In to Unlock" `<Lock />`<br>If `!hasSubscription` -> "Upgrade to Unlock" `<Lock />` |
-| **CodeFile Auto-Patching** | Regex patch `const IS_LOCKED = (true\|false);` in `App.tsx` on status change |
-| **Canvas Banner** | Frosted glass lock card when `IS_LOCKED === true` |
-| **Trial System** | Auto-start 7-day trial on registration, sticky live countdown banner |
-| **Stripe Flow** | Stripe Elements modal, `/api/create-payment-intent`, override cache |
+| Requirement                | Implementation Detail                                                                                         |
+| :------------------------- | :------------------------------------------------------------------------------------------------------------ |
+| **UI Button Gating**       | If `!isLoggedIn` -> "Sign In to Unlock" `<Lock />`<br>If `!hasSubscription` -> "Upgrade to Unlock" `<Lock />` |
+| **CodeFile Auto-Patching** | Regex patch `const IS_LOCKED = (true\|false);` in `App.tsx` on status change                                  |
+| **Canvas Banner**          | Frosted glass lock card when `IS_LOCKED === true`                                                             |
+| **Trial System**           | Auto-start 7-day trial on registration, sticky live countdown banner                                          |
+| **Stripe Flow**            | Stripe Elements modal, `/api/create-payment-intent`, override cache                                           |
 
 ---
 

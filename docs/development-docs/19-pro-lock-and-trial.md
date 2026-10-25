@@ -246,3 +246,20 @@ The creator asked for the lock to apply to every canvas component, not only the 
 - Small sizes: the block's container queries shrink the watermark to the Framefic icon in the corner below 200px wide or 64px tall, and the lock card to its lock icon over the blur below 140px wide or 64px tall. Larger components look as before.
 - A locked tray never opens its drawer, which renders outside the trigger where the lock card does not reach.
 - Bookmark instances inserted before this change have no seal and are held to the license alone, like any pre-seal instance. Inserting each bookmark component once from the Builder updates its code file for every instance.
+
+### 8.2 Following BEAF's Lock Logic, 2026-10-25
+
+The creator saw the canvas lock after signing out while the live site kept working, and asked for BEAF's backend and frontend lock logic to be followed. BEAF (`BEAF-Framer-Plugin/src/features/slider/beafComponentCode.js`, `Framefic-BEAF-Backend/index.js` `/api/subscription-status`) does this:
+
+| | BEAF | MemberFrame |
+| :--- | :--- | :--- |
+| What the live site shows | The backend's answer from the site's payments and trial. Logging out of the plugin changes nothing | The same, `/api/license` |
+| On logout | The plugin rewrites the component file as not subscribed | The same, `IS_LOCKED = true` |
+| Settings panel while locked | Settings hidden, one "Status: Upgrade to PRO to customize" row | Now the same: settings hidden and a "Status: Sign in or upgrade to customize" row (`mfLockedStatus` in `mfControls`) |
+| A trial ending while a page is open | Counts down and locks at that second | Now the same: `/api/license` sends `trialEndsAt` with a trial answer (`licenseAnswer`), and the block arms a timer to lock at that second |
+| Canvas after logout | Follows the server, so a paid slider renders unlocked | Stays locked (the stricter of file and server on the canvas), as the creator asked in section 8 |
+
+So the live site of a paid plan does not lock on logout, in BEAF or here: it locks when the trial or the plan ends. The live screenshot that prompted this was a paid site (`/api/license` answered `active`).
+
+- [x] Tests: `licenseAnswer` (backend `test/instanceSeal.test.ts`); the Status row, the stored trial end, and the countdown in every component (`test/canvasLicenseParity.test.ts`).
+- [ ] Needs human verification: a locked component shows only the Status row in Framer's right panel; a trial that ends while a published page is open locks it at that second. The backend change needs a deploy before the live countdown works.

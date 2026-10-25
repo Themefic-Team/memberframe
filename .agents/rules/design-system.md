@@ -254,6 +254,7 @@ Never restyle a kit class from a feature stylesheet, and never rebuild a kit com
 | Action finished | Feedback | `useToast()` | A banner |
 | Persistent screen state | Feedback | `<Banner tone>` | A toast, a coloured div |
 | Nothing here yet | Feedback | `<EmptyState>` with exactly one action | A blank area |
+| Waiting on the server | Kit extension | `<SkeletonList label variant count>` (or `<Skeleton>`): the shape of what is coming, in state/skeleton, pulsing; still under reduced motion (kit.css `.kit-skeleton`) | "Loading ..." text, a spinner, or a blank area. `lint:design` rejects loading text |
 | A field is wrong | Feedback | Inline message under the field, `aria-describedby` | A banner |
 
 Figma components not yet in the kit: Radio (CSS exists, no React wrapper), AI field, Help card, Illustration/Pro, Icon/Crown, Logo/Calfic. Build them through section 9 when first needed.
@@ -307,6 +308,7 @@ Figma components not yet in the kit: Radio (CSS exists, no React wrapper), AI fi
 | Action finished | Toast: 45 characters max, optional Undo, at least 5s, pauses on hover and focus. `role="status"`, error `role="alert"` |
 | Screen has a state the user must know | Banner: Info, Success, Warning, Danger. Radius 14. Danger `role="alert"`. Max 2 per screen |
 | Area has no content | Empty state: radius 16, dashed hairline, 40px icon tile, exactly one next step |
+| Content is loading | Skeleton: `row` 52px for data rows, `card` 64px for cards, `line` for text, `block` for a hero or chart. A tab waiting on the connection shows a card skeleton |
 | Field input wrong | Inline message under the field |
 
 Don't: toast for errors that need a decision; more than 2 banners; blank areas; colour as the only signal.
@@ -381,5 +383,6 @@ Then self-review against this list, and say in your report which items you check
 - v0.4.2 · 2026-10-18 · Shell: five tabs (Reports added at the creator's request, chosen over an icon beside Account). Tab gap 12px in kit.css so five labels and the Account icon fit 360px. Kit: `SearchSelect` for long lists. See docs/development-docs/24-reports.md and 23-dynamic-tiers.md.
 - v0.4.3 · 2026-10-18 · Kit: `Modal` for dialogs over the panel, added for F19 (plugin billing): the Stripe payment form, the upgrade confirmation, and the cancel steps. See docs/development-docs/19-pro-lock-and-trial.md.
 - v0.4.4 · 2026-10-18 · Billing exemption: the F19 billing screens are a copy of the BEAF plugin's (company-wide billing standard, the user's decision), in `components/billing` and `styles/billing`, exempt from `lint:design`. See section 14. `Modal` stays in the kit, but billing no longer uses it.
+- v0.4.7 · 2026-10-25 · Kit: `Skeleton` and `SkeletonList`, replacing every "Loading ..." text and the ad hoc `.member-row-skeleton`; tabs show a skeleton while the connection loads; lint rule 16.
 - v0.4.6 · 2026-10-25 · Full review at the user's request: icons, no CDN, glass, design accuracy. Fonts bundled (Inter, JetBrains Mono, billing's Mulish and Sora) and every Google Fonts load removed, including the one inside Framer's framer.css; new gate `check:no-cdn` (only Stripe.js may load from outside). `--font-body` is Inter (was DM Sans). Lucide everywhere: billing glyphs and hand-drawn icons replaced, canvas icons made exact and tagged; lint rules 12 to 14. Glass tokens and section 6.1; modal and billing backdrops unified at 4px, toast 82% in light too; lint rule 15.
 - v0.4.5 · 2026-10-19 · `.primary-cta` gets the product owner's 2px gradient border (reference CSS, synced). Kit: `ConfirmDialog`, and every delete, remove, revoke, and disconnect in the panel now asks in it first (members, files, tiers, gateways, webhooks, fields, page and section locks). Review fixes: Integration cards open one at a time (one primary per view), icons sized by CSS, busy labels without ellipses, verb plus object Save labels, sentence-case "Page locks", "Attach file", "Copy asset ID". Canvas: the auth card fills its frame (fixed 400px width, no padding band) and the trial mark sits inside it.

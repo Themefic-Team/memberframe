@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link2 } from "lucide-react";
-import { Banner, EmptyState, Segmented, Select } from "../ui";
+import { Banner, EmptyState, Segmented, Select, Skeleton, SkeletonList } from "../ui";
 import { useConnection } from "../../hooks/useConnection";
 import { failureMessage, type ApiFailure } from "../../services/apiClient";
 import { fetchPayments as fetchPaymentSettings } from "../../services/paymentsService";
@@ -111,10 +111,9 @@ export const ReportsTab: React.FC = () => {
       ) : null}
 
       {!report && !failure ? (
-        <div className="report-stack" aria-busy={true} aria-label="Loading reports">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="member-row-skeleton" />
-          ))}
+        <div className="report-stack">
+          <Skeleton variant="block" />
+          <SkeletonList label="Loading reports" count={3} heading />
         </div>
       ) : null}
 

@@ -35,13 +35,6 @@
 .beaf-avatar-badge--trial span { color: black; }
 .beaf-avatar-segmented-ring { overflow: visible; }
 
-/* ── Profile: this project's site and domains (MemberFrame addition, BEAF field style) ── */
-.beaf-profile-project { margin-top: 20px; }
-.beaf-profile-domain-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.beaf-profile-domain-list li { color: var(--beaf-text-muted); font-size: 12px; font-family: "Inter", sans-serif; word-break: break-all; }
-.beaf-profile-hint { margin: 0; color: var(--beaf-text-muted); font-size: 11px; font-family: "Inter", sans-serif; line-height: 1.45; }
-.beaf-profile-error { margin: 0; color: #ff6b6b; font-size: 12px; font-family: "Inter", sans-serif; }
-.beaf-profile-input-wrapper input:not([readonly]) { color: var(--beaf-heading); }
 .beaf-profile-logout-wrap { margin-top: 16px; }
 
 /* ── SubscriptionPage ── */

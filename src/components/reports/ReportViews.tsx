@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronRight, Crown, Gift, Users } from "lucide-react";
-import { Badge, Banner, EmptyState, IconButton, Select } from "../ui";
+import { Badge, Banner, EmptyState, IconButton, Select, SkeletonList } from "../ui";
 import { MemberRow } from "../manage/MemberRow";
 import { failureMessage, type ApiFailure } from "../../services/apiClient";
 import { fetchMembers } from "../../services/siteService";
@@ -261,8 +261,8 @@ export const RevenueView: React.FC<ViewProps & { tierOptions: ReadonlyArray<{ va
           <Select label="Tier" value={tier} options={tierOptions} onChange={setTier} />
         </Heading>
         {failure ? <Banner tone="warning" title="Could not load payments" message={failureMessage(failure).message} /> : null}
+        {list === null && !failure ? <SkeletonList label="Loading payments" count={4} /> : null}
         <div className="report-table">
-          {list === null ? <p className="report-empty">Loading payments.</p> : null}
           {list && list.rows.length === 0 ? <p className="report-empty">No payments for this filter.</p> : null}
           {list?.rows.map((row) => (
             <ReportRow
@@ -375,8 +375,8 @@ export const SubscriptionsView: React.FC<ViewProps & { tierOptions: ReadonlyArra
           <Select label="Tier" value={tier} options={tierOptions} onChange={setTier} />
         </div>
         {failure ? <Banner tone="warning" title="Could not load subscriptions" message={failureMessage(failure).message} /> : null}
+        {list === null && !failure ? <SkeletonList label="Loading subscriptions" count={4} /> : null}
         <div className="report-table">
-          {list === null ? <p className="report-empty">Loading subscriptions.</p> : null}
           {list && list.rows.length === 0 ? <p className="report-empty">No subscriptions for this filter.</p> : null}
           {list?.rows.map((row) => (
             <ReportRow
@@ -513,11 +513,7 @@ const TierMembersView: React.FC<{
       {failure ? <Banner tone="warning" title="Could not load members" message={failureMessage(failure).message} /> : null}
 
       {members === null && !failure ? (
-        <div className="members-list" aria-busy={true} aria-label="Loading members">
-          {[0, 1].map((index) => (
-            <div key={index} className="member-row-skeleton" />
-          ))}
-        </div>
+        <SkeletonList label="Loading members" count={2} />
       ) : null}
 
       {members && members.rows.length === 0 ? (
@@ -579,11 +575,7 @@ const MemberHistoryView: React.FC<{ siteId: string; memberId: string; mode: Repo
       {failure ? <Banner tone="warning" title="Could not load this member" message={failureMessage(failure).message} /> : null}
 
       {history === null && !failure ? (
-        <div className="members-list" aria-busy={true} aria-label="Loading history">
-          {[0, 1].map((index) => (
-            <div key={index} className="member-row-skeleton" />
-          ))}
-        </div>
+        <SkeletonList label="Loading history" count={2} />
       ) : null}
 
       {history ? (

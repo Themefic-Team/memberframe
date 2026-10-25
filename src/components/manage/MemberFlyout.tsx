@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link2, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
-import { Badge, Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Select } from "../ui";
+import { Badge, Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Select, SkeletonList } from "../ui";
 import type { SiteMemberRecord } from "../../types/site";
 import { siteTiers, type TierKey } from "../../types/member";
 import { formatJoinedDate, statusLabel, statusTone, tierLabel } from "./memberFilters";
@@ -74,7 +74,14 @@ const MemberPurchasesList: React.FC<{ siteId: string; memberId: string }> = ({ s
     };
   }, [memberId, siteId]);
 
-  const empty = failed ? "Purchases could not be loaded." : !data ? "Loading purchases." : null;
+  if (!data && !failed) {
+    return (
+      <MemberSection title="Purchases">
+        <SkeletonList label="Loading purchases" count={2} variant="line" />
+      </MemberSection>
+    );
+  }
+  const empty = failed ? "Purchases could not be loaded." : null;
   if (empty !== null || !data || (data.subscriptions.length === 0 && data.payments.length === 0)) {
     return (
       <MemberSection title="Purchases">

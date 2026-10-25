@@ -96,12 +96,13 @@ describe("what the block reads from the server", () => {
 
   const helpers = (locked: boolean) =>
     // eslint-disable-next-line no-new-func
-    new Function("IS_LOCKED", "IS_TRIAL", "React", "useState", "useEffect", `${js}\nreturn { mfEffectiveLicense, mfControls };`)(
+    new Function("IS_LOCKED", "IS_TRIAL", "React", "useState", "useEffect", "ControlType", `${js}\nreturn { mfEffectiveLicense, mfControls };`)(
       locked,
       false,
       { createElement: () => null },
       () => [null, () => undefined],
-      () => undefined
+      () => undefined,
+      { Enum: "enum" }
     ) as {
       mfEffectiveLicense(baked: string, answer: string, onCanvas: boolean): string;
       mfControls(controls: Record<string, Record<string, unknown>>): Record<string, Record<string, unknown>>;
@@ -130,6 +131,10 @@ describe("what the block reads from the server", () => {
     expect(helpers(false).mfControls(controls)).toBe(controls);
     const locked = helpers(true).mfControls(controls);
     expect(locked.mfSeal).toBe(controls.mfSeal);
+    // BEAF's Status row, first, in place of the settings.
+    expect(Object.keys(locked)[0]).toBe("mfLockedStatus");
+    expect(locked.mfLockedStatus).toMatchObject({ type: "enum", title: "Status", optionTitles: ["Sign in or upgrade to customize"] });
+    expect(locked.mfLockedStatus!.hidden).toBeUndefined();
     expect((locked.headline!.hidden as () => boolean)()).toBe(true);
     expect((locked.mode!.hidden as () => boolean)()).toBe(true);
     expect(locked.headline!.title).toBe("Headline");
@@ -163,5 +168,22 @@ describe("what the block reads from the server", () => {
     expect(await mfFetchLicense("https://api.example.com", "down")).toBeNull();
     expect(await mfFetchLicense("https://api.example.com", "")).toBeNull();
     vi.unstubAllGlobals();
+  });
+
+  it("keeps a trial's end from the server, for the countdown that locks at that second", async () => {
+    const host: { __mfTrialEnds?: Record<string, number> } = {};
+    vi.stubGlobal("window", host);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ state: "trial", trialEndsAt: "2026-11-01T10:00:00.000Z" }) }))
+    );
+    const { mfFetchLicense } = load({ locked: false, trial: true });
+    expect(await mfFetchLicense("https://api.example.com/", "mf_site_t")).toBe("trial");
+    expect(host.__mfTrialEnds?.["https://api.example.com|mf_site_t"]).toBe(Date.parse("2026-11-01T10:00:00.000Z"));
+    vi.unstubAllGlobals();
+  });
+
+  it("counts down in every component, so a running trial locks without a reload", () => {
+    for (const name of LICENSED) expect(block(read(name)), name).toContain('window.setTimeout(() => setLicense("locked")');
   });
 });

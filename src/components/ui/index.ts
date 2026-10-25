@@ -57,3 +57,6 @@ export type { ModalProps } from "./Modal";
 
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogProps } from "./ConfirmDialog";
+
+export { Skeleton, SkeletonList } from "./Skeleton";
+export type { SkeletonListProps, SkeletonProps, SkeletonVariant } from "./Skeleton";

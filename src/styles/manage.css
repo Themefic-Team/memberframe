@@ -234,16 +234,6 @@
   color: var(--framer-color-text-tertiary);
 }
 
-/* Row-shaped, not a spinner, so the toolbar above does not jump when rows
-   arrive. Height matches .member-row exactly. */
-.member-row-skeleton {
-  width: 100%;
-  min-height: 52px;
-  border-radius: var(--radius-12);
-  background: var(--px-color-skeleton);
-  opacity: 0.6;
-}
-
 /* --------------------------------------------------------------------------
    3. ROW ACTION FLYOUT
    -------------------------------------------------------------------------- */

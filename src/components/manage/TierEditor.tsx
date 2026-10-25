@@ -11,6 +11,7 @@ import {
   IconButton,
   InfoTip,
   Segmented,
+  SkeletonList,
   TextField,
   fieldErrorId,
 } from "../ui";
@@ -191,11 +192,7 @@ export const TierEditor: React.FC<TierEditorProps> = ({
       ) : null}
 
       {loading ? (
-        <div className="tiers-list" aria-busy={true} aria-label="Loading tiers">
-          {[0, 1].map((index) => (
-            <div key={index} className="member-row-skeleton" />
-          ))}
-        </div>
+        <SkeletonList label="Loading tiers" count={2} variant="card" />
       ) : null}
 
       {cta === "empty_create" ? (

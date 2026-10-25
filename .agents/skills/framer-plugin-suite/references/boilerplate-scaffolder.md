@@ -7,6 +7,7 @@ This runbook outlines how an AI agent or developer bootstraps a brand-new Framer
 ## Step 1: Initialize Repository & Dependencies
 
 Run in terminal:
+
 ```bash
 npm create vite@latest my-plugin -- --template react-ts
 cd my-plugin
@@ -15,6 +16,7 @@ npm install -D vite-plugin-framer @types/node
 ```
 
 Update `package.json` scripts:
+
 ```json
 {
   "scripts": {
@@ -31,17 +33,17 @@ Update `package.json` scripts:
 ## Step 2: Configure Vite (`vite.config.ts`)
 
 ```typescript
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import framer from "vite-plugin-framer"
-import mkcert from "vite-plugin-mkcert"
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import framer from "vite-plugin-framer";
+import mkcert from "vite-plugin-mkcert";
 
 export default defineConfig({
   plugins: [react(), framer(), mkcert()],
   build: {
     target: "esnext",
   },
-})
+});
 ```
 
 ---
@@ -49,6 +51,7 @@ export default defineConfig({
 ## Step 3: Configure Framer Manifest (`framer.json`)
 
 Create `framer.json` in the plugin root:
+
 ```json
 {
   "id": "generate-unique-6-char-hex",
@@ -63,7 +66,7 @@ Create `framer.json` in the plugin root:
     "Node.remove",
     "setPluginData"
   ],
-  "icon": "/icon.png"
+  "icon": "/icon.svg"
 }
 ```
 
@@ -74,10 +77,13 @@ Create `framer.json` in the plugin root:
 1. Copy [design-tokens.css](design-tokens.css) to `src/styles/variables.css`.
 2. Implement `src/config/backend.ts`:
    ```typescript
-   export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || "https://api.myplugin.framefic.com";
-   export const buildBackendUrl = (path: string) => `${BACKEND_BASE_URL.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+   export const BACKEND_BASE_URL =
+     import.meta.env.VITE_BACKEND_URL || "https://api.myplugin.framefic.com";
+   export const buildBackendUrl = (path: string) =>
+     `${BACKEND_BASE_URL.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
    ```
 3. Implement `src/lib/framer/project.ts`:
+
    ```typescript
    import { framer } from "framer-plugin";
 
@@ -105,6 +111,7 @@ Create `framer.json` in the plugin root:
      }
    }
    ```
+
 4. Copy `features/auth/` and `features/payment/` from the reference architecture.
 5. In `src/components/home/`, implement standard Home tab components from [plugin-components.md](plugin-components.md):
    - `HeroCard` (AI welcome hero with `.primary-cta`)
@@ -127,4 +134,5 @@ npm run dev
 # Package plugin for Framer Marketplace review
 npm run pack
 ```
+
 This produces `plugin.zip` containing the manifest and compiled assets ready for the Framer Marketplace.

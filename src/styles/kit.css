@@ -584,3 +584,62 @@
   width: 12px;
   height: 12px;
 }
+
+/* --------------------------------------------------------------------------
+   Skeleton: the loading placeholder (section 8). The shape of what is coming,
+   in state/skeleton, pulsing gently. Never "Loading ..." text.
+   -------------------------------------------------------------------------- */
+.kit-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: 100%;
+}
+
+.kit-skeleton {
+  width: 100%;
+  border-radius: var(--radius-12);
+  background: var(--px-color-skeleton);
+  opacity: 0.6;
+  animation: kit-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.kit-skeleton.is-row {
+  min-height: 52px;
+}
+
+.kit-skeleton.is-card {
+  min-height: 64px;
+  border-radius: var(--radius-14);
+}
+
+.kit-skeleton.is-line {
+  height: 12px;
+  border-radius: var(--radius-4);
+}
+
+.kit-skeleton.is-line.is-short {
+  width: 40%;
+  height: 16px;
+}
+
+.kit-skeleton.is-block {
+  min-height: 120px;
+  border-radius: var(--radius-16);
+}
+
+@keyframes kit-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-skeleton {
+    animation: none;
+  }
+}

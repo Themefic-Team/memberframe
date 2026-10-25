@@ -3,7 +3,7 @@ import { framer } from "framer-plugin";
 import { PluginShell } from "./components/shell";
 import { ConnectionProvider } from "./components/ConnectionProvider";
 import { ACCOUNT_VIEW, BuilderTab, ConnectTab, HomeTab, ManageTab, ReportsTab, SettingsTab } from "./components/tabs";
-import { ToastProvider } from "./components/ui";
+import { SkeletonList, ToastProvider } from "./components/ui";
 import { LicenseProvider } from "./components/account/LicenseProvider";
 import { LicenseBanner } from "./components/account/LicenseGate";
 import { AuthModal } from "./components/billing/AuthModal";
@@ -191,15 +191,24 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
                 <WatermarkNotice onUpgrade={openSubscription} />
               </div>
             ) : null}
-            <TabContent
-              activeTab={activeTab}
-              onOpenBuilder={openBuilder}
-              onOpenManage={openManage}
-              onOpenSettings={openSettings}
-              onOpenConnect={openConnect}
-              themePreference={preference}
-              onChangeThemePreference={setPreference}
-            />
+            {/* Until the connection is known, a tab would flash "Connect this
+                project first": show the shape of the tab instead. Home needs
+                nothing from the server, so it renders at once. */}
+            {state.status === "loading" && activeTab !== "home" ? (
+              <div className="tab-panel-body">
+                <SkeletonList label="Loading MemberFrame" count={4} variant="card" heading />
+              </div>
+            ) : (
+              <TabContent
+                activeTab={activeTab}
+                onOpenBuilder={openBuilder}
+                onOpenManage={openManage}
+                onOpenSettings={openSettings}
+                onOpenConnect={openConnect}
+                themePreference={preference}
+                onChangeThemePreference={setPreference}
+              />
+            )}
           </>
         )}
       </PluginShell>

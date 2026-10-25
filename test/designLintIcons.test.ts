@@ -68,6 +68,16 @@ describe("design lint, glass", () => {
   });
 });
 
+describe("design lint, loading", () => {
+  it("rejects loading text in a panel component, and accepts a skeleton's label", () => {
+    const bad = lint({ "components/manage/Panel.tsx": 'export const A = () => <p className="x">Loading payments.</p>;\n' });
+    expect(bad.code).toBe(1);
+    expect(bad.out).toContain("loading text, show a <SkeletonList> instead");
+    const ok = lint({ "components/manage/Panel.tsx": 'export const A = () => <SkeletonList label="Loading payments" />;\n' });
+    expect(ok.out).toContain("PASSED");
+  });
+});
+
 describe("design lint, legacy tokens", () => {
   it("rejects a legacy alias that has a Figma twin, and names the twin", () => {
     const result = lint({

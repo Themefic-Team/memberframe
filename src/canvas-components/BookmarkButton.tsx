@@ -107,8 +107,12 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
       }
       return response.ok ? response.json() : null;
     })
-    .then((data: { state?: unknown } | null): MfLicense | null => {
+    .then((data: { state?: unknown; trialEndsAt?: unknown } | null): MfLicense | null => {
       const state = data ? data.state : null;
+      const ends = (host as unknown as { __mfTrialEnds?: Record<string, number> });
+      ends.__mfTrialEnds = ends.__mfTrialEnds || {};
+      const endsAt = data && typeof data.trialEndsAt === "string" ? Date.parse(data.trialEndsAt) : NaN;
+      if (state === "trial" && !isNaN(endsAt)) ends.__mfTrialEnds[base + "|" + siteKey] = endsAt;
       if (state === "copied") return "copied";
       // Published at an address the site does not allow yet. Not a copy: the
       // plugin adds the address the next time it is open in this project.
@@ -141,7 +145,16 @@ function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boole
  */
 function mfControls<T extends object>(controls: T): T {
   if (!IS_LOCKED) return controls;
-  const locked: Record<string, unknown> = {};
+  // BEAF's "Status" row: the one thing a locked component shows in the panel.
+  const locked: Record<string, unknown> = {
+    mfLockedStatus: {
+      type: ControlType.Enum,
+      title: "Status",
+      options: ["locked"],
+      optionTitles: ["Sign in or upgrade to customize"],
+      defaultValue: "locked",
+    },
+  };
   for (const [key, control] of Object.entries(controls)) {
     locked[key] = key === "mfSeal" ? control : { ...(control as object), hidden: () => true };
   }
@@ -150,6 +163,9 @@ function mfControls<T extends object>(controls: T): T {
 
 function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLicense {
   const [license, setLicense] = useState<MfLicense>(mfBakedLicense);
+  // Bumped on every server answer, so the countdown below re-arms even when
+  // the answer matches the file (trial and trial): it brings the end time.
+  const [answeredAt, setAnsweredAt] = useState(0);
   useEffect(() => {
     let live = true;
     let checkedAt = 0;
@@ -158,7 +174,10 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
     const check = () => {
       checkedAt = Date.now();
       void mfFetchLicense(apiBaseUrl, siteKey, seal).then((answer) => {
-        if (live && answer) setLicense(mfEffectiveLicense(mfBakedLicense(), answer, onCanvas));
+        if (live && answer) {
+          setLicense(mfEffectiveLicense(mfBakedLicense(), answer, onCanvas));
+          setAnsweredAt(Date.now());
+        }
       });
     };
     check();
@@ -176,6 +195,19 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
       document.removeEventListener("visibilitychange", onReturn);
     };
   }, [apiBaseUrl, siteKey, seal]);
+
+  // BEAF's countdown: a running trial locks at the second it ends, on the
+  // canvas and the live site, without waiting for a reload or the next check.
+  useEffect(() => {
+    if (license !== "trial" || typeof window === "undefined") return () => undefined;
+    const ends = (window as unknown as { __mfTrialEnds?: Record<string, number> }).__mfTrialEnds || {};
+    const endsAt = ends[String(apiBaseUrl).replace(/\/+$/, "") + "|" + siteKey];
+    if (typeof endsAt !== "number") return () => undefined;
+    // setTimeout holds at most about 24 days; a longer wait re-arms on the next check.
+    const timer = window.setTimeout(() => setLicense("locked"), Math.min(Math.max(0, endsAt - Date.now()), 2147483647));
+    return () => window.clearTimeout(timer);
+  }, [license, answeredAt, apiBaseUrl, siteKey]);
+
   return license;
 }
 

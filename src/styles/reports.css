@@ -82,6 +82,11 @@
   overflow: hidden;
 }
 
+/* While a list loads, the skeleton above stands in for it: no empty frame. */
+.report-table:empty {
+  display: none;
+}
+
 .report-row {
   display: flex;
   align-items: center;

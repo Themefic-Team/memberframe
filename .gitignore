@@ -5,8 +5,10 @@
 
 # Dependencies
 node_modules/
+framefic-ui-kit/
 .pnp
 .pnp.js
+
 
 # Production Build Outputs
 dist/
