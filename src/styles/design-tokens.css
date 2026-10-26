@@ -9,10 +9,10 @@
    See PRD section 6.3. This file holds variables only.
 
    Recopied 2026-10-25 for Foundations v0.4.0 (was v0.3.7),
-   reference lines 1 to 324.
+   reference lines 1 to 352.
    Check for drift:
      diff <(tail -n +17 src/styles/design-tokens.css) \
-          <(sed -n '1,324p' .agents/skills/framer-plugin-suite/references/design-tokens.css)
+          <(sed -n '1,352p' .agents/skills/framer-plugin-suite/references/design-tokens.css)
    ========================================================================== */
 /* ==========================================================================
    FRAMER framefic UNIFIED DESIGN SYSTEM TOKENS & STYLE GUIDELINE
@@ -42,16 +42,17 @@ html[data-user-theme="dark"] body {
   /* Inter everywhere (design-system.md section 4). --font-body was DM Sans,
      which put a second typeface under every element not set by a --text-*
      token; it stays as an alias so existing rules keep resolving. */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif; /* framefic-ui-kit --px-font-sans */
   --font-body: var(--font-sans);
-  --font-mono: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; /* framefic-ui-kit --px-font-mono */
 
   /* Brand Tokens (Pixelfic / Calfic Accent). Brand mode, same in both themes. */
   --px-brand-primary: #5271ff;
   --px-brand-primary-hover: #4761db;
   --px-brand-primary-pressed: #3b51b8;
   --px-brand-on-primary: #ffffff;
-  --px-brand-subtle: rgba(82, 113, 255, 0.20);
+  --px-brand-subtle: rgba(82, 113, 255, 0.16); /* kit v0.4.0: indigo alpha 16 */
+  --px-brand-tint: rgba(82, 113, 255, 0.08); /* kit v0.4.0: indigo alpha 8, chip hover */
   --px-brand-action: #4761db;
   --px-brand-action-hover: #3b51b8;
   --px-brand-action-pressed: #3b51b8;
@@ -93,7 +94,8 @@ html[data-user-theme="dark"] body {
   --px-color-border-highlight: rgba(255, 255, 255, 0.03);
   --px-color-border-selected: rgba(255, 255, 255, 0.06);
   --px-color-border-subtle: #1b1f22;
-  --px-color-control-track: #2d2d2d;
+  --px-color-control-track: rgba(255, 255, 255, 0.12); /* kit: white 12% */
+  --px-border-strong: rgba(255, 255, 255, 0.20); /* kit: scrollbar thumb, switch edge */
   --px-color-glow-brand: rgba(82, 113, 255, 0.14);
   --px-color-shadow-deep: rgba(0, 0, 0, 0.18);
   --px-color-shadow-soft: rgba(0, 0, 0, 0.06);
@@ -108,7 +110,7 @@ html[data-user-theme="dark"] body {
   --px-color-danger: #f87171;
   --px-color-danger-subtle: #3a1414;
   --px-color-info: #8fa3ff;
-  --px-color-info-subtle: #1a1f36;
+  --px-color-info-subtle: rgba(82, 113, 255, 0.16); /* kit: indigo alpha 16 */
   --px-color-success: #00e454;
   --px-color-success-subtle: #062e13;
   --px-color-warning: #ffc745;
@@ -195,10 +197,11 @@ html[data-user-theme="light"] body {
   --px-color-bg-raised: #ffffff;
   --px-color-bg-selected: #ffffff;
   --px-color-border-brand: rgba(82, 113, 255, 0.20);
-  --px-color-border-highlight: rgba(255, 255, 255, 0);
+  --px-color-border-highlight: #ffffff; /* kit: white 100%, invisible on a white card */
   --px-color-border-selected: rgba(0, 0, 0, 0.05);
   --px-color-border-subtle: #f5f5f5;
-  --px-color-control-track: #ebebeb;
+  --px-color-control-track: rgba(0, 0, 0, 0.08); /* kit: black 8% */
+  --px-border-strong: rgba(0, 0, 0, 0.18); /* kit: scrollbar thumb, switch edge */
   --px-color-glow-brand: rgba(82, 113, 255, 0.14);
   --px-color-shadow-deep: rgba(0, 0, 0, 0.05);
   --px-color-shadow-soft: rgba(0, 0, 0, 0.02);
@@ -213,7 +216,7 @@ html[data-user-theme="light"] body {
   --px-color-danger: #dc2626;
   --px-color-danger-subtle: #fef2f2;
   --px-color-info: #4761db;
-  --px-color-info-subtle: #f2f4ff;
+  --px-color-info-subtle: rgba(82, 113, 255, 0.08); /* kit: indigo alpha 8 */
   --px-color-success: #15803d;
   --px-color-success-subtle: #f0fdf4;
   --px-color-warning: #b45309;
@@ -336,5 +339,30 @@ body {
   --px-glass-blur-backdrop: 4px; /* Dialog and modal backdrops. Not in Figma yet: confirm in Dev Mode. */
   --px-glass-blur-surface: 8px; /* Frosted lock banners and overlays. */
   --px-glass-blur-toast: 16px; /* Toasts. */
+
+  /* framefic-ui-kit v0.4.0 sizes and motion (HANDOFF section 4). */
+  --text-body-lg-tracking: 0;
+  --text-body-tracking: 0;
+  --text-body-strong-tracking: 0;
+  --text-body-sm-tracking: 0;
+  --text-body-sm-strong-tracking: 0;
+  --text-mono-tracking: 0;
+  --px-control-height-sm: 30px;
+  --px-control-height-md: 36px;
+  --px-icon-12: 12px;
+  --px-icon-16: 16px;
+  --px-icon-20: 20px;
+  --px-icon-24: 24px;
+  --px-border-width: 1px;
+  --px-panel-width-min: 300px;
+  --px-panel-width-default: 360px;
+  --px-panel-width-split: 600px;
+  --px-panel-width-max: 900px;
+  --px-panel-height-min: 480px;
+  --px-panel-height-default: 640px;
+  /* Motion: --px-ease for hovers, --px-spring for friendly pops (card lift, icon pop). */
+  --px-ease: 0.18s cubic-bezier(0.2, 0, 0, 1);
+  --px-ease-curve: cubic-bezier(0.2, 0, 0, 1);
+  --px-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 

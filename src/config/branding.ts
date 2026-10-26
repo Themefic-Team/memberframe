@@ -66,3 +66,21 @@ export const SIBLING_PLUGINS: ReadonlyArray<{
 
 /** Mirrors `version` in framer.json. Keep the two in step at packaging time. */
 export const PLUGIN_VERSION = "1.0.0";
+
+/**
+ * Setup guides, one per sign-in provider and payment gateway, linked from the
+ * top of each one's settings sheet. UNCONFIRMED like the links above (task
+ * 8.8): they follow the sections of docs/integrations-setup-guide.md under the
+ * docs address. Replace them with the published guide's real addresses.
+ */
+export type SetupGuideId = "google" | "github" | "apple" | "discord" | "stripe" | "lemonsqueezy" | "razorpay";
+
+export const SETUP_GUIDES: Record<SetupGuideId, string> = {
+  google: `${HELP_LINKS.guide}/sign-in/google`,
+  github: `${HELP_LINKS.guide}/sign-in/github`,
+  apple: `${HELP_LINKS.guide}/sign-in/apple`,
+  discord: `${HELP_LINKS.guide}/sign-in/discord`,
+  stripe: `${HELP_LINKS.guide}/payments/stripe`,
+  lemonsqueezy: `${HELP_LINKS.guide}/payments/lemon-squeezy`,
+  razorpay: `${HELP_LINKS.guide}/payments/razorpay`,
+};

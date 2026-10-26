@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Link2, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
-import { Badge, Button, ConfirmDialog, FieldRow, FieldRows, IconButton, Select, SkeletonList } from "../ui";
+import React, { useEffect, useState } from "react";
+import { Link2, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { Badge, Button, ConfirmDialog, Field, Fields, Select, Sheet, SkeletonList } from "../ui";
 import type { SiteMemberRecord } from "../../types/site";
 import { siteTiers, type TierKey } from "../../types/member";
 import { formatJoinedDate, statusLabel, statusTone, tierLabel } from "./memberFilters";
@@ -294,9 +294,10 @@ function tierOptions(): ReadonlyArray<{ value: TierKey; label: string }> {
  * product owner: nothing in the panel deletes on the first click). The dialog
  * names the member, so it still says what is being confirmed.
  *
- * No `.primary-cta` here. The Manage tab's single primary action belongs to the
- * Tiers segment, per PRD section 7.3, so every control in this flyout is a
- * secondary or a danger button.
+ * Shown in the kit's Sheet, a centered dialog over the list (2026-10-25, the
+ * user's request), not inline under the member's row. Delete member is pinned
+ * in the footer. No `.primary-cta`: every control here is a secondary or a
+ * danger button.
  */
 export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
   member,
@@ -308,44 +309,31 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
 }) => {
   const [confirming, setConfirming] = useState<"revoke" | "delete" | null>(null);
 
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-      }
-    },
-    [onClose]
-  );
-
   const alreadyRevoked = member.status === "canceled";
 
   return (
-    <div
-      className="member-flyout"
-      role="group"
-      aria-label={`Actions for ${member.name ?? member.email}`}
-      onKeyDown={handleKeyDown}
-    >
-      <div className="member-flyout-head">
-        <span className="member-avatar" aria-hidden={true}>
-          {initialsOf(member.name, member.email)}
+    <>
+    <Sheet
+      title={member.name ?? member.email}
+      description={member.name ? member.email : undefined}
+      icon={<span className="member-sheet-initials">{initialsOf(member.name, member.email)}</span>}
+      badge={
+        <span className="member-flyout-badges">
+          <Badge tone="brand">{tierLabel(member.tier)}</Badge>
+          <Badge tone={statusTone(member.status)}>{statusLabel(member.status)}</Badge>
         </span>
-        <div className="member-flyout-identity">
-          <span className="member-flyout-title">{member.name ?? member.email}</span>
-          {member.name ? <span className="member-flyout-email">{member.email}</span> : null}
-          <span className="member-flyout-badges">
-            <Badge tone="brand">{tierLabel(member.tier)}</Badge>
-            <Badge tone={statusTone(member.status)}>{statusLabel(member.status)}</Badge>
-          </span>
-        </div>
-        <IconButton label="Close actions" variant="ghost" onClick={onClose}>
-          <X aria-hidden={true} />
-        </IconButton>
-      </div>
+      }
+      onClose={onClose}
+      footer={
+        <Button variant="danger" size="md" disabled={busy} onClick={() => setConfirming("delete")}>
+          <Trash2 aria-hidden={true} />
+          Delete member
+        </Button>
+      }
+    >
 
-      <FieldRows>
-        <FieldRow label="Tier" htmlFor={`member-tier-${member.id}`} fill>
+      <Fields>
+        <Field label="Tier" htmlFor={`member-tier-${member.id}`}>
           <Select
             id={`member-tier-${member.id}`}
             value={member.tier}
@@ -354,8 +342,8 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
             onChange={(tier) => onAction({ kind: "change_tier", tier })}
             fill
           />
-        </FieldRow>
-      </FieldRows>
+        </Field>
+      </Fields>
 
       <div className="member-flyout-actions">
         <Button
@@ -395,6 +383,16 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
         )}
       </div>
 
+      <MemberSignInMethods member={member} />
+
+      {profileFields.length > 0 ? (
+        <MemberProfileValues fields={profileFields} metadata={member.metadata} />
+      ) : null}
+
+      {siteId ? <MemberPurchasesList siteId={siteId} memberId={member.id} /> : null}
+
+      <p className="member-flyout-note">Changes apply on this member's next session check.</p>
+    </Sheet>
       {confirming === "revoke" ? (
         <ConfirmDialog
           title="Revoke this member's access?"
@@ -438,22 +436,6 @@ export const MemberFlyout: React.FC<MemberFlyoutProps> = ({
           }}
         />
       ) : null}
-
-      <MemberSignInMethods member={member} />
-
-      {profileFields.length > 0 ? (
-        <MemberProfileValues fields={profileFields} metadata={member.metadata} />
-      ) : null}
-
-      {siteId ? <MemberPurchasesList siteId={siteId} memberId={member.id} /> : null}
-
-      <div className="member-flyout-danger">
-        <Button variant="danger" size="md" className="fill" disabled={busy} onClick={() => setConfirming("delete")}>
-          <Trash2 aria-hidden={true} />
-          Delete member
-        </Button>
-        <p className="member-flyout-note">Changes apply on this member's next session check.</p>
-      </div>
-    </div>
+    </>
   );
 };

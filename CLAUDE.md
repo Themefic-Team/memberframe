@@ -92,10 +92,10 @@ Full text in [`.agents/rules/framer-sdd-standards.md`](.agents/rules/framer-sdd-
 - **Zero hardcoded hex.** Use design tokens by their Figma names: `--framer-color-bg`, `--framer-color-text-secondary`, `--px-color-bg-raised`, `--framer-color-divider`, `--px-color-text-brand`. Never `--secondary-default` as text: #5271FF fails AA.
 - **Exactly one `.primary-cta` per view.** Brand gradient 180deg `#5271ff` to `#3b51b8`. Never flat `#5271FF` as a button fill, it fails WCAG AA at 4.07:1.
 - **Icons: Lucide React or Framer SVG only.** Zero unicode emoji anywhere, including docs and UI copy. All icons `stroke="currentColor"`.
-- **Window geometry**: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse goes to height 36.
-- **Three-part shell**: Tab Bar 36px (top row: 4 tabs, then the Account icon), Content Scroll Area, Footer 40px. Collapse is a `framer.setMenu` item in Framer's own window bar, beside its close button. No plugin header: Framer's own window bar already shows the name and close, and the SDK cannot hide it. Connect opens from the Account icon, not a tab.
+- **Window geometry**: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse goes to height 40 (the tab bar).
+- **Three-part shell**: Tab Bar 40px (top row: the tabs, then the Account icon), Content Scroll Area, Footer 36px (framefic-ui-kit). Collapse is a `framer.setMenu` item in Framer's own window bar, beside its close button. No plugin header: Framer's own window bar already shows the name and close, and the SDK cannot hide it. Connect opens from the Account icon, not a tab.
 - **`framer.css` is imported in a cascade layer** via `src/styles/framer-base.css`, so kit classes always beat its bare-element rules. Never import it directly.
-- **Form controls**: `.field-row` pattern, label left and control right, 30px tall, 8px radius, control width 160px or `.fill`.
+- **Form controls** (framefic-ui-kit): a text input, select, or text area sits in a `<Field>`: label on top with its help in an info tip, control full width, error under it. A checkbox, toggle, or segmented control sits in a `<Setting>`: title left, control right. Connect and config forms open in a `<Sheet>`, a centered dialog. Controls 30px tall, 8px radius.
 - **Theme sync**: honor `body[data-framer-theme]` and `html[data-user-theme]`. Both themes must hit WCAG AA.
 - **`framer.mode` guardrail**: always check before `framer.getCodeFiles()`. Never call it during `configureManagedCollection` or `syncManagedCollection`.
 - **2kB limit** on `setPluginData`. Use differential compression.

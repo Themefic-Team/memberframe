@@ -39,8 +39,12 @@ describe("the webhook settings", () => {
     const secret = panel.slice(panel.indexOf('title="Signing secret"'));
     expect(secret).toContain('label="Copy secret"');
     expect(secret).toContain('label={revealed ? "Hide secret" : "Show secret"}');
-    const actions = panel.slice(panel.indexOf('<div className="webhook-actions">', panel.indexOf("const WebhookCard")));
-    expect(actions.slice(0, actions.indexOf("</div>"))).toContain("Send test");
+    // Delete, Send test, and Save together in the webhook sheet's footer.
+    const card = panel.slice(panel.indexOf("const WebhookCard"));
+    const footer = card.slice(card.indexOf("footer={"), card.indexOf("<WebhookForm"));
+    expect(footer).toContain("Send test");
+    expect(footer).toContain("Save changes");
+    expect(footer).toContain("onClick={() => setConfirmingDelete(true)}");
   });
 
   it("shows the address's host under the name, and folds the preview away", () => {

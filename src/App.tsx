@@ -17,17 +17,20 @@ import { useLicense } from "./hooks/useLicense";
 import { useSealGuard } from "./hooks/useSealGuard";
 import { useActiveTab } from "./hooks/useActiveTab";
 import { useFramerTheme } from "./hooks/useFramerTheme";
+import { useScrollReveal } from "./hooks/useScrollReveal";
 
 /** PRD section 7.1. Geometry is fixed by the shell standard. */
 const PANEL_WIDTH = 360;
 const PANEL_HEIGHT = 640;
-/** The tab bar, which is the panel's top row since the plugin header went. */
-const COLLAPSED_HEIGHT = 36;
+/** The tab bar (framefic-ui-kit .tabs, 40px), the panel's top row since the plugin header went. */
+const COLLAPSED_HEIGHT = 40;
 /** A trial younger than this, met right after signing in, is "just started". */
 const JUST_STARTED_MS = 10 * 60_000;
 
 export const App: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+  // The kit's slim scrollbars show while an area scrolls (kit.css).
+  useScrollReveal();
 
   useEffect(() => {
     try {

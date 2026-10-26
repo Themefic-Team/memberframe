@@ -190,3 +190,7 @@ Needs human verification: the view at 360px in both themes.
   - the Recent deliveries list, and the fetch behind it
 - Send test now reads "Test sent", or the error when the address cannot be reached or refuses with 4xx or 5xx.
 - The backend still records deliveries and retries; the endpoints stay.
+
+## Webhooks Open In A Sheet (2026-10-25)
+
+Following the Framefic UI kit (design-system.md v0.5.0): **Add webhook** opens a "New webhook" sheet, and clicking a webhook's card opens its form in a sheet. The card keeps its status dot, host, and on or off toggle. The sheet's footer holds Delete (confirmed first, on the left), Send test, and Save changes (the primary). The trash icon moved off the card into that footer, as the payment gateways do.

@@ -120,7 +120,7 @@ export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string 
   return [
     "// MemberFrame section locks.",
     "//",
-    "// Written by the MemberFrame plugin each time you click Save locks. Edit your",
+    "// Written by the MemberFrame plugin each time you save a lock. Edit your",
     "// locks in the plugin (Settings, Page Locks, Section Locks), not here: this",
     "// file is replaced on every save.",
     "//",
@@ -141,7 +141,7 @@ export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string 
     "  }) as React.ComponentType<any>",
     "}",
     "",
-    ...(overrides.length > 0 ? overrides : ["// No section locks yet. Add one in the plugin, then click Save locks."]),
+    ...(overrides.length > 0 ? overrides : ["// No section locks yet. Add one in the plugin (Settings, Page Locks)."]),
     "",
   ].join("\n");
 }
@@ -150,7 +150,7 @@ export function sectionLocksCode(rules: ReadonlyArray<SectionLockRule>): string 
  * Whether a project's locks file was written by an older plugin: one
  * whose overrides drop the layer's ref, so Framer's appear effects never run
  * and a locked layer stays invisible. Only that is rewritten on open; a file
- * that merely lists other rules waits for Save locks, as before.
+ * that merely lists other rules waits for the next lock save, as before.
  */
 export function staleSectionLocksFile(content: string, rules: ReadonlyArray<SectionLockRule>): boolean {
   return !content.includes("React.forwardRef(function Locked") && content !== sectionLocksCode(rules);

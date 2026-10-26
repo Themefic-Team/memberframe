@@ -72,10 +72,13 @@ describe("checkout wording on each gateway card", () => {
 
   it("has one Save at the bottom for the keys and the wording, reconnecting only when a key changed", () => {
     expect(panel).not.toContain("Save wording");
-    expect(panel).toContain('{busy ? "Saving" : status.connected ? "Save changes" : `Connect ${label}`}');
+    expect(panel).toContain('{status.connected ? "Save changes" : `Connect ${label}`}');
     expect(panel).toMatch(/if \(keysChanged\) \{\s*const message = await onConnect\(values\);/);
-    // The button row comes after the checkout wording.
-    expect(panel.indexOf('label="Checkout description"')).toBeLessThan(panel.indexOf('"Save changes"'));
+    // One Save, pinned in the gateway sheet's footer, for the keys and the wording in its body.
+    const sheet = panel.slice(panel.indexOf("<Sheet"), panel.indexOf("</Sheet>"));
+    expect(sheet).toContain("footer={");
+    expect(sheet).toContain('"Save changes"');
+    expect(sheet).toContain('label="Checkout description"');
   });
 });
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Copy, Eye, EyeOff, Plus, Send, Trash2, Webhook, X } from "lucide-react";
-import { Banner, Button, ConfirmDialog, EmptyState, FieldRow, FieldRows, IconButton, Segmented, Select, SkeletonList, TextField, Toggle, useToast } from "../ui";
+import { ArrowRight, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Plus, Send, Trash2, Webhook, X } from "lucide-react";
+import { Banner, Button, ConfirmDialog, EmptyState, Field, Fields, IconButton, Segmented, Select, Sheet, SkeletonList, TextField, Toggle, useToast } from "../ui";
 import { failureMessage } from "../../services/apiClient";
 import {
   FIELD_KEY_PATTERN,
@@ -143,28 +143,29 @@ export const WebhooksPanel: React.FC<WebhooksPanelProps> = ({ siteId, tiers, pro
           />
         ))}
 
-        {adding ? (
-          <div className="page-rule-card is-open">
-            <div className="page-rule-card-header">
-              <div className="page-rule-info">
-                <span className="page-rule-title">New webhook</span>
-              </div>
-            </div>
-            <div className="page-rule-card-body">
-              <WebhookForm idPrefix="webhook-new" draft={adding} tiers={tiers} profileFields={profileFields} siteName={siteName} disabled={busy} onChange={setAdding} />
-              <FormProblem draft={adding} />
-              <div className="webhook-actions">
-                <Button variant="secondary" size="sm" disabled={busy || webhookDraftProblem(adding) !== null} onClick={() => void handleCreate()}>
-                  <span>{busy ? "Saving" : "Save webhook"}</span>
-                </Button>
-                <Button variant="ghost" size="sm" disabled={busy} onClick={() => setAdding(null)}>
-                  <span>Cancel</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
+
+      {adding ? (
+        <Sheet
+          title="New webhook"
+          onClose={busy ? undefined : () => setAdding(null)}
+          footer={
+            <Button
+              variant="primary"
+              size="md"
+              loading={busy}
+              disabled={webhookDraftProblem(adding) !== null}
+              onClick={() => void handleCreate()}
+            >
+              <Plus aria-hidden={true} />
+              Add webhook
+            </Button>
+          }
+        >
+          <WebhookForm idPrefix="webhook-new" draft={adding} tiers={tiers} profileFields={profileFields} siteName={siteName} disabled={busy} onChange={setAdding} />
+          <FormProblem draft={adding} />
+        </Sheet>
+      ) : null}
 
       {!adding && webhooks !== null && count === 0 ? (
         <EmptyState
@@ -258,11 +259,11 @@ const WebhookForm: React.FC<{
   return (
     <>
       <WebhookSection title="Destination">
-        <FieldRows>
-          <FieldRow label="Name" htmlFor={`${idPrefix}-name`}>
+        <Fields>
+          <Field label="Name" htmlFor={`${idPrefix}-name`}>
             <TextField id={`${idPrefix}-name`} value={draft.name} disabled={disabled} placeholder="Zoho CRM" onChange={(name) => onChange({ ...draft, name })} />
-          </FieldRow>
-          <FieldRow label="URL" htmlFor={`${idPrefix}-url`}>
+          </Field>
+          <Field label="URL" htmlFor={`${idPrefix}-url`}>
             <TextField
               id={`${idPrefix}-url`}
               value={draft.url}
@@ -270,8 +271,8 @@ const WebhookForm: React.FC<{
               placeholder="https://hooks.example.com/..."
               onChange={(url) => onChange({ ...draft, url })}
             />
-          </FieldRow>
-        </FieldRows>
+          </Field>
+        </Fields>
         <p className="webhook-section-hint">
           A Zapier Catch Hook, Make Custom webhook, or Zoho Flow Webhook trigger. Failed sends retry for about 9 hours.
         </p>
@@ -477,16 +478,17 @@ const WebhookCard: React.FC<{
 
   const dirty = !sameDraft(draft, draftOf(hook));
 
-  const save = async (patch: Partial<WebhookDraft>, message: string) => {
+  const save = async (patch: Partial<WebhookDraft>, message: string): Promise<boolean> => {
     setBusy(true);
     const result = await updateWebhook(siteId, hook.id, patch);
     setBusy(false);
     if (result.kind === "ok") {
       onChange(result.data.webhook);
       showToast({ tone: "success", message });
-    } else {
-      showToast({ tone: "error", message: short(failureMessage(result).message) });
+      return true;
     }
+    showToast({ tone: "error", message: short(failureMessage(result).message) });
+    return false;
   };
 
   const sendTest = async () => {
@@ -507,6 +509,7 @@ const WebhookCard: React.FC<{
     setBusy(false);
     setConfirmingDelete(false);
     if (result.kind === "ok") {
+      setOpen(false);
       onDelete();
       showToast({ tone: "success", message: "Webhook deleted" });
     } else {
@@ -514,19 +517,26 @@ const WebhookCard: React.FC<{
     }
   };
 
-  const toggleOpen = () => setOpen((value) => !value);
+  /** Open the sheet with the saved webhook; closing discards unsaved edits. */
+  const openSheet = () => {
+    setDraft(draftOf(hook));
+    setRevealed(false);
+    setOpen(true);
+  };
 
   return (
-    <div className={cn("page-rule-card", open && "is-open")}>
+    <div className="page-rule-card">
       <div
         className="page-rule-card-header"
         role="button"
         tabIndex={0}
-        onClick={toggleOpen}
+        aria-haspopup="dialog"
+        aria-label={`Edit ${hook.name}`}
+        onClick={openSheet}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            toggleOpen();
+            openSheet();
           }
         }}
       >
@@ -545,11 +555,8 @@ const WebhookCard: React.FC<{
             label={`Enable ${hook.name}`}
             onChange={(enabled) => void save({ enabled }, enabled ? "Webhook on" : "Webhook off")}
           />
-          <IconButton label="Delete webhook" variant="ghost" disabled={busy} onClick={() => setConfirmingDelete(true)}>
-            <Trash2 aria-hidden={true} />
-          </IconButton>
-          <span className={cn("page-rule-chevron", open && "is-open")}>
-            <ChevronDown aria-hidden={true} />
+          <span className="page-rule-chevron">
+            <ChevronRight aria-hidden={true} />
           </span>
         </div>
       </div>
@@ -567,24 +574,34 @@ const WebhookCard: React.FC<{
       ) : null}
 
       {open ? (
-        <div className="page-rule-card-body">
+        <Sheet
+          title={hook.name}
+          description={hostOf(hook.url) || undefined}
+          onClose={busy ? undefined : () => setOpen(false)}
+          footer={
+            <>
+              <Button variant="danger" size="md" disabled={busy} onClick={() => setConfirmingDelete(true)}>
+                <Trash2 aria-hidden={true} />
+                Delete
+              </Button>
+              <Button variant="secondary" size="md" disabled={busy || dirty} onClick={() => void sendTest()}>
+                <Send aria-hidden={true} />
+                Send test
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                loading={busy}
+                disabled={!dirty || webhookDraftProblem(draft) !== null}
+                onClick={() => void save(draft, "Webhook saved").then((saved) => saved && setOpen(false))}
+              >
+                Save changes
+              </Button>
+            </>
+          }
+        >
           <WebhookForm idPrefix={`webhook-${hook.id}`} draft={draft} tiers={tiers} profileFields={profileFields} siteName={siteName} disabled={busy} onChange={setDraft} />
           <FormProblem draft={draft} />
-
-          <div className="webhook-actions">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={busy || !dirty || webhookDraftProblem(draft) !== null}
-              onClick={() => void save(draft, "Webhook saved")}
-            >
-              <span>{busy ? "Saving" : "Save changes"}</span>
-            </Button>
-            <Button variant="secondary" size="sm" disabled={busy || dirty} onClick={() => void sendTest()}>
-              <Send aria-hidden={true} />
-              <span>Send test</span>
-            </Button>
-          </div>
 
           <WebhookSection title="Signing secret">
             <div className="webhook-secret-row">
@@ -605,7 +622,7 @@ const WebhookCard: React.FC<{
             </div>
             <p className="webhook-section-hint">Your server can use it to check each request came from MemberFrame.</p>
           </WebhookSection>
-        </div>
+        </Sheet>
       ) : null}
     </div>
   );

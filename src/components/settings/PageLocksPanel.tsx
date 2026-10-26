@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Copy, Plus, Save, Trash2 } from "lucide-react";
+import { Check, Copy, FileLock, Plus, Trash2 } from "lucide-react";
 import {
+  Badge,
   Banner,
   Button,
   ConfirmDialog,
-  FieldRow,
-  FieldRows,
-  IconButton,
+  Field,
+  Fields,
   Select,
+  Sheet,
   TextField,
-  Toggle,
 } from "../ui";
 import type { GatedPageFallbackAction, GatedPageRule, GatedPageTier, SectionLockRule } from "../../types/connection";
 import { isSafeSitePath } from "../../services/siteSettingsService";
@@ -18,26 +18,24 @@ import {
   getFramerProjectPages,
   isCmsItemPath,
   pageOptionLabel,
-  sectionLockNameProblem,
   sortPagesByPath,
   type DeployContext,
   type FramerProjectPage,
 } from "../../services";
 import { useToast } from "../ui";
 import { SectionLocksEditor } from "./SectionLocksEditor";
+import { LockCard } from "./LockCard";
 import { TierChecklist } from "./TierChecklist";
 import { isOnlyChoice } from "../../services/tierChoice";
 import { accessOptions, accessOptionsFor, accessValue, parseAccess } from "../../services/accessChoices";
-import { cn } from "../../utils/cn";
 
 export interface PageLocksPanelProps {
   rules: GatedPageRule[];
-  onChangeRules: (rules: GatedPageRule[]) => void;
-  /** Section locks, saved with the page locks by the same button. */
+  /** Section locks, saved with the page locks. */
   sectionLocks: SectionLockRule[];
-  onChangeSectionLocks: (rules: SectionLockRule[]) => void;
   saving: boolean;
-  onSave: () => void;
+  /** Saves both lists as given. Resolves true when saved. */
+  onSave: (next: { gatedPages: GatedPageRule[]; sectionLocks: SectionLockRule[] }) => Promise<boolean>;
   deployContext: DeployContext;
   onNavigateToBuilder?: () => void;
   siteConnected?: boolean;
@@ -45,11 +43,23 @@ export interface PageLocksPanelProps {
   tiers?: ReadonlyArray<TierLadderEntry>;
 }
 
+/** The lock open in the sheet: its index, or null for a new one, and the edited copy. */
+interface EditingLock {
+  index: number | null;
+  rule: GatedPageRule;
+  customPath: boolean;
+  customRedirect: boolean;
+}
+
+/**
+ * Page locks and section locks. Each lock is a card; a click opens its form in
+ * a `Sheet` (2026-10-25, the user's request; before, the form expanded inside
+ * the card). The sheet's Save lock writes the list at once, as does a card's
+ * toggle and a confirmed delete, so there is no Save locks button left to forget.
+ */
 export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
   rules,
-  onChangeRules,
   sectionLocks,
-  onChangeSectionLocks,
   saving,
   onSave,
   deployContext,
@@ -61,24 +71,16 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
   /** The rule waiting on the delete popup. */
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
   const [projectPages, setProjectPages] = useState<FramerProjectPage[]>([]);
-  const [customPathActive, setCustomPathActive] = useState<Record<number, boolean>>({});
-  const [customRedirectActive, setCustomRedirectActive] = useState<Record<number, boolean>>({});
-  const [expandedRules, setExpandedRules] = useState<Record<number, boolean>>({ 0: true });
+  const [editing, setEditing] = useState<EditingLock | null>(null);
 
   const shieldSnippet = `<script src="${deployContext.apiBaseUrl}/api/member/shield.js?site=${deployContext.siteKey || "YOUR_SITE_KEY"}"></script>`;
+  const connected = siteConnected !== false;
 
   const handleCopySnippet = () => {
     void navigator.clipboard.writeText(shieldSnippet);
     setCopiedSnippet(true);
     showToast({ tone: "success", message: "Script copied" });
     setTimeout(() => setCopiedSnippet(false), 2200);
-  };
-
-  const toggleRule = (index: number) => {
-    setExpandedRules((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
   };
 
   useEffect(() => {
@@ -124,96 +126,207 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
     [sortedPages]
   );
 
-  const handleToggle = (index: number, enabled: boolean) => {
-    const next = [...rules];
-    next[index] = { ...next[index], enabled };
-    onChangeRules(next);
-  };
-
   // The same list section locks and the paywall use (services/accessChoices.ts).
   const pageAccessOptions = useMemo(() => accessOptions(tiers, { others: true }), [tiers]);
 
-  const handleUpdate = <K extends keyof GatedPageRule>(
-    index: number,
-    key: K,
-    val: GatedPageRule[K]
-  ) => {
-    const next = [...rules];
-    next[index] = { ...next[index], [key]: val };
-    onChangeRules(next);
-  };
+  const savePages = (gatedPages: GatedPageRule[]) => onSave({ gatedPages, sectionLocks });
 
-  /** Who the page is for: the audience and the tier choice change together. */
-  const handleAccess = (index: number, value: string) => {
-    const next = [...rules];
-    const access = parseAccess(value, next[index], tiers);
-    const { audience: _old, ...rest } = next[index]!;
-    next[index] = access.audience === "others" ? { ...rest, ...access } : { ...rest, requiredTier: access.requiredTier };
-    onChangeRules(next);
-  };
+  /** A card's toggle applies at once (PRD section 7.5). */
+  const handleToggle = (index: number, enabled: boolean) =>
+    void savePages(rules.map((rule, i) => (i === index ? { ...rule, enabled } : rule)));
 
-  const handleRemove = (index: number) => {
-    const next = rules.filter((_, i) => i !== index);
-    setExpandedRules((prev) => {
-      const nextExpanded: Record<number, boolean> = {};
-      Object.keys(prev).forEach((keyStr) => {
-        const k = Number(keyStr);
-        if (k < index) nextExpanded[k] = prev[k];
-        else if (k > index) nextExpanded[k - 1] = prev[k];
-      });
-      return nextExpanded;
+  const openRule = (index: number) => {
+    const rule = rules[index]!;
+    const redirect = rule.redirectPath ?? deployContext.loginPath ?? "/login";
+    setEditing({
+      index,
+      rule: { ...rule },
+      customPath: !lockablePathSet.has(rule.path),
+      customRedirect: !pagePathSet.has(redirect),
     });
-    setCustomPathActive((prev) => {
-      const nextActive: Record<number, boolean> = {};
-      Object.keys(prev).forEach((keyStr) => {
-        const k = Number(keyStr);
-        if (k < index) nextActive[k] = prev[k];
-        else if (k > index) nextActive[k - 1] = prev[k];
-      });
-      return nextActive;
-    });
-    setCustomRedirectActive((prev) => {
-      const nextActive: Record<number, boolean> = {};
-      Object.keys(prev).forEach((keyStr) => {
-        const k = Number(keyStr);
-        if (k < index) nextActive[k] = prev[k];
-        else if (k > index) nextActive[k - 1] = prev[k];
-      });
-      return nextActive;
-    });
-    onChangeRules(next);
   };
 
   const handleAdd = () => {
     const usedPaths = new Set(rules.map((r) => r.path));
-    const unusedPage = projectPages.find(
-      (p) =>
-        !usedPaths.has(p.path) &&
-        p.path !== "/" &&
-        p.path !== "/login" &&
-        p.path !== "/404" &&
-        p.path !== "/reset-password"
-    );
-    const newPath = unusedPage ? unusedPage.path : `/private-${rules.length + 1}`;
-    const next = [
-      ...rules,
-      {
-        path: newPath,
+    const unusedPage = lockablePages.find((p) => !usedPaths.has(p.path) && p.path !== "/");
+    const redirect = deployContext.loginPath || "/login";
+    setEditing({
+      index: null,
+      rule: {
+        path: unusedPage ? unusedPage.path : `/private-${rules.length + 1}`,
         enabled: true,
         requiredTier: "signed_in" as GatedPageTier,
         fallbackAction: "redirect" as GatedPageFallbackAction,
-        redirectPath: deployContext.loginPath || "/login",
+        redirectPath: redirect,
       },
-    ];
-    const newIdx = rules.length;
-    setExpandedRules((prev) => ({ ...prev, [newIdx]: true }));
-    onChangeRules(next);
+      customPath: !unusedPage,
+      customRedirect: !pagePathSet.has(redirect),
+    });
+  };
+
+  const patch = (next: Partial<EditingLock>) => setEditing((current) => (current ? { ...current, ...next } : current));
+  const patchRule = <K extends keyof GatedPageRule>(key: K, val: GatedPageRule[K]) =>
+    setEditing((current) => (current ? { ...current, rule: { ...current.rule, [key]: val } } : current));
+
+  /** Who the page is for: the audience and the tier choice change together. */
+  const handleAccess = (value: string) =>
+    setEditing((current) => {
+      if (!current) return current;
+      const access = parseAccess(value, current.rule, tiers);
+      const { audience: _old, ...rest } = current.rule;
+      return {
+        ...current,
+        rule: access.audience === "others" ? { ...rest, ...access } : { ...rest, requiredTier: access.requiredTier },
+      };
+    });
+
+  const submit = async () => {
+    if (!editing) return;
+    const next =
+      editing.index === null
+        ? [...rules, editing.rule]
+        : rules.map((rule, i) => (i === editing.index ? editing.rule : rule));
+    if (await savePages(next)) setEditing(null);
+  };
+
+  const remove = async (index: number) => {
+    if (await savePages(rules.filter((_, i) => i !== index))) setEditing(null);
   };
 
   const hasInvalidPath = rules.some(
     (rule) => !isSafeSitePath(rule.path) || (rule.redirectPath && !isSafeSitePath(rule.redirectPath))
   );
-  const hasInvalidSectionLock = sectionLocks.some((_, index) => sectionLockNameProblem(sectionLocks, index) !== null);
+
+  const renderSheet = (open: EditingLock) => {
+    const { rule, index } = open;
+    const redirect = rule.redirectPath ?? deployContext.loginPath ?? "/login";
+    const pathError = isSafeSitePath(rule.path) ? undefined : "Start with a slash, like /dashboard.";
+    const redirectError = isSafeSitePath(redirect) ? undefined : "Start with a slash, like /login.";
+    const saved = index === null ? null : rules[index] ?? null;
+
+    return (
+      <Sheet
+        title={saved ? saved.path || "/" : "New page lock"}
+        description="Who can open the page, and where everyone else goes."
+        icon={<FileLock aria-hidden={true} />}
+        badge={saved ? <Badge tone={saved.enabled ? "success" : "neutral"}>{saved.enabled ? "On" : "Off"}</Badge> : undefined}
+        onClose={saving ? undefined : () => setEditing(null)}
+        footer={
+          <>
+            {index !== null ? (
+              <Button variant="danger" size="md" disabled={saving} onClick={() => setRemovingIndex(index)}>
+                <Trash2 aria-hidden={true} />
+                Delete lock
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              size="md"
+              loading={saving}
+              disabled={!connected || Boolean(pathError) || Boolean(redirectError)}
+              onClick={() => void submit()}
+            >
+              {index === null ? "Add lock" : "Save lock"}
+            </Button>
+          </>
+        }
+      >
+        {!connected ? (
+          <Banner tone="warning" title="Not connected" message="Connect this project before saving locks." />
+        ) : null}
+        <Fields>
+          <Field
+            label="Protected path"
+            htmlFor="page-lock-path"
+            hint="Also locks the pages under it. Blog, every item locks the posts and leaves /blog open."
+          >
+            <Select
+              id="page-lock-path"
+              value={open.customPath ? "__custom__" : rule.path}
+              options={protectedPageOptions}
+              disabled={saving}
+              onChange={(val) => {
+                if (val === "__custom__") patch({ customPath: true });
+                else {
+                  patch({ customPath: false });
+                  patchRule("path", val);
+                }
+              }}
+            />
+          </Field>
+
+          {open.customPath ? (
+            <Field label="Custom path" htmlFor="page-lock-path-custom" error={pathError}>
+              <TextField
+                id="page-lock-path-custom"
+                value={rule.path}
+                invalid={Boolean(pathError)}
+                disabled={saving}
+                placeholder="/dashboard"
+                onChange={(val) => patchRule("path", val)}
+                fill
+              />
+            </Field>
+          ) : null}
+
+          <Field label="Who can open it" htmlFor="page-lock-tier">
+            <Select
+              id="page-lock-tier"
+              value={accessValue(rule)}
+              options={accessOptionsFor(rule, pageAccessOptions)}
+              disabled={saving}
+              onChange={handleAccess}
+            />
+          </Field>
+
+          {isOnlyChoice(rule.requiredTier) ? (
+            <TierChecklist
+              value={rule.requiredTier}
+              tiers={tiers}
+              idPrefix="page-lock-only"
+              disabled={saving}
+              excluding={rule.audience === "others"}
+              onChange={(next) => patchRule("requiredTier", next)}
+            />
+          ) : null}
+
+          <Field
+            label="Redirect to"
+            htmlFor="page-lock-redirect"
+            hint="Where signed-out visitors go. Use /pricing to sell the plan."
+          >
+            <Select
+              id="page-lock-redirect"
+              value={open.customRedirect ? "__custom__" : redirect}
+              options={redirectPageOptions}
+              disabled={saving}
+              onChange={(val) => {
+                if (val === "__custom__") patch({ customRedirect: true });
+                else {
+                  patch({ customRedirect: false });
+                  patchRule("redirectPath", val);
+                }
+              }}
+            />
+          </Field>
+
+          {open.customRedirect ? (
+            <Field label="Custom redirect" htmlFor="page-lock-redirect-custom" error={redirectError}>
+              <TextField
+                id="page-lock-redirect-custom"
+                value={redirect}
+                invalid={Boolean(redirectError)}
+                disabled={saving}
+                placeholder="/login"
+                onChange={(val) => patchRule("redirectPath", val)}
+                fill
+              />
+            </Field>
+          ) : null}
+        </Fields>
+      </Sheet>
+    );
+  };
 
   return (
     <div className="page-locks-vault">
@@ -247,167 +360,24 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
         {hasInvalidPath ? (
           <Banner tone="warning" title="Check the paths" message="Each path starts with a slash, like /dashboard." />
         ) : null}
+        {!connected ? (
+          <Banner tone="warning" title="Not connected" message="Connect this project before saving locks." />
+        ) : null}
 
         <div className="page-rules-list">
-          {rules.map((rule, index) => {
-            const isInvalid = !isSafeSitePath(rule.path);
-            const isCustomPath = customPathActive[index] ?? !lockablePathSet.has(rule.path);
-            const isExpanded = Boolean(expandedRules[index]);
-
-            const currentRedirect = rule.redirectPath ?? deployContext.loginPath ?? "/login";
-            const isCustomRedirect = customRedirectActive[index] ?? !pagePathSet.has(currentRedirect);
-            const isInvalidRedirect = !isSafeSitePath(currentRedirect);
-
-            return (
-              <div
-                key={index}
-                className={cn("page-rule-card", isExpanded && "is-open")}
-              >
-                <div
-                  className="page-rule-card-header"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => toggleRule(index)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      toggleRule(index);
-                    }
-                  }}
-                >
-                  <div className="page-rule-info">
-                    <span
-                      className="page-rule-status-dot"
-                      data-enabled={rule.enabled}
-                      title={rule.enabled ? "Rule active" : "Rule disabled"}
-                    />
-                    <span className="page-rule-title">Rule {index + 1}</span>
-                    <span className="page-rule-path-badge">{rule.path || "/"}</span>
-                  </div>
-                  <div
-                    className="page-rule-header-actions"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Toggle
-                      id={`page-lock-toggle-${index}`}
-                      checked={rule.enabled}
-                      onChange={(checked) => handleToggle(index, checked)}
-                      label={`Enable lock for rule ${index + 1}`}
-                      disabled={saving}
-                    />
-                    <IconButton
-                      label="Remove page lock"
-                      variant="ghost"
-                      onClick={() => setRemovingIndex(index)}
-                      disabled={saving}
-                    >
-                      <Trash2 aria-hidden={true} />
-                    </IconButton>
-                    <span className={cn("page-rule-chevron", isExpanded && "is-open")}>
-                      <ChevronDown aria-hidden={true} />
-                    </span>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="page-rule-card-body">
-                    <FieldRows>
-                      <FieldRow
-                        label="Protected path"
-                        htmlFor={`rule-path-select-${index}`}
-                        hint="Also locks the pages under it. Blog, every item locks the posts and leaves /blog open."
-                      >
-                        <Select
-                          id={`rule-path-select-${index}`}
-                          value={isCustomPath ? "__custom__" : rule.path}
-                          options={protectedPageOptions}
-                          disabled={saving || !rule.enabled}
-                          onChange={(val) => {
-                            if (val === "__custom__") {
-                              setCustomPathActive((prev) => ({ ...prev, [index]: true }));
-                            } else {
-                              setCustomPathActive((prev) => ({ ...prev, [index]: false }));
-                              handleUpdate(index, "path", val);
-                            }
-                          }}
-                        />
-                      </FieldRow>
-
-                      {isCustomPath ? (
-                        <FieldRow label="Custom path" htmlFor={`rule-path-custom-${index}`}>
-                          <TextField
-                            id={`rule-path-custom-${index}`}
-                            value={rule.path}
-                            invalid={isInvalid}
-                            disabled={saving || !rule.enabled}
-                            placeholder="/dashboard"
-                            onChange={(val) => handleUpdate(index, "path", val)}
-                          />
-                        </FieldRow>
-                      ) : null}
-
-                      <FieldRow label="Who can open it" htmlFor={`rule-tier-${index}`}>
-                        <Select
-                          id={`rule-tier-${index}`}
-                          value={accessValue(rule)}
-                          options={accessOptionsFor(rule, pageAccessOptions)}
-                          disabled={saving || !rule.enabled}
-                          onChange={(val) => handleAccess(index, val)}
-                        />
-                      </FieldRow>
-
-                      {isOnlyChoice(rule.requiredTier) ? (
-                        <TierChecklist
-                          value={rule.requiredTier}
-                          tiers={tiers}
-                          idPrefix={`rule-only-${index}`}
-                          disabled={saving || !rule.enabled}
-                          excluding={rule.audience === "others"}
-                          onChange={(next) => handleUpdate(index, "requiredTier", next)}
-                        />
-                      ) : null}
-
-                      <>
-                          <FieldRow
-                            label="Redirect to"
-                            htmlFor={`rule-redir-select-${index}`}
-                            hint="Where signed-out visitors go. Use /pricing to sell the plan."
-                          >
-                            <Select
-                              id={`rule-redir-select-${index}`}
-                              value={isCustomRedirect ? "__custom__" : currentRedirect}
-                              options={redirectPageOptions}
-                              disabled={saving || !rule.enabled}
-                              onChange={(val) => {
-                                if (val === "__custom__") {
-                                  setCustomRedirectActive((prev) => ({ ...prev, [index]: true }));
-                                } else {
-                                  setCustomRedirectActive((prev) => ({ ...prev, [index]: false }));
-                                  handleUpdate(index, "redirectPath", val);
-                                }
-                              }}
-                            />
-                          </FieldRow>
-
-                          {isCustomRedirect ? (
-                            <FieldRow label="Custom redirect" htmlFor={`rule-redir-custom-${index}`}>
-                              <TextField
-                                id={`rule-redir-custom-${index}`}
-                                value={currentRedirect}
-                                invalid={isInvalidRedirect}
-                                disabled={saving || !rule.enabled}
-                                placeholder="/login"
-                                onChange={(val) => handleUpdate(index, "redirectPath", val)}
-                              />
-                            </FieldRow>
-                          ) : null}
-                      </>
-                    </FieldRows>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {rules.map((rule, index) => (
+            <LockCard
+              key={index}
+              title={`Rule ${index + 1}`}
+              badge={rule.path || "/"}
+              enabled={rule.enabled}
+              toggleId={`page-lock-toggle-${index}`}
+              toggleLabel={`Enable lock for rule ${index + 1}`}
+              disabled={saving || !connected}
+              onToggle={(checked) => handleToggle(index, checked)}
+              onOpen={() => openRule(index)}
+            />
+          ))}
         </div>
 
         <div className="page-locks-btn-row">
@@ -418,43 +388,28 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
         </div>
       </section>
 
-      <SectionLocksEditor rules={sectionLocks} onChange={onChangeSectionLocks} saving={saving} tiers={tiers} />
+      <SectionLocksEditor
+        rules={sectionLocks}
+        onSave={(next) => onSave({ gatedPages: rules, sectionLocks: next })}
+        saving={saving}
+        connected={connected}
+        tiers={tiers}
+      />
 
-      <div className="page-locks-footer">
-        <Button
-          variant="primary"
-          size="md"
-          className="fill"
-          disabled={saving || hasInvalidPath || hasInvalidSectionLock || siteConnected === false}
-          onClick={onSave}
-        >
-          <Save aria-hidden={true} />
-          <span>{saving ? "Saving" : "Save locks"}</span>
-        </Button>
-        {siteConnected === false ? (
-          <p className="settings-cta-note">Connect this project before saving locks.</p>
-        ) : hasInvalidPath ? (
-          <p className="settings-cta-note">Fix the highlighted path before saving.</p>
-        ) : hasInvalidSectionLock ? (
-          <p className="settings-cta-note">Fix the highlighted lock name before saving.</p>
-        ) : null}
-      </div>
+      {editing ? renderSheet(editing) : null}
 
       {removingIndex !== null && rules[removingIndex] ? (
         <ConfirmDialog
           title={`Delete the lock on ${rules[removingIndex]!.path || "/"}?`}
-          message={
-            <>
-              <p>Anyone can open that page again once it is gone.</p>
-              <p>It is removed when you press Save locks, and nothing changes on your site before that.</p>
-            </>
-          }
+          message={<p>Anyone can open that page again once it is gone. The site updates at once.</p>}
           confirmLabel="Delete page lock"
           cancelLabel="Keep lock"
+          busy={saving}
           onCancel={() => setRemovingIndex(null)}
           onConfirm={() => {
-            handleRemove(removingIndex);
+            const index = removingIndex;
             setRemovingIndex(null);
+            void remove(index);
           }}
         />
       ) : null}

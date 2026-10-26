@@ -128,7 +128,7 @@ describe("the MemberFrameLocks file", () => {
     const old = code.replace("return React.forwardRef(function Locked(props: any, ref: any) {", "function Locked(props: any) {");
     expect(staleSectionLocksFile(old, RULES)).toBe(true);
     expect(staleSectionLocksFile(code, RULES)).toBe(false);
-    // A current file listing other rules waits for Save locks.
+    // A current file listing other rules waits for the next lock save.
     expect(staleSectionLocksFile(sectionLocksCode([rule("Other")]), RULES)).toBe(false);
   });
 

@@ -36,6 +36,9 @@
  * Feedback (section 10), outside billing:
  *  16. No "Loading ..." text in a panel component: a wait shows <SkeletonList>.
  *
+ * Forms (section 8, framefic-ui-kit):
+ *  17. No FieldRow: a text control in a <Field>, an on or off control in a <Setting>.
+ *
  * Usage:
  *   node .agents/scripts/lint-design-system.js [directory]
  */
@@ -245,6 +248,11 @@ for (const file of codeFiles) {
       !/\b(aria-label|label)=["{]/.test(line)
     ) {
       report(file, n, "loading text, show a <SkeletonList> instead", line);
+    }
+
+    // 17. Forms are framefic-ui-kit Fields and Settings: FieldRow is gone.
+    if (/<FieldRows?[\s>]/.test(line)) {
+      report(file, n, "FieldRow, use <Field> (label on top) or <Setting> (checkbox, toggle, segmented)", line);
     }
 
     if (rel.startsWith("components" + path.sep) && /<svg\b/.test(line) && !ICON_SVG_ALLOWED.has(rel)) {

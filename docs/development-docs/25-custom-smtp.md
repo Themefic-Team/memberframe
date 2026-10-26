@@ -35,10 +35,10 @@ Technical development specification, user flow, architectural wiring, and testin
 
 ### 2.1. In-Plugin Configuration Flow (Framer Designer)
 
-1. **Settings, Config.** An **Email** section (title and one-line subtitle) under Membership, holding a **Custom SMTP** card in the integration-card accordion style. The badge uses the Integration cards' words: "Not connected" when off, "Connected" when on, "Send failed" when the latest custom send failed.
-2. Open the card. Kit field rows, label left and control right, every explanation in the label's info tip and none as a paragraph: **Host**, **Security** (a `<Select>`: STARTTLS (587), SSL/TLS (465), None (unencrypted); changing it moves the port while the creator has not typed their own), **Port**, **Username**, **Password** (write-only: "Saved. Type to replace" once stored), **From name**, **From address**, **Reply-to** (optional).
-3. **Save and turn on** / **Save** (secondary button; the view's one primary CTA stays "Save settings"). Validated in the panel and again on the server.
-4. The switch in the card bar turns custom sending on and off immediately, keeping the values.
+1. **Settings, Config.** An **Email** section (title and one-line subtitle) under Membership, holding a **Custom SMTP** card in the integration-card style. The badge uses the Integration cards' words: "Not connected" when off, "Connected" when on, "Send failed" when the latest custom send failed.
+2. Click the card: the form opens in a kit **Sheet** (2026-10-25, framefic-ui-kit). Kit fields, the label on top and the control full width, each explanation in an info tip beside its label: **Host**, **Security** (a `<Select>`: STARTTLS (587), SSL/TLS (465), None (unencrypted); changing it moves the port while the creator has not typed their own), **Port**, **Username**, **Password** (write-only: "Saved. Type to replace" once stored), **From name**, **From address**, **Reply-to** (optional).
+3. **Save and turn on** / **Save SMTP settings**, the sheet's primary, pinned in its footer. Validated in the panel and again on the server. The sheet stays open after a save, so the test email (step 5) is right there.
+4. The switch on the card turns custom sending on and off immediately, keeping the values, without opening the sheet.
 5. Once on: a **Test address** row and a **Send test email** button. The test goes through the site's SMTP only, never the fallback.
 6. One banner at most: the test result when there is one, otherwise "Last email failed" with the server's reason when the latest custom send failed. A success needs no banner; the badge says Connected.
 

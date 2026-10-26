@@ -239,19 +239,10 @@
 }
 
 /* --------------------------------------------------------------------------
-   Info tip: a field hint behind an info icon beside the label.
-   Hints never sit as paragraphs under fields; errors still do (they must be
-   seen without an action). The bubble is the Popover rung: bg/raised,
-   hairline, Shadow/Popover, radius 8, Body/Small.
+   Info tip: an explanation behind an info icon beside a section title. Field
+   help is visible text under the field (Field's hint), not a tip. The bubble
+   is the Popover rung: bg/raised, hairline, Shadow/Popover, radius 8.
    -------------------------------------------------------------------------- */
-.field-row-label-group {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex-shrink: 0;
-  min-width: 0;
-}
-
 .info-tip {
   display: inline-flex;
   flex-shrink: 0;
@@ -321,30 +312,6 @@
   pointer-events: auto;
   visibility: visible;
   opacity: 1;
-}
-
-/* --------------------------------------------------------------------------
-   Fill rows: a fixed label column, so every full-width control in a card
-   starts at the same x and a long label wraps instead of pushing its control
-   past the card edge. The control takes the rest and may shrink.
-   -------------------------------------------------------------------------- */
-.field-row.is-fill > .field-row-label,
-.field-row.is-fill > .field-row-label-group {
-  flex: 0 0 112px;
-  min-width: 0;
-}
-
-.field-row.is-fill .field-row-label {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.field-row-label-group .field-row-label {
-  flex-shrink: 1;
-}
-
-.field-row-control.fill {
-  min-width: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -455,11 +422,14 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Modal (kit extension, F19). A dialog over the panel: the payment form and
-   the plan notices. Tokens only, so both themes follow.
+   Sheet (framefic-ui-kit .sheet, section 8), always a centered dialog: the
+   user chose it over the kit's bottom sheet (2026-10-25). A raised card over
+   the overlay scrim with the glass backdrop (section 6.1), 16px from the
+   panel's edges, 16px padding inside, the head and the footer fixed and only
+   the body scrolling.
    --------------------------------------------------------------------------- */
 
-.kit-modal-backdrop {
+.kit-sheet-scrim {
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -468,60 +438,154 @@
   justify-content: center;
   padding: var(--space-16);
   background: var(--px-color-overlay);
-  /* Glass backdrop (section 6.1): the same frost as every billing dialog. */
   -webkit-backdrop-filter: blur(var(--px-glass-blur-backdrop));
   backdrop-filter: blur(var(--px-glass-blur-backdrop));
+  animation: kit-fade-in 0.15s both;
 }
 
-.kit-modal {
-  width: 100%;
-  max-height: 100%;
-  overflow-y: auto;
+.kit-sheet {
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
+  width: 100%;
+  max-width: 440px;
+  max-height: 100%;
   border: 1px solid var(--framer-color-divider);
   border-radius: var(--radius-16);
   background: var(--px-color-bg-raised);
   box-shadow: var(--px-shadow-popover);
   outline: none;
-  box-sizing: border-box;
+  overflow: hidden;
+  animation: kit-sheet-in 0.18s ease-out both;
 }
 
-.kit-modal-head {
+.kit-sheet-head {
+  flex: none;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-8);
+  gap: var(--space-10);
+  padding: var(--space-16) var(--space-12) var(--space-12) var(--space-16);
 }
 
-.kit-modal-heading {
+.kit-sheet-heading {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  padding-top: var(--space-4);
 }
 
-.kit-modal-title {
-  margin: 0;
-  font: var(--text-title-sm);
+/* The icon tile left of the title: the kit's 32px brand icon circle, squared. */
+.kit-sheet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-8);
+  background: var(--framer-color-bg-tertiary);
   color: var(--framer-color-text);
 }
 
-.kit-modal-desc {
+.kit-sheet-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The setup guide: a kit .link, brand text, opening the browser. */
+.kit-sheet-guide {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  font: var(--text-body-sm-strong);
+  color: var(--px-color-text-brand);
+  text-decoration: none;
+}
+
+.kit-sheet-guide:hover {
+  text-decoration: underline;
+}
+
+.kit-sheet-guide:focus-visible {
+  outline: none;
+  border-radius: var(--radius-4);
+  box-shadow: 0 0 0 1px var(--px-color-focus-ring), var(--px-focus-halo);
+}
+
+.kit-sheet-guide svg {
+  width: 12px;
+  height: 12px;
+}
+
+.kit-sheet-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  font: var(--text-title-sm);
+  letter-spacing: var(--text-title-sm-tracking);
+  color: var(--framer-color-text);
+}
+
+.kit-sheet-desc {
   margin: 0;
   font: var(--text-body-sm);
   color: var(--framer-color-text-secondary);
 }
 
-.kit-modal-body {
+.kit-sheet-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
+  gap: var(--space-16);
+  padding: var(--space-4) var(--space-16) var(--space-16);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-/* ConfirmDialog: the popup in front of every delete (section 8). */
+.kit-sheet-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid var(--framer-color-divider);
+  background: var(--px-color-bg-raised);
+}
+
+/* One action fills the footer; with a destructive one, it sits left and the primary right. */
+.kit-sheet-footer > .btn,
+.kit-sheet-footer > .primary-cta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@keyframes kit-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes kit-sheet-in {
+  from {
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-sheet-scrim,
+  .kit-sheet {
+    animation: none;
+  }
+}
+
+/* ConfirmDialog: the sheet in front of every delete (section 8). */
 .kit-confirm-message {
   display: flex;
   flex-direction: column;
@@ -544,6 +608,98 @@
   min-width: 0;
 }
 
+/* ---------------------------------------------------------------------------
+   Field and Setting (framefic-ui-kit .field and .setting, section 8).
+   Field: the label on top, the control full width, the help or error under
+   it. Setting: title and hint left, a checkbox, toggle, or segmented right.
+   --------------------------------------------------------------------------- */
+
+.kit-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.kit-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.kit-field-label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.kit-field-label {
+  font: var(--text-body-sm-strong);
+  color: var(--framer-color-text-secondary);
+}
+
+.kit-field-control {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The control takes the field's width: no fixed 160px column. */
+.kit-field-control > .framefic-input,
+.kit-field-control > .framefic-select,
+.kit-field-control > .framefic-input-wrap,
+.kit-field-control > .search-select-trigger {
+  width: 100%;
+  max-width: none;
+}
+
+.kit-field-error {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--px-color-danger);
+}
+
+.kit-setting-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.kit-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: 36px;
+}
+
+.kit-setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.kit-setting-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font: var(--text-body);
+  color: var(--framer-color-text);
+}
+
+.kit-setting-title label {
+  cursor: pointer;
+}
+
+.kit-setting-control {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
 /* --------------------------------------------------------------------------
    Control modifiers (section 9). A feature asks for these through the
    component's prop (`fill`, `compact`, `muted`), never by restyling a kit
@@ -557,6 +713,14 @@
 .btn.fill {
   width: 100%;
   min-width: 0;
+}
+
+/* In a row (a key field with its copy or show button), the control takes the
+   room left and shrinks; framer.css would otherwise keep it from shrinking
+   and push the buttons past the edge. */
+.framefic-input.fill,
+.framefic-select.fill {
+  flex: 1 1 auto;
 }
 
 /* Select `compact`: sized to its options, for a toolbar beside a search field. */
@@ -596,12 +760,18 @@
   width: 100%;
 }
 
+/* framefic-ui-kit .skeleton: a shimmer from bg/tertiary to bg/secondary. */
 .kit-skeleton {
   width: 100%;
   border-radius: var(--radius-12);
-  background: var(--px-color-skeleton);
-  opacity: 0.6;
-  animation: kit-skeleton-pulse 1.4s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    var(--framer-color-bg-tertiary) 25%,
+    var(--framer-color-bg-secondary) 50%,
+    var(--framer-color-bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: kit-skeleton-shimmer 1.2s infinite;
 }
 
 .kit-skeleton.is-row {
@@ -628,18 +798,204 @@
   border-radius: var(--radius-16);
 }
 
-@keyframes kit-skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 0.3;
+@keyframes kit-skeleton-shimmer {
+  to {
+    background-position: -200% 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .kit-skeleton {
     animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Button parts (framefic-ui-kit .btn-ico, .btn-label): stable wrappers, and
+   the loading spinner that takes the icon's place.
+   -------------------------------------------------------------------------- */
+.btn-ico {
+  display: inline-flex;
+  flex: none;
+}
+
+.btn-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.btn-label:empty {
+  display: none;
+}
+
+.btn-spinner {
+  animation: kit-spin 0.8s linear infinite;
+}
+
+.btn.is-loading,
+.primary-cta.is-loading {
+  cursor: progress;
+}
+
+@keyframes kit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Page rhythm (framefic-ui-kit .page): 16px panel padding, 12px inside a
+   section, 32px between sections. Sections sit in 12px stacks (the tab body,
+   a panel's fragment), so a section after a section adds the other 20px.
+   -------------------------------------------------------------------------- */
+.section-group + .section-group {
+  margin-top: var(--space-20);
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbars (framefic-ui-kit v0.4.0): a slim 6px bar, shown while the area
+   is hovered or scrolling (useScrollReveal sets .is-scrolling), with the
+   gutter always reserved. The thumb takes its colour from the area's
+   zero-width border colour, which can transition; scrollbar colours cannot.
+   -------------------------------------------------------------------------- */
+.framefic-content-area,
+.kit-sheet-body,
+.search-select-list {
+  scrollbar-gutter: stable;
+  border-color: transparent;
+  transition: border-color 0.35s ease;
+}
+
+.framefic-content-area::-webkit-scrollbar,
+.kit-sheet-body::-webkit-scrollbar,
+.search-select-list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.framefic-content-area::-webkit-scrollbar-track,
+.kit-sheet-body::-webkit-scrollbar-track,
+.search-select-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.framefic-content-area::-webkit-scrollbar-thumb,
+.kit-sheet-body::-webkit-scrollbar-thumb,
+.search-select-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 3px solid;
+  border-color: inherit;
+  border-radius: var(--radius-4);
+}
+
+.framefic-content-area:hover,
+.kit-sheet-body:hover,
+.search-select-list:hover,
+.framefic-content-area.is-scrolling,
+.kit-sheet-body.is-scrolling,
+.search-select-list.is-scrolling {
+  border-color: var(--px-border-strong);
+  transition-duration: 0.15s;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .framefic-content-area,
+  .kit-sheet-body,
+  .search-select-list {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .framefic-content-area:hover,
+  .kit-sheet-body:hover,
+  .search-select-list:hover,
+  .framefic-content-area.is-scrolling,
+  .kit-sheet-body.is-scrolling,
+  .search-select-list.is-scrolling {
+    scrollbar-color: var(--px-border-strong) transparent;
+  }
+}
+
+/* The reserved 6px gutter: content stays 16px from both edges. */
+.framefic-content-area .tab-panel:not(.is-flush) {
+  padding-right: var(--space-10);
+}
+
+/* --------------------------------------------------------------------------
+   Friendly card hover (framefic-ui-kit v0.4.0): a clickable card lifts 2px,
+   its icon pops, and its chevron or arrow nudges forward. Off for reduced
+   motion.
+   -------------------------------------------------------------------------- */
+.step-row,
+.help-tile,
+.framefic-card,
+.integration-card {
+  transition: box-shadow var(--px-ease), border-color var(--px-ease), transform 0.22s var(--px-spring);
+}
+
+.step-row:hover,
+.help-tile:hover,
+.framefic-card:hover,
+.integration-card:hover {
+  transform: translateY(-2px);
+}
+
+.step-row:active,
+.help-tile:active,
+.framefic-card:active {
+  transform: translateY(0) scale(0.99);
+  transition-duration: 0.08s;
+}
+
+.step-row-icon,
+.help-tile-icon-box,
+.framefic-card-logo,
+.integration-card-icon {
+  transition: transform 0.28s var(--px-spring);
+}
+
+.step-row:hover .step-row-icon,
+.help-tile:hover .help-tile-icon-box,
+.framefic-card:hover .framefic-card-logo,
+.integration-card:hover .integration-card-icon {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.step-row-chevron,
+.integration-chevron,
+.framefic-card-open svg {
+  transition: transform 0.22s var(--px-spring);
+}
+
+.step-row:hover .step-row-chevron,
+.integration-card:hover .integration-chevron {
+  transform: translateX(2px);
+}
+
+.framefic-card:hover .framefic-card-open svg {
+  transform: translate(1.5px, -1.5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-row,
+  .help-tile,
+  .framefic-card,
+  .integration-card,
+  .step-row-icon,
+  .help-tile-icon-box,
+  .framefic-card-logo,
+  .integration-card-icon,
+  .step-row-chevron,
+  .integration-chevron,
+  .framefic-card-open svg {
+    transition: none;
+    transform: none;
   }
 }

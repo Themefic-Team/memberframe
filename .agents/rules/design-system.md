@@ -22,7 +22,9 @@ The rule has two halves. The mechanical half is enforced by `npm run lint:design
 | Kit extensions | `src/styles/kit.css` and `src/components/ui/` | The agent |
 | Feature styling | `src/styles/<feature>.css` | The agent, layout only |
 
-Precedence when they disagree: **Figma, then this rule, then the reference CSS, then feature code.** If Figma moved and the reference did not, update the reference, run `npm run sync:tokens`, and record the change in section 15. Never patch a slice by hand: the provenance diff will fail.
+**The Framefic UI kit** (`framefic-ui-kit/`, `@pixelfic/ui`, its own repository `akandaui/framefic-ui-kit`, git-ignored here) is the company's code source of truth for the same Figma kit. Its `HANDOFF.md` sets the tokens, the components, and the patterns this file follows. MemberFrame does not import it: `src/components/ui` and `kit.css` rebuild it component for component under our gates (no inline CSS, no CDN, Lucide icons, glass tokens), and `test/uiKitParity.test.ts` holds every shared token to the kit's value when the kit is checked out.
+
+Precedence when they disagree: **Figma, then `framefic-ui-kit/HANDOFF.md`, then this rule, then the reference CSS, then feature code.** Where the kit's own CSS and its tokens disagree, follow the tokens (section 14, kit discrepancies). If Figma moved and the reference did not, update the reference, run `npm run sync:tokens`, and record the change in section 15. Never patch a slice by hand: the provenance diff will fail.
 
 Only the agent's own view of Figma is a screenshot. When a value is read from a screenshot rather than Dev Mode, say so in the change and ask for a Dev Mode check.
 
@@ -134,12 +136,12 @@ Inter everywhere, the Framer plugin font. JetBrains Mono for code. Use the `font
 
 | Where | Value |
 | :--- | :--- |
-| Tab panel padding | 16 |
-| Between sections on a tab | 20 (Home) or 24 (dense settings) |
-| Section title to its content | 10 |
+| Tab panel padding | 16 (10 on the right, beside the reserved 6px scrollbar gutter) |
+| Between sections on a tab | 32 (framefic-ui-kit `.page`): sections sit in 12px stacks, and `.section-group + .section-group` adds 20 |
+| Inside a section, title to content | 12 (`.stack-l`) |
 | Inside a card | 12 to 16 padding, 12 gap |
 | Between rows in a list | 8 |
-| Field rows | gap 12 inside a row, 8 between rows |
+| Fields | label to control 6, control to help 6, 12 between fields (`<Fields>`) |
 
 **Radius** (`--radius-N`): 4, 6, 8, 10, 12, 14, 16, 20, full.
 
@@ -183,7 +185,7 @@ Frosted glass (a translucent fill plus a backdrop blur) is used on exactly three
 
 | Surface | Fill (theme token) | Blur token | Value |
 | :--- | :--- | :--- | :--- |
-| Dialog and modal backdrop: `Modal`, every `ConfirmDialog`, the billing dialogs, canvas dialogs | `--px-color-overlay` (billing: `--beaf-overlay`) | `--px-glass-blur-backdrop` | 4px. Not in Figma yet: confirm in Dev Mode |
+| Sheet and dialog backdrop: every `Sheet` and `ConfirmDialog`, the billing dialogs, canvas dialogs | `--px-color-overlay` (billing: `--beaf-overlay`) | `--px-glass-blur-backdrop` | 4px. Not in Figma yet: confirm in Dev Mode |
 | Frosted lock banner and overlay (`.framefic-locked-overlay`, the canvas `.mf-lock`) | `--framefic-frosted-bg` | `--px-glass-blur-surface` | 8px |
 | Toast | `--px-toast-bg`, 82% in both themes | `--px-glass-blur-toast` | 16px |
 
@@ -196,7 +198,7 @@ Rules:
 
 ## 7. Shell And Home Tab
 
-**Window**: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse to height 36 (the tab bar).
+**Window**: `framer.showUI({ position: "top right", width: 360, height: 640 })`. Collapse to height 40 (the tab bar).
 
 **Framer draws its own window bar** above every plugin (plugin name and close), and the SDK cannot hide it. So the plugin draws **no header of its own**: the Figma 48px Plugin header repeated the name and close, and the user dropped it on 2026-10-15.
 
@@ -204,9 +206,9 @@ Rules:
 
 | Part | Height | Contents |
 | :--- | :--- | :--- |
-| Tab bar | 36 | Top row. Up to 4 tabs, spacer, then the Account (UserRound) icon button pinned right. Inactive tab text/secondary, active Body/Strong plus 2px gradient pill. Hairline below |
+| Tab bar | 40 | Top row. Up to 4 tabs, spacer, then the Account (UserRound) icon button pinned right. Inactive tab text/secondary, active Body/Strong plus 2px gradient pill. Hairline below |
 | Content | flex | Scrolls. `.tab-panel` padding 16 |
-| Plugin footer | 40 | bg/secondary with a top hairline. `@Framefic` then a brand ArrowUpRight (after the label, not before), version tag right, both text/tertiary Body/Small. Always pinned, never hidden |
+| Plugin footer | 36 | bg/secondary with a top hairline. `@Framefic` then a brand ArrowUpRight (after the label, not before), version tag right, both text/tertiary Body/Small. Always pinned, never hidden |
 
 Rules:
 - **At most 4 tabs.** The Account icon must always be visible; a fifth tab pushed it out of the panel once (`test/tabs.test.ts` guards this).
@@ -233,13 +235,14 @@ Never restyle a kit class from a feature stylesheet, and never rebuild a kit com
 | :--- | :--- | :--- | :--- |
 | A button | Actions | `<Button variant size>` | A raw `<button className="primary-cta">` or a new button class |
 | An icon-only action | Actions | `<IconButton label>` | A bare svg in a `<button>` |
-| A form row | Inputs | `<FieldRows>` + `<FieldRow label htmlFor>` | Label above control in a properties form |
-| Explain what a field is for | Kit extension | `<FieldRow hint="...">`: an info icon beside the label with a tooltip (`<InfoTip>`) | A help paragraph under the field. That slot is for errors only |
+| A text input, select, or text area | Inputs (kit `Field`) | `<Fields>` + `<Field label htmlFor hint error>`: label on top (Body/Small Strong, text/secondary) with the `hint` in an `InfoTip` beside it (the user kept tooltips, 2026-10-25), control full width, the error under it | A label beside the control, a 160px control column, or help as a paragraph under the field. `FieldRow` is gone (lint rule 17) |
+| A checkbox, toggle, or segmented control | Inputs (kit `Setting`) | `<Setting title htmlFor hint>` + the control: title left with the hint in an `InfoTip`, control right | A checkbox in a `Field` |
+| A connect or config form (sign in providers, SMTP, payment gateways, webhooks), a tier's create and edit form, a page lock, a section lock, a profile field, a member's details | Kit `Sheet` | The card or row keeps its status and its one-click toggle and carries `aria-haspopup="dialog"`; clicking it opens `<Sheet title description badge icon guide onClose footer>`, the form in the body, a destructive action left and the primary right in the footer. `icon` is a 32px tile left of the title (the provider's or gateway's Lucide mark, the tier's Gift or Crown, the member's initials); `guide` is a Setup guide link to the user guide, `SETUP_GUIDES` in `config/branding.ts`, for every sign in provider and payment gateway | An accordion that expands the form inside the list |
 | Text input | Inputs | `<TextField>` | A styled `<input>` |
 | Dropdown | Inputs | `<Select>` | A custom menu |
 | Dropdown with a long list (currencies, countries) | Kit extension | `<SearchSelect>`: the kit select that opens a filter box and listbox (kit.css `.search-select-*`) | A native select of 150 options, or a one-off searchable menu |
-| Confirm a delete, remove, revoke, or disconnect | Kit extension | `<ConfirmDialog title message confirmLabel cancelLabel>` on `<Modal>`: danger confirm button, focus starts on the keep button (kit.css `.kit-confirm-*`). **Every** destructive action opens it; nothing deletes on the first click | An inline "Are you sure" block, a two-press "Confirm delete" button, or deleting straight from a trash icon |
-| A dialog over the panel (payment, plan notices) | Kit extension | `<Modal title onClose>`: bg/raised, radius 16, overlay token, Escape and backdrop close; omit `onClose` for a dialog only its own buttons can leave (kit.css `.kit-modal-*`) | A one-off fixed overlay or a hand-built dialog |
+| Confirm a delete, remove, revoke, or disconnect | Kit extension | `<ConfirmDialog title message confirmLabel cancelLabel>` on `<Sheet>`: danger confirm button, focus starts on the keep button (kit.css `.kit-confirm-*`). **Every** destructive action opens it; nothing deletes on the first click | An inline "Are you sure" block, a two-press "Confirm delete" button, or deleting straight from a trash icon |
+| A dialog over the panel | Kit `Sheet` | `<Sheet>`: always a centered dialog (the user's choice over the kit's bottom sheet, 2026-10-25), 16px from the panel's edges, 16px padding, bg/raised with a hairline and Shadow/Popover, title and close, scrolling body, pinned footer; overlay scrim with the glass backdrop; Escape closes only the top sheet; focus trapped and restored; rendered in a portal. Omit `onClose` for a sheet only its own buttons can leave (kit.css `.kit-sheet-*`). `Modal` is gone | A one-off fixed overlay or a hand-built dialog |
 | On or off, applies instantly | Inputs | `<Toggle>` | A checkbox |
 | On or off, needs Save | Inputs | `<Checkbox>` | A toggle |
 | Pick one of 2 to 3 views | Inputs | `<Segmented>` | A hand-built tab bar (this happened, see changelog) |
@@ -254,7 +257,7 @@ Never restyle a kit class from a feature stylesheet, and never rebuild a kit com
 | Action finished | Feedback | `useToast()` | A banner |
 | Persistent screen state | Feedback | `<Banner tone>` | A toast, a coloured div |
 | Nothing here yet | Feedback | `<EmptyState>` with exactly one action | A blank area |
-| Waiting on the server | Kit extension | `<SkeletonList label variant count>` (or `<Skeleton>`): the shape of what is coming, in state/skeleton, pulsing; still under reduced motion (kit.css `.kit-skeleton`) | "Loading ..." text, a spinner, or a blank area. `lint:design` rejects loading text |
+| Waiting on the server | Kit extension | `<SkeletonList label variant count>` (or `<Skeleton>`): the shape of what is coming, the kit's shimmer from bg/tertiary to bg/secondary; still under reduced motion (kit.css `.kit-skeleton`) | "Loading ..." text, a spinner, or a blank area. `lint:design` rejects loading text |
 | A field is wrong | Feedback | Inline message under the field, `aria-describedby` | A banner |
 
 Figma components not yet in the kit: Radio (CSS exists, no React wrapper), AI field, Help card, Illustration/Pro, Icon/Crown, Logo/Calfic. Build them through section 9 when first needed.
@@ -284,7 +287,7 @@ Figma components not yet in the kit: Radio (CSS exists, no React wrapper), AI fi
 
 ### Inputs
 
-- Controls are 30px tall, radius 8, bg/tertiary fill. Field row: label left (Body/Default, text/secondary), control right (160px or `.fill`), min-height 30.
+- Controls are 30px tall, radius 8, bg/tertiary fill. Field (kit): label on top with its hint in an info tip, control full width, error under it. Setting (kit): title and info tip left, control right, min-height 36.
 - States: Default, Hover, Focus (1px focus/ring + Focus/Halo), Error (1px status/danger + message below), Disabled (50%).
 - Checked checkbox, toggle on, and radio fill with brand/action. Toggle 28 by 16. Checkbox 16, radius 4.
 - Segmented: 30px track bg/tertiary, active segment bg/selected + border/selected.
@@ -307,7 +310,7 @@ Figma components not yet in the kit: Radio (CSS exists, no React wrapper), AI fi
 | :--- | :--- |
 | Action finished | Toast: 45 characters max, optional Undo, at least 5s, pauses on hover and focus. `role="status"`, error `role="alert"` |
 | Screen has a state the user must know | Banner: Info, Success, Warning, Danger. Radius 14. Danger `role="alert"`. Max 2 per screen |
-| Area has no content | Empty state: radius 16, dashed hairline, 40px icon tile, exactly one next step |
+| Area has no content | Empty state (kit `.empty.card`): a raised card, radius 14, a 36px brand icon circle, the title, one line, exactly one next step |
 | Content is loading | Skeleton: `row` 52px for data rows, `card` 64px for cards, `line` for text, `block` for a hero or chart. A tab waiting on the connection shows a card skeleton |
 | Field input wrong | Inline message under the field |
 
@@ -363,6 +366,15 @@ Then self-review against this list, and say in your report which items you check
 
 ## 14. Known Gotchas And Open Conflicts
 
+- **Kit discrepancies, to fix in the kit repository.** MemberFrame follows the tokens where the kit's CSS disagrees with them:
+  - `.title-s` is 13px in `kit.css`; Title/Small is 14/20 in the tokens.
+  - `.badge` is 10px; the handoff says Body/Small Strong, 11px.
+  - `.empty` pads 22 by 16; 22 is off the spacing scale, MemberFrame uses 20.
+  - The scrim is a literal `rgba(0, 0, 0, 0.32)`; MemberFrame uses `--px-color-overlay` with the glass blur.
+  - `Setting`, `Banner`, `EmptyState`, `Skeleton`, and the `Sheet` footer set inline styles, which `lint:css` forbids here.
+  - The kit's icon set is its own 16px set; MemberFrame keeps Lucide (the user's rule).
+- **Kept against the kit, by the product owner:** the primary button's 2px gradient border (v0.4.5); field and setting help in an info tip rather than text under the field; the Sheet as a centered dialog rather than a bottom sheet (both 2026-10-25).
+
 - **framer.css styles every `<button>`**: `height: 30px`, `width: 134px` (reset globally in `shell.css`), `flex-shrink: 0`, `overflow: hidden`. A multi-line button row must set `height: auto` or its text is clipped.
 - **framer.css styles every `<input>` and `<select>`** at width 134. Kit controls override it; a raw input will not.
 - **Canvas code components are out of scope here.** They render on the creator's published site and follow `references/canvas-component-template.md`, not the panel tokens. Their own contract is the shared appearance block (Theme default Light, Colors, Typography, Layout, Labels, fixed size): see `.claude/agents/framer-canvas-codegen.md`.
@@ -383,6 +395,10 @@ Then self-review against this list, and say in your report which items you check
 - v0.4.2 · 2026-10-18 · Shell: five tabs (Reports added at the creator's request, chosen over an icon beside Account). Tab gap 12px in kit.css so five labels and the Account icon fit 360px. Kit: `SearchSelect` for long lists. See docs/development-docs/24-reports.md and 23-dynamic-tiers.md.
 - v0.4.3 · 2026-10-18 · Kit: `Modal` for dialogs over the panel, added for F19 (plugin billing): the Stripe payment form, the upgrade confirmation, and the cancel steps. See docs/development-docs/19-pro-lock-and-trial.md.
 - v0.4.4 · 2026-10-18 · Billing exemption: the F19 billing screens are a copy of the BEAF plugin's (company-wide billing standard, the user's decision), in `components/billing` and `styles/billing`, exempt from `lint:design`. See section 14. `Modal` stays in the kit, but billing no longer uses it.
+- v0.5.3 · 2026-10-25 · Page locks, section locks, and profile fields open in a `Sheet`; each sheet's primary saves the list at once, as do a card's toggle, a field's move, and a confirmed delete, so the list-wide Save locks and Save fields buttons are gone. A sheet's first focus is its first field, never an info tip's icon, and an info tip opens on keyboard focus only (`:focus-visible`), so a sheet no longer opens with a tip showing.
+- v0.5.2 · 2026-10-25 · Info tips render in a portal, centered over their icon and clamped to the panel, so a transformed card (the hover lift) no longer pushes them off. `Sheet` gains `icon` and `guide`: every sign in provider and payment gateway sheet shows its mark and a Setup guide link. A member's details and a tier's create and edit form open in a `Sheet` instead of expanding in the list.
+- v0.5.1 · 2026-10-25 · The user's review of v0.5.0: field and setting help back in info tips beside the label; the Sheet always a centered dialog with 16px padding and margins (no bottom sheet, no grip); a filled input in a row shrinks again, so copy and show buttons stay inside.
+- v0.5.0 · 2026-10-25 · Aligned with the Framefic UI kit (`framefic-ui-kit`, v0.4.0), the user's request. Tokens: kit values for brand/subtle (16%), info-subtle, control/track, border/highlight, font stacks; new control, icon, panel, motion (`--px-ease`, `--px-spring`), and `--px-border-strong` tokens; `uiKitParity.test.ts`. Kit: `Field` and `Setting` replace `FieldRow` (label on top, visible help); `Sheet` replaces `Modal` and the settings accordions (sign in providers, SMTP, payment gateways, webhooks); `Button` `full` and `loading`; Banner radius 12 and padding 10 by 12; EmptyState a card with a 36px brand icon circle; skeleton shimmer; slim auto-hiding scrollbars (`useScrollReveal`); card hover lift; tab bar 40, footer 36; 32px between sections. Lint rule 17; `uiKitForms.test.ts`.
 - v0.4.7 · 2026-10-25 · Kit: `Skeleton` and `SkeletonList`, replacing every "Loading ..." text and the ad hoc `.member-row-skeleton`; tabs show a skeleton while the connection loads; lint rule 16.
 - v0.4.6 · 2026-10-25 · Full review at the user's request: icons, no CDN, glass, design accuracy. Fonts bundled (Inter, JetBrains Mono, billing's Mulish and Sora) and every Google Fonts load removed, including the one inside Framer's framer.css; new gate `check:no-cdn` (only Stripe.js may load from outside). `--font-body` is Inter (was DM Sans). Lucide everywhere: billing glyphs and hand-drawn icons replaced, canvas icons made exact and tagged; lint rules 12 to 14. Glass tokens and section 6.1; modal and billing backdrops unified at 4px, toast 82% in light too; lint rule 15.
 - v0.4.5 · 2026-10-19 · `.primary-cta` gets the product owner's 2px gradient border (reference CSS, synced). Kit: `ConfirmDialog`, and every delete, remove, revoke, and disconnect in the panel now asks in it first (members, files, tiers, gateways, webhooks, fields, page and section locks). Review fixes: Integration cards open one at a time (one primary per view), icons sized by CSS, busy labels without ellipses, verb plus object Save labels, sentence-case "Page locks", "Attach file", "Copy asset ID". Canvas: the auth card fills its frame (fixed 400px width, no padding band) and the trial mark sits inside it.

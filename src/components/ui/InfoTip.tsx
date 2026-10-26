@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Info } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -14,6 +15,15 @@ const EDGE = 8;
 /** Long enough to move the pointer from the icon onto the bubble without it closing. */
 const CLOSE_DELAY_MS = 120;
 
+/** `:focus-visible`, the browser's own test for focus a keyboard moved. True where it is unsupported. */
+function isKeyboardFocus(element: HTMLElement): boolean {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
+
 /**
  * A field hint behind a 14px info icon. Opens on hover, keyboard focus, or a
  * tap; closes on leave, blur, Escape, or scroll. WCAG 1.4.13: the bubble can be
@@ -24,6 +34,11 @@ const CLOSE_DELAY_MS = 120;
  * be cut off at the card edge. The coordinates arrive as custom properties set
  * through the ref, the same bridge PreviewStudio uses, so there is no
  * `style={{ }}`.
+ *
+ * The bubble is rendered into document.body through a portal. A fixed
+ * element inside a transformed ancestor is placed against that ancestor, not
+ * the window, and cards transform (the kit's hover lift): inline, the bubble
+ * landed away from its icon (2026-10-25).
  *
  * The bubble stays in the DOM while closed so `aria-describedby` always has
  * something to read: a screen reader hears the hint when the icon is focused.
@@ -59,8 +74,8 @@ export const InfoTip: React.FC<InfoTipProps> = ({ label, children }) => {
 
   useEffect(() => cancelClose, [cancelClose]);
 
-  // Below the icon, left-aligned with it, clamped inside the window. Above it
-  // when there is no room below, which is the case near the pinned footer.
+  // Below the icon and centred on it, clamped inside the window. Above it when
+  // there is no room below, which is the case near the pinned footer.
   useLayoutEffect(() => {
     const trigger = triggerRef.current;
     const bubble = bubbleRef.current;
@@ -70,7 +85,8 @@ export const InfoTip: React.FC<InfoTipProps> = ({ label, children }) => {
     const width = bubble.offsetWidth;
     const height = bubble.offsetHeight;
 
-    const x = Math.max(EDGE, Math.min(anchor.left - OFFSET, window.innerWidth - width - EDGE));
+    const centre = anchor.left + anchor.width / 2 - width / 2;
+    const x = Math.max(EDGE, Math.min(centre, window.innerWidth - width - EDGE));
     const below = anchor.bottom + OFFSET;
     const y =
       below + height > window.innerHeight - EDGE
@@ -99,6 +115,19 @@ export const InfoTip: React.FC<InfoTipProps> = ({ label, children }) => {
     };
   }, [open, hideNow]);
 
+  const bubble = (
+    <span
+      ref={bubbleRef}
+      id={tipId}
+      role="tooltip"
+      className={cn("info-tip-bubble", open && "is-open")}
+      onMouseEnter={show}
+      onMouseLeave={hideSoon}
+    >
+      {children}
+    </span>
+  );
+
   return (
     <span className="info-tip" onMouseEnter={show} onMouseLeave={hideSoon}>
       <button
@@ -107,15 +136,18 @@ export const InfoTip: React.FC<InfoTipProps> = ({ label, children }) => {
         className={cn("info-tip-trigger", open && "is-open")}
         aria-label={`About ${label}`}
         aria-describedby={tipId}
-        onFocus={show}
+        onFocus={(event) => {
+          // Keyboard focus only. Focus a script moves here (a dialog opening)
+          // must not open the bubble over the form.
+          if (isKeyboardFocus(event.currentTarget)) show();
+        }}
         onBlur={hideNow}
         onClick={() => (open ? hideNow() : show())}
       >
         <Info aria-hidden={true} />
       </button>
-      <span ref={bubbleRef} id={tipId} role="tooltip" className={cn("info-tip-bubble", open && "is-open")}>
-        {children}
-      </span>
+      {/* No document when rendered on a server (tests): then inline. */}
+      {typeof document === "undefined" ? bubble : createPortal(bubble, document.body)}
     </span>
   );
 };

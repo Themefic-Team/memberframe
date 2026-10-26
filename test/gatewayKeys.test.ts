@@ -162,7 +162,7 @@ describe("checkKey: it guides rather than validates", () => {
 
 describe("keyProblemMessage", () => {
   it("returns null when there is nothing to say", () => {
-    // So a caller can pass it straight to FieldRow's error prop.
+    // So a caller can pass it straight to Field's error prop.
     expect(keyProblemMessage(checkKey("", "stripe", "publishable"))).toBeNull();
   });
 

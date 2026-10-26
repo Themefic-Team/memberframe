@@ -2,7 +2,7 @@
    PROVENANCE: do not hand-edit the copied block below.
 
    Reset and app container only, per PRD section 6.3. Verbatim copy of
-   reference section 5 (lines 632 to 657) of:
+   reference section 5 (lines 660 to 685) of:
      .agents/skills/framer-plugin-suite/references/design-tokens.css
 
    Variables live in design-tokens.css. Component classes live in
@@ -11,7 +11,7 @@
    Recopied 2026-10-25 for Foundations v0.4.0.
    Check for drift:
      diff <(tail -n +17 src/App.css) \
-          <(sed -n '632,657p' \
+          <(sed -n '660,685p' \
             .agents/skills/framer-plugin-suite/references/design-tokens.css)
    ========================================================================== */
 /* --------------------------------------------------------------------------

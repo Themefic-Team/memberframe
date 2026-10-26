@@ -387,7 +387,7 @@ export function useSealGuard(): void {
             framer.notify(`Updated ${updated} MemberFrame component file${updated === 1 ? "" : "s"} for this site. Publish to update your live site.`, { variant: "info" });
           }
           // The locks files as the saved rules and the current generator say,
-          // so a fix to the overrides reaches projects without a Save locks click.
+          // so a fix to the overrides reaches projects without a lock being saved.
           // That is MemberFrameLocks.tsx, and MemberLocks.tsx where a project
           // still has it from before the rename (its layers point at it).
           const rules = settingsRef.current?.sectionLocks;

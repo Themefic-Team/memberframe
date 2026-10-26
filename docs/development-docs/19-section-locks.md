@@ -26,7 +26,7 @@ Lock any section of a page to a rule the creator writes, with the same logic as 
 ### 1.2. The Design
 
 1. A **rule** is a name, who sees the section, and what everyone else gets. Rules are site settings, next to page locks.
-2. **Save locks** also writes `MemberFrameLocks.tsx` into the project: one code override per rule, named after it (`Gold article` becomes `GoldArticle`).
+2. Saving a lock (its popup's **Save lock**, its card's toggle, or a confirmed delete) also writes `MemberFrameLocks.tsx` into the project: one code override per rule, named after it (`Gold article` becomes `GoldArticle`).
 3. In Framer the creator selects a section, opens **Code overrides** in the right sidebar, chooses File **MemberFrameLocks**, and picks the rule. Framer's sidebar is the only place a plugin can put choices next to a layer; plugins cannot add their own controls there, and the plugin API cannot attach an override itself, so the creator picks it.
 4. The override only marks the layer: it adds `data-mf-lock="<rule>"` and a `mf-lock-<slug>` class, keeping the layer's own class and props. Any layer works, components included.
 5. The **Route Shield**, already in the site's head for page locks, hides every marked layer before the first paint, then shows, blurs, or keeps hiding each per its rule once the one shared session check answers. The rules come from the settings, so a change applies on the next page load without a republish.
@@ -41,15 +41,15 @@ A layer named `Lock: <rule>` still works (the previous version), so nothing tagg
 
 One-time: the Route Shield script is in Site Settings, Custom Code, End of head (page locks need it too), and the tiers exist in Manage, Tiers.
 
-1. Settings, Page Locks, **Section Locks**, **Add section lock**.
+1. Settings, Page Locks, **Section Locks**, **Add section lock**. The lock's form opens in a popup (2026-10-25).
 2. **Name** it, for example `Experience`. The badge and the hint show its override name.
 3. **Who sees it**: Any signed-in member, Signed-out visitors only, `<Tier>` members or higher, or Everyone without `<Tier>`.
 4. **Everyone else**: Hidden, or Blurred, not clickable.
-5. **Save locks**. The rules are saved and MemberFrameLocks is written.
+5. **Add lock**, in the popup's footer. The rules are saved and MemberFrameLocks is written.
 6. In Framer, select the section, then right sidebar, **Code overrides**, **+**, File **MemberFrameLocks**, Override **Experience**.
 7. Publish.
 
-Later changes to who sees a lock, or switching it off: Save locks only. Renaming a lock changes its override name, so it has to be picked again on each section.
+Later changes to who sees a lock: open its card, **Save lock**. Switching it off: the card's toggle, saved at once. Renaming a lock changes its override name, so it has to be picked again on each section.
 
 ### 2.2. Visitor / Member Runtime Flow
 
@@ -139,7 +139,7 @@ React.createElement(Component, {
 
 ### Human, in Framer (the agent cannot check these)
 
-- [ ] Save locks creates MemberFrameLocks, and Code overrides lists each lock by name
+- [ ] Saving a lock creates MemberFrameLocks, and Code overrides lists each lock by name
 - [ ] An override on a frame and on a component reaches the published HTML (data-mf-lock or the class)
 - [ ] A section locked to Gold shows for a Gold member and hides when signed out
 - [ ] Changing who sees a lock and saving changes the live site with no republish
@@ -267,4 +267,4 @@ The creator asked for the code override file to be called MemberFrameLocks, so F
 A layer keeps pointing at the file its override was picked from, and the plugin API cannot re-point it. So a project that already has `MemberLocks.tsx` keeps it: Save locks writes the same overrides to both files (`sectionLocksFilesToWrite`), and opening the plugin creates `MemberFrameLocks.tsx` once for such a project, so the next layer is locked from the new file. A new project only ever gets MemberFrameLocks. Once every layer in a project is re-picked from MemberFrameLocks, the creator can delete MemberLocks in Framer; the plugin never deletes it, because that would unlock the layers still using it.
 
 - [x] Tests: the name, which files a save writes (none for nothing, both for an older project), and the file's own instructions, in `test/sectionLocks.test.ts`.
-- [ ] Needs human verification: in Framer, Code overrides lists File MemberFrameLocks after Save locks; in a project with MemberLocks, layers picked from it stay locked after a save.
+- [ ] Needs human verification: in Framer, Code overrides lists File MemberFrameLocks after a lock is saved; in a project with MemberLocks, layers picked from it stay locked after a save.

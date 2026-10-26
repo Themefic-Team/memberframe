@@ -110,15 +110,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
    */
   const [auth, setAuth] = useState<AuthSettings | null>(null);
 
-  // Empty until the creator adds a lock (2026-10-20): no sample rules.
+  // The stored locks. Each lock's sheet, toggle, and delete saves the whole
+  // list at once (2026-10-25), so these mirror the stored document.
   const [gatedPages, setGatedPages] = useState<GatedPageRule[]>(() => settings?.gatedPages ?? []);
 
-  /** Section locks being edited. Saved with the page locks, by the same button. */
+  /** The stored section locks, saved with the page locks. */
   const [sectionLocks, setSectionLocks] = useState<SectionLockRule[]>(() => settings?.sectionLocks ?? []);
 
   /**
-   * The profile field definitions being edited, FP-09. Same draft-until-save
-   * model as `auth`, reset whenever the stored document changes.
+   * The stored profile field definitions, FP-09, reset whenever the stored
+   * document changes. A field's sheet, a move, or a delete saves the list.
    */
   const storedFields = useMemo(() => readDefinitions(settings?.customFields), [settings]);
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(storedFields);
@@ -128,15 +129,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   }, [storedFields]);
 
   const savedFieldKeys = useMemo(() => storedFields.map((field) => field.key), [storedFields]);
-
-  // Compared in saved form, so moving a field and back again, or typing a space
-  // and deleting it, does not count as an unsaved change.
-  const fieldsDirty = useMemo(
-    () =>
-      JSON.stringify(normalizeDefinitions(customFields)) !==
-      JSON.stringify(normalizeDefinitions(storedFields)),
-    [customFields, storedFields]
-  );
 
   useEffect(() => {
     setAuth(settings ? { ...settings.auth } : null);
@@ -333,18 +325,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     [applySettings, integrationState, settingsVersion, showToast, siteId]
   );
 
-  const handleSavePageLocks = useCallback(async () => {
+  /**
+   * Save the page and section locks, the lists given: a lock's sheet passes
+   * the list with its edit in it. Resolves true when saved, so the sheet closes.
+   */
+  const handleSavePageLocks = useCallback(async (next: { gatedPages: GatedPageRule[]; sectionLocks: SectionLockRule[] }) => {
     if (!siteId) {
       showToast({
         tone: "neutral",
         message: "Connect this project in Account first",
       });
-      return;
+      return false;
     }
 
     setSaving(true);
-    const savedLocks = sectionLocks.map((rule) => ({ ...rule, name: normalizeSectionLockName(rule.name) }));
-    const savedPages = gatedPages.map((rule) => ({ ...rule, fallbackAction: "redirect" as const }));
+    const savedLocks = next.sectionLocks.map((rule) => ({ ...rule, name: normalizeSectionLockName(rule.name) }));
+    const savedPages = next.gatedPages.map((rule) => ({ ...rule, fallbackAction: "redirect" as const }));
     const result = await saveSiteSettings(siteId, settingsVersion, { gatedPages: savedPages, sectionLocks: savedLocks });
 
     if (result.kind === "ok") {
@@ -366,13 +362,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           setSaving(false);
           setFailure({ title: "Locks saved, MemberFrameLocks not updated", message: written.message });
           showToast({ tone: "error", message: "Locks saved, file not updated" });
-          return;
+          return true;
         }
       }
 
       setSaving(false);
       showToast({ tone: "success", message: "Locks saved" });
-      return;
+      return true;
     }
 
     setSaving(false);
@@ -382,7 +378,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       tone: "error",
       message: failureMessage(result).message || "Could not save page locks",
     });
-  }, [applySettings, gatedPages, sectionLocks, settingsVersion, showToast, siteId]);
+    return false;
+  }, [applySettings, settingsVersion, showToast, siteId]);
 
   /**
    * Save the field list, FP-09.
@@ -392,12 +389,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
    * a second panel open on the same project cannot overwrite this one's edits
    * without being told.
    */
-  const handleSaveFields = useCallback(async () => {
-    if (!siteId) return;
+  const handleSaveFields = useCallback(async (fields: CustomFieldDefinition[]) => {
+    if (!siteId) return false;
 
     setSaving(true);
     const result = await saveSiteSettings(siteId, settingsVersion, {
-      customFields: normalizeDefinitions(customFields),
+      customFields: normalizeDefinitions(fields),
     });
     setSaving(false);
 
@@ -405,12 +402,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       applySettings(result.data.settings, result.data.version);
       setFailure(null);
       showToast({ tone: "success", message: "Fields saved" });
-      return;
+      return true;
     }
 
     setFailure(failureMessage(result));
     showToast({ tone: "error", message: "Could not save fields" });
-  }, [applySettings, customFields, settingsVersion, showToast, siteId]);
+    return false;
+  }, [applySettings, settingsVersion, showToast, siteId]);
 
   return (
     <div className="tab-panel-body">
@@ -460,22 +458,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
           <CustomFieldsPanel
             fields={customFields}
-            onChangeFields={setCustomFields}
             savedKeys={savedFieldKeys}
             saving={saving}
-            onSave={() => void handleSaveFields()}
+            onSave={handleSaveFields}
             siteConnected={siteId !== null}
-            dirty={fieldsDirty}
           />
         </>
       ) : view === "locks" ? (
         <PageLocksPanel
           rules={gatedPages}
-          onChangeRules={setGatedPages}
           sectionLocks={sectionLocks}
-          onChangeSectionLocks={setSectionLocks}
           saving={saving}
-          onSave={() => void handleSavePageLocks()}
+          onSave={handleSavePageLocks}
           deployContext={deployContext}
           siteConnected={siteId !== null}
           tiers={siteTierList}

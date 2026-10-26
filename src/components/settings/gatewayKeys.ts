@@ -169,7 +169,7 @@ const ROLE_NAMES: Record<KeyRole, string> = {
  *
  * F03: "An invalid key shows an inline field error under the field, not a
  * banner." Returns null when there is nothing to say, so a caller can pass it
- * straight to `FieldRow`'s `error` prop.
+ * straight to `Field`'s `error` prop.
  *
  * PRD section 7.6 rule 4: no raw value reaches the creator. The gateway and the
  * role are named in words, never as `lemonsqueezy` or `publishable`.

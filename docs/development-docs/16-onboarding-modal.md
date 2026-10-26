@@ -27,11 +27,11 @@ Technical development specification, user flow, architectural wiring, and testin
 ### 2.1. In-Plugin Configuration Flow (Framer Designer)
 
 1. **Settings, Fields.** A fourth segment beside Config, Page Locks, and Integration. Empty, it shows one action: Add field.
-2. **Add field.** A card opens with Label, Key, Type, Required, and Placeholder. The key is derived from the label as the creator types ("Portfolio URL" becomes `portfolio_url`) and stays editable until the first save.
+2. **Add field.** A popup (`Sheet`, 2026-10-25) opens with Label, Key, Type, Required, and Placeholder. The key is derived from the label as the creator types ("Portfolio URL" becomes `portfolio_url`) and stays editable until the first save.
 3. **Type.** Short text, Long text, Web address, Phone number, Dropdown, Checkbox, Number. A dropdown shows an options list with one row per option. A required checkbox is explained as "must be ticked, like accepting terms".
 4. **Show when.** Offered on any field below an unconditional dropdown or checkbox. One select lists every usable answer: "Role is Agency", "Newsletter is on". Choosing one makes the field conditional.
-5. **Reorder and remove.** Up, down, and remove on every card. A move that would put a conditional field above its parent is refused. Removing a parent makes its dependants always shown rather than deleting them.
-6. **Save fields.** The view's one `.primary-cta`. Disabled until something changed, and disabled with a reason while any card has a problem. Each problem is inline under its control, and a closed card with a problem says "needs a fix" in its summary line.
+5. **Reorder and remove.** Up and down on every card, saved at once; Delete field in the field's popup, after a confirm, also saved at once. A move that would put a conditional field above its parent is refused. Removing a parent makes its dependants always shown rather than deleting them.
+6. **Add field or Save field.** The popup's primary, pinned in its footer: it saves the whole list and closes the popup. Disabled with a reason while any field has a problem. Each problem is inline under its control, and a card with a problem says "needs a fix" in its summary line. There is no Save fields button under the list any more (2026-10-25).
 7. **After the first save the key locks**, with the reason on screen: members' answers are stored under it.
 8. **Builder, Onboarding Modal, Add to canvas.** Deploys `<OnboardingModal>`. The creator places it once, on the page members land on after sign-in or in a shared layout.
 9. **Manage, a member's row.** The flyout now shows a Profile section with every visible field and the member's answer, "Not answered" where there is none, and web addresses as links.

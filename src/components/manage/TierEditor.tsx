@@ -1,19 +1,22 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { ChevronDown, Crown, Gift, Layers, Plus, Trash2, X } from "lucide-react";
+import { ChevronRight, Crown, Gift, Layers, Plus, Trash2, X } from "lucide-react";
 import {
   Badge,
   Banner,
   Button,
-  Checkbox, ConfirmDialog,
+  Checkbox,
+  ConfirmDialog,
   EmptyState,
-  FieldRow,
-  FieldRows,
+  Field,
+  fieldErrorId,
+  Fields,
+  Setting,
   IconButton,
   InfoTip,
   Segmented,
+  Sheet,
   SkeletonList,
   TextField,
-  fieldErrorId,
 } from "../ui";
 import { cn } from "../../utils/cn";
 import type { CurrencyCode, SiteTierRecord, TierFeature } from "../../types/site";
@@ -44,7 +47,7 @@ export interface TierEditorProps {
   saving: boolean;
   failure: { title: string; message: string } | null;
   onRetry: () => void;
-  /** Resolves true when saved; the card then closes. False keeps it open with the creator's input. */
+  /** Resolves true when saved; the sheet then closes. False keeps it open with the creator's input. */
   onSave: (draft: TierFormDraft) => Promise<boolean>;
   /** Resolves true when deleted. */
   onDelete: (tier: SiteTierRecord) => Promise<boolean>;
@@ -83,13 +86,12 @@ const KIND_OPTIONS: ReadonlyArray<{ value: TierKind; label: string }> = [
  * The tier editor. PRD task 2.3, feature F02; dynamic tiers,
  * `docs/development-docs/23-dynamic-tiers.md`.
  *
- * Each tier is a card, the same accordion as a payment gateway: the bar names
- * the tier and its prices, and opening it puts the form inside the card, not
- * under the whole list. One card is open at a time. Create tier opens a new
- * card where the button was.
+ * Each tier is a card, the same as a payment gateway: the bar names the tier
+ * and its prices, and a click opens its form in a `Sheet`, a centered popup
+ * (2026-10-25). Create tier opens the same sheet, empty. One sheet at a time.
  *
  * Carries the Manage tab's one `.primary-cta` (PRD section 7.3): Create tier
- * under the list, or the open card's save, decided by `tierEditorCta`.
+ * under the list, or the open sheet's save, decided by `tierEditorCta`.
  * Validation is `tierValidation.ts`; errors render inline under their field.
  */
 export const TierEditor: React.FC<TierEditorProps> = ({
@@ -130,10 +132,10 @@ export const TierEditor: React.FC<TierEditorProps> = ({
     });
   };
 
-  /** Open a tier's card, or close it when it is the open one. */
-  const toggle = (tier: SiteTierRecord) => {
+  /** Open a tier's sheet with its saved values. */
+  const open = (tier: SiteTierRecord) => {
     setSubmitted(false);
-    setDraft((current) => (current?.id === tier.id ? null : draftFromRecord(tier, currency)));
+    setDraft(draftFromRecord(tier, currency));
   };
 
   const setKind = (kind: TierKind) =>
@@ -143,7 +145,7 @@ export const TierEditor: React.FC<TierEditorProps> = ({
 
   /*
     Nothing is written until Save tier or Create tier, and a successful save
-    closes the card. Before, the card stayed open after a create: the list
+    closes the sheet. Before, the form stayed open after a create: the list
     reloaded with the new tier in it, and the still-open form was checked
     against itself, saying its own name was taken.
   */
@@ -161,29 +163,6 @@ export const TierEditor: React.FC<TierEditorProps> = ({
   };
 
   const errors: TierFieldErrors = submitted ? validation?.errors ?? {} : {};
-
-  const form = (open: TierFormDraft) => (
-    <TierForm
-      draft={open}
-      tiers={tiers}
-      currency={currency}
-      hasFreeTier={hasFreeTier}
-      errors={errors}
-      saving={saving}
-      onPatch={patch}
-      onKind={setKind}
-      onCancel={() => setDraft(null)}
-      onSubmit={() => void submit()}
-      onDelete={
-        open.id !== null && open.kind === "paid"
-          ? () => {
-              const tier = tiers.find((entry) => entry.id === open.id);
-              if (tier) void remove(tier);
-            }
-          : null
-      }
-    />
-  );
 
   return (
     <div className="tiers-panel">
@@ -209,46 +188,23 @@ export const TierEditor: React.FC<TierEditorProps> = ({
         />
       ) : null}
 
-      {!loading && (ordered.length > 0 || draft?.id === null) ? (
+      {!loading && ordered.length > 0 ? (
         <>
-          {ordered.length > 0 ? (
-            <p className="tiers-count">
-              {pluralize(ordered.length, "tier")}. Prices in {currency}.
-            </p>
-          ) : null}
+          <p className="tiers-count">
+            {pluralize(ordered.length, "tier")}. Prices in {currency}.
+          </p>
 
           <div className="integration-grid">
-            {ordered.map((tier) => {
-              const open = draft !== null && draft.id === tier.id;
-              return (
-                <TierCard
-                  key={tier.id}
-                  id={`tier-card-${tier.id}`}
-                  title={tier.name}
-                  subtitle={describePrices(tier)}
-                  free={isFreeTier(tier)}
-                  hidden={!tier.isActive}
-                  open={open}
-                  onToggle={() => toggle(tier)}
-                >
-                  {open && draft ? form(draft) : null}
-                </TierCard>
-              );
-            })}
-
-            {draft !== null && draft.id === null ? (
+            {ordered.map((tier) => (
               <TierCard
-                id="tier-card-new"
-                title={draft.name.trim() || "New tier"}
-                subtitle={draft.kind === "free" ? "Everyone starts here" : "Paid"}
-                free={draft.kind === "free"}
-                hidden={false}
-                open={true}
-                onToggle={() => setDraft(null)}
-              >
-                {form(draft)}
-              </TierCard>
-            ) : null}
+                key={tier.id}
+                title={tier.name}
+                subtitle={describePrices(tier)}
+                free={isFreeTier(tier)}
+                hidden={!tier.isActive}
+                onOpen={() => open(tier)}
+              />
+            ))}
           </div>
         </>
       ) : null}
@@ -261,33 +217,53 @@ export const TierEditor: React.FC<TierEditorProps> = ({
           </Button>
         </div>
       ) : null}
+
+      {draft ? (
+        <TierSheet
+          draft={draft}
+          tiers={tiers}
+          currency={currency}
+          hasFreeTier={hasFreeTier}
+          errors={errors}
+          saving={saving}
+          onPatch={patch}
+          onKind={setKind}
+          onClose={() => setDraft(null)}
+          onSubmit={() => void submit()}
+          onDelete={
+            draft.id !== null && draft.kind === "paid"
+              ? () => {
+                  const tier = tiers.find((entry) => entry.id === draft.id);
+                  if (tier) void remove(tier);
+                }
+              : null
+          }
+        />
+      ) : null}
     </div>
   );
 };
 
-/** A tier's card: the bar, and the form inside it when open. The gateway card's markup. */
+/** A tier's card: its name and prices. A click opens the tier's sheet. The gateway card's markup. */
 const TierCard: React.FC<{
-  id: string;
   title: string;
   subtitle: string;
   free: boolean;
   hidden: boolean;
-  open: boolean;
-  onToggle: () => void;
-  children?: React.ReactNode;
-}> = ({ id, title, subtitle, free, hidden, open, onToggle, children }) => (
-  <article className={cn("integration-card", open && "is-open")}>
+  onOpen: () => void;
+}> = ({ title, subtitle, free, hidden, onOpen }) => (
+  <article className="integration-card">
     <div
       className="integration-card-bar"
       role="button"
       tabIndex={0}
-      aria-expanded={open}
-      aria-controls={`${id}-form`}
-      onClick={onToggle}
+      aria-haspopup="dialog"
+      aria-label={`Edit ${title}`}
+      onClick={onOpen}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onToggle();
+          onOpen();
         }
       }}
     >
@@ -301,21 +277,20 @@ const TierCard: React.FC<{
       <div className="integration-card-bar-right">
         {hidden ? <Badge tone="neutral">Hidden</Badge> : null}
         <Badge tone={free ? "neutral" : "brand"}>{free ? "Free" : "Paid"}</Badge>
-        <span className={cn("integration-chevron", open && "is-open")}>
-          <ChevronDown aria-hidden={true} />
+        <span className="integration-chevron">
+          <ChevronRight aria-hidden={true} />
         </span>
       </div>
     </div>
-    {open ? (
-      <div className="integration-tier-form" id={`${id}-form`} role="group" aria-label={`${title} details`}>
-        {children}
-      </div>
-    ) : null}
   </article>
 );
 
-/** The fields of one tier, inside its open card. */
-const TierForm: React.FC<{
+/**
+ * One tier's form in a sheet: the fields and features in the body, Delete
+ * (a saved paid tier only) and Create tier or Save tier pinned in the footer.
+ * Closing discards the edits; nothing is written until the primary.
+ */
+const TierSheet: React.FC<{
   draft: TierFormDraft;
   tiers: ReadonlyArray<SiteTierRecord>;
   currency: CurrencyCode;
@@ -324,19 +299,22 @@ const TierForm: React.FC<{
   saving: boolean;
   onPatch: <Key extends keyof TierFormDraft>(key: Key, value: TierFormDraft[Key]) => void;
   onKind: (kind: TierKind) => void;
-  onCancel: () => void;
+  onClose: () => void;
   onSubmit: () => void;
   /** Present for a saved paid tier. The Free tier cannot be deleted. */
   onDelete: (() => void) | null;
-}> = ({ draft, tiers, currency, hasFreeTier, errors, saving, onPatch, onKind, onCancel, onSubmit, onDelete }) => {
+}> = ({ draft, tiers, currency, hasFreeTier, errors, saving, onPatch, onKind, onClose, onSubmit, onDelete }) => {
   const exponent = currencyExponent(currency);
   // Deleting asks first, in a popup (2026-10-19: nothing deletes on one click).
   const [confirmDelete, setConfirmDelete] = useState(false);
   const idPreview = draft.id !== null || draft.name.trim() !== "" ? resolvedTierKey(draft, tiers) : "";
   const describedBy = (field: keyof TierFormDraft, inputId: string) => (errors[field] ? fieldErrorId(inputId) : undefined);
+  // The saved record, so the title does not change with every key typed.
+  const saved = draft.id === null ? null : tiers.find((entry) => entry.id === draft.id) ?? null;
+  const free = draft.kind === "free";
 
   const price = (field: "monthlyPrice" | "annualPrice" | "lifetimePrice", label: string, inputId: string, sample: string) => (
-    <FieldRow label={`${label}, ${currency}`} htmlFor={inputId} error={errors[field]}>
+    <Field label={`${label}, ${currency}`} htmlFor={inputId} error={errors[field]}>
       <TextField
         id={inputId}
         value={draft[field]}
@@ -345,121 +323,113 @@ const TierForm: React.FC<{
         invalid={Boolean(errors[field])}
         aria-describedby={describedBy(field, inputId)}
         onChange={(value) => onPatch(field, value)}
+        fill
       />
-    </FieldRow>
+    </Field>
   );
 
   return (
     <>
-      <FieldRows>
-        <FieldRow
-          label="Type"
-          htmlFor="tier-kind"
-          error={errors.kind}
-          hint="Free is where every member starts, with nothing to pay. A site has one. Paid tiers are what members buy."
-          fill
-        >
-          {draft.id === null ? (
-            <Segmented
-              label="Tier type"
-              options={KIND_OPTIONS.map((option) => ({ ...option, disabled: option.value === "free" && hasFreeTier }))}
-              value={draft.kind}
-              onChange={onKind}
-            />
-          ) : (
-            <Badge tone="neutral">{draft.kind === "free" ? "Free" : "Paid"}</Badge>
-          )}
-        </FieldRow>
-
-        <FieldRow label="Name" htmlFor="tier-name" error={errors.name} fill>
-          <TextField
-            id="tier-name"
-            value={draft.name}
-            placeholder={draft.kind === "free" ? "Free" : "Gold"}
-            invalid={Boolean(errors.name)}
-            aria-describedby={describedBy("name", "tier-name")}
-            onChange={(value) => onPatch("name", value)}
-            fill
-          />
-        </FieldRow>
-
-        <FieldRow
-          label="ID"
-          htmlFor="tier-id"
-          error={errors.key}
-          hint="Made from the name. Gates, locks, and plans use it, so it never changes once saved."
-          fill
-        >
-          <span id="tier-id">
-            {idPreview ? <code className="code-chip">{idPreview}</code> : <span className="settings-help">From the name</span>}
-          </span>
-        </FieldRow>
-
-        {draft.kind === "paid" ? (
+      <Sheet
+        title={saved ? saved.name : "New tier"}
+        description={saved ? describePrices(saved) : free ? "Everyone starts here" : `Priced in ${currency}`}
+        icon={free ? <Gift aria-hidden={true} /> : <Crown aria-hidden={true} />}
+        badge={<Badge tone={free ? "neutral" : "brand"}>{free ? "Free" : "Paid"}</Badge>}
+        onClose={saving ? undefined : onClose}
+        footer={
           <>
-            <FieldRow label="Level" htmlFor="tier-rank" error={errors.rank} hint="Higher levels include everything below them. Free is level 0.">
-              <TextField
-                id="tier-rank"
-                value={draft.rank}
-                inputMode="numeric"
-                invalid={Boolean(errors.rank)}
-                aria-describedby={describedBy("rank", "tier-rank")}
-                onChange={(value) => onPatch("rank", value)}
-              />
-            </FieldRow>
-            {price("monthlyPrice", "Monthly", "tier-monthly", "9.99")}
-            {price("annualPrice", "Annual", "tier-annual", "99.00")}
-            {price("lifetimePrice", "Lifetime", "tier-lifetime", "249.00")}
+            {onDelete ? (
+              <Button variant="danger" size="md" disabled={saving} onClick={() => setConfirmDelete(true)}>
+                <Trash2 aria-hidden={true} />
+                Delete tier
+              </Button>
+            ) : null}
+            <Button variant="primary" size="md" loading={saving} onClick={onSubmit}>
+              {draft.id === null ? "Create tier" : "Save tier"}
+            </Button>
           </>
-        ) : null}
-
-        {/*
-          A checkbox, not a toggle. PRD section 7.5: a toggle is for
-          instant-apply only, and this change is not applied until Save.
-        */}
-        <FieldRow label="Visible to members" htmlFor="tier-active">
-          <Checkbox id="tier-active" checked={draft.isActive} onChange={(checked) => onPatch("isActive", checked)} />
-        </FieldRow>
-      </FieldRows>
-
-      <TierFeatures
-        features={draft.features}
-        error={errors.features}
-        disabled={saving}
-        onChange={(features) => onPatch("features", features)}
-      />
-
-      <div className="integration-card-actions">
-        {onDelete ? (
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={saving}
-            onClick={() => setConfirmDelete(true)}
+        }
+      >
+        <Fields>
+          <Setting
+            title="Type"
+            error={errors.kind}
+            hint="Free is where every member starts, with nothing to pay. A site has one. Paid tiers are what members buy."
           >
-            <Trash2 aria-hidden={true} />
-            Delete tier
-          </Button>
-        ) : null}
-        <Button variant="ghost" size="sm" disabled={saving} onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
+            {draft.id === null ? (
+              <Segmented
+                label="Tier type"
+                options={KIND_OPTIONS.map((option) => ({ ...option, disabled: option.value === "free" && hasFreeTier }))}
+                value={draft.kind}
+                onChange={onKind}
+              />
+            ) : (
+              <Badge tone="neutral">{free ? "Free" : "Paid"}</Badge>
+            )}
+          </Setting>
 
-      {/*
-        The primary on its own row. The kit's .primary-cta is full width by
-        design, so in one row with Delete and Cancel it pushed them out of a
-        360px panel and only Save showed.
-      */}
-      <div className="tier-form-cta">
-        <Button variant="primary" size="md" className="fill" disabled={saving} onClick={onSubmit}>
-          {saving ? "Saving" : draft.id === null ? "Create tier" : "Save tier"}
-        </Button>
-      </div>
+          <Field label="Name" htmlFor="tier-name" error={errors.name}>
+            <TextField
+              id="tier-name"
+              value={draft.name}
+              placeholder={free ? "Free" : "Gold"}
+              invalid={Boolean(errors.name)}
+              aria-describedby={describedBy("name", "tier-name")}
+              onChange={(value) => onPatch("name", value)}
+              fill
+            />
+          </Field>
+
+          <Field
+            label="ID"
+            htmlFor="tier-id"
+            error={errors.key}
+            hint="Made from the name. Gates, locks, and plans use it, so it never changes once saved."
+          >
+            <span id="tier-id">
+              {idPreview ? <code className="code-chip">{idPreview}</code> : <span className="settings-help">From the name</span>}
+            </span>
+          </Field>
+
+          {free ? null : (
+            <>
+              <Field label="Level" htmlFor="tier-rank" error={errors.rank} hint="Higher levels include everything below them. Free is level 0.">
+                <TextField
+                  id="tier-rank"
+                  value={draft.rank}
+                  inputMode="numeric"
+                  invalid={Boolean(errors.rank)}
+                  aria-describedby={describedBy("rank", "tier-rank")}
+                  onChange={(value) => onPatch("rank", value)}
+                  fill
+                />
+              </Field>
+              {price("monthlyPrice", "Monthly", "tier-monthly", "9.99")}
+              {price("annualPrice", "Annual", "tier-annual", "99.00")}
+              {price("lifetimePrice", "Lifetime", "tier-lifetime", "249.00")}
+            </>
+          )}
+
+          {/*
+            A checkbox, not a toggle. PRD section 7.5: a toggle is for
+            instant-apply only, and this change is not applied until Save.
+          */}
+          <Setting title="Visible to members" htmlFor="tier-active">
+            <Checkbox id="tier-active" checked={draft.isActive} onChange={(checked) => onPatch("isActive", checked)} />
+          </Setting>
+        </Fields>
+
+        <TierFeatures
+          features={draft.features}
+          error={errors.features}
+          disabled={saving}
+          onChange={(features) => onPatch("features", features)}
+        />
+      </Sheet>
 
       {confirmDelete && onDelete ? (
         <ConfirmDialog
-          title={draft.name.trim() ? `Delete the ${draft.name.trim()} tier?` : "Delete this tier?"}
+          title={saved ? `Delete the ${saved.name} tier?` : "Delete this tier?"}
           message={
             <>
               <p>Pages, sections, and paywalls set to this tier lock for everyone until you choose another tier for them.</p>
@@ -499,7 +469,7 @@ const TierFeatures: React.FC<{
 
   return (
     <div className="tier-features" role="group" aria-label="Features">
-      {/* The explanation is an info tip beside the title, as FieldRow does: never a paragraph. */}
+      {/* The explanation is an info tip beside the title, as a section title's InfoTip does. */}
       <div className="tier-features-head">
         <span className="tier-features-title">Features</span>
         <InfoTip label="Features">

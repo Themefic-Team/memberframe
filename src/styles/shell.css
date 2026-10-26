@@ -7,10 +7,10 @@
    ========================================================================== */
 
 /* The reference sets .framefic-shell to height 100vh with min-height 590px.
-   Collapsed, the panel is a 36px iframe holding only the tab bar, so that
+   Collapsed, the panel is a 40px iframe holding only the tab bar, so that
    floor has to come off or the bar is pushed out of a window it cannot scroll. */
 .framefic-shell.is-collapsed {
-  height: 36px;
+  height: 40px;
   min-height: 0;
   overflow: hidden;
 }

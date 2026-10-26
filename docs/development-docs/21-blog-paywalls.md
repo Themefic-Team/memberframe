@@ -63,12 +63,12 @@ One-time for all three: tiers in Manage, Tiers; a gateway in Manage, Payments; /
 2. **Add locked page**, Protected path **Blog, every item (/blog/:slug)**. That locks every post and leaves `/blog`, the list, open. Picking **Blog (/blog)** instead locks the list and every post, since a path covers the pages under it.
 
    The Shield matches a `:name` segment as any one segment (`pathMatches` in `routes/shield.ts`). Before 2026-10-18 it compared paths literally, so a `/blog/:slug` rule, which the picker offered, locked nothing; `test/shieldBehaviour.test.ts` now covers it. The picker labels pages from their path when Framer named them after it (it read "/blog (/blog)"), sorts them by path, and leaves the sign in, sign up, reset, and 404 pages out of what can be locked, since a locked sign in page redirects to itself.
-3. Required tier, Redirect to (`/login`, or `/pricing` to sell the plan), **Save locks**.
+3. Who can open it, Redirect to (`/login`, or `/pricing` to sell the plan), **Add lock** in the popup.
 
 **Section Lock, part of every post**
 1. Split the post in the CMS: an `Intro` field, free, and the `Content` field, locked.
 2. On the detail page, put the Content text in a frame, and a "Subscribe to keep reading" card under it.
-3. Settings, Section Locks: `Blog Body`, Any signed-in member, Blurred; `Blog Upsell`, Signed-out visitors only, Hidden. **Save locks**.
+3. Settings, Section Locks: `Blog Body`, Any signed-in member, Blurred; `Blog Upsell`, Signed-out visitors only, Hidden. **Add lock** in each lock's popup.
 4. Code overrides, File MemberFrameLocks: `BlogBody` on the content frame, `BlogUpsell` on the card. Publish.
 
 **Soft Paywall on a CMS post, metered or teaser, designed on the canvas**

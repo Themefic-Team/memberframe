@@ -14,10 +14,11 @@
   gap: var(--space-8);
 }
 
+/* 12px like every section stack, so sections land 32px apart (kit.css page rhythm). */
 .report-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  gap: var(--space-12);
 }
 
 /* Export CSV and Export PDF, side by side, on every report view (Button `fill`). */

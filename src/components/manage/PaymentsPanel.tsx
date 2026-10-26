@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Copy, CreditCard, Eye, EyeOff, Save, Unplug } from "lucide-react";
+import { Check, ChevronRight, Citrus, Copy, CreditCard, Eye, EyeOff, IndianRupee, Save, Unplug } from "lucide-react";
 import {
   Badge,
   Banner,
   Button,
   ConfirmDialog,
-  FieldRow,
-  FieldRows,
+  Field,
+  Fields,
   IconButton,
   InfoTip,
   SearchSelect,
   Segmented,
+  Sheet,
   SkeletonList,
   TextField,
   Toggle,
@@ -36,12 +37,20 @@ import {
   type PaymentsOverview,
 } from "../../services/paymentsService";
 import { isSafeSitePath } from "../../services/siteSettingsService";
+import { SETUP_GUIDES } from "../../config/branding";
 import { CURRENCY_OPTIONS } from "../../utils/currencies";
 
 const MODE_OPTIONS = [
   { value: "test", label: "Test" },
   { value: "live", label: "Live" },
 ] as const satisfies ReadonlyArray<{ value: PaymentMode; label: string }>;
+
+/** Each gateway's mark in its card and sheet. Lucide has no brand logos, so a fitting glyph. */
+const GATEWAY_ICON: Record<PaymentGateway, React.ReactNode> = {
+  stripe: <CreditCard aria-hidden={true} />,
+  lemonsqueezy: <Citrus aria-hidden={true} />,
+  razorpay: <IndianRupee aria-hidden={true} />,
+};
 
 const GATEWAY_BLURB: Record<PaymentGateway, string> = {
   stripe: "Cards, Apple Pay, Google Pay",
@@ -314,8 +323,8 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
           <h2 className="section-title">Checkout Settings</h2>
         </div>
 
-        <FieldRows>
-          <FieldRow
+        <Fields>
+          <Field
             label="Grace period"
             htmlFor="payments-grace"
             hint="Days members keep access while renewal payments retry."
@@ -328,9 +337,9 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
                 setDraft({ ...draft, graceDays: Math.max(0, Math.min(30, Math.round(Number(value) || 0))) })
               }
             />
-          </FieldRow>
+          </Field>
 
-          <FieldRow
+          <Field
             label="Pricing page"
             htmlFor="payments-pricing-path"
             error={pathProblem(draft.pricingPath)}
@@ -342,9 +351,9 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
               invalid={pathProblem(draft.pricingPath) !== undefined}
               onChange={(value) => setDraft({ ...draft, pricingPath: value })}
             />
-          </FieldRow>
+          </Field>
 
-          <FieldRow
+          <Field
             label="After purchase"
             htmlFor="payments-after-path"
             error={pathProblem(draft.afterPurchasePath)}
@@ -356,9 +365,9 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
               invalid={pathProblem(draft.afterPurchasePath) !== undefined}
               onChange={(value) => setDraft({ ...draft, afterPurchasePath: value })}
             />
-          </FieldRow>
+          </Field>
 
-          <FieldRow
+          <Field
             label="Site currency"
             htmlFor="payments-currency"
             hint="Every tier is priced in it, so buyers always compare like with like."
@@ -370,8 +379,8 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ siteId }) => {
               searchPlaceholder="Search currencies"
               onChange={(value) => setDraft({ ...draft, defaultCurrency: value })}
             />
-          </FieldRow>
-        </FieldRows>
+          </Field>
+        </Fields>
 
         {overview && draft.defaultCurrency !== overview.settings.defaultCurrency ? (
           <Banner
@@ -473,10 +482,11 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
     setOpened({ values: initial, wording: startWording });
   }, [defaultLabel, fields, label, methodLabel.description, methodLabel.title, status.options, status.publicId]);
 
-  const toggle = () => {
-    if (!open) reset();
+  /** Open the card's sheet with fresh values; closing discards unsaved edits. */
+  const openSheet = () => {
+    reset();
     setConfirmRemove(false);
-    setOpen(!open);
+    setOpen(true);
   };
 
   const submit = async () => {
@@ -530,31 +540,31 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
     : GATEWAY_BLURB[status.gateway];
 
   return (
-    <article className={cn("integration-card", open && "is-open", status.connected && "is-configured")}>
+    <article className={cn("integration-card", status.connected && "is-configured")}>
       <div
         className="integration-card-bar"
         role="button"
         tabIndex={0}
-        aria-expanded={open}
-        aria-controls={`${id}-form`}
-        onClick={toggle}
+        aria-haspopup="dialog"
+        aria-label={`Edit ${label}`}
+        onClick={openSheet}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            toggle();
+            openSheet();
           }
         }}
       >
         <div className="integration-card-bar-left">
           <span className="integration-card-icon">
-            {status.connected ? <Check aria-hidden={true} /> : <CreditCard aria-hidden={true} />}
+            {status.connected ? <Check aria-hidden={true} /> : GATEWAY_ICON[status.gateway]}
           </span>
           <div className="integration-card-text">
             <span className="integration-card-title">{label}</span>
             <span className="integration-card-sub">{statusSubtitle}</span>
           </div>
         </div>
-        {/* The Toggle acts on its own: a click on it must not open or close the card. */}
+        {/* The Toggle acts on its own: a click on it must not open the sheet. */}
         <div className="integration-card-bar-right" onClick={(event) => event.stopPropagation()}>
           {status.connected ? (
             <Badge tone={shown ? "success" : "neutral"}>{shown ? "Connected" : "Off"}</Badge>
@@ -570,8 +580,8 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
               onChange={onToggleEnabled}
             />
           ) : null}
-          <span className={cn("integration-chevron", open && "is-open")} onClick={toggle}>
-            <ChevronDown aria-hidden={true} />
+          <span className="integration-chevron" onClick={openSheet}>
+            <ChevronRight aria-hidden={true} />
           </span>
         </div>
       </div>
@@ -579,17 +589,42 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
       {notice && !open ? <p className="integration-card-pending">{notice}</p> : null}
 
       {open ? (
-        <div className="integration-tier-form" id={`${id}-form`} role="group" aria-label={`${label} keys`}>
-          <FieldRows>
+        <Sheet
+          title={label}
+          icon={GATEWAY_ICON[status.gateway]}
+          guide={{ href: SETUP_GUIDES[status.gateway] }}
+          badge={
+            status.connected ? (
+              <Badge tone={shown ? "success" : "neutral"}>{shown ? "Connected" : "Off"}</Badge>
+            ) : (
+              <Badge tone="neutral">Not connected</Badge>
+            )
+          }
+          description={statusSubtitle}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              {status.connected ? (
+                <Button variant="danger" size="md" disabled={busy} onClick={() => setConfirmRemove(true)}>
+                  <Unplug aria-hidden={true} />
+                  Remove
+                </Button>
+              ) : null}
+              <Button variant="primary" size="md" loading={busy} disabled={disabled} onClick={() => void submit()}>
+                {status.connected ? "Save changes" : `Connect ${label}`}
+              </Button>
+            </>
+          }
+        >
+          <Fields>
             {fields.map((field) => {
               const isRevealed = revealed.includes(field.key);
               return (
-                <FieldRow
+                <Field
                   key={field.key}
                   label={field.label}
                   htmlFor={`${id}-${field.key}`}
                   hint={field.hint}
-                  fill
                 >
                   <div className="integration-input">
                     <TextField
@@ -616,11 +651,11 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
                       </IconButton>
                     ) : null}
                   </div>
-                </FieldRow>
+                </Field>
               );
             })}
 
-            <FieldRow
+            <Field
               label="Webhook URL"
               htmlFor={`${id}-webhook`}
               hint={
@@ -628,7 +663,6 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
                   ? `Add in Razorpay, Webhooks with: ${status.events.join(", ")}.`
                   : `Auto-registered with ${label} on connect.`
               }
-              fill
             >
               <div className="integration-input">
                 <TextField id={`${id}-webhook`} fill readOnly value={status.webhookUrl} onChange={() => undefined} />
@@ -643,18 +677,17 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
                   {copied ? <Check aria-hidden={true} /> : <Copy aria-hidden={true} />}
                 </IconButton>
               </div>
-            </FieldRow>
-          </FieldRows>
+            </Field>
+          </Fields>
 
           {status.connected ? (
             <>
               {/* How buyers see this gateway in the checkout chooser (29-checkout-methods.md). */}
-              <FieldRows>
-                <FieldRow
+              <Fields>
+                <Field
                   label="Checkout title"
                   htmlFor={`${id}-title`}
                   hint="What buyers see in the payment method list. Leave it empty for the default."
-                  fill
                 >
                   <TextField
                     id={`${id}-title`}
@@ -665,12 +698,11 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
                     disabled={busy || disabled}
                     onChange={(title) => setWording((current) => ({ ...current, title }))}
                   />
-                </FieldRow>
-                <FieldRow
+                </Field>
+                <Field
                   label="Checkout description"
                   htmlFor={`${id}-description`}
                   hint="One line under the title, for example the cards or wallets it takes."
-                  fill
                 >
                   <TextField
                     id={`${id}-description`}
@@ -681,35 +713,17 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
                     disabled={busy || disabled}
                     onChange={(description) => setWording((current) => ({ ...current, description }))}
                   />
-                </FieldRow>
-              </FieldRows>
+                </Field>
+              </Fields>
             </>
           ) : null}
 
           {error ? (
-            <p className="integration-field-problem" role="alert">
+            <p className="kit-field-error" role="alert">
               {error}
             </p>
           ) : null}
-
-          {/* At the bottom: one Save for the keys and the checkout wording. */}
-          <div className="integration-card-actions">
-            {status.connected ? (
-              <Button
-                variant="danger"
-                size="sm"
-                disabled={busy}
-                onClick={() => setConfirmRemove(true)}
-              >
-                <Unplug aria-hidden={true} />
-                Remove
-              </Button>
-            ) : null}
-            <Button variant="secondary" size="sm" disabled={busy || disabled} onClick={() => void submit()}>
-              {busy ? "Saving" : status.connected ? "Save changes" : `Connect ${label}`}
-            </Button>
-          </div>
-        </div>
+        </Sheet>
       ) : null}
 
       {confirmRemove ? (
@@ -728,6 +742,7 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
           onCancel={() => setConfirmRemove(false)}
           onConfirm={() => {
             setConfirmRemove(false);
+            setOpen(false);
             onDisconnect();
           }}
         />

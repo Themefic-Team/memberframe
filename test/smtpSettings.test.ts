@@ -123,8 +123,10 @@ describe("the requests", () => {
 describe("the card", () => {
   const source = readFileSync(path.join(process.cwd(), "src", "components", "settings", "EmailSettings.tsx"), "utf-8");
 
-  it("keeps Save settings the Config view's only primary button", () => {
-    expect(source).not.toContain('variant="primary"');
+  it("keeps its one primary inside its own sheet, so the Config view keeps Save settings as its only one", () => {
+    expect(source.split('variant="primary"').length - 1).toBe(1);
+    const sheet = source.slice(source.indexOf("<Sheet"), source.indexOf("</Sheet>"));
+    expect(sheet).toContain('variant="primary"');
   });
 
   it("follows the kit: a Select for a setting, help in info tips, no help paragraphs", () => {

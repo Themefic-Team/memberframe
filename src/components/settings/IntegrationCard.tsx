@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Check, ChevronDown, Copy, CreditCard, Eye, EyeOff, Globe, Key, Plug, X } from "lucide-react";
-import { Banner, Button, FieldRow, FieldRows, IconButton, TextField, Toggle } from "../ui";
+import { Check, ChevronRight, Copy, CreditCard, Eye, EyeOff, Plug } from "lucide-react";
+import { Badge, Banner, Button, Field, Fields, IconButton, Sheet, TextField, Toggle } from "../ui";
 import { cn } from "../../utils/cn";
 import { ProviderMark } from "../providerMarks";
 import { API_BASE_URL } from "../../config/backend";
+import { SETUP_GUIDES, type SetupGuideId } from "../../config/branding";
 import { checkKey, keyProblemMessage } from "./gatewayKeys";
 import {
   draftFor,
@@ -27,8 +28,8 @@ export interface IntegrationCardProps {
   /** Instant apply, per the toggle's own contract. */
   onToggleEnabled: (enabled: boolean) => void;
   /**
-   * Whether this card's form is open. Held by IntegrationPanel so only one is
-   * open at a time: each form carries a primary Save, and a view has one.
+   * Whether this card's sheet is open. Held by IntegrationPanel so only one is
+   * open at a time: each sheet carries a primary Save, and a view has one.
    */
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -53,9 +54,17 @@ function getIntegrationIcon(id: string) {
   }
 }
 
+/** The setup guide for a provider's sheet, when it has one. */
+function setupGuideFor(id: string): string | undefined {
+  const key = id.replace(/_oauth$/, "") as SetupGuideId;
+  return SETUP_GUIDES[key];
+}
+
 /**
- * An integration item rendered as a collapsible accordion card,
- * matching the Tier creation structure (Screenshot 2).
+ * One sign-in provider: a card with its status and the one-click enable
+ * toggle. Clicking the card opens its settings in the kit's Sheet
+ * (design-system.md section 8), never an accordion: the list stays put and
+ * Save stays in view, pinned in the sheet's footer.
  */
 export const IntegrationCard: React.FC<IntegrationCardProps> = ({
   definition,
@@ -153,13 +162,22 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
   const problemFor = (key: string): string | null =>
     problems.find((problem) => problem.key === key)?.message ?? null;
 
+  const statusBadge = redirectStale ? (
+    <Badge tone="warning">Update needed</Badge>
+  ) : configured ? (
+    <Badge tone="success">Connected</Badge>
+  ) : (
+    <Badge tone="neutral">Not connected</Badge>
+  );
+
   return (
-    <article className={cn("integration-card", open && "is-open", configured && "is-configured")}>
-      {/* Accordion header bar */}
+    <article className={cn("integration-card", configured && "is-configured")}>
       <div
         className="integration-card-bar"
         role="button"
         tabIndex={0}
+        aria-haspopup="dialog"
+        aria-label={`Edit ${definition.name}`}
         onClick={handleToggleOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -173,13 +191,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
             {configured ? <Check aria-hidden={true} /> : getIntegrationIcon(definition.id)}
           </span>
           <span className="integration-card-title">{definition.name}</span>
-          {redirectStale ? (
-            <span className="badge badge-warning">Update needed</span>
-          ) : configured ? (
-            <span className="badge badge-success">Connected</span>
-          ) : (
-            <span className="badge badge-neutral">Not connected</span>
-          )}
+          {statusBadge}
         </div>
 
         <div className="integration-card-bar-right" onClick={(e) => e.stopPropagation()}>
@@ -198,21 +210,25 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
               }
             }}
           />
-          <span className={cn("integration-chevron", open && "is-open")}>
-            <ChevronDown aria-hidden={true} />
+          <span className="integration-chevron">
+            <ChevronRight aria-hidden={true} />
           </span>
         </div>
       </div>
 
-      {/* Expanded Tier-style Edit Form (Screenshot 2) */}
       {open && (
-        <div className="integration-tier-form" role="group" aria-label={`${definition.name} details`}>
-          <div className="tier-form-head">
-            <span className="tier-form-title">Edit {definition.name}</span>
-            <IconButton label="Close" variant="ghost" onClick={() => onOpenChange(false)}>
-              <X aria-hidden={true} />
-            </IconButton>
-          </div>
+        <Sheet
+          title={definition.name}
+          badge={statusBadge}
+          icon={getIntegrationIcon(definition.id)}
+          guide={setupGuideFor(definition.id) ? { href: setupGuideFor(definition.id)! } : undefined}
+          onClose={() => onOpenChange(false)}
+          footer={
+            <Button variant="primary" size="md" loading={saving} onClick={handleSave}>
+              Save settings
+            </Button>
+          }
+        >
 
           {redirectStale ? (
             <Banner
@@ -222,7 +238,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
             />
           ) : null}
 
-          <FieldRows>
+          <Fields>
             {definition.fields.map((field) => {
               const locked = field.secret && !secretsSupported && isGatewayIntegration(definition);
               const isRedirect = field.key === "redirect_url";
@@ -253,12 +269,11 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
 
               return (
                 <React.Fragment key={field.key}>
-                  <FieldRow
+                  <Field
                     label={field.label}
                     htmlFor={`integration-${definition.id}-${field.key}`}
                     error={problem ?? undefined}
                     hint={field.help}
-                    fill
                   >
                     <div className="integration-input">
                       <TextField
@@ -299,25 +314,13 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
                         </IconButton>
                       ) : null}
                     </div>
-                  </FieldRow>
+                  </Field>
 
                 </React.Fragment>
               );
             })}
-          </FieldRows>
-
-          <div className="tier-form-cta">
-            <Button
-              variant="primary"
-              size="md"
-              className="fill"
-              disabled={saving}
-              onClick={handleSave}
-            >
-              {saving ? "Saving" : "Save settings"}
-            </Button>
-          </div>
-        </div>
+          </Fields>
+        </Sheet>
       )}
     </article>
   );

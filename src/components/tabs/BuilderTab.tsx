@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FileStack, Plus } from "lucide-react";
 import { framer } from "framer-plugin";
-import { Badge, Banner, Button, Checkbox, FieldRow, FieldRows, Select, useToast } from "../ui";
+import { Badge, Banner, Button, Checkbox, Field, Fields, Select, useToast } from "../ui";
 import { useLicense } from "../../hooks/useLicense";
 import { canvasLicense } from "../../services/licenseService";
 import { cn } from "../../utils/cn";
@@ -507,8 +507,8 @@ export const BuilderTab: React.FC = () => {
   return (
     <MemberSessionProvider>
       <div className="tab-panel-body">
-        <FieldRows>
-          <FieldRow label="Component" htmlFor="builder-component" fill>
+        <Fields>
+          <Field label="Component" htmlFor="builder-component">
             <Select
               id="builder-component"
               value={componentId}
@@ -516,9 +516,9 @@ export const BuilderTab: React.FC = () => {
               onChange={setComponentId}
               fill
             />
-          </FieldRow>
+          </Field>
 
-        </FieldRows>
+        </Fields>
 
         {/*
           Deploying while disconnected would bake an empty site key into the

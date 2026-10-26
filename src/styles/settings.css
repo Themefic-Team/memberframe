@@ -156,11 +156,6 @@
   border-color: var(--px-color-border-brand);
 }
 
-.integration-card.is-open {
-  border-color: var(--px-color-border-brand);
-  background: var(--px-color-bg-raised);
-}
-
 /* Accordion trigger row */
 .integration-card-bar {
   display: flex;
@@ -276,51 +271,6 @@
   stroke: currentColor;
 }
 
-.integration-chevron.is-open {
-  transform: rotate(180deg);
-  color: var(--framer-color-text);
-}
-
-/* Expanded Tier-style Edit Form (Screenshot 2) */
-.integration-tier-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  padding: 12px;
-  padding-top: 10px;
-  box-sizing: border-box;
-  border-top: 1px solid var(--px-color-border-brand);
-  background: var(--px-color-bg-raised);
-}
-
-.integration-tier-form .tier-form-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.integration-tier-form .tier-form-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--framer-color-text);
-}
-
-.integration-tier-form .tier-form-cta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  padding-top: 4px;
-  box-sizing: border-box;
-}
 
 .integration-card-desc {
   margin: 0;
@@ -341,13 +291,6 @@
   font-size: 11px;
   line-height: 1.45;
   font-style: italic;
-}
-
-.integration-field-problem {
-  margin: 0;
-  color: var(--px-color-danger);
-  font-size: 11px;
-  line-height: 1.4;
 }
 
 /* Why a secret field is disabled, stated where the disabled field is. */
@@ -507,10 +450,6 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.page-rule-card.is-open {
-  border-color: var(--px-color-border-brand);
-}
-
 .page-rule-card-header {
   display: flex;
   align-items: center;
@@ -584,6 +523,12 @@
   flex-shrink: 0;
 }
 
+/* The toggle stops a click from opening the sheet; the chevron beside it does not. */
+.page-rule-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
 .page-rule-chevron {
   display: inline-flex;
   align-items: center;
@@ -598,19 +543,6 @@
   width: 16px;
   height: 16px;
   stroke: currentColor;
-}
-
-.page-rule-chevron.is-open {
-  transform: rotate(180deg);
-  color: var(--framer-color-text);
-}
-
-.page-rule-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-12);
-  border-top: 1px solid var(--framer-color-divider);
 }
 
 /* The exact tiers a lock names (19-section-locks.md 8 and 9): tiles in a two-column grid. */
@@ -814,18 +746,11 @@
   gap: var(--space-8);
 }
 
-.page-locks-footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  padding-bottom: var(--space-24);
-}
-
 /* ---------------------------------------------------------------------------
    Profile fields, feature plan FP-09
    ---------------------------------------------------------------------------
-   One card per field, one open at a time. The header is a real button for the
-   expand control plus three icon buttons beside it, rather than one clickable
+   One card per field; a click opens its sheet. The header is a real button
+   that opens it, plus the move buttons beside it, rather than one clickable
    row holding buttons, because a button inside a button is not operable by
    keyboard or announced sensibly by a screen reader. */
 
@@ -853,11 +778,6 @@
   box-sizing: border-box;
   overflow: hidden;
   box-shadow: var(--px-shadow-card);
-}
-
-.custom-field-card.is-open {
-  border-color: var(--px-color-border-brand);
-  background: var(--px-color-bg-raised);
 }
 
 .custom-field-card.is-invalid {
@@ -936,24 +856,11 @@
   stroke: currentColor;
 }
 
-.custom-field-chevron.is-open {
-  transform: rotate(180deg);
-  color: var(--framer-color-text);
-}
-
 .custom-field-actions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 2px;
-}
-
-.custom-field-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-top: 1px solid var(--framer-color-divider);
 }
 
 .custom-field-caption {
@@ -1056,12 +963,6 @@
   white-space: nowrap;
   font: var(--text-body-sm);
   color: var(--framer-color-text-tertiary);
-}
-
-.webhook-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-6);
 }
 
 .webhook-secret-row {

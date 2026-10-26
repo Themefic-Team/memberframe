@@ -1,5 +1,5 @@
 import React from "react";
-import { Checkbox, FieldRow, FieldRows, TextField } from "../ui";
+import { Checkbox, Field, Fields, Setting, TextField } from "../ui";
 import { AUTH_PATH_FIELDS, isSafeSitePath } from "../../services/siteSettingsService";
 import type { AuthSettings } from "../../types/connection";
 import { PASSWORD_MIN_LENGTH, PASSWORD_POLICY_MAX_MIN, readPasswordPolicy, type PasswordPolicy } from "../../utils/credentials";
@@ -86,13 +86,13 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
 
   return (
     <>
-      <FieldRows>
+      <Fields>
         {AUTH_PATH_FIELDS.map((spec) => {
           const current = value[spec.field];
           const invalid = !isSafeSitePath(current);
 
           return (
-            <FieldRow
+            <Field
               key={spec.field}
               label={spec.label}
               htmlFor={`settings-${spec.field}`}
@@ -106,10 +106,10 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
                 placeholder="/login"
                 onChange={(next) => set(spec.field, next)}
               />
-            </FieldRow>
+            </Field>
           );
         })}
-      </FieldRows>
+      </Fields>
 
       {/*
         One message for the whole group rather than one per field. At 360px,
@@ -122,13 +122,13 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
         </p>
       ) : null}
 
-      <FieldRows>
+      <Fields>
         {/*
           A checkbox, not a toggle. PRD section 7.5 reserves the toggle for
           instant-apply controls, and nothing here applies until Save.
         */}
-        <FieldRow
-          label="Allow new sign ups"
+        <Setting
+          title="Allow new sign ups"
           htmlFor="settings-allow-registration"
           hint={
             value.allowRegistration
@@ -142,16 +142,16 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
             disabled={disabled}
             onChange={(checked) => set("allowRegistration", checked)}
           />
-        </FieldRow>
-      </FieldRows>
+        </Setting>
+      </Fields>
 
       {/*
         Password rules, for sign up and reset on every form on this site. Sign
         in never checks them, so a member whose password predates a stricter
         rule still signs in and meets it at their next reset.
       */}
-      <FieldRows>
-        <FieldRow
+      <Fields>
+        <Field
           label="Minimum password length"
           htmlFor="settings-password-min"
           hint={`From ${PASSWORD_MIN_LENGTH} to ${PASSWORD_POLICY_MAX_MIN} characters.`}
@@ -165,18 +165,18 @@ export const MembershipSettings: React.FC<MembershipSettingsProps> = ({
             placeholder="8"
             onChange={(next) => setPolicy({ minLength: Number.parseInt(next.replace(/[^0-9]/g, ""), 10) || 0 })}
           />
-        </FieldRow>
+        </Field>
         {RULE_TOGGLES.map((rule) => (
-          <FieldRow key={rule.key} label={rule.label} htmlFor={`settings-password-${rule.key}`}>
+          <Setting key={rule.key} title={rule.label} htmlFor={`settings-password-${rule.key}`}>
             <Checkbox
               id={`settings-password-${rule.key}`}
               checked={policy[rule.key]}
               disabled={disabled}
               onChange={(checked) => setPolicy({ [rule.key]: checked })}
             />
-          </FieldRow>
+          </Setting>
         ))}
-      </FieldRows>
+      </Fields>
       <p className={policyProblem ? "settings-help settings-help-problem" : "settings-help"}>
         {policyProblem ?? `${passwordPolicySummary(policy)} Used on sign up and password reset. Sign in is not affected.`}
       </p>

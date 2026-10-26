@@ -10,8 +10,14 @@ export type { CheckboxProps } from "./Checkbox";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 
-export { FieldRow, FieldRows, fieldErrorId } from "./FieldRow";
-export type { FieldRowProps } from "./FieldRow";
+export { Field, Fields, fieldErrorId } from "./Field";
+export type { FieldProps } from "./Field";
+
+export { Setting } from "./Setting";
+export type { SettingProps } from "./Setting";
+
+export { Sheet } from "./Sheet";
+export type { SheetProps } from "./Sheet";
 
 export { IconButton } from "./IconButton";
 export type { IconButtonProps, IconButtonVariant } from "./IconButton";
@@ -52,8 +58,6 @@ export type { HelpTileProps } from "./HelpTile";
 export { PluginCard, PluginCardList } from "./PluginCard";
 export type { PluginCardProps } from "./PluginCard";
 
-export { Modal } from "./Modal";
-export type { ModalProps } from "./Modal";
 
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogProps } from "./ConfirmDialog";

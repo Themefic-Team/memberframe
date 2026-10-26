@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Mail, Save, Send, X } from "lucide-react";
-import { Banner, Button, FieldRow, FieldRows, IconButton, Select, TextField, Toggle } from "../ui";
+import { Check, ChevronRight, Mail, Save, Send } from "lucide-react";
+import { Badge, Banner, Button, Field, Fields, Select, Sheet, TextField, Toggle } from "../ui";
 import { cn } from "../../utils/cn";
 import { fetchEmailStatus, sendTestEmail } from "../../services/emailSettingsService";
 import {
@@ -36,11 +36,11 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * has. On, it goes through the creator's server, and falls back to
  * MemberFrame's sender if that fails, so a member is never locked out.
  *
- * The integration-card accordion, like Settings, Integration, so a credential
- * looks the same wherever it is entered: the same bar, the same badges, the
- * same field rows. What a field is for is in its info tip, never a paragraph
- * (design-system.md section 8). Its buttons are secondary: the Config view's
- * one primary action is Save settings.
+ * The integration card, like Settings, Integration, so a credential looks the
+ * same wherever it is entered: the same card, the same badges. Clicking it
+ * opens the form in the kit's Sheet (design-system.md section 8), with Save
+ * pinned in the footer. The sheet stays open after a save, because the test
+ * email, the natural next step, appears once sending is on.
  */
 export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, saving, onSave }) => {
   const enabled = stored?.enabled === true;
@@ -66,15 +66,12 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
     };
   }, [siteId, refresh, stored]);
 
-  const toggleOpen = useCallback(() => {
-    setOpen((current) => {
-      if (!current) {
-        setDraft(smtpDraftFrom(stored));
-        setProblems({});
-        setTestResult(null);
-      }
-      return !current;
-    });
+  /** Open the sheet with the saved values; closing discards unsaved edits. */
+  const openSheet = useCallback(() => {
+    setDraft(smtpDraftFrom(stored));
+    setProblems({});
+    setTestResult(null);
+    setOpen(true);
   }, [stored]);
 
   const update = <Key extends keyof SmtpDraft>(key: Key, value: SmtpDraft[Key]) => {
@@ -108,7 +105,7 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
     const complete = Object.keys(smtpDraftProblems(smtpDraftFrom(stored), passwordStored)).length === 0;
     if (next && !complete) {
       // Nothing usable is saved yet: open the form rather than send a save the server would refuse.
-      if (!open) toggleOpen();
+      if (!open) openSheet();
       return;
     }
     // The stored values go back unchanged; the password stays on the server.
@@ -141,41 +138,46 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
   const busy = saving || siteId === null;
 
   return (
-    <article className={cn("integration-card", open && "is-open", enabled && "is-configured")}>
+    <article className={cn("integration-card", enabled && "is-configured")}>
       <div
         className="integration-card-bar"
         role="button"
         tabIndex={0}
-        aria-expanded={open}
-        onClick={toggleOpen}
+        aria-haspopup="dialog"
+        aria-label="Edit Custom SMTP"
+        onClick={openSheet}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            toggleOpen();
+            openSheet();
           }
         }}
       >
         <div className="integration-card-bar-left">
           <span className="integration-card-icon">{enabled ? <Check aria-hidden={true} /> : <Mail aria-hidden={true} />}</span>
           <span className="integration-card-title">Custom SMTP</span>
-          <span className={`badge badge-${badge.tone}`}>{badge.label}</span>
+          <Badge tone={badge.tone}>{badge.label}</Badge>
         </div>
         <div className="integration-card-bar-right" onClick={(event) => event.stopPropagation()}>
           <Toggle id="email-smtp-status" checked={enabled} disabled={busy} label="Send member emails through my SMTP server" onChange={handleToggle} />
-          <span className={cn("integration-chevron", open && "is-open")}>
-            <ChevronDown aria-hidden={true} />
+          <span className="integration-chevron">
+            <ChevronRight aria-hidden={true} />
           </span>
         </div>
       </div>
 
       {open ? (
-        <div className="integration-tier-form" role="group" aria-label="Custom SMTP details">
-          <div className="tier-form-head">
-            <span className="tier-form-title">Edit Custom SMTP</span>
-            <IconButton label="Close" variant="ghost" onClick={() => setOpen(false)}>
-              <X aria-hidden={true} />
-            </IconButton>
-          </div>
+        <Sheet
+          title="Custom SMTP"
+          badge={<Badge tone={badge.tone}>{badge.label}</Badge>}
+          onClose={() => setOpen(false)}
+          footer={
+            <Button variant="primary" size="md" loading={saving} disabled={siteId === null} onClick={() => void handleSave()}>
+              <Save aria-hidden={true} />
+              {enabled ? "Save SMTP settings" : "Save and turn on"}
+            </Button>
+          }
+        >
 
           {testResult ? (
             <Banner tone={testResult.sent ? "success" : "warning"} title={testResult.sent ? "Test email sent" : "Test email failed"} message={testResult.message} />
@@ -183,20 +185,20 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
             <Banner tone="warning" title="Last email failed" message={failure} />
           ) : null}
 
-          <FieldRows>
-            <FieldRow label="Host" htmlFor="smtp-host" error={problems.host} hint="Your provider's SMTP server, for example smtp.gmail.com or smtp.sendgrid.net." fill>
+          <Fields>
+            <Field label="Host" htmlFor="smtp-host" error={problems.host} hint="Your provider's SMTP server, for example smtp.gmail.com or smtp.sendgrid.net.">
               <TextField id="smtp-host" fill value={draft.host} onChange={(value) => update("host", value)} placeholder="smtp.example.com" disabled={busy} invalid={Boolean(problems.host)} autoComplete="off" />
-            </FieldRow>
-            <FieldRow label="Security" htmlFor="smtp-security" hint="STARTTLS suits most providers. SSL/TLS is the older port 465. None is not encrypted." fill>
+            </Field>
+            <Field label="Security" htmlFor="smtp-security" hint="STARTTLS suits most providers. SSL/TLS is the older port 465. None is not encrypted.">
               <Select id="smtp-security" fill value={draft.security} options={SECURITY_OPTIONS} onChange={changeSecurity} disabled={busy} />
-            </FieldRow>
-            <FieldRow label="Port" htmlFor="smtp-port" error={problems.port} hint="Set for you by Security. Change it only if your provider says so." fill>
+            </Field>
+            <Field label="Port" htmlFor="smtp-port" error={problems.port} hint="Set for you by Security. Change it only if your provider says so.">
               <TextField id="smtp-port" fill value={draft.port} onChange={(value) => update("port", value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" disabled={busy} invalid={Boolean(problems.port)} />
-            </FieldRow>
-            <FieldRow label="Username" htmlFor="smtp-username" error={problems.username} hint="Often your full email address, or a word like apikey. Leave empty if your server needs no sign in." fill>
+            </Field>
+            <Field label="Username" htmlFor="smtp-username" error={problems.username} hint="Often your full email address, or a word like apikey. Leave empty if your server needs no sign in.">
               <TextField id="smtp-username" fill value={draft.username} onChange={(value) => update("username", value)} disabled={busy} autoComplete="off" />
-            </FieldRow>
-            <FieldRow label="Password" htmlFor="smtp-password" error={problems.password} hint="Stored encrypted and never shown again. Many providers want an app password or API key." fill>
+            </Field>
+            <Field label="Password" htmlFor="smtp-password" error={problems.password} hint="Stored encrypted and never shown again. Many providers want an app password or API key.">
               <TextField
                 id="smtp-password"
                 fill
@@ -208,41 +210,32 @@ export const EmailSettings: React.FC<EmailSettingsProps> = ({ siteId, stored, sa
                 invalid={Boolean(problems.password)}
                 autoComplete="new-password"
               />
-            </FieldRow>
-            <FieldRow label="From name" htmlFor="smtp-from-name" error={problems.fromName} hint="The sender name members see, usually your site's name." fill>
+            </Field>
+            <Field label="From name" htmlFor="smtp-from-name" error={problems.fromName} hint="The sender name members see, usually your site's name.">
               <TextField id="smtp-from-name" fill value={draft.fromName} onChange={(value) => update("fromName", value)} placeholder="Your site" disabled={busy} />
-            </FieldRow>
-            <FieldRow label="From address" htmlFor="smtp-from-address" error={problems.fromAddress} hint="An address your SMTP server is allowed to send from." fill>
+            </Field>
+            <Field label="From address" htmlFor="smtp-from-address" error={problems.fromAddress} hint="An address your SMTP server is allowed to send from.">
               <TextField id="smtp-from-address" type="email" fill value={draft.fromAddress} onChange={(value) => update("fromAddress", value)} placeholder="hello@yoursite.com" disabled={busy} invalid={Boolean(problems.fromAddress)} />
-            </FieldRow>
-            <FieldRow label="Reply-to" htmlFor="smtp-reply-to" error={problems.replyTo} hint="Optional. Where members' replies go, if not the From address." fill>
+            </Field>
+            <Field label="Reply-to" htmlFor="smtp-reply-to" error={problems.replyTo} hint="Optional. Where members' replies go, if not the From address.">
               <TextField id="smtp-reply-to" type="email" fill value={draft.replyTo} onChange={(value) => update("replyTo", value)} placeholder="Optional" disabled={busy} invalid={Boolean(problems.replyTo)} />
-            </FieldRow>
-          </FieldRows>
-
-          <div className="tier-form-cta">
-            <Button variant="secondary" size="md" className="fill" disabled={busy} onClick={() => void handleSave()}>
-              <Save aria-hidden={true} />
-              {saving ? "Saving" : enabled ? "Save SMTP settings" : "Save and turn on"}
-            </Button>
-          </div>
+            </Field>
+          </Fields>
 
           {enabled ? (
             <>
-              <FieldRows>
-                <FieldRow label="Test address" htmlFor="smtp-test-to" hint="Sends one email through your server only, with no fallback, so you see its real result." fill>
+              <Fields>
+                <Field label="Test address" htmlFor="smtp-test-to" hint="Sends one email through your server only, with no fallback, so you see its real result.">
                   <TextField id="smtp-test-to" type="email" fill value={testTo} onChange={setTestTo} placeholder="you@example.com" disabled={testing} />
-                </FieldRow>
-              </FieldRows>
-              <div className="tier-form-cta">
-                <Button variant="secondary" size="md" className="fill" disabled={testing || !EMAIL.test(testTo.trim())} onClick={() => void handleTest()}>
-                  <Send aria-hidden={true} />
-                  {testing ? "Sending" : "Send test email"}
-                </Button>
-              </div>
+                </Field>
+              </Fields>
+              <Button variant="secondary" size="md" full loading={testing} disabled={!EMAIL.test(testTo.trim())} onClick={() => void handleTest()}>
+                <Send aria-hidden={true} />
+                Send test email
+              </Button>
             </>
           ) : null}
-        </div>
+        </Sheet>
       ) : null}
     </article>
   );

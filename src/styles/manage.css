@@ -234,29 +234,6 @@
   color: var(--framer-color-text-tertiary);
 }
 
-/* --------------------------------------------------------------------------
-   3. ROW ACTION FLYOUT
-   -------------------------------------------------------------------------- */
-.member-flyout {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  width: 100%;
-  padding: var(--space-12);
-  box-sizing: border-box;
-  border: 1px solid var(--px-color-border-brand);
-  border-radius: var(--radius-14);
-  background: var(--px-color-bg-raised);
-  box-shadow: var(--px-shadow-card);
-}
-
-/* The member at a glance: initials, name, email, plan and status. */
-.member-flyout-head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-10);
-}
-
 .member-avatar {
   display: inline-flex;
   flex-shrink: 0;
@@ -270,51 +247,11 @@
   font: var(--text-body-strong);
 }
 
-.member-flyout-identity {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.member-flyout-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: var(--text-title-sm);
-  color: var(--framer-color-text);
-}
-
-.member-flyout-email {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: var(--text-body-sm);
-  color: var(--framer-color-text-secondary);
-}
-
-.member-flyout-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
 /* Send magic link and Revoke or Restore, side by side. */
 .member-flyout-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-6);
-}
-
-/* Delete last, apart from everything else. */
-.member-flyout-danger {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  padding-top: var(--space-12);
-  border-top: 1px solid var(--framer-color-divider);
 }
 
 .member-flyout-note {
@@ -418,39 +355,6 @@
   color: var(--framer-color-text-secondary);
 }
 
-.tier-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  padding: 12px;
-  box-sizing: border-box;
-  border: 1px solid var(--px-color-border-brand);
-  border-radius: var(--radius-14);
-  background: var(--px-color-bg-raised);
-  box-shadow: var(--px-shadow-card);
-}
-
-.tier-form-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.tier-form-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--framer-color-text);
-}
-
-.tier-form-cta,
 .tiers-cta {
   display: flex;
   flex-direction: column;
@@ -591,4 +495,16 @@
 .tier-features-actions {
   display: flex;
   gap: var(--space-8);
+}
+
+/* The member sheet's icon tile: their initials, as the row's avatar has them. */
+.member-sheet-initials {
+  font: var(--text-body-sm-strong);
+  color: var(--framer-color-text);
+}
+
+.member-flyout-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
 }

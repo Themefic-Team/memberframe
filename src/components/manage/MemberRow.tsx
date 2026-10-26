@@ -47,7 +47,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({ member, selected, onSelect
     type="button"
     className={cn("member-row", selected && "is-selected")}
     onClick={() => onSelect(member)}
-    aria-expanded={selected}
+    aria-haspopup="dialog"
   >
     <span className="member-row-avatar">
       <MemberAvatar url={member.avatarUrl} />

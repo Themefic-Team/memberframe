@@ -46,19 +46,21 @@ const render = (over: Partial<SiteMemberRecord> = {}, fields: CustomFieldDefinit
 describe("the member panel", () => {
   it("shows the member at a glance: initials, name, email, plan, and status", () => {
     const html = render();
-    expect(html).toContain('<span class="member-avatar" aria-hidden="true">SR</span>');
+    // In a sheet now (2026-10-25): the initials in its icon tile, the name as its title.
+    expect(html).toContain('<span class="member-sheet-initials">SR</span>');
+    expect(html).toContain('role="dialog"');
     expect(html).toContain("sydur@example.com");
     expect(html).toMatch(/class="badge badge-success">Active</);
   });
 
-  it("puts the two everyday actions side by side, and Delete last, as a danger button", () => {
+  it("puts the two everyday actions side by side, and Delete in the sheet's footer, as a danger button", () => {
     const html = render();
     const actions = html.slice(html.indexOf("member-flyout-actions"), html.indexOf("Sign-in methods"));
     expect(actions).toContain("Send magic link");
     expect(actions).toContain("Revoke access");
     expect(actions).not.toContain("Delete member");
-    const danger = html.slice(html.indexOf("member-flyout-danger"));
-    expect(danger).toMatch(/class="btn btn-danger btn-md fill"[^>]*>.*Delete member/);
+    const footer = html.slice(html.indexOf("kit-sheet-footer"));
+    expect(footer).toMatch(/class="btn btn-danger btn-md"[^>]*>.*Delete member/);
   });
 
   it("lists profile answers, and names the unanswered in one line", () => {

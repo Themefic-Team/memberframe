@@ -68,6 +68,14 @@ describe("design lint, glass", () => {
   });
 });
 
+describe("design lint, forms", () => {
+  it("rejects a FieldRow", () => {
+    const bad = lint({ "components/settings/Form.tsx": 'export const A = () => <FieldRow label="Name"><input /></FieldRow>;\n' });
+    expect(bad.code).toBe(1);
+    expect(bad.out).toContain("FieldRow, use <Field>");
+  });
+});
+
 describe("design lint, loading", () => {
   it("rejects loading text in a panel component, and accepts a skeleton's label", () => {
     const bad = lint({ "components/manage/Panel.tsx": 'export const A = () => <p className="x">Loading payments.</p>;\n' });

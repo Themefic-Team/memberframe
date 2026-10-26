@@ -88,3 +88,7 @@ OAuth refusal reasons (in #mf_oauth_error): email_unverified_link, github_email_
 - [ ] Sign in with GitHub on the same email: one member, two linked lines.
 - [ ] A Discord account with an unverified email that matches an existing member: refused, with the message.
 - [ ] Apple sign in still works after the code exchange change.
+
+## 8. Settings Open In A Sheet, 2026-10-25
+
+Following the Framefic UI kit (design-system.md v0.5.0), a provider's card in Settings, Integration no longer expands in place. The card keeps its status badge and its enable toggle; clicking it opens the provider's fields in a kit `Sheet`, a centered dialog (label on top, help in an info tip beside it, Save settings pinned in the footer). One sheet is open at a time, through `IntegrationPanel`'s `openId`. Closing discards unsaved edits.

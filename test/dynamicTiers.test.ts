@@ -52,15 +52,16 @@ describe("one site currency in the panel", () => {
     expect(editor).toContain("label={`${label}, ${currency}`}");
   });
 
-  it("opens each tier in its own card, like a payment gateway, not under the list", () => {
-    expect(editor).toContain('className={cn("integration-card", open && "is-open")}');
-    expect(editor).toContain("const open = draft !== null && draft.id === tier.id;");
-    expect(editor).toContain("{open && draft ? form(draft) : null}");
-    // One card open at a time: opening another replaces the draft.
-    expect(editor).toContain("current?.id === tier.id ? null : draftFromRecord(tier, currency)");
+  it("opens each tier, and a new one, in a sheet, like a payment gateway", () => {
+    expect(editor).toContain('aria-haspopup="dialog"');
+    expect(editor).not.toContain("aria-expanded");
+    expect(editor).toContain("setDraft(draftFromRecord(tier, currency));");
+    // One sheet at a time: the one draft drives it.
+    expect(editor).toMatch(/\{draft \? \(\s*<TierSheet/);
+    expect(editor).toContain("<Sheet");
   });
 
-  it("closes the card after a save, so the saved tier is never checked against itself", () => {
+  it("closes the sheet after a save, so the saved tier is never checked against itself", () => {
     // The bug: a created tier stayed open, the list reloaded with it, and the
     // form said its own name was taken.
     expect(editor).toMatch(/if \(await onSave\(draft\)\) \{\s*setDraft\(null\);/);
@@ -68,17 +69,18 @@ describe("one site currency in the panel", () => {
   });
 
   it("deletes a saved paid tier only after the popup, and never the Free tier", () => {
-    expect(editor).toContain('open.id !== null && open.kind === "paid"');
+    expect(editor).toContain('draft.id !== null && draft.kind === "paid"');
     expect(editor).toContain("onClick={() => setConfirmDelete(true)}");
     expect(editor).toContain("<ConfirmDialog");
   });
 
-  it("keeps the full-width save on its own row, so Delete and Cancel stay visible", () => {
-    // .primary-cta is 100% wide; in one row it pushed the other two out.
-    const actions = editor.slice(editor.indexOf('<div className="integration-card-actions">'), editor.indexOf('<div className="tier-form-cta">'));
-    expect(actions).toContain("Delete tier");
-    expect(actions).toContain("Cancel");
-    expect(actions).not.toContain('variant="primary"');
+  it("pins Delete tier and the save in the sheet's footer, the save busy while saving", () => {
+    const footer = editor.slice(editor.indexOf("footer={"), editor.indexOf("<Fields>"));
+    expect(footer).toContain("Delete tier");
+    expect(footer).toContain('variant="primary"');
+    expect(footer).toContain("loading={saving}");
+    // A save in flight cannot be dismissed half done.
+    expect(editor).toContain("onClose={saving ? undefined : onClose}");
   });
 
   it("sets the site currency in Payments, searchable, with a warning before it moves every tier", () => {
