@@ -65,11 +65,12 @@ describe("the component is standalone", () => {
   it("imports only what the Framer runtime supplies", () => {
     // A relative import resolves here and typechecks here, then fails on the
     // creator's published site where this file sits alone in their project.
-    expect(specifiers.sort()).toEqual(["framer", "lucide-react", "react"]);
+    // `react-dom` is Framer's own, for the modal's portal, as Protected Download uses it.
+    expect(specifiers.sort()).toEqual(["framer", "lucide-react", "react", "react-dom"]);
   });
 
   it("found some imports, so the match is not vacuously empty", () => {
-    expect(specifiers.length).toBe(3);
+    expect(specifiers.length).toBe(4);
   });
 });
 
@@ -341,14 +342,17 @@ describe("the component is safe by construction", () => {
     }
   });
 
-  it("draws the brand marks as SVG, never a raster: Google's four-colour G, the others in the button's colour", () => {
+  it("draws the brand marks as SVG, never a raster: Google's full-colour G, the others in the button's colour", () => {
     // A documented deviation: the icon rule says stroke=currentColor, Lucide
     // carries no brand marks, and a brand glyph is a filled shape rather than a
-    // line. Google's guidelines allow only its four-colour G.
+    // line. Google's G is public/google-icon.svg, its gradient G, in full colour.
     const marks = code.match(/fill="currentColor"/g) ?? [];
 
     expect(marks.length).toBe(3);
-    for (const colour of ["#EA4335", "#4285F4", "#FBBC05", "#34A853"]) expect(code).toContain(`fill="${colour}"`);
+    expect(code).toContain('fill="#3086FF"');
+    for (const paint of ["paint0_radial", "paint3_radial", "paint7_linear"]) {
+      expect(code).toContain(`fill="url(#memberframe-google-${paint})"`);
+    }
     expect(code).not.toContain("<img");
     expect(code).not.toMatch(/url\(data:image/);
   });
@@ -380,6 +384,7 @@ describe("the property controls", () => {
     "modalDelay",
     "modalScrollPercent",
     "modalOncePerSession",
+    "modalCanvasPreview",
     "headline",
     "welcomeMessage",
     "emailEnabled",
@@ -938,9 +943,41 @@ describe("modal triggers (05-member-auth.md)", () => {
     expect(code).toContain('className="memberframe-auth-close" aria-label="Close" onClick={closeModal}');
   });
 
-  it("is always shown on the canvas, and draws nothing on a page until it opens", () => {
+  it("is always shown on the canvas, and draws only an empty anchor on a page until it opens", () => {
     expect(code).toContain("const showCard = !isModal || onCanvas || modalOpen;");
-    expect(code).toContain("if (!showCard) return null;");
+    expect(code).toContain("if (!isModal || onCanvas) return root;");
+    expect(code).toContain('<span ref={anchorRef} className="memberframe-auth-anchor" aria-hidden={true} />');
+    expect(code).not.toContain("if (!showCard) return null;");
+  });
+});
+
+describe("a popup kept in a shared menu (05-member-auth.md 11.6)", () => {
+  it("renders the open popup into the page's body, out of the menu's box", () => {
+    expect(source).toContain('import { createPortal } from "react-dom";');
+    expect(code).toContain('showCard && typeof document !== "undefined" ? createPortal(root, document.body) : null');
+  });
+
+  it("opens one popup per trigger, from a copy that is showing", () => {
+    expect(code).toContain('const MODAL_REGISTRY_KEY = "__memberframeModals";');
+    expect(code).toContain("if (!isShowing(anchorRef.current)) return false;");
+    expect(code).toContain("if (!claimModal(modalKey)) return false;");
+    // Every way of opening goes through openModal: click, hash, load, scroll.
+    expect(code.match(/setModalOpen\(true\)/g)?.length).toBe(1);
+    expect(code).toMatch(/event\.stopPropagation\(\);\s*openModal\(\);/);
+    expect(code).toContain('if (window.location.hash === "#" + id) openModal();');
+    expect(code).toContain("if (!openModal()) return;");
+  });
+
+  it("frees the trigger on close and when the copy goes away", () => {
+    expect(code).toMatch(/const closeModal = useCallback\(\(\) => \{\s*if \(heldKey\.current\) \{\s*releaseModal\(heldKey\.current\);/);
+    expect(code).toContain("if (heldKey.current) releaseModal(heldKey.current);");
+  });
+
+  it("can draw a chip on the canvas in place of the card", () => {
+    expect(code).toContain("if (isModal && onCanvas && !modalCanvasPreview) {");
+    expect(normalizeAuthConfig(config()).modalCanvasPreview).toBe(true);
+    expect(normalizeAuthConfig(config({ modalCanvasPreview: false })).modalCanvasPreview).toBe(false);
+    expect(normalizeAuthConfig(config({ modalCanvasPreview: undefined as never })).modalCanvasPreview).toBe(true);
   });
 });
 

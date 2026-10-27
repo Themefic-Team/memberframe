@@ -44,6 +44,8 @@ export interface MemberAuthConfig {
   modalScrollPercent: number;
   /** On Page Load and On Scroll: once per visit. */
   modalOncePerSession: boolean;
+  /** Modal only: false draws a chip on the canvas, for a popup kept in a menu. */
+  modalCanvasPreview: boolean;
   headline: string;
   welcomeMessage: string;
   emailEnabled: boolean;
@@ -97,6 +99,7 @@ export const DEFAULT_MEMBER_AUTH_CONFIG: MemberAuthConfig = {
   modalDelay: 0,
   modalScrollPercent: 50,
   modalOncePerSession: true,
+  modalCanvasPreview: true,
   headline: "Sign in to continue",
   welcomeMessage: "Use your email or a connected account.",
   emailEnabled: true,

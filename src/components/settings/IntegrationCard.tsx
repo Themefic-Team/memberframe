@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Check, ChevronRight, Copy, CreditCard, Eye, EyeOff, Plug } from "lucide-react";
+import { Check, ChevronRight, Copy, Eye, EyeOff, Plug } from "lucide-react";
 import { Badge, Banner, Button, Field, Fields, IconButton, Sheet, TextField, Toggle } from "../ui";
 import { cn } from "../../utils/cn";
-import { ProviderMark } from "../providerMarks";
+import { BrandLogo, isBrandLogoId } from "../providerMarks";
 import { API_BASE_URL } from "../../config/backend";
 import { SETUP_GUIDES, type SetupGuideId } from "../../config/branding";
 import { checkKey, keyProblemMessage } from "./gatewayKeys";
@@ -36,22 +36,8 @@ export interface IntegrationCardProps {
 }
 
 function getIntegrationIcon(id: string) {
-  switch (id) {
-    case "google_oauth":
-      return <ProviderMark provider="google" />;
-    case "github_oauth":
-      return <ProviderMark provider="github" />;
-    case "apple_oauth":
-      return <ProviderMark provider="apple" />;
-    case "discord_oauth":
-      return <ProviderMark provider="discord" />;
-    case "stripe":
-    case "lemonsqueezy":
-    case "razorpay":
-      return <CreditCard aria-hidden={true} />;
-    default:
-      return <Plug aria-hidden={true} />;
-  }
+  const brand = id.replace(/_oauth$/, "");
+  return isBrandLogoId(brand) ? <BrandLogo brand={brand} /> : <Plug aria-hidden={true} />;
 }
 
 /** The setup guide for a provider's sheet, when it has one. */
@@ -188,7 +174,7 @@ export const IntegrationCard: React.FC<IntegrationCardProps> = ({
       >
         <div className="integration-card-bar-left">
           <span className="integration-card-icon">
-            {configured ? <Check aria-hidden={true} /> : getIntegrationIcon(definition.id)}
+            {getIntegrationIcon(definition.id)}
           </span>
           <span className="integration-card-title">{definition.name}</span>
           {statusBadge}

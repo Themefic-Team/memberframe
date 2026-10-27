@@ -4,8 +4,8 @@
  * ## This file leaves the repository
  *
  * It is written into the creator's Framer project and runs on
- * their published site, it may import only `react`, `framer`, and
- * `lucide-react`, all styling is one `cssContent` string, and the marked config
+ * their published site, it may import only `react`, `react-dom` (for the
+ * modal's portal), `framer`, and `lucide-react`, all styling is one `cssContent` string, and the marked config
  * block is the only part the generator rewrites.
  *
  * ## Two things make this riskier than most components
@@ -35,6 +35,7 @@
  */
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
 import {
   ArrowLeft,
@@ -761,6 +762,7 @@ interface AuthConfig {
   modalDelay: number;
   modalScrollPercent: number;
   modalOncePerSession: boolean;
+  modalCanvasPreview: boolean;
   headline: string;
   welcomeMessage: string;
   emailEnabled: boolean;
@@ -823,6 +825,7 @@ const CONFIG: AuthConfig = {
   modalDelay: 0,
   modalScrollPercent: 50,
   modalOncePerSession: true,
+  modalCanvasPreview: true,
   headline: "Sign in to continue",
   welcomeMessage: "Use your email or a connected account.",
   emailEnabled: true,
@@ -1661,6 +1664,28 @@ const cssContent = `
   position: relative;
 }
 
+/* Show On Canvas: No. A chip on the canvas in place of the popup's card. */
+.memberframe-auth-root.is-chip {
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.memberframe-auth-chip {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 4px 10px;
+  overflow: hidden;
+  border: 1px dashed var(--memberframe-auth-border);
+  border-radius: 999px;
+  background: var(--memberframe-auth-surface);
+  color: var(--memberframe-auth-body);
+  font-size: calc(12px * var(--mf-text-scale, 1));
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .memberframe-auth-close {
   position: absolute;
   top: 10px;
@@ -2122,8 +2147,9 @@ const cssContent = `
 // ============================================================================
 // PROVIDER MARKS
 // ============================================================================
-// Google's four-colour G (its guidelines allow no other); the rest use
-// `fill="currentColor"`, the button's text colour. Lucide has no brand marks,
+// The glyphs of the logo files in `public/` (`<name>-icon.svg`). Google's G
+// keeps its full colour; the rest use `fill="currentColor"`, the button's text
+// colour, so each stays legible on its own brand fill. Lucide has no brand marks,
 // so these are filled SVG paths, never an emoji or a raster.
 //
 // Each provider publishes brand guidelines governing how its mark may appear on
@@ -2132,34 +2158,179 @@ const cssContent = `
 
 const PROVIDER_MARKS: Record<OAuthProvider, React.ReactNode> = {
   google: (
-    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false" data-brand="google">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    <svg viewBox="0 0 40 41" aria-hidden="true" focusable="false" data-brand="google">
+      <mask id="memberframe-google-mask0" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="41">
+      <path d="M39.146 16.4248H20.1838V24.1781H31.0796C30.9044 25.2753 30.5111 26.3547 29.9352 27.339C29.2753 28.4667 28.4595 29.3252 27.6234 29.979C25.1187 31.9375 22.1985 32.3379 20.1706 32.3379C15.0476 32.3379 10.6703 28.9593 8.97579 24.3684C8.90741 24.2018 8.862 24.0297 8.8067 23.8596C8.43225 22.6911 8.22765 21.4536 8.22765 20.1674C8.22765 18.8288 8.44921 17.5474 8.85317 16.3373C10.4466 11.5643 14.9225 7.99933 20.1742 7.99933C21.2306 7.99933 22.2478 8.12763 23.2124 8.38354C25.417 8.96838 26.9764 10.1202 27.932 11.0313L33.6976 5.26967C30.1904 1.98832 25.6184 4.96116e-09 20.1647 4.96116e-09C15.8047 -9.57542e-05 11.7794 1.38605 8.48088 3.72869C5.80583 5.62851 3.61192 8.17212 2.13129 11.1262C0.7541 13.8653 0 16.9007 0 20.1644C0 23.4282 0.755253 26.4951 2.13245 29.2089V29.2272C3.58711 32.1082 5.71432 34.5888 8.29972 36.4799C10.5583 38.1319 14.6083 40.3322 20.1647 40.3322C23.36 40.3322 26.1919 39.7444 28.6894 38.6427C30.4911 37.848 32.0874 36.8114 33.5327 35.4792C35.4423 33.719 36.9379 31.5417 37.9587 29.0367C38.9795 26.5316 39.5256 23.6989 39.5256 20.6277C39.5256 19.1974 39.3848 17.7449 39.146 16.4247V16.4248Z" fill="white" />
+      </mask>
+      <g mask="url(#memberframe-google-mask0)">
+      <g filter="url(#memberframe-google-filter0_f)">
+      <path d="M-0.290771 20.3013C-0.269812 23.5136 0.62721 26.8278 1.985 29.5033V29.5218C2.96607 31.4648 4.30691 32.9996 5.83411 34.5204L15.058 31.0861C13.3129 30.1815 13.0466 29.6273 11.7956 28.6159C10.5173 27.3005 9.5645 25.7905 8.97115 24.0199H8.94724L8.97115 24.0015C8.58079 22.8322 8.54229 21.5911 8.52789 20.3013H-0.290771Z" fill="url(#memberframe-google-paint0_radial)" />
+      </g>
+      <g filter="url(#memberframe-google-filter1_f)">
+      <path d="M20.1839 -0.146729C19.2722 3.12152 19.6208 6.29835 20.1839 8.14678C21.2366 8.14758 22.2508 8.27563 23.2125 8.53075C25.417 9.11559 26.9763 10.2675 27.9318 11.1786L33.8451 5.26971C30.3421 1.99228 26.1264 -0.141565 20.1839 -0.146729Z" fill="url(#memberframe-google-paint1_radial)" />
+      </g>
+      <g filter="url(#memberframe-google-filter2_f)">
+      <path d="M20.1641 -0.172607C15.6923 -0.172706 11.5637 1.24903 8.18043 3.65181C6.92422 4.54397 5.77143 5.57455 4.74494 6.72059C4.47603 9.2949 6.75798 12.459 11.277 12.4328C13.4695 9.83028 16.7123 8.14646 20.3215 8.14646C20.3248 8.14646 20.328 8.14673 20.3313 8.14675L20.1839 -0.172019C20.1772 -0.172023 20.1708 -0.172607 20.1641 -0.172607Z" fill="url(#memberframe-google-paint2_radial)" />
+      </g>
+      <g filter="url(#memberframe-google-filter3_f)">
+      <path d="M34.9237 21.2328L30.9323 24.0308C30.7571 25.1281 30.3636 26.2075 29.7876 27.1917C29.1277 28.3194 28.312 29.178 27.4759 29.8318C24.9763 31.7862 22.064 32.1886 20.0365 32.1903C17.9409 35.8323 17.5735 37.6565 20.1839 40.5959C23.4139 40.5935 26.2775 39.9985 28.8034 38.8844C30.6293 38.079 32.2469 37.0285 33.7115 35.6784C35.6468 33.8945 37.1627 31.6879 38.1972 29.1493C39.2317 26.6107 39.7849 23.7401 39.7849 20.6277L34.9237 21.2328Z" fill="url(#memberframe-google-paint3_radial)" />
+      </g>
+      <g filter="url(#memberframe-google-filter4_f)">
+      <path d="M19.8892 16.1301V24.4725H39.0929C39.2618 23.33 39.8204 21.8515 39.8204 20.6276C39.8204 19.1973 39.6797 17.4503 39.441 16.1301H19.8892Z" fill="#3086FF" />
+      </g>
+      <g filter="url(#memberframe-google-filter5_f)">
+      <path d="M4.83653 6.42603C3.65145 7.74911 2.63904 9.23003 1.83632 10.8316C0.459145 13.5707 -0.294922 16.9006 -0.294922 20.1643C-0.294922 20.2103 -0.291192 20.2553 -0.290891 20.3012C0.319016 21.4945 8.13387 21.266 8.52777 20.3012C8.52727 20.2562 8.5223 20.2123 8.5223 20.1672C8.5223 18.8286 8.74393 17.8419 9.14789 16.6317C9.64624 15.139 10.4265 13.7644 11.4243 12.58C11.6505 12.2853 12.2538 11.6519 12.4298 11.2719C12.4969 11.1272 12.3081 11.046 12.2976 10.995C12.2858 10.938 12.0326 10.9839 11.9759 10.9414C11.7959 10.8067 11.4394 10.7363 11.2229 10.6737C10.7601 10.54 9.99326 10.2452 9.56731 9.93957C8.22089 8.97348 6.11969 7.8195 4.83653 6.42603Z" fill="url(#memberframe-google-paint4_radial)" />
+      </g>
+      <g filter="url(#memberframe-google-filter6_f)">
+      <path d="M9.5963 11.0007C12.7185 12.9305 13.6164 10.0266 15.6922 9.11782L12.0812 1.47681C10.7529 2.04649 9.49794 2.75427 8.3335 3.58125C6.59451 4.81628 5.05884 6.32337 3.79028 8.03846L9.5963 11.0007Z" fill="url(#memberframe-google-paint5_radial)" />
+      </g>
+      <g filter="url(#memberframe-google-filter7_f)">
+      <path d="M10.8669 30.4958C6.67573 32.0398 6.01958 32.0951 5.63379 34.7455C6.37102 35.4796 7.16313 36.1587 8.00486 36.7744C10.2635 38.4265 14.6081 40.6268 20.1645 40.6268C20.171 40.6268 20.1772 40.6262 20.1838 40.6262V32.0431C20.1796 32.0431 20.1747 32.0433 20.1705 32.0433C18.0899 32.0433 16.4272 31.4857 14.7225 30.5159C14.3021 30.2769 13.5396 30.9189 13.1519 30.6319C12.6173 30.236 11.3306 30.9729 10.8669 30.4958Z" fill="url(#memberframe-google-paint6_radial)" />
+      </g>
+      <g opacity="0.5" filter="url(#memberframe-google-filter8_f)">
+      <path d="M17.7292 31.7727V40.4775C18.5067 40.5704 19.3158 40.6268 20.1645 40.6268C21.0154 40.6268 21.8385 40.5822 22.6383 40.5002V31.8314C21.742 31.9877 20.8978 32.0434 20.1706 32.0434C19.333 32.0434 18.5185 31.9439 17.7292 31.7727Z" fill="url(#memberframe-google-paint7_linear)" />
+      </g>
+      </g>
+      <defs>
+      <filter id="memberframe-google-filter0_f" x="-0.760851" y="19.8312" width="16.2888" height="15.1592" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter1_f" x="19.1532" y="-0.616808" width="15.1621" height="12.2654" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter2_f" x="4.25355" y="-0.642687" width="16.5478" height="13.5456" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter3_f" x="17.8744" y="20.1576" width="22.3806" height="20.9084" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter4_f" x="19.4191" y="15.66" width="20.8713" height="9.28244" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter5_f" x="-0.765001" y="5.95595" width="13.6794" height="15.6269" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter6_f" x="0.485433" y="-1.82804" width="18.5116" height="16.7823" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="1.65243" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter7_f" x="5.16371" y="29.9913" width="15.4902" height="11.1054" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <filter id="memberframe-google-filter8_f" x="17.2592" y="31.3026" width="5.84934" height="9.79416" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="0.23504" result="effect1_foregroundBlur" />
+      </filter>
+      <radialGradient id="memberframe-google-paint0_radial" cx="0" cy="0" r="1" gradientTransform="matrix(-0.821344 -20.0853 29.5307 -1.2053 14.8733 34.2177)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.141612" stopColor="#1ABD4D" />
+      <stop offset="0.247515" stopColor="#6EC30D" />
+      <stop offset="0.311547" stopColor="#8AC502" />
+      <stop offset="0.366013" stopColor="#A2C600" />
+      <stop offset="0.445673" stopColor="#C8C903" />
+      <stop offset="0.540305" stopColor="#EBCB03" />
+      <stop offset="0.615636" stopColor="#F7CD07" />
+      <stop offset="0.699345" stopColor="#FDCD04" />
+      <stop offset="0.771242" stopColor="#FDCE05" />
+      <stop offset="0.860566" stopColor="#FFCE0A" />
+      </radialGradient>
+      <radialGradient id="memberframe-google-paint1_radial" cx="0" cy="0" r="1" gradientTransform="matrix(13.9487 -3.42079e-05 -1.96054e-05 17.997 33.2919 10.751)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.408458" stopColor="#FB4E5A" />
+      <stop offset="1" stopColor="#FF4540" />
+      </radialGradient>
+      <radialGradient id="memberframe-google-paint2_radial" cx="0" cy="0" r="1" gradientTransform="matrix(-19.5431 10.8139 14.6883 26.4949 25.6745 -2.77774)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.231273" stopColor="#FF4541" />
+      <stop offset="0.311547" stopColor="#FF4540" />
+      <stop offset="0.457516" stopColor="#FF4640" />
+      <stop offset="0.540305" stopColor="#FF473F" />
+      <stop offset="0.699346" stopColor="#FF5138" />
+      <stop offset="0.771242" stopColor="#FF5B33" />
+      <stop offset="0.860566" stopColor="#FF6C29" />
+      <stop offset="1" stopColor="#FF8C18" />
+      </radialGradient>
+      <radialGradient id="memberframe-google-paint3_radial" cx="0" cy="0" r="1" gradientTransform="matrix(-35.442 -46.222 -17.0778 13.0702 20.4744 37.9855)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.131546" stopColor="#0CBA65" />
+      <stop offset="0.209784" stopColor="#0BB86D" />
+      <stop offset="0.297297" stopColor="#09B479" />
+      <stop offset="0.396257" stopColor="#08AD93" />
+      <stop offset="0.477124" stopColor="#0AA6A9" />
+      <stop offset="0.568425" stopColor="#0D9CC6" />
+      <stop offset="0.667385" stopColor="#1893DD" />
+      <stop offset="0.768727" stopColor="#258BF1" />
+      <stop offset="0.858506" stopColor="#3086FF" />
+      </radialGradient>
+      <radialGradient id="memberframe-google-paint4_radial" cx="0" cy="0" r="1" gradientTransform="matrix(-2.50815 21.5982 29.8914 3.46468 18.4519 3.6366)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.366013" stopColor="#FF4E3A" />
+      <stop offset="0.457516" stopColor="#FF8A1B" />
+      <stop offset="0.540305" stopColor="#FFA312" />
+      <stop offset="0.615636" stopColor="#FFB60C" />
+      <stop offset="0.771242" stopColor="#FFCD0A" />
+      <stop offset="0.860566" stopColor="#FECF0A" />
+      <stop offset="0.915033" stopColor="#FECF08" />
+      <stop offset="1" stopColor="#FDCD01" />
+      </radialGradient>
+      <radialGradient id="memberframe-google-paint5_radial" cx="0" cy="0" r="1" gradientTransform="matrix(-7.24986 8.01061 -22.6156 -20.4293 14.9249 3.41251)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.315904" stopColor="#FF4C3C" />
+      <stop offset="0.603818" stopColor="#FF692C" />
+      <stop offset="0.726837" stopColor="#FF7825" />
+      <stop offset="0.884534" stopColor="#FF8D1B" />
+      <stop offset="1" stopColor="#FF9F13" />
+      </radialGradient>
+      <radialGradient id="memberframe-google-paint6_radial" cx="0" cy="0" r="1" gradientTransform="matrix(-19.5431 -10.8139 14.6883 -26.4949 25.6744 43.1093)" gradientUnits="userSpaceOnUse">
+      <stop offset="0.231273" stopColor="#0FBC5F" />
+      <stop offset="0.311547" stopColor="#0FBC5F" />
+      <stop offset="0.366013" stopColor="#0FBC5E" />
+      <stop offset="0.457516" stopColor="#0FBC5D" />
+      <stop offset="0.540305" stopColor="#12BC58" />
+      <stop offset="0.699346" stopColor="#28BF3C" />
+      <stop offset="0.771242" stopColor="#38C02B" />
+      <stop offset="0.860566" stopColor="#52C218" />
+      <stop offset="0.915033" stopColor="#67C30F" />
+      <stop offset="1" stopColor="#86C504" />
+      </radialGradient>
+      <linearGradient id="memberframe-google-paint7_linear" x1="17.7292" y1="36.1997" x2="22.6383" y2="36.1997" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#0FBC5C" />
+      <stop offset="1" stopColor="#0CBA65" />
+      </linearGradient>
+      </defs>
     </svg>
   ),
   apple: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-brand="apple">
+    <svg viewBox="0 0 36 44" aria-hidden="true" focusable="false" data-brand="apple">
       <path
         fill="currentColor"
-        d="M16.3 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.2-2.9.9-3.7.9-.8 0-2-.8-3.2-.8-1.7 0-3.4 1.4-3.4 4 0 1.6.6 3.3 1.4 4.4.7 1 1.4 1.9 2.4 1.9.9 0 1.3-.6 2.5-.6s1.5.6 2.5.6c1 0 1.7-.9 2.4-1.9.5-.8.8-1.5 1-1.9-1.9-.7-2.1-2.5-2.1-3.3zM14.3 6c.6-.7 1-1.6.9-2.6-.9.1-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.5 1 .1 2-.5 2.5-1.2z"
+        d="M34.8723 15.0118C31.9229 16.8235 30.1012 19.9294 30.1012 23.3804C30.1012 27.2627 32.4434 30.8 36 32.2667C35.306 34.5098 34.2651 36.5804 32.9639 38.4784C31.0554 41.1529 29.0602 43.9137 26.1108 43.9137C23.1614 43.9137 22.294 42.1882 18.8241 42.1882C15.441 42.1882 14.2265 44 11.4506 44C8.6747 44 6.76627 41.498 4.59759 38.3922C1.73494 34.0784 0.086747 29.0745 0 23.8118C0 15.2706 5.55181 10.698 11.1036 10.698C14.053 10.698 16.4819 12.5961 18.3036 12.5961C20.0386 12.5961 22.8145 10.6118 26.1108 10.6118C29.5807 10.5255 32.8771 12.1647 34.8723 15.0118ZM24.5494 6.98824C26.0241 5.26275 26.8048 3.10588 26.8916 0.862745C26.8916 0.603922 26.8916 0.258824 26.8048 0C24.2892 0.258824 21.947 1.46667 20.2988 3.36471C18.8241 5.00392 17.9566 7.07451 17.8699 9.31765C17.8699 9.57647 17.8699 9.83529 17.9566 10.0941C18.1301 10.0941 18.3904 10.1804 18.5639 10.1804C20.906 10.0078 23.0747 8.8 24.5494 6.98824Z"
       />
     </svg>
   ),
   github: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-brand="github">
+    <svg viewBox="0 0 40 39" aria-hidden="true" focusable="false" data-brand="github">
       <path
         fill="currentColor"
-        d="M12 2a10 10 0 00-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.8-4.6 5 .4.3.7 1 .7 2v2.9c0 .3.2.6.7.5A10 10 0 0012 2z"
+        d="M16.7135 27.9844C11.6183 27.3668 8.02862 23.6999 8.02862 18.9522C8.02862 17.0223 8.72342 14.9379 9.8814 13.5483C9.37962 12.2746 9.45682 9.57261 10.0358 8.45323C11.5797 8.26024 13.6641 9.0708 14.8993 10.1902C16.3661 9.72701 17.91 9.49542 19.8014 9.49542C21.6928 9.49542 23.2367 9.72701 24.6263 10.1516C25.8229 9.0708 27.9458 8.26024 29.4898 8.45323C30.0302 9.49542 30.1074 12.1974 29.6056 13.5097C30.8408 14.9765 31.4969 16.9451 31.4969 18.9522C31.4969 23.6999 27.9072 27.2896 22.7349 27.9458C24.0473 28.795 24.9351 30.6478 24.9351 32.7707V36.7851C24.9351 37.943 25.9001 38.5992 27.0581 38.136C34.0445 35.4727 39.5256 28.4862 39.5256 19.84C39.5256 8.91641 30.6478 9.62484e-08 19.7242 0C8.80062 -9.62484e-08 9.62489e-08 8.91641 0 19.84C-7.55023e-08 28.409 5.44247 35.5113 12.7763 38.1746C13.8185 38.5606 14.8221 37.8658 14.8221 36.8237V33.7357C14.2817 33.9673 13.5869 34.1217 12.9693 34.1217C10.4218 34.1217 8.91641 32.7322 7.83563 30.146C7.41105 29.1038 6.94787 28.4862 6.06008 28.3704C5.5969 28.3318 5.44247 28.1388 5.44247 27.9072C5.44247 27.444 6.21447 27.0966 6.98647 27.0966C8.10585 27.0966 9.0708 27.7915 10.0744 29.2196C10.8464 30.339 11.6569 30.8408 12.6219 30.8408C13.5869 30.8408 14.2045 30.4934 15.0923 29.6056C15.7485 28.9494 16.2503 28.3704 16.7135 27.9844Z"
       />
     </svg>
   ),
   discord: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-brand="discord">
+    <svg viewBox="0 0 40 31" aria-hidden="true" focusable="false" data-brand="discord">
       <path
         fill="currentColor"
-        d="M19.3 5.6A16 16 0 0015.2 4.3l-.3.7a12 12 0 00-5.8 0l-.3-.7a16 16 0 00-4.1 1.3C2.2 9.3 1.5 12.9 1.9 16.4a16 16 0 004.8 2.4l.6-1a10 10 0 01-1.6-.8l.4-.3a11.4 11.4 0 009.8 0l.4.3c-.5.3-1 .6-1.6.8l.6 1a16 16 0 004.8-2.4c.5-4-.6-7.6-2.8-10.8zM8.7 14.3c-.9 0-1.7-.9-1.7-1.9s.8-1.9 1.7-1.9 1.7.9 1.7 1.9-.8 1.9-1.7 1.9zm6.6 0c-.9 0-1.7-.9-1.7-1.9s.8-1.9 1.7-1.9 1.7.9 1.7 1.9-.8 1.9-1.7 1.9z"
+        d="M33.4601 2.72663C30.9409 1.5707 28.2394 0.719062 25.4148 0.231294C25.3633 0.22188 25.312 0.245406 25.2855 0.292458C24.938 0.9104 24.5532 1.71655 24.2837 2.35019C21.2457 1.89537 18.2232 1.89537 15.2475 2.35019C14.978 1.70247 14.5792 0.9104 14.2302 0.292458C14.2037 0.246976 14.1523 0.22345 14.1008 0.231294C11.2778 0.717504 8.57633 1.56914 6.05554 2.72663C6.03372 2.73604 6.01502 2.75174 6.0026 2.77211C0.878443 10.4275 -0.525279 17.8947 0.16334 25.2694C0.166456 25.3054 0.186709 25.3399 0.214752 25.3619C3.59553 27.8446 6.87038 29.3519 10.0844 30.351C10.1359 30.3667 10.1904 30.3478 10.2231 30.3055C10.9834 29.2672 11.6611 28.1725 12.2422 27.0212C12.2765 26.9538 12.2437 26.8738 12.1737 26.8472C11.0987 26.4394 10.0751 25.9422 9.09044 25.3776C9.01256 25.3321 9.00632 25.2207 9.07797 25.1674C9.28517 25.0121 9.49243 24.8506 9.69028 24.6874C9.72608 24.6577 9.77596 24.6514 9.81805 24.6702C16.2867 27.6235 23.2897 27.6235 29.682 24.6702C29.7241 24.6498 29.774 24.6561 29.8113 24.6859C30.0092 24.849 30.2164 25.0121 30.4252 25.1674C30.4968 25.2207 30.4922 25.3321 30.4143 25.3776C29.4296 25.9531 28.406 26.4394 27.3295 26.8456C27.2594 26.8723 27.2282 26.9538 27.2625 27.0212C27.8561 28.1709 28.5338 29.2656 29.2801 30.3039C29.3112 30.3478 29.3673 30.3667 29.4187 30.351C32.6484 29.3519 35.9232 27.8446 39.304 25.3619C39.3336 25.3399 39.3523 25.307 39.3554 25.2709C40.1795 16.745 37.975 9.33904 33.5115 2.77367C33.5006 2.75174 33.4819 2.73604 33.4601 2.72663ZM13.2082 20.779C11.2607 20.779 9.65599 18.991 9.65599 16.7952C9.65599 14.5994 11.2296 12.8115 13.2082 12.8115C15.2023 12.8115 16.7915 14.6151 16.7603 16.7952C16.7603 18.991 15.1867 20.779 13.2082 20.779ZM26.3417 20.779C24.3943 20.779 22.7896 18.991 22.7896 16.7952C22.7896 14.5994 24.3631 12.8115 26.3417 12.8115C28.336 12.8115 29.9251 14.6151 29.8939 16.7952C29.8939 18.991 28.336 20.779 26.3417 20.779Z"
       />
     </svg>
   ),
@@ -2267,6 +2438,8 @@ export interface MemberAuthProps extends MfAppearanceProps {
   modalDelay?: number;
   modalScrollPercent?: number;
   modalOncePerSession?: boolean;
+  /** Modal only: No draws a small chip on the canvas, for a popup kept in a menu. */
+  modalCanvasPreview?: boolean;
 }
 
 type ModalTrigger = "click" | "load" | "scroll";
@@ -2283,6 +2456,45 @@ function isModalTrigger(target: EventTarget | null, id: string): boolean {
     node = node.parentElement;
   }
   return false;
+}
+
+/*
+  One popup per trigger, whichever copy of the component it comes from.
+
+  A popup placed in a shared Navigation component, a leftover copy on the page,
+  and the copies in hidden breakpoint variants all listen for the same click.
+  The first copy that is actually showing claims the trigger and opens; the
+  others see it taken and stay closed. The record is on `window`, not in this
+  module, because Member Auth and each dedicated screen are separate files.
+*/
+const MODAL_REGISTRY_KEY = "__memberframeModals";
+
+function modalRegistry(): Record<string, true> {
+  const host = window as unknown as Record<string, Record<string, true> | undefined>;
+  const existing = host[MODAL_REGISTRY_KEY];
+  if (existing && typeof existing === "object") return existing;
+  const created: Record<string, true> = {};
+  host[MODAL_REGISTRY_KEY] = created;
+  return created;
+}
+
+/** True if this copy may open the popup for `key`, which it now holds. */
+function claimModal(key: string): boolean {
+  const registry = modalRegistry();
+  if (registry[key]) return false;
+  registry[key] = true;
+  return true;
+}
+
+function releaseModal(key: string): void {
+  delete modalRegistry()[key];
+}
+
+/** False inside a hidden breakpoint variant (`display: none`) or a hidden layer. */
+function isShowing(anchor: HTMLElement | null): boolean {
+  if (!anchor || !anchor.isConnected) return false;
+  if (typeof anchor.checkVisibility === "function") return anchor.checkVisibility();
+  return anchor.getClientRects().length > 0;
 }
 
 /** Drawn here: Framer's bundled lucide-react may lack `X`. */
@@ -2334,6 +2546,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     modalDelay = CONFIG.modalDelay,
     modalScrollPercent = CONFIG.modalScrollPercent,
     modalOncePerSession = CONFIG.modalOncePerSession,
+    modalCanvasPreview = CONFIG.modalCanvasPreview,
     theme = "light",
     colors,
     typography,
@@ -2388,15 +2601,44 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   const isModal = authMode === "modal";
   const [modalOpen, setModalOpen] = useState(false);
   const showCard = !isModal || onCanvas || modalOpen;
+  const triggerId = String(modalTriggerId || "").trim().replace(/^#/, "");
+  const modalKey = triggerId || "auto-" + modalTrigger;
+  /** In place on the page, so a copy in a hidden breakpoint knows it is hidden. */
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  /** The trigger this copy holds in the shared registry while its popup is open. */
+  const heldKey = useRef<string | null>(null);
+
+  /** Opens only from a copy that is showing, and only one copy per trigger. */
+  const openModal = useCallback((): boolean => {
+    if (heldKey.current) return true;
+    if (!isShowing(anchorRef.current)) return false;
+    if (!claimModal(modalKey)) return false;
+    heldKey.current = modalKey;
+    setModalOpen(true);
+    return true;
+  }, [modalKey]);
 
   const closeModal = useCallback(() => {
+    if (heldKey.current) {
+      releaseModal(heldKey.current);
+      heldKey.current = null;
+    }
     setModalOpen(false);
     onClose?.();
   }, [onClose]);
 
+  // A copy removed while open (a page change) frees its trigger for the next.
+  useEffect(
+    () => () => {
+      if (heldKey.current) releaseModal(heldKey.current);
+      heldKey.current = null;
+    },
+    []
+  );
+
   useEffect(() => {
     if (!isModal || onCanvas || typeof window === "undefined") return;
-    const id = String(modalTriggerId || "").trim().replace(/^#/, "");
+    const id = triggerId;
     const entry = window.location.pathname + "|" + (id || modalTrigger);
     const signedIn = () => {
       try {
@@ -2418,12 +2660,13 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       if (signedIn()) return;
       const seen = shown();
       if (modalOncePerSession && seen.includes(entry)) return;
+      // Recorded only by the copy that opened, not by a hidden one that could not.
+      if (!openModal()) return;
       try {
         window.sessionStorage.setItem(MODAL_SHOWN_KEY, JSON.stringify([...seen, entry].slice(-50)));
       } catch {
         // Blocked storage only means it may show again.
       }
-      setModalOpen(true);
     };
 
     const cleanups: Array<() => void> = [];
@@ -2434,10 +2677,10 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
         if (!isModalTrigger(event.target, id)) return;
         event.preventDefault();
         event.stopPropagation();
-        setModalOpen(true);
+        openModal();
       };
       const onHash = () => {
-        if (window.location.hash === "#" + id) setModalOpen(true);
+        if (window.location.hash === "#" + id) openModal();
       };
       document.addEventListener("click", onClick, true);
       window.addEventListener("hashchange", onHash);
@@ -2471,7 +2714,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     return () => {
       for (const cleanup of cleanups) cleanup();
     };
-  }, [isModal, onCanvas, modalTrigger, modalTriggerId, modalDelay, modalScrollPercent, modalOncePerSession]);
+  }, [isModal, onCanvas, modalTrigger, triggerId, modalDelay, modalScrollPercent, modalOncePerSession, openModal]);
 
   useEffect(() => {
     if (!isModal || onCanvas || !modalOpen || typeof document === "undefined") return;
@@ -3890,10 +4133,25 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     </div>
   );
 
-  // A closed modal on a published page draws nothing until its trigger fires.
-  if (!showCard) return null;
+  /*
+    A popup kept in a menu would cover the header while it is designed, so Show
+    On Canvas: No draws a chip in its place. Canvas only; the site is unchanged.
+  */
+  if (isModal && onCanvas && !modalCanvasPreview) {
+    return (
+      <div className={`memberframe-auth-root is-chip ${mfThemeClass(theme)}`} data-memberframe-auth={styled.scope}>
+        <style>{mfThemeCss(".memberframe-auth-root")}</style>
+        <style>{cssContent}</style>
+        <style>{styled.css}</style>
+        <span className="memberframe-auth-chip">
+          {triggerId !== "" ? `Sign in popup, opens from #${triggerId}` : "Sign in popup"}
+        </span>
+        <MfLicenseLayer license={license} />
+      </div>
+    );
+  }
 
-  return (
+  const root = (
     <div
       className={`memberframe-auth-root ${mfThemeClass(theme)}${authMode === "modal" ? " is-modal" : ""}${license === "trial" ? " has-mf-wm" : ""}`}
       onClick={
@@ -3917,6 +4175,21 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 
       <MfLicenseLayer license={license} />
     </div>
+  );
+
+  if (!isModal || onCanvas) return root;
+
+  /*
+    On a published page the popup renders into the page's body, so a menu with
+    blur, a transform, or an appear effect cannot trap it in the header's box;
+    its theme and scoped styles travel with it. In place stays only an empty
+    anchor, which draws nothing until the trigger fires.
+  */
+  return (
+    <>
+      <span ref={anchorRef} className="memberframe-auth-anchor" aria-hidden={true} />
+      {showCard && typeof document !== "undefined" ? createPortal(root, document.body) : null}
+    </>
   );
 }
 
@@ -3986,6 +4259,13 @@ addPropertyControls(MemberAuth, mfControls({
     title: "Once Per Visit",
     defaultValue: CONFIG.modalOncePerSession,
     hidden: (props) => props.authMode !== "modal" || (props.modalTrigger !== "load" && props.modalTrigger !== "scroll"),
+  },
+  modalCanvasPreview: {
+    type: ControlType.Boolean,
+    title: "Show On Canvas",
+    defaultValue: CONFIG.modalCanvasPreview,
+    description: "No shows a small chip on the canvas instead of the card, for a popup kept in your menu. The live site is the same.",
+    hidden: (props) => props.authMode !== "modal",
   },
   headline: {
     type: ControlType.String,

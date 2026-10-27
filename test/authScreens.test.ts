@@ -116,7 +116,7 @@ describe("Member Auth itself", () => {
 
   it("emits the same complete config block", () => {
     // Guards every key comparison in this file: two empty lists are equal.
-    expect(declaredKeys.length).toBe(26);
+    expect(declaredKeys.length).toBe(27);
     expect(configKeys(generated.code)).toEqual(declaredKeys);
     expect(syntaxErrors(generated.code)).toEqual([]);
   });

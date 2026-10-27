@@ -314,6 +314,8 @@ the user commits it.
 | FP-00 | Connect, Creator Identity, And Membership Pages | F02, F05, F06 | `components/tabs/ConnectTab.tsx`, `services/connectService.ts`, `services/connectionStore.ts`, `services/pageScaffoldService.ts`, `backend/src/routes/connect.ts`, `backend/src/routes/site.ts` | awaiting review | |
 | FP-15 | Backend Architecture, Node and Prisma | sections 6, 10, 11, 14 | `backend/` in this repo. Specified in [`memberframe-backend-prd.md`](memberframe-backend-prd.md) | awaiting review, partial | |
 
+**Sign-in popup in a shared menu, added 2026-10-26 on request, awaiting review and unstaged.** The Modal Overlay sign-in can sit once inside the Navigation component and open from the menu on every page: the open popup renders into the page's body, one copy per Trigger ID opens (the first that is showing), and a new **Show On Canvas** control draws a chip in the editor instead of the card. All five auth components. [`05-member-auth.md`](development-docs/05-member-auth.md) section 11.6. **Not yet seen in Framer.**
+
 **Blog paywalls and every currency, added 2026-10-18 on request, awaiting review and unstaged, in
 both repositories.** The Soft Paywall gained a linked mode for CMS posts: placed below the post with
 Article Body empty, styled in Framer's sidebar, and finding the post body tagged by the new

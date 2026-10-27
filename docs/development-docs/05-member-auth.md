@@ -610,8 +610,9 @@ Requested by the product owner, 2026-10-20. Applies to `<MemberAuth>` and the fo
 | Delay | 0 to 60 seconds, On Page Load only | 0 |
 | Scroll Depth | 0 to 100 percent of the page, On Scroll only | 50 |
 | Once Per Visit | Yes or No, On Page Load and On Scroll only | Yes |
+| Show On Canvas | Yes or No (2026-10-26, section 11.6) | Yes |
 
-All five are in the `CONFIG` block (`MemberAuthConfig`), normalized by `normalizeAuthConfig`, so the Builder and the sidebar agree.
+All six are in the `CONFIG` block (`MemberAuthConfig`), normalized by `normalizeAuthConfig`, so the Builder and the sidebar agree.
 
 ### 11.3. How A Button Is Identified
 
@@ -624,7 +625,7 @@ The listener is on `document` in the capture phase and calls `preventDefault` an
 
 ### 11.4. Rules
 
-- On the canvas the modal is always shown, so it can be designed. On a published page it starts closed and renders nothing until it opens.
+- On the canvas the modal is always shown, so it can be designed (unless Show On Canvas is No, section 11.6). On a published page it starts closed and renders only an empty anchor `<span>` until it opens.
 - Opening by itself (load or scroll) never happens for a visitor the component's `HINT_KEY` marks as signed in. A click always opens.
 - Once Per Visit is remembered in `sessionStorage` under `MODAL_SHOWN_KEY`, per page and trigger (not a credential; listed in the storage test).
 - It closes on the close button (top right of the card), a click on the dimmed backdrop, or Escape. The page behind it does not scroll while it is open.
@@ -633,6 +634,26 @@ The listener is on `document` in the capture phase and calls `preventDefault` an
 
 - [x] Unit: normalization of the five settings; the trigger match, capture listener, signed-in rule, close paths, and canvas behaviour read from source.
 - [ ] Human, on a published page: each Opens mode; a button linked to `#sign-in`; a layer named `sign-in`; Once Per Visit; signed in, no automatic opening; close by button, backdrop, Escape.
+
+### 11.6. Placing It In A Shared Component (2026-10-26)
+
+Requested by the product owner: place the popup once, inside the site's Navigation component, so the menu's "Login" opens it on every page that shows the menu. Applies to `<MemberAuth>` and the four dedicated screens.
+
+**The problems it solves.** The open popup used to be the component's own root with `position: fixed`. Inside a menu with blur, a transform, or an appear effect, `fixed` resolves to the menu's box, so the popup was clipped to the header. And every copy listened on `document` for the same click: a menu copy plus a page copy, or a menu that exists in several breakpoint variants, opened two or three stacked popups (`stopPropagation` does not stop other listeners on the same node).
+
+**What it does now.**
+
+- On a published page the open popup is rendered with `createPortal` into `document.body`, with its theme, `cssContent`, scoped styles, and license layer, the same way Protected Download's password popup is. React keeps events bubbling through the portal, so Escape, the focus trap, and the backdrop click are unchanged. Canvas and inline rendering are unchanged.
+- In place, the component renders only an empty `<span className="memberframe-auth-anchor">`. `isShowing` asks it `checkVisibility()` (fallback: `getClientRects().length > 0`), so a copy inside a hidden breakpoint variant ignores the trigger.
+- A shared registry on `window.__memberframeModals`, keyed by Trigger ID (or `auto-load` / `auto-scroll` with no ID), lets one copy hold a trigger at a time. On `window`, not module scope, because each dedicated screen is a separate file. Every way of opening (click, `#id` in the address, load, scroll) goes through `openModal`: showing, then `claimModal`, then open. `closeModal` and unmount release it. Once Per Visit is recorded only by the copy that opened.
+- **Show On Canvas** (`modalCanvasPreview`, default Yes). No draws a small chip ("Sign in popup, opens from #sign-in") on the canvas in place of the card, so a popup kept in the menu does not cover the header while designing. The published site is the same either way.
+
+**How a creator sets it up.** Put the Modal Overlay component inside the Navigation component, Position Absolute so its frame takes no room in the menu's stack (the frame's size does not matter: the open popup covers the screen and the card keeps its own width). A menu with breakpoint variants needs a copy in each variant; only the showing one opens. A leftover page copy with the same Trigger ID is harmless.
+
+**Verification.**
+
+- [x] Unit: the portal, the anchor, the registry and visibility guard on every opening path, release on close and unmount, the Show On Canvas normalization (`test/memberAuth.test.ts`); the config block has the new key on all five components (`test/authScreens.test.ts`).
+- [ ] Human, on a published page: the popup in the Navigation component opens from the menu on several pages, full screen and not clipped; exactly one popup at desktop, tablet, and phone widths, and with a page copy also present; close by button, backdrop, Escape; `/#sign-in` opens it; Show On Canvas No shows the chip in the editor and the live site still opens the popup.
 
 ## 12. Sign-in Methods and Account Linking, 2026-10-20
 

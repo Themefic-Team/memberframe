@@ -35,6 +35,12 @@ When you choose **Modal Overlay**, **Opens** decides when the popup appears: **O
 
 [Add Modal Overlay Settings Screenshot]
 
+### Open the popup from your menu on every page
+
+You only need to add the popup once. Open your **Navigation** component and put the component inside it, set to **Modal Overlay**, then set its **Position** to **Absolute** so it takes no room in the menu. Set the menu's **Login** button link to `#sign-in`. Every page that shows your menu can now open the popup. If your menu has separate tablet and phone variants, add the component to each one.
+
+While you design the menu, the popup's card covers it on the canvas. Turn **Show On Canvas** off to show a small label in its place instead. Your live site is not affected.
+
 ## Step 3: Choose the sign-in options
 
 | Setting | What it does |

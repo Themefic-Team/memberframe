@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Check, ChevronRight, Citrus, Copy, CreditCard, Eye, EyeOff, IndianRupee, Save, Unplug } from "lucide-react";
+import { Check, ChevronRight, Copy, Eye, EyeOff, Save, Unplug } from "lucide-react";
 import {
   Badge,
   Banner,
@@ -38,6 +38,7 @@ import {
 } from "../../services/paymentsService";
 import { isSafeSitePath } from "../../services/siteSettingsService";
 import { SETUP_GUIDES } from "../../config/branding";
+import { BrandLogo } from "../providerMarks";
 import { CURRENCY_OPTIONS } from "../../utils/currencies";
 
 const MODE_OPTIONS = [
@@ -47,9 +48,9 @@ const MODE_OPTIONS = [
 
 /** Each gateway's mark in its card and sheet. Lucide has no brand logos, so a fitting glyph. */
 const GATEWAY_ICON: Record<PaymentGateway, React.ReactNode> = {
-  stripe: <CreditCard aria-hidden={true} />,
-  lemonsqueezy: <Citrus aria-hidden={true} />,
-  razorpay: <IndianRupee aria-hidden={true} />,
+  stripe: <BrandLogo brand="stripe" />,
+  lemonsqueezy: <BrandLogo brand="lemonsqueezy" />,
+  razorpay: <BrandLogo brand="razorpay" />,
 };
 
 const GATEWAY_BLURB: Record<PaymentGateway, string> = {
@@ -557,7 +558,7 @@ const GatewayCard: React.FC<GatewayCardProps> = ({
       >
         <div className="integration-card-bar-left">
           <span className="integration-card-icon">
-            {status.connected ? <Check aria-hidden={true} /> : GATEWAY_ICON[status.gateway]}
+            {GATEWAY_ICON[status.gateway]}
           </span>
           <div className="integration-card-text">
             <span className="integration-card-title">{label}</span>
