@@ -202,7 +202,9 @@ export class ApiClient {
     const doFetch = this.deps.fetchImpl ?? globalThis.fetch;
     if (typeof doFetch !== "function") return Promise.reject(new Error("No fetch implementation available."));
     const headers: Record<string, string> = { Accept: "text/event-stream" };
-    if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+    if (import.meta.env.DEV) {
+      if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+    }
     const token = this.deps.getCreatorToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     return doFetch(`${base}${path}${buildQuery(query)}`, { method: "GET", headers, signal, cache: "no-store" });
@@ -232,7 +234,10 @@ export class ApiClient {
     // of the API, and that page carries no CORS headers, so the panel reports
     // the server as unreachable. Asking ngrok to skip it is the documented fix.
     // Only sent to an ngrok address; the backend lists the header in CORS.
-    if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+    // Dev only: a production build talks to one fixed host and drops this.
+    if (import.meta.env.DEV) {
+      if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+    }
 
     const token = this.deps.getCreatorToken();
     if (token) {

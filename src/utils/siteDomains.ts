@@ -14,7 +14,9 @@
  * address copied from the browser.
  */
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+// Dev only: no creator's live site runs on loopback, and a shipped bundle
+// carries no loopback hostnames (Marketplace review problem 2, doc 36 step 1).
+const LOOPBACK_HOSTS: ReadonlySet<string> = import.meta.env.DEV ? new Set(["localhost", "127.0.0.1", "[::1]"]) : new Set();
 
 /** `https://host[:port]` for what was typed, or null when it is not a domain. */
 export function toOrigin(input: string): string | null {

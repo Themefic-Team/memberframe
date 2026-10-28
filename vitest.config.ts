@@ -16,13 +16,14 @@ import { defineConfig } from "vitest/config";
  * `VITE_API_BASE_URL` is blanked because Vitest reads the developer's `.env`,
  * which is gitignored and points at a local backend. Left alone, the generator
  * tests assert against whatever host that machine happens to have configured,
- * so the suite passes on one checkout and fails on the next. Blank falls
- * through to `DEFAULT_API_BASE_URL` in `config/backend.ts`.
+ * so the suite passes on one checkout and fails on the next. Both variables are
+ * blanked, so `API_BASE_URL` in `config/backend.ts` falls through to its
+ * loopback dev default on every machine.
  */
 export default defineConfig({
   test: {
     environment: "node",
     include: ["test/**/*.test.ts"],
-    env: { VITE_API_BASE_URL: "" },
+    env: { VITE_API_BASE_URL: "", VITE_APP_BASE_URL: "" },
   },
 });

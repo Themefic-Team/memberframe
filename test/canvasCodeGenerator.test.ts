@@ -27,7 +27,7 @@ import {
   generateMeteredPaywallCode,
   normalizeMeteredPaywallConfig,
 } from "../src/services/canvasComponentCodeGenerator";
-import { API_BASE_URL } from "../src/config/backend";
+import { deployBaseUrl } from "../src/config/backend";
 import {
   BLUR_MAX,
   BLUR_MIN,
@@ -113,7 +113,7 @@ describe("the shape of the output", () => {
     // PRD section 10.1: the base URL is configured in src/config/backend.ts and
     // never hardcoded at a call site. The canvas component cannot import it, so
     // the generator is the only legitimate way for it to arrive there.
-    expect(readEmittedString(generateMeteredPaywallCode(config()).code, "apiBaseUrl")).toBe(API_BASE_URL);
+    expect(readEmittedString(generateMeteredPaywallCode(config()).code, "apiBaseUrl")).toBe(deployBaseUrl());
   });
 });
 
@@ -133,7 +133,7 @@ describe("creator text cannot break the file", () => {
 
     expect(readEmittedString(code, "cardDescription")).toBe(breakout);
     // The real assertion: the injected key did not become a second assignment.
-    expect(readEmittedString(code, "apiBaseUrl")).toBe(API_BASE_URL);
+    expect(readEmittedString(code, "apiBaseUrl")).toBe(deployBaseUrl());
     expect(code).not.toContain('evil.example.com",\n};');
   });
 

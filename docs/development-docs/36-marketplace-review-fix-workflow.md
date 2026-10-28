@@ -66,6 +66,15 @@
 
 **শেষ হয়েছে যখন**: সব গেট পাস, স্ক্যান পরিষ্কার, dev আগের মতো চলে।
 
+### বাস্তবায়ন নোট (২০২৬-১০-২৮)
+
+- `PRODUCTION_API_BASE_URL` আর `isLoopbackUrl` আছে নতুন [`src/config/productionApi.ts`](../../src/config/productionApi.ts)-এ, `backend.ts` সেগুলো re-export করে। কারণ `vite.config.ts` এটা import করে, আর `backend.ts` `import.meta` পড়ে।
+- চিহ্নিত ব্লক: `// @memberframe-dev-only-start` থেকে `// @memberframe-dev-only-end`। সরানোর কাজ [`src/config/devOnlyBlocks.ts`](../../src/config/devOnlyBlocks.ts)-এ। জেনারেটর production-এ ব্লক সরায়। `vite.config.ts`-এর একটা build plugin `?raw` সোর্স থেকেও সরায়, নইলে `dist`-এ কম্পোনেন্টের কাঁচা সোর্সে `ngrok` থেকে যেত।
+- [`src/utils/siteDomains.ts`](../../src/utils/siteDomains.ts): loopback ডোমেইন এখন শুধু dev-এ গ্রহণ হয়। এটাই ছিল বিল্ডে `localhost` এর দ্বিতীয় উৎস।
+- dev-এ loopback ব্যাকএন্ড থাকলে deploy করা কম্পোনেন্টে এখন production ঠিকানা যায়। প্যানেল আগের মতো লোকাল ব্যাকএন্ডেই কথা বলে।
+- টেস্ট: [`test/productionBuild.test.ts`](../../test/productionBuild.test.ts)। `test/deployContext.test.ts` নতুন আচরণে আপডেট।
+- স্ক্যান: `127.0.0.1`/`localhost`, `process.env`, `ngrok` শূন্য। বাকি `js.stripe.com` ধাপ ৪-এর।
+
 ---
 
 ## ধাপ ২: প্রজেক্ট ও ইউজারের তথ্য কমানো (সমস্যা ৩, ৪, ৬, ৯, দেড় থেকে দুই দিন)
@@ -433,7 +442,7 @@ Framefic
 | ধাপ | সমস্যা | আনুমানিক সময় | দায়িত্বে | স্ট্যাটাস | কমিট |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | ০. প্রস্তুতি | সব | আধা দিন | | শুরু হয়নি | |
-| ১. স্থির ঠিকানা | ২, ৮ | আধা দিন | | শুরু হয়নি | |
+| ১. স্থির ঠিকানা | ২, ৮ | আধা দিন | | সম্পন্ন (২০২৬-১০-২৮), রিভিউর অপেক্ষায় | |
 | ২. তথ্য কমানো | ৩, ৪, ৬, ৯ | দেড় থেকে দুই দিন | | আংশিক: ৩ ও ৪ সম্পন্ন (২০২৬-১০-২৮), রিভিউর অপেক্ষায়। ৬ ও ৯ বাকি | |
 | ৩. `/api/license` বাদ | ৫ | দেড় দিন | | শুরু হয়নি | |
 | ৪. hosted checkout | ১ | দুই থেকে তিন দিন | | শুরু হয়নি | |

@@ -26,7 +26,7 @@ import {
   generateMemberDashboardCode,
   type DeployContext,
 } from "../src/services/canvasComponentCodeGenerator";
-import { DEFAULT_API_BASE_URL, deployBaseUrl, isLoopbackUrl } from "../src/config/backend";
+import { PRODUCTION_API_BASE_URL, deployBaseUrl, isLoopbackUrl } from "../src/config/backend";
 import {
   DEFAULT_MEMBER_AUTH_CONFIG,
   DEFAULT_MEMBER_DASHBOARD_CONFIG,
@@ -65,9 +65,10 @@ describe("isLoopbackUrl", () => {
 });
 
 describe("deployBaseUrl", () => {
-  it("uses the configured API base URL dynamically", () => {
-    expect(deployBaseUrl("http://127.0.0.1:4001")).toBe("http://127.0.0.1:4001");
-    expect(deployBaseUrl("http://localhost:4001")).toBe("http://localhost:4001");
+  it("replaces a loopback address with the production backend", () => {
+    expect(deployBaseUrl("http://127.0.0.1:4001")).toBe(PRODUCTION_API_BASE_URL);
+    expect(deployBaseUrl("http://localhost:4001")).toBe(PRODUCTION_API_BASE_URL);
+    expect(deployBaseUrl("")).toBe(PRODUCTION_API_BASE_URL);
   });
 
   it("passes a tunnel or a production host through", () => {
@@ -81,8 +82,9 @@ describe("the disconnected context", () => {
     expect(DISCONNECTED_DEPLOY_CONTEXT.siteKey).toBe("");
   });
 
-  it("carries the configured or default apiBaseUrl", () => {
-    expect(DISCONNECTED_DEPLOY_CONTEXT.apiBaseUrl).toBe(DEFAULT_API_BASE_URL);
+  it("carries a base URL a published site can reach", () => {
+    expect(DISCONNECTED_DEPLOY_CONTEXT.apiBaseUrl).toBe(deployBaseUrl());
+    expect(isLoopbackUrl(DISCONNECTED_DEPLOY_CONTEXT.apiBaseUrl)).toBe(false);
   });
 });
 

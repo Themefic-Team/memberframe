@@ -17,36 +17,21 @@
  */
 
 import { panelApiBaseUrl } from "./devProxy";
+import { PRODUCTION_API_BASE_URL, isLoopbackUrl } from "./productionApi";
 
-const getEnvApiBaseUrl = (): string => {
-  if (typeof import.meta !== "undefined") {
-    return (
-      import.meta.env?.VITE_API_BASE_URL ||
-      import.meta.env?.VITE_APP_BASE_URL ||
-      ""
-    );
-  }
-  if (typeof process !== "undefined" && process.env) {
-    return (
-      process.env.VITE_API_BASE_URL ||
-      process.env.VITE_APP_BASE_URL ||
-      process.env.API_BASE_URL ||
-      ""
-    );
-  }
-  return "";
-};
-
-const resolvedEnvUrl = getEnvApiBaseUrl();
-
-export const DEFAULT_API_BASE_URL = resolvedEnvUrl || "http://127.0.0.1:4001";
-export const LOCAL_DEV_API_BASE_URL = resolvedEnvUrl || "http://127.0.0.1:4001";
+export { PRODUCTION_API_BASE_URL, isLoopbackUrl };
 
 /**
- * Backend host configuration.
- * Single source of truth driven directly by VITE_API_BASE_URL / VITE_APP_BASE_URL from .env
+ * The backend the plugin talks to.
+ *
+ * A production build always uses `PRODUCTION_API_BASE_URL`, and Vite folds the
+ * dev branch away, so no `.env` value, loopback fallback, or runtime switch can
+ * reach the shipped bundle (Marketplace review problems 2 and 8). Only `vite
+ * dev` and the test run read `VITE_API_BASE_URL` / `VITE_APP_BASE_URL`.
  */
-export const API_BASE_URL = resolvedEnvUrl || DEFAULT_API_BASE_URL;
+export const API_BASE_URL: string = import.meta.env.PROD
+  ? PRODUCTION_API_BASE_URL
+  : import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_APP_BASE_URL || "http://127.0.0.1:4001";
 
 /**
  * The base URL for requests the panel itself makes.
@@ -86,40 +71,20 @@ export const MEMBER_ENDPOINTS = {
 export const SESSION_CACHE_TTL_MS = 60_000;
 
 /**
- * Is this a URL only the developer's own machine can reach?
- *
- * The distinction matters because two different things want a base URL and
- * they are not the same thing:
- *
- *   - The plugin panel runs on the developer's machine, so `127.0.0.1` is
- *     exactly right for it, which is what `VITE_API_BASE_URL` is for.
- *   - A generated canvas component runs on a creator's PUBLISHED site, on
- *     someone else's browser, which cannot reach the developer's loopback
- *     address at all.
- *
- * Baking the panel's dev URL into a deployed component produces a membership
- * that works perfectly in the panel and fails silently everywhere else, with a
- * network error no creator could interpret. Backend PRD section 9.1 covers the
- * supported way to develop against a published site, which is a tunnel with a
- * stable HTTPS hostname.
- */
-export function isLoopbackUrl(value: string): boolean {
-  try {
-    const host = new URL(value).hostname;
-    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
-  } catch {
-    return false;
-  }
-}
-
-/**
  * The base URL to bake into a generated component.
  *
- * `API_BASE_URL` when it is reachable from the open internet, and the
- * production default when it is not. Refusing to emit a loopback URL is a
- * guard rather than a preference: the alternative is a component that cannot
- * work and does not say why.
+ * `configured` when it is reachable from the open internet, and
+ * `PRODUCTION_API_BASE_URL` when it is a loopback address. Refusing to emit a
+ * loopback URL is a guard rather than a preference: a component baked with the
+ * developer's `127.0.0.1` works in the panel and fails silently on every
+ * published site, with a network error no creator could interpret. Developing
+ * against a published site needs a tunnel with a stable HTTPS hostname, which
+ * passes through (backend PRD section 9.1).
+ *
+ * A production build returns the constant before the check, so the loopback
+ * hostnames in `isLoopbackUrl` never reach the bundle.
  */
 export function deployBaseUrl(configured: string = API_BASE_URL): string {
-  return configured || DEFAULT_API_BASE_URL;
+  if (import.meta.env.PROD) return PRODUCTION_API_BASE_URL;
+  return configured && !isLoopbackUrl(configured) ? configured : PRODUCTION_API_BASE_URL;
 }

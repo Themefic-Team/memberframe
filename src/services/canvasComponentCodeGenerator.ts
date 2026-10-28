@@ -40,6 +40,7 @@ import type { CanvasLicense } from "./licenseService";
 import { isSafeSitePath } from "./siteSettingsService";
 import { readPasswordPolicy, type PasswordPolicy } from "../utils/credentials";
 import { stripComments } from "../utils/stripComments";
+import { stripDevOnlyBlocks } from "../config/devOnlyBlocks";
 
 /** The site's password rules as a CONFIG literal, read defensively first. */
 function policyLiteral(policy: PasswordPolicy | undefined): string {
@@ -324,8 +325,11 @@ export function generateComponentCode<Config>(
     context.license && LICENSED_FILE_NAMES.includes(descriptor.fileName)
       ? patchLockState(transformed, context.license) ?? transformed
       : transformed;
+  // A shipped plugin deploys no ngrok wiring (config/devOnlyBlocks.ts). Before
+  // stripComments, which would remove the markers along with the comments.
+  const shipped = import.meta.env.PROD ? stripDevOnlyBlocks(patched) : patched;
   // The repository's explanations stay in the repository (utils/stripComments.ts).
-  const code = stripComments(patched);
+  const code = stripComments(shipped);
 
   return { fileName: descriptor.fileName, code, config: normalized };
 }

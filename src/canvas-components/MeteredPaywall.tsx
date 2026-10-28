@@ -110,7 +110,9 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
+  // @memberframe-dev-only-start
   if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  // @memberframe-dev-only-end
   const query = "?site=" + encodeURIComponent(siteKey) + (seal === undefined ? "" : "&seal=" + encodeURIComponent(seal));
   const answer = fetch(base + "/api/license" + query, { credentials: "omit", headers, cache: "no-store" })
     .then((response) => {
@@ -1437,9 +1439,11 @@ function apiHeaders(withBody: boolean): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (withBody) headers["Content-Type"] = "application/json";
   if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  // @memberframe-dev-only-start
   // A free ngrok tunnel answers a browser with its warning page, not the API,
   // unless the request asks it not to. Only sent to an ngrok address.
   if (CONFIG.apiBaseUrl.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  // @memberframe-dev-only-end
   return headers;
 }
 

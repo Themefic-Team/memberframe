@@ -94,7 +94,9 @@ function mfFetchLicense(apiBaseUrl: string, siteKey: string, seal: string | unde
   const hit = cache[key];
   if (hit && Date.now() - hit.at < MF_LICENSE_CACHE_MS) return hit.answer;
   const headers: Record<string, string> = {};
+  // @memberframe-dev-only-start
   if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  // @memberframe-dev-only-end
   const query = "?site=" + encodeURIComponent(siteKey) + (seal === undefined ? "" : "&seal=" + encodeURIComponent(seal));
   const answer = fetch(base + "/api/license" + query, { credentials: "omit", headers, cache: "no-store" })
     .then((response) => {
@@ -760,7 +762,9 @@ function mfCanvasPreview(apiBaseUrl: string, siteKey: string, assetId: string = 
   const hit = cache[url];
   if (hit && Date.now() - hit.at < MF_PREVIEW_TTL_MS) return hit.promise;
   const headers: Record<string, string> = { Accept: "application/json" };
+  // @memberframe-dev-only-start
   if (base.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  // @memberframe-dev-only-end
   const promise = fetch(url, { headers })
     .then((response) => (response.ok ? (response.json() as Promise<Record<string, unknown>>) : null))
     .catch(() => null);
@@ -1486,9 +1490,11 @@ function apiHeaders(withBody: boolean): Record<string, string> {
 
   if (withBody) headers["Content-Type"] = "application/json";
   if (CONFIG.siteKey !== "") headers["X-MemberFrame-Site"] = CONFIG.siteKey;
+  // @memberframe-dev-only-start
   // A free ngrok tunnel answers a browser with its warning page, not the API,
   // unless the request asks it not to. Only sent to an ngrok address.
   if (CONFIG.apiBaseUrl.indexOf(".ngrok") !== -1) headers["ngrok-skip-browser-warning"] = "1";
+  // @memberframe-dev-only-end
 
   return headers;
 }
