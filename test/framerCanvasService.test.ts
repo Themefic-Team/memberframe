@@ -18,6 +18,7 @@ import {
   REPARENT_METHOD,
   SCAFFOLD_EXPORT_RETRY_DELAYS_MS,
   WRITE_METHODS,
+  WRITE_RETRY_DELAYS_MS,
   deployCanvasComponent,
   type CanvasDeps,
 } from "../src/services/framerCanvasService";
@@ -197,6 +198,15 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
    * same file in `getCodeFiles()` already carries it. The service re-reads for
    * exactly this case.
    */
+  /** A file Framer never compiles: no exports, however it is read or saved again. */
+  function uncompiled(file: MockCodeFile, exports: MockCodeFile["exports"] = []): MockCodeFile {
+    return {
+      ...file,
+      exports,
+      setFileContent: async (code: string) => uncompiled(await file.setFileContent(code), exports),
+    };
+  }
+
   function mockWithDelayedExports(everReady: boolean): FramerMock {
     const base = createFramerMock();
 
@@ -210,7 +220,7 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
       // The list is where they turn up, unless the file never compiles at all.
       getCodeFiles: async () => {
         const files = await base.getCodeFiles();
-        return everReady ? files : files.map((file) => ({ ...file, exports: [] }));
+        return everReady ? files : files.map((file) => uncompiled(file));
       },
     });
   }
@@ -269,17 +279,20 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
 
   it("names Framer's own first error when the file never compiles", async () => {
     const base = createFramerMock();
-    const broken = async (name: string, code: string) => ({
-      ...(await base.createCodeFile(name, code)),
+    // Every file object Framer hands back can typecheck, however it was read.
+    const typecheck = async () => [
+      { message: "A warning", category: 0 },
+      { message: "Cannot find module 'lucide-react'.", category: 1, span: { start: { line: 4 } } },
+    ];
+    const broken = (file: MockCodeFile): MockCodeFile => ({
+      ...file,
       exports: [],
-      typecheck: async () => [
-        { message: "A warning", category: 0 },
-        { message: "Cannot find module 'lucide-react'.", category: 1, span: { start: { line: 4 } } },
-      ],
-    });
+      typecheck,
+      setFileContent: async (code: string) => broken(await file.setFileContent(code)),
+    } as MockCodeFile);
     const mock = createFramerMock({
-      createCodeFile: broken,
-      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => ({ ...file, exports: [] })),
+      createCodeFile: async (name: string, code: string) => broken(await base.createCodeFile(name, code)),
+      getCodeFiles: async () => (await base.getCodeFiles()).map(broken),
     });
     const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0] });
 
@@ -292,10 +305,7 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
 
   it("says what Framer exports when none of it is a component", async () => {
     const base = createFramerMock();
-    const helperOnly = (file: MockCodeFile) => ({
-      ...file,
-      exports: [{ name: "helper", isDefaultExport: false, type: "override" }],
-    });
+    const helperOnly = (file: MockCodeFile) => uncompiled(file, [{ name: "helper", isDefaultExport: false, type: "override" }]);
     const mock = createFramerMock({
       createCodeFile: async (name: string, code: string) => helperOnly(await base.createCodeFile(name, code)),
       getCodeFiles: async () => (await base.getCodeFiles()).map(helperOnly),
@@ -311,13 +321,39 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
     const base = createFramerMock();
     await base.createCodeFile(generated.fileName, generated.code);
     const noExports = createFramerMock({
-      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => ({ ...file, exports: [] })),
+      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => uncompiled(file)),
     });
-    // The first retry: same content, no component, so it is written with the line break toggled.
-    // The file object comes from the first mock, so its save is recorded there.
+    // Same content, no component, so it is written with the line break toggled;
+    // still none after the wait, so it is saved once more, toggled back.
+    // The file object comes from the first mock, so its saves are recorded there.
     await deployCanvasComponent(deps(noExports), generated, { exportRetryDelaysMs: [0] });
-    expect(base.calls.setFileContent).toHaveLength(1);
-    expect(base.calls.setFileContent[0]!.code).toBe(`${generated.code}\n`);
+    expect(base.calls.setFileContent.map((call) => call.code)).toEqual([`${generated.code}\n`, generated.code]);
+  });
+
+  it("saves once more by itself when the first save never compiles, then inserts", async () => {
+    // Framer's save service failed behind an accepted save (2026-10-28): no
+    // component until the file is saved again, which a second click used to do.
+    const base = createFramerMock();
+    let saved = false;
+    const mock = createFramerMock({
+      createCodeFile: async (name: string, code: string) => uncompiled(await base.createCodeFile(name, code)),
+      getCodeFiles: async () => {
+        const files = await base.getCodeFiles();
+        return saved
+          ? files
+          : files.map((file) => ({
+              ...uncompiled(file),
+              setFileContent: async (code: string) => {
+                saved = true;
+                return file.setFileContent(code);
+              },
+            }));
+      },
+    });
+    const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0] });
+
+    expect(outcome.ok).toBe(true);
+    expect(mock.calls.addComponentInstance).toHaveLength(1);
   });
 
   it("inserts as soon as Framer pushes the compiled file, without waiting out the schedule", async () => {
@@ -325,7 +361,7 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
     let push: ((files: ReadonlyArray<MockCodeFile>) => void) | null = null;
     const mock = createFramerMock({
       createCodeFile: async (name: string, code: string) => ({ ...(await base.createCodeFile(name, code)), exports: [] }),
-      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => ({ ...file, exports: [] })),
+      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => uncompiled(file)),
     });
     const withPush: CanvasDeps = {
       ...deps(mock),
@@ -382,13 +418,39 @@ describe("deployCanvasComponent: SDK failures", () => {
       },
     });
 
-    const outcome = await deployCanvasComponent(deps(mock), generated);
+    const outcome = await deployCanvasComponent(deps(mock), generated, { writeRetryDelaysMs: [0, 0] });
 
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
 
     expect(outcome.reason).toBe("write_failed");
     expect(mock.calls.addComponentInstance).toHaveLength(0);
+  });
+
+  it("saves again when Framer refuses the first save, as its save service does now and then", async () => {
+    // 2026-10-28: a 502 from Framer's modules service, "Connection error". The
+    // first click failed and the second worked; the retry is that second click.
+    const base = createFramerMock();
+    let attempts = 0;
+    const mock = createFramerMock({
+      createCodeFile: async (name: string, code: string) => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("ServiceError.UnknownError: Connection error");
+        return base.createCodeFile(name, code);
+      },
+      getCodeFiles: base.getCodeFiles,
+    });
+
+    const outcome = await deployCanvasComponent(deps(mock), generated, { writeRetryDelaysMs: [0, 0] });
+
+    expect(outcome.ok).toBe(true);
+    expect(attempts).toBe(2);
+    expect(mock.calls.addComponentInstance).toHaveLength(1);
+  });
+
+  it("retries the save a bounded number of times", () => {
+    expect(WRITE_RETRY_DELAYS_MS.length).toBeGreaterThan(0);
+    expect(WRITE_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0)).toBeLessThanOrEqual(5_000);
   });
 
   it("reports an insert failure and says the file is already saved", async () => {

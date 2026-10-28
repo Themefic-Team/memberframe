@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
-import { loadStripe, type Stripe, type StripeElementsOptions } from "@stripe/stripe-js";
+// Types only: they load nothing. Stripe.js itself is fetched in stripeFor().
+import type { Stripe, StripeElementsOptions } from "@stripe/stripe-js";
 import { Elements, LinkAuthenticationElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { applyCoupon, type CheckoutResponse, type PlanId } from "../../services/licenseService";
 import { notify } from "./billingHelpers";
@@ -21,11 +22,25 @@ export interface PaymentModalProps {
   onCheckoutChange: (next: CheckoutResponse) => void;
 }
 
+/**
+ * Stripe.js, loaded when the payment modal opens and not before (Marketplace
+ * audit C2). The default `@stripe/stripe-js` entry injects js.stripe.com as a
+ * side effect of being imported, which loaded Stripe on every panel open. The
+ * `pure` entry injects nothing until `loadStripe` is called, and the dynamic
+ * import keeps even that module out of the launch bundle. Fraud signals are
+ * off: no Stripe background tracking in the panel.
+ */
 const stripes = new Map<string, Promise<Stripe | null>>();
 const stripeFor = (key: string): Promise<Stripe | null> => {
   let found = stripes.get(key);
   if (!found) {
-    found = loadStripe(key);
+    found = import("@stripe/stripe-js/pure").then(({ loadStripe }) => {
+      // Before loadStripe. Calling it again with the same value is a no-op.
+      loadStripe.setLoadParameters({ advancedFraudSignals: false });
+      return loadStripe(key);
+    });
+    // A failed load (offline, blocked) is not cached: the next open tries again.
+    found.catch(() => stripes.delete(key));
     stripes.set(key, found);
   }
   return found;
@@ -53,9 +68,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = (props) => {
   useEffect(() => {
     if (!stripePromise) return;
     let cancelled = false;
-    void stripePromise.then((stripe) => {
-      if (!cancelled && !stripe) setStripeLoadError(true);
-    });
+    stripePromise.then(
+      (stripe) => {
+        if (!cancelled && !stripe) setStripeLoadError(true);
+      },
+      () => {
+        // The script was blocked or the network failed: show the fallback.
+        if (!cancelled) setStripeLoadError(true);
+      }
+    );
     return () => {
       cancelled = true;
     };
@@ -66,23 +87,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = (props) => {
 
   if (stripeLoadError || !props.publishableKey) {
     return (
-      <div className="beaf-payment-modal">
-        <div className="beaf-payment-box">
+      <div className="ffmf-payment-modal">
+        <div className="ffmf-payment-box">
           <h3>Payment Unavailable</h3>
-          <p className="beaf-payment-muted">
+          <p className="ffmf-payment-muted">
             The payment service could not be initialized. This may be caused by a network issue or a browser extension blocking external scripts.
           </p>
-          <p className="beaf-payment-muted beaf-payment-muted--small">
+          <p className="ffmf-payment-muted ffmf-payment-muted--small">
             Please check your internet connection and try again. If the problem persists, disable any ad-blockers or privacy extensions and reload the plugin.
           </p>
-          <div className="beaf-payment-button beaf-payment-unavailable-actions">
-            <a href="https://framefic.com/support/" target="_blank" rel="noreferrer" className="beaf-payment-support">
+          <div className="ffmf-payment-button ffmf-payment-unavailable-actions">
+            <a href="https://framefic.com/support/" target="_blank" rel="noreferrer" className="ffmf-payment-support">
               Contact Support
               <ArrowRight aria-hidden={true} />
             </a>
             <button
               type="button"
-              className="beaf-payment-cancel beaf-payment-cancel--solo"
+              className="ffmf-payment-cancel ffmf-payment-cancel--solo"
               onClick={() => {
                 setStripeLoadError(false);
                 props.onClose();
@@ -98,12 +119,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = (props) => {
 
   if (!stripePromise) {
     return (
-      <div className="beaf-payment-modal">
-        <div className="beaf-payment-box beaf-payment-box--center">
+      <div className="ffmf-payment-modal">
+        <div className="ffmf-payment-box ffmf-payment-box--center">
           <h3>Connecting to Checkout...</h3>
-          <p className="beaf-payment-muted">Initializing secure Stripe connection.</p>
-          <div className="beaf-payment-center-actions">
-            <button type="button" className="beaf-payment-cancel" onClick={props.onClose}>
+          <p className="ffmf-payment-muted">Initializing secure Stripe connection.</p>
+          <div className="ffmf-payment-center-actions">
+            <button type="button" className="ffmf-payment-cancel" onClick={props.onClose}>
               Cancel
             </button>
           </div>
@@ -141,8 +162,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = (props) => {
   };
 
   return (
-    <div className="beaf-payment-modal">
-      <div className="beaf-payment-box">
+    <div className="ffmf-payment-modal">
+      <div className="ffmf-payment-box">
         <h3>Complete Payment</h3>
         <p>
           Total Amount is: ${props.showAmount.toFixed(2)} ({props.showType})
@@ -248,42 +269,42 @@ const CheckoutForm: React.FC<PaymentModalProps> = ({ onClose, onSuccess, plan, s
   };
 
   return (
-    <form onSubmit={(event) => void handleSubmit(event)} className="beaf-payment-form">
+    <form onSubmit={(event) => void handleSubmit(event)} className="ffmf-payment-form">
       {(plan === "monthly" || plan === "lifetime") && !couponApplied ? (
-        <div className="beaf-coupon-section">
+        <div className="ffmf-coupon-section">
           {!showCouponInput ? (
-            <button type="button" className="beaf-coupon-toggle" onClick={() => setShowCouponInput(true)}>
+            <button type="button" className="ffmf-coupon-toggle" onClick={() => setShowCouponInput(true)}>
               Have a coupon code?
             </button>
           ) : (
             <div>
-              <div className="beaf-coupon-input-row--spaced">
+              <div className="ffmf-coupon-input-row--spaced">
                 <input
                   type="text"
-                  className="beaf-coupon-input--large"
+                  className="ffmf-coupon-input--large"
                   placeholder="Enter coupon"
                   value={couponCode}
                   onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
                   disabled={applying}
                 />
-                <button type="button" className="beaf-coupon-apply" onClick={() => void handleApplyCoupon()} disabled={applying || !couponCode.trim()}>
+                <button type="button" className="ffmf-coupon-apply" onClick={() => void handleApplyCoupon()} disabled={applying || !couponCode.trim()}>
                   {applying ? "Applying..." : "Apply"}
                 </button>
               </div>
-              {couponError ? <div className="beaf-coupon-error">{couponError}</div> : null}
+              {couponError ? <div className="ffmf-coupon-error">{couponError}</div> : null}
             </div>
           )}
         </div>
       ) : null}
 
       {couponApplied ? (
-        <div className="beaf-coupon-success-badge">
+        <div className="ffmf-coupon-success-badge">
           <Check aria-hidden={true} />
           <span>Coupon applied successfully!</span>
         </div>
       ) : null}
 
-      <div className="beaf-link-auth">
+      <div className="ffmf-link-auth">
         <LinkAuthenticationElement
           onChange={(event) => setEmail(event.value.email)}
           options={defaultEmail ? { defaultValues: { email: defaultEmail } } : undefined}
@@ -297,15 +318,15 @@ const CheckoutForm: React.FC<PaymentModalProps> = ({ onClose, onSuccess, plan, s
         }}
       />
       {processingMessage ? (
-        <div className="beaf-processing-banner">
+        <div className="ffmf-processing-banner">
           <p>{processingMessage}</p>
         </div>
       ) : null}
-      <div className="beaf-payment-button">
-        <button type="button" className="beaf-payment-cancel" onClick={onClose} disabled={submitting}>
+      <div className="ffmf-payment-button">
+        <button type="button" className="ffmf-payment-cancel" onClick={onClose} disabled={submitting}>
           Cancel
         </button>
-        <button type="submit" className="beaf-buy-now-button" disabled={submitting}>
+        <button type="submit" className="ffmf-buy-now-button" disabled={submitting}>
           {submitting ? "Processing..." : "Pay Now"}
         </button>
       </div>

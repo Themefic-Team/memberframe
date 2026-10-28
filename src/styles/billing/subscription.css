@@ -6,19 +6,19 @@
  * Edit it only to stay in step with BEAF.
  */
 
-.beaf-subscription-page {
+.ffmf-subscription-page {
   padding: 12px;
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-.beaf-subpage-back-button-wide {
+.ffmf-subpage-back-button-wide {
   height: 32px;
   border-radius: 6px;
   padding: 0;
   background-color: transparent !important;
-  color: var(--beaf-text-soft);
+  color: var(--ffmf-text-soft);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -28,40 +28,40 @@
   transition: all 0.2s ease;
 }
 
-.beaf-subpage-back-button-wide:hover {
+.ffmf-subpage-back-button-wide:hover {
   background: transparent !important;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
 }
 
-.beaf-subpage-title-left {
-  color: var(--beaf-heading);
+.ffmf-subpage-title-left {
+  color: var(--ffmf-heading);
   font-size: 16px;
   font-weight: 700;
   font-family: "Inter", sans-serif;
   margin-bottom: 10px;
 }
 
-.beaf-subscription-card {
-  border: 1px solid var(--beaf-surface-border);
+.ffmf-subscription-card {
+  border: 1px solid var(--ffmf-surface-border);
   border-radius: 10px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--beaf-page-bg2);
+  background: var(--ffmf-page-bg2);
 
 
 }
 
-.beaf-subscription-detail-item {
+.ffmf-subscription-detail-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
 }
 
-.beaf-subscription-label {
-  color: var(--beaf-text-soft);
+.ffmf-subscription-label {
+  color: var(--ffmf-text-soft);
   font-size: 11px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
@@ -70,14 +70,14 @@
   flex-shrink: 0;
 }
 
-.beaf-subscription-value {
-  color: var(--beaf-heading);
+.ffmf-subscription-value {
+  color: var(--ffmf-heading);
   font-size: 13px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-subscription-status {
+.ffmf-subscription-status {
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(34, 197, 94, 0.15);
@@ -87,14 +87,14 @@
   font-family: "Inter", sans-serif;
 }
 
-.beaf-subscription-divider {
+.ffmf-subscription-divider {
   height: 1px;
-  background: var(--beaf-surface-border);
+  background: var(--ffmf-surface-border);
   opacity: 0.5;
   width: 100%;
 }
 
-.beaf-subscription-cancel-btn {
+.ffmf-subscription-cancel-btn {
   width: 100%;
   height: 36px;
   border-radius: 10px;
@@ -108,18 +108,18 @@
   color: #FFF;
 }
 
-.beaf-subscription-cancel-btn:hover {
+.ffmf-subscription-cancel-btn:hover {
   background: linear-gradient(180deg, #d60c0c 0%, #500202 100%);
 }
 
-.beaf-subscription-actions {
+.ffmf-subscription-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.beaf-subscription-secondary-btn,
-.beaf-subscription-upgrade-btn {
+.ffmf-subscription-secondary-btn,
+.ffmf-subscription-upgrade-btn {
   width: 100%;
   height: 36px;
   border-radius: 10px;
@@ -156,8 +156,8 @@
 
 
 
-.beaf-subscription-upgrade-btn {
-  background: var(--beaf-success-btn);
+.ffmf-subscription-upgrade-btn {
+  background: var(--ffmf-success-btn);
   background:
     linear-gradient(var(--Secondary-Default, #038f3d), var(--Secondary-Default, #00421c)) padding-box,
     linear-gradient(180deg, #038f3d 0%, #00421c 100%) border-box;
@@ -168,12 +168,12 @@
   justify-content: center;
 }
 
-.beaf-subscription-upgrade-btn:hover {
+.ffmf-subscription-upgrade-btn:hover {
   color: #fff;
   filter: brightness(1.15);
 }
 
-.beaf-subscription-downgrade-btn {
+.ffmf-subscription-downgrade-btn {
   width: 100%;
   height: 36px;
   border-radius: 10px;
@@ -191,47 +191,47 @@
   justify-content: center;
 }
 
-.beaf-subscription-downgrade-btn:hover {
+.ffmf-subscription-downgrade-btn:hover {
   filter: brightness(1.15);
 }
 
-.beaf-subscription-secondary-btn:disabled,
-.beaf-subscription-upgrade-btn:disabled,
-.beaf-subscription-downgrade-btn:disabled,
-.beaf-subscription-cancel-btn:disabled {
+.ffmf-subscription-secondary-btn:disabled,
+.ffmf-subscription-upgrade-btn:disabled,
+.ffmf-subscription-downgrade-btn:disabled,
+.ffmf-subscription-cancel-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.beaf-subscription-empty {
+.ffmf-subscription-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
   text-align: center;
   padding: 32px 16px;
-  background: var(--beaf-surface);
-  border: 1px dashed var(--beaf-surface-border);
+  background: var(--ffmf-surface);
+  border: 1px dashed var(--ffmf-surface-border);
   border-radius: 10px;
   margin-bottom: 16px;
 }
 
-.beaf-subscription-empty h4 {
+.ffmf-subscription-empty h4 {
   margin: 0;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
   font-size: 14px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-subscription-empty p {
+.ffmf-subscription-empty p {
   margin: 0;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 12px;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-primary-cta {
+.ffmf-primary-cta {
   color: #fff;
   /* Body/Small/Semi Bold */
   font-family: "Inter", sans-serif;
@@ -256,3 +256,9 @@
   height: 32px;
   border-radius: 10px;
 }
+/* Manage Billing, once the portal address is known, is a link (Marketplace audit I2). */
+a.ffmf-subscription-secondary-btn {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+

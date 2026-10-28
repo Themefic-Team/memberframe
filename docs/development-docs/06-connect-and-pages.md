@@ -351,7 +351,7 @@ that false.
 | Id | Conflict | Decision | Needs the user |
 | :--- | :--- | :--- | :--- |
 | **C26** | The shell standard permits two to four tabs. Connect is a fifth | Added on explicit instruction. Members and Tiers stay folded into Manage, which is the PRD section 7.3 resolution and is untouched | **Yes.** If 360px feels cramped, move Connect into Settings. Never re-split Manage |
-| **C27** | S2 bars a token from client storage; the creator token is in Framer plugin data | Project-scoped rather than origin-scoped, thirty-day expiry, revocable. The model becomes "whoever can edit this project can administer its membership" | **Yes.** It is weaker than "whoever has the creator's email" |
+| **C27** | S2 bars a token from client storage; the creator token is in Framer plugin data | Project-scoped rather than origin-scoped, thirty-day expiry, revocable. The model becomes "whoever can edit this project can administer its membership" | **Reversed 2026-10-28.** The token is in this browser's `localStorage`, keyed by the open project, never in plugin data (Marketplace audit C1, [`34-marketplace-audit-fixes.md`](34-marketplace-audit-fixes.md)) |
 | **C28** | First address to verify owns the Framer project, with no transfer | Refuses a second account with 403 rather than guessing at a transfer flow | **Yes.** A project connected by mistake needs support |
 | **C29** | `sendMagicLink` is called by the Manage tab and no route answers it | Left in place, resolves `unavailable`. It is a few lines once the OTP flow exists. **Resolved 2026-10-19**: built, see [`26-magic-link-and-revoke.md`](26-magic-link-and-revoke.md) | **Yes**, with C24 |
 

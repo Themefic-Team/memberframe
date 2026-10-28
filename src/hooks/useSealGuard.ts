@@ -27,6 +27,7 @@ import {
   staleSectionLocksFile,
 } from "../services/sectionLocks";
 import { writeCodeFile } from "../services/framerCanvasService";
+import { queueCodeFileWrite } from "../utils/codeFileQueue";
 import { ARTICLE_TAG_FILE_NAME, articleTagCode } from "../services/articleTag";
 import { PROTECTED_DOWNLOAD_FILE_NAME } from "../services/canvasComponentCodeGenerator";
 import { assetsFailure } from "../services/assetsService";
@@ -396,7 +397,7 @@ export function useSealGuard(): void {
           for (const name of [SECTION_LOCKS_FILE_NAME, LEGACY_SECTION_LOCKS_FILE_NAME]) {
             const locksFile = files.find((file) => file.name === name);
             if (rules && locksFile && staleSectionLocksFile(locksFile.content, rules) && !stopped) {
-              await locksFile.setFileContent(sectionLocksCode(rules));
+              await queueCodeFileWrite(() => locksFile.setFileContent(sectionLocksCode(rules)));
               framer.notify("Updated MemberFrameLocks for this site. Publish to update your live site.", { variant: "info" });
             }
           }
@@ -410,7 +411,7 @@ export function useSealGuard(): void {
           // MemberArticle.tsx holds no creator input: any other content is an older plugin's.
           const articleFile = files.find((file) => file.name === ARTICLE_TAG_FILE_NAME);
           if (articleFile && articleFile.content !== articleTagCode() && !stopped) {
-            await articleFile.setFileContent(articleTagCode());
+            await queueCodeFileWrite(() => articleFile.setFileContent(articleTagCode()));
             framer.notify("Updated MemberArticle for this site. Publish to update your live site.", { variant: "info" });
           }
         }

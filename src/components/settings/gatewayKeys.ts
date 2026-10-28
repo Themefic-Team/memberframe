@@ -225,7 +225,7 @@ export const VAULT_FIELDS: ReadonlyArray<VaultFieldSpec> = [
     role: "secret",
     label: "Secret key",
     secret: true,
-    placeholder: "sk_live_...",
+    placeholder: "Paste the secret key",
   },
   {
     field: "lemonSqueezyStoreId",

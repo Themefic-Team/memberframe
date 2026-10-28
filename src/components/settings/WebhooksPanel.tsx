@@ -605,7 +605,7 @@ const WebhookCard: React.FC<{
 
           <WebhookSection title="Signing secret">
             <div className="webhook-secret-row">
-              <code className="code-chip webhook-secret">{revealed ? hook.secret : "whsec_••••••••••••"}</code>
+              <code className="code-chip webhook-secret">{revealed ? hook.secret : "••••••••••••••••"}</code>
               <IconButton label={revealed ? "Hide secret" : "Show secret"} variant="ghost" onClick={() => setRevealed((value) => !value)}>
                 {revealed ? <EyeOff aria-hidden={true} /> : <Eye aria-hidden={true} />}
               </IconButton>

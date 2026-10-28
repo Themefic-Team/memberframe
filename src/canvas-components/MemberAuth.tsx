@@ -5,7 +5,7 @@
  *
  * It is written into the creator's Framer project and runs on
  * their published site, it may import only `react`, `react-dom` (for the
- * modal's portal), `framer`, and `lucide-react`, all styling is one `cssContent` string, and the marked config
+ * modal's portal), and `framer` (never `lucide-react`: Framer cannot resolve it), all styling is one `cssContent` string, and the marked config
  * block is the only part the generator rewrites.
  *
  * ## Two things make this riskier than most components
@@ -37,17 +37,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Loader2,
-  Mail,
-  MailCheck,
-  ShieldCheck,
-  UserPlus,
-} from "lucide-react";
 
 // ============================================================================
 // LICENSING AND TRIAL STATE
@@ -70,7 +59,7 @@ const IS_TRIAL = false;
 // rewritten in place by the plugin whenever the license changes, and set to
 // locked when the creator signs out of the plugin. The component also asks the
 // server: trial shows the "Made with Framefic" mark, the bottom right corner
-// copied from the BEAF slider; an ended trial or plan blurs the component
+// shared by every Framefic plugin; an ended trial or plan blurs the component
 // behind an Upgrade card. On the published site the server's answer wins. On
 // the canvas the stricter of the two wins, so a signed-out plugin locks the
 // canvas even though the site's plan is still paid, and a locked component
@@ -160,7 +149,7 @@ function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boole
  */
 function mfControls<T extends object>(controls: T): T {
   if (!IS_LOCKED) return controls;
-  // BEAF's "Status" row: the one thing a locked component shows in the panel.
+  // The "Status" row: the one thing a locked component shows in the panel.
   const locked: Record<string, unknown> = {
     mfLockedStatus: {
       type: ControlType.Enum,
@@ -211,7 +200,7 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
     };
   }, [apiBaseUrl, siteKey, seal]);
 
-  // BEAF's countdown: a running trial locks at the second it ends, on the
+  // The countdown: a running trial locks at the second it ends, on the
   // canvas and the live site, without waiting for a reload or the next check.
   useEffect(() => {
     if (license !== "trial" || typeof window === "undefined") return () => undefined;
@@ -2518,7 +2507,7 @@ function isShowing(anchor: HTMLElement | null): boolean {
   return anchor.getClientRects().length > 0;
 }
 
-/** Drawn here: Framer's bundled lucide-react may lack `X`. */
+/** Drawn here: Framer cannot resolve a lucide-react import. */
 function MfCloseMark(): React.ReactElement {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="x">
@@ -4406,3 +4395,106 @@ addPropertyControls(MemberAuth, mfControls({
   ...mfAppearanceControls({ padding: 24, gap: 14, shadow: true }),
   labels: mfLabelControls(AUTH_LABELS),
 }));
+
+// ============================================================================
+// ICONS
+// ============================================================================
+// Inline, tagged with their Lucide names. Framer cannot resolve a lucide-react
+// import from a code file: the file fails to load and Add to canvas stalls
+// (test/canvasIconImports.test.ts). test/canvasIcons.test.ts holds each shape
+// equal to Lucide's. Each draws as lucide-react does: 24px, stroke 2.
+
+interface InlineIconProps {
+  className?: string | undefined;
+  stroke?: string;
+  "aria-hidden"?: boolean;
+}
+
+function iconClass(name: string, className: string | undefined): string {
+  return className ? `lucide lucide-${name} ${className}` : `lucide lucide-${name}`;
+}
+
+function ArrowLeft({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("arrow-left", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="arrow-left">
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
+    </svg>
+  );
+}
+
+function ArrowRight({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("arrow-right", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="arrow-right">
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function Eye({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("eye", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="eye">
+      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOff({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("eye-off", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="eye-off">
+      <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
+      <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+      <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
+      <path d="m2 2 20 20" />
+    </svg>
+  );
+}
+
+function Loader2({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("loader-circle", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="loader-circle">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+function Mail({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("mail", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="mail">
+      <rect width="20" height="16" x="2" y="4" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  );
+}
+
+function MailCheck({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("mail-check", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="mail-check">
+      <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h8" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+      <path d="m16 19 2 2 4-4" />
+    </svg>
+  );
+}
+
+function ShieldCheck({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("shield-check", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="shield-check">
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function UserPlus({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("user-plus", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="user-plus">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" x2="19" y1="8" y2="14" />
+      <line x1="22" x2="16" y1="11" y2="11" />
+    </svg>
+  );
+}

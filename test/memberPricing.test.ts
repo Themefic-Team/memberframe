@@ -43,7 +43,7 @@ const CONTEXT: DeployContext = {
 describe("the component file", () => {
   it("imports only what the Framer runtime supplies", () => {
     const imports = [...source.matchAll(/^import\s[^;]*?from\s+"([^"]+)";/gm)].map((match) => match[1]);
-    expect(new Set(imports)).toEqual(new Set(["react", "framer", "lucide-react"]));
+    expect(new Set(imports)).toEqual(new Set(["react", "framer"]));
   });
 
   it("is offered in the Builder and deployable", () => {

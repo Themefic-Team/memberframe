@@ -11,6 +11,7 @@
  */
 
 import { CONFIG_END_MARKER, CONFIG_START_MARKER } from "../services/canvasComponentCodeGenerator";
+import { queueCodeFileWrite } from "./codeFileQueue";
 
 /** Every component file the Builder writes, licensed or not. */
 export const MEMBERFRAME_FILE_NAMES: ReadonlyArray<string> = [
@@ -66,7 +67,7 @@ export async function syncSiteConfig(
     if (!MEMBERFRAME_FILE_NAMES.includes(file.name) || typeof file.content !== "string") continue;
     const next = patchSiteConfig(file.content, target);
     if (next === null) continue;
-    await file.setFileContent(next);
+    await queueCodeFileWrite(() => file.setFileContent(next));
     changed += 1;
   }
   return changed;

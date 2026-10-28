@@ -14,6 +14,8 @@ export const BRANDING = {
   companyHandle: "@Framefic",
   companyUrl: "https://framefic.com",
   changelogUrl: "https://framefic.com/memberframe/changelog",
+  /** Linked from the consent line before sign in (Marketplace audit C3). UNCONFIRMED, task 8.8. */
+  privacyUrl: "https://framefic.com/privacy",
 } as const;
 
 /**

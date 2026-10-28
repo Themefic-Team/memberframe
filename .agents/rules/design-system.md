@@ -185,7 +185,7 @@ Frosted glass (a translucent fill plus a backdrop blur) is used on exactly three
 
 | Surface | Fill (theme token) | Blur token | Value |
 | :--- | :--- | :--- | :--- |
-| Sheet and dialog backdrop: every `Sheet` and `ConfirmDialog`, the billing dialogs, canvas dialogs | `--px-color-overlay` (billing: `--beaf-overlay`) | `--px-glass-blur-backdrop` | 4px. Not in Figma yet: confirm in Dev Mode |
+| Sheet and dialog backdrop: every `Sheet` and `ConfirmDialog`, the billing dialogs, canvas dialogs | `--px-color-overlay` (billing: `--ffmf-overlay`) | `--px-glass-blur-backdrop` | 4px. Not in Figma yet: confirm in Dev Mode |
 | Frosted lock banner and overlay (`.framefic-locked-overlay`, the canvas `.mf-lock`) | `--framefic-frosted-bg` | `--px-glass-blur-surface` | 8px |
 | Toast | `--px-toast-bg`, 82% in both themes | `--px-glass-blur-toast` | 16px |
 
@@ -383,7 +383,7 @@ Then self-review against this list, and say in your report which items you check
 - **Write CSS files atomically.** A truncate-then-write (`> file`) lets a running Vite dev server cache an empty stylesheet; every token vanishes until the file changes again. The sync script renames from a `.tmp` file. Symptom to recognise: components look right (they have fallbacks) but every kit.css surface is unstyled.
 - **Resolved: tabs.** Was conflict C26 (five tabs). The user chose 4 tabs with Connect behind the Account icon on 2026-10-15. Never re-split Manage.
 - **Resolved: header.** The Figma Plugin header is not built (see section 7).
-- **Resolved: billing screens follow BEAF, not this kit.** The user chose on 2026-10-18 that every Framefic plugin bills the same way, so the F19 screens (sign in modal, trial modals and sticky bar, Profile, Manage Subscription, plans, payment, cancel) are a copy of the BEAF plugin's. They live only in `src/components/billing/` and `src/styles/billing/`, use their own `--beaf-*` tokens keyed by `data-framer-theme`, and are skipped by `lint:design`'s token, type, and copy rules (`BILLING_DIRS` in `lint-design-system.js`). Its icon rules (12 to 14) and glass rule (15) do apply to them since v0.4.6, and so does `lint:css`: no inline styles. Everything else in the panel stays on this kit. Change the billing screens only to follow BEAF.
+- **Resolved: billing screens follow BEAF, not this kit.** The user chose on 2026-10-18 that every Framefic plugin bills the same way, so the F19 screens (sign in modal, trial modals and sticky bar, Profile, Manage Subscription, plans, payment, cancel) are a copy of the BEAF plugin's. They live only in `src/components/billing/` and `src/styles/billing/`, use their own `--ffmf-*` tokens keyed by `data-framer-theme`, and are skipped by `lint:design`'s token, type, and copy rules (`BILLING_DIRS` in `lint-design-system.js`). Its icon rules (12 to 14) and glass rule (15) do apply to them since v0.4.6, and so does `lint:css`: no inline styles. Everything else in the panel stays on this kit. Change the billing screens only to follow BEAF.
 - **Open: heading case.** Figma section headings are sentence case ("More from Pixelfic"); `instruction/INSTRUCTION.md` says Title Case for headings. The code follows the writing rule until the user decides.
 
 ---

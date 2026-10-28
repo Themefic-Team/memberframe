@@ -54,6 +54,8 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
   const [showPlans, setShowPlans] = useState(showPlansRequest > 0);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  /** Fetched on the first click, then offered as a link (Marketplace audit I2: no window.open). */
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [changing, setChanging] = useState(false);
   const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
@@ -176,7 +178,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
     setBillingError(null);
     const result = await fetchBillingPortal(siteId);
     setLoadingPortal(false);
-    if (result.kind === "ok") window.open(result.data.url, "_blank", "noopener,noreferrer");
+    if (result.kind === "ok") setPortalUrl(result.data.url);
     else reportFailure(result, "Failed to open billing portal. Please try again.");
   };
 
@@ -212,15 +214,15 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
   const showType = payingPlan === "monthly" ? "Monthly" : payingPlan === "yearly" ? "Annually" : "One time";
 
   return (
-    <div className="beaf-subscription-page">
-      <button type="button" className="beaf-subpage-back-button-wide" onClick={handleBack} aria-label="Back">
+    <div className="ffmf-subscription-page">
+      <button type="button" className="ffmf-subpage-back-button-wide" onClick={handleBack} aria-label="Back">
         <ArrowLeft aria-hidden={true} />
         <span>Back</span>
       </button>
 
-      <h3 className="beaf-subpage-title-left">Manage Subscription</h3>
+      <h3 className="ffmf-subpage-title-left">Manage Subscription</h3>
 
-      <div className="beaf-subscription-content">
+      <div className="ffmf-subscription-content">
         {!hasSubscription || showPlans ? (
           <PaymentPlans
             plans={plans}
@@ -231,56 +233,69 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
           />
         ) : (
           <>
-            <div className="beaf-subscription-card">
-              <div className="beaf-subscription-detail-item">
-                <span className="beaf-subscription-label">PLAN</span>
-                <span className="beaf-subscription-value">{getPlanName(view?.plan ?? null)}</span>
+            <div className="ffmf-subscription-card">
+              <div className="ffmf-subscription-detail-item">
+                <span className="ffmf-subscription-label">PLAN</span>
+                <span className="ffmf-subscription-value">{getPlanName(view?.plan ?? null)}</span>
               </div>
-              <div className="beaf-subscription-divider" />
-              <div className="beaf-subscription-detail-item">
-                <span className="beaf-subscription-label">STATUS</span>
-                <span className="beaf-subscription-status">{getStatusLabel(view?.status ?? null, hasSubscription)}</span>
+              <div className="ffmf-subscription-divider" />
+              <div className="ffmf-subscription-detail-item">
+                <span className="ffmf-subscription-label">STATUS</span>
+                <span className="ffmf-subscription-status">{getStatusLabel(view?.status ?? null, hasSubscription)}</span>
               </div>
-              <div className="beaf-subscription-divider" />
-              <div className="beaf-subscription-detail-item">
-                <span className="beaf-subscription-label">START DATE</span>
-                <span className="beaf-subscription-value">{formatDate(view?.startedAt ?? null)}</span>
+              <div className="ffmf-subscription-divider" />
+              <div className="ffmf-subscription-detail-item">
+                <span className="ffmf-subscription-label">START DATE</span>
+                <span className="ffmf-subscription-value">{formatDate(view?.startedAt ?? null)}</span>
               </div>
-              <div className="beaf-subscription-divider" />
-              <div className="beaf-subscription-detail-item">
-                <span className="beaf-subscription-label">END DATE</span>
-                <span className="beaf-subscription-value">{endDate}</span>
+              <div className="ffmf-subscription-divider" />
+              <div className="ffmf-subscription-detail-item">
+                <span className="ffmf-subscription-label">END DATE</span>
+                <span className="ffmf-subscription-value">{endDate}</span>
               </div>
-              <div className="beaf-subscription-divider" />
-              <div className="beaf-subscription-detail-item">
-                <span className="beaf-subscription-label">RENEWS</span>
-                <span className="beaf-subscription-value">{isAutoRenew(view)}</span>
+              <div className="ffmf-subscription-divider" />
+              <div className="ffmf-subscription-detail-item">
+                <span className="ffmf-subscription-label">RENEWS</span>
+                <span className="ffmf-subscription-value">{isAutoRenew(view)}</span>
               </div>
             </div>
 
-            {billingError ? <div className="beaf-billing-error">{billingError}</div> : null}
+            {billingError ? <div className="ffmf-billing-error">{billingError}</div> : null}
 
             {trial ? (
-              <div className="beaf-subscription-actions beaf-subscription-actions--column">
-                <button type="button" className="beaf-profile-primary-button" onClick={() => setShowPlans(true)}>
+              <div className="ffmf-subscription-actions ffmf-subscription-actions--column">
+                <button type="button" className="ffmf-profile-primary-button" onClick={() => setShowPlans(true)}>
                   Upgrade to Pro Plan
                 </button>
               </div>
             ) : view?.plan !== "lifetime" ? (
-              <div className="beaf-subscription-actions">
-                <button type="button" className="beaf-subscription-secondary-btn" onClick={() => void handleManageBilling()} disabled={busy}>
-                  {loadingPortal ? "Loading..." : "Manage Billing"}
-                </button>
+              <div className="ffmf-subscription-actions">
+                {portalUrl ? (
+                  <a
+                    className="ffmf-subscription-secondary-btn"
+                    href={portalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    // A portal session is short lived: the next visit fetches a fresh one.
+                    onClick={() => window.setTimeout(() => setPortalUrl(null), 0)}
+                  >
+                    Open Billing Portal
+                  </a>
+                ) : (
+                  <button type="button" className="ffmf-subscription-secondary-btn" onClick={() => void handleManageBilling()} disabled={busy}>
+                    {loadingPortal ? "Loading..." : "Manage Billing"}
+                  </button>
+                )}
                 {canceling ? (
-                  <button type="button" className="beaf-subscription-upgrade-btn" onClick={() => void handleResume()} disabled={busy}>
+                  <button type="button" className="ffmf-subscription-upgrade-btn" onClick={() => void handleResume()} disabled={busy}>
                     {changing ? "Resuming..." : "Resume Subscription"}
                   </button>
                 ) : (
-                  <button type="button" className="beaf-subscription-cancel-btn" onClick={() => setCancelStep(1)} disabled={busy}>
+                  <button type="button" className="ffmf-subscription-cancel-btn" onClick={() => setCancelStep(1)} disabled={busy}>
                     Cancel Subscription
                   </button>
                 )}
-                <button type="button" className="beaf-subscription-upgrade-btn" onClick={() => setShowPlans(true)} disabled={busy}>
+                <button type="button" className="ffmf-subscription-upgrade-btn" onClick={() => setShowPlans(true)} disabled={busy}>
                   Upgrade Plan
                 </button>
               </div>
@@ -290,36 +305,36 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
       </div>
 
       {upgradePreview ? (
-        <div className="beaf-payment-modal">
-          <div className="beaf-payment-box beaf-confirm-box">
-            <h3 className="beaf-confirm-title">Confirm Plan Change</h3>
-            <p className="beaf-confirm-text">
+        <div className="ffmf-payment-modal">
+          <div className="ffmf-payment-box ffmf-confirm-box">
+            <h3 className="ffmf-confirm-title">Confirm Plan Change</h3>
+            <p className="ffmf-confirm-text">
               You are about to switch to the <strong>{getPlanName(upgradePreview.to)}</strong> plan.
             </p>
-            <p className="beaf-confirm-text">
+            <p className="ffmf-confirm-text">
               {upgradePreview.to === "yearly"
                 ? "Your unused monthly time will be credited, and you'll be billed the prorated yearly amount today."
                 : "Your unused subscription time will be calculated as a discount, and you'll be billed the prorated lifetime amount today."}
             </p>
-            <div className="beaf-confirm-rows">
-              <div className="beaf-confirm-row">
+            <div className="ffmf-confirm-rows">
+              <div className="ffmf-confirm-row">
                 <span>Unused time credit</span>
                 <strong>-{money(upgradePreview.creditMinor, upgradePreview.currency)}</strong>
               </div>
-              <div className="beaf-confirm-row">
+              <div className="ffmf-confirm-row">
                 <span>Due today</span>
                 <strong>{money(upgradePreview.amountDueMinor, upgradePreview.currency)}</strong>
               </div>
-              <div className="beaf-confirm-row">
+              <div className="ffmf-confirm-row">
                 <span>Renews</span>
                 <strong>{upgradePreview.nextRenewal ? formatDate(upgradePreview.nextRenewal) : "Never"}</strong>
               </div>
             </div>
-            <div className="beaf-confirm-actions">
-              <button type="button" className="beaf-confirm-cancel" onClick={() => setUpgradePreview(null)}>
+            <div className="ffmf-confirm-actions">
+              <button type="button" className="ffmf-confirm-cancel" onClick={() => setUpgradePreview(null)}>
                 Cancel
               </button>
-              <button type="button" className="beaf-confirm-pay" disabled={changing} onClick={() => void handleChangePlan()}>
+              <button type="button" className="ffmf-confirm-pay" disabled={changing} onClick={() => void handleChangePlan()}>
                 {changing ? "Processing..." : "Pay Now"}
               </button>
             </div>
@@ -328,37 +343,37 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
       ) : null}
 
       {cancelStep ? (
-        <div className="beaf-payment-modal">
-          <div className="beaf-payment-box beaf-cancel-box">
+        <div className="ffmf-payment-modal">
+          <div className="ffmf-payment-box ffmf-cancel-box">
             {cancelStep === 1 ? (
-              <div className="beaf-cancel-step-content">
+              <div className="ffmf-cancel-step-content">
                 <h3>We&apos;re sorry to see you go</h3>
-                <p className="beaf-cancel-intro">Mind telling us why? It helps us improve.</p>
-                <div className="beaf-cancel-options">
+                <p className="ffmf-cancel-intro">Mind telling us why? It helps us improve.</p>
+                <div className="ffmf-cancel-options">
                   {CANCEL_REASONS.map((option) => (
-                    <label key={option} className="beaf-cancel-option-label">
+                    <label key={option} className="ffmf-cancel-option-label">
                       <input
                         type="radio"
                         name="cancelReason"
                         value={option}
                         checked={cancelFeedback === option}
                         onChange={(event) => setCancelFeedback(event.target.value)}
-                        className="beaf-cancel-radio-input"
+                        className="ffmf-cancel-radio-input"
                       />
-                      <span className={`beaf-cancel-radio-custom ${cancelFeedback === option ? "checked" : ""}`}>
-                        {cancelFeedback === option ? <span className="beaf-cancel-radio-dot" /> : null}
+                      <span className={`ffmf-cancel-radio-custom ${cancelFeedback === option ? "checked" : ""}`}>
+                        {cancelFeedback === option ? <span className="ffmf-cancel-radio-dot" /> : null}
                       </span>
-                      <span className="beaf-cancel-option-text">{option}</span>
+                      <span className="ffmf-cancel-option-text">{option}</span>
                     </label>
                   ))}
                 </div>
-                <div className="beaf-cancel-actions-row">
-                  <button type="button" className="beaf-primary-cta" disabled={!cancelFeedback} onClick={() => setCancelStep(2)}>
+                <div className="ffmf-cancel-actions-row">
+                  <button type="button" className="ffmf-primary-cta" disabled={!cancelFeedback} onClick={() => setCancelStep(2)}>
                     Continue
                   </button>
                   <button
                     type="button"
-                    className="beaf-cancel-text-link"
+                    className="ffmf-cancel-text-link"
                     onClick={() => {
                       setCancelFeedback("Skipped");
                       setCancelStep(2);
@@ -371,23 +386,23 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
             ) : null}
 
             {cancelStep === 2 ? (
-              <div className="beaf-cancel-step-content">
+              <div className="ffmf-cancel-step-content">
                 <h3>Confirm cancellation</h3>
-                <p className="beaf-cancel-intro">
+                <p className="ffmf-cancel-intro">
                   You&apos;ll keep full access until your billing period ends on <strong>{formatDate(view?.currentPeriodEnd ?? null)}</strong>. After that:
                 </p>
-                <div className="beaf-cancel-warnings">
+                <div className="ffmf-cancel-warnings">
                   {CANCEL_WARNINGS.map((warning) => (
-                    <div key={warning} className="beaf-cancel-warning-item">
-                      <X className="beaf-cancel-warning-icon" aria-hidden={true} />
+                    <div key={warning} className="ffmf-cancel-warning-item">
+                      <X className="ffmf-cancel-warning-icon" aria-hidden={true} />
                       <span>{warning}</span>
                     </div>
                   ))}
                 </div>
-                <div className="beaf-cancel-actions-row beaf-cancel-actions-row--spaced">
+                <div className="ffmf-cancel-actions-row ffmf-cancel-actions-row--spaced">
                   <button
                     type="button"
-                    className="beaf-primary-cta"
+                    className="ffmf-primary-cta"
                     onClick={() => {
                       setCancelStep(null);
                       setCancelFeedback("");
@@ -397,7 +412,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
                   </button>
                   <button
                     type="button"
-                    className="beaf-subscription-cancel-btn"
+                    className="ffmf-subscription-cancel-btn"
                     disabled={cancelling}
                     onClick={() => {
                       void handleCancelSubscription(cancelFeedback).then((done) => {
@@ -412,18 +427,18 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
             ) : null}
 
             {cancelStep === 3 ? (
-              <div className="beaf-cancel-step-content beaf-cancel-step-content--center">
-                <div className="beaf-cancel-status-icon-wrapper">
+              <div className="ffmf-cancel-step-content ffmf-cancel-step-content--center">
+                <div className="ffmf-cancel-status-icon-wrapper">
                   <Ban aria-hidden={true} />
                 </div>
                 <h3>Subscription canceled</h3>
-                <p className="beaf-cancel-intro">
+                <p className="ffmf-cancel-intro">
                   You&apos;ll have full access until <strong>{formatDate(view?.currentPeriodEnd ?? null)}</strong>. We&apos;d love to have you back anytime.
                 </p>
-                <div className="beaf-cancel-actions-row beaf-cancel-actions-row--spaced">
+                <div className="ffmf-cancel-actions-row ffmf-cancel-actions-row--spaced">
                   <button
                     type="button"
-                    className="beaf-primary-cta beaf-primary-cta--tall"
+                    className="ffmf-primary-cta ffmf-primary-cta--tall"
                     onClick={() => {
                       void refresh();
                       setCancelStep(null);
@@ -432,7 +447,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
                   >
                     Go to Dashboard
                   </button>
-                  <span className="beaf-cancel-resubscribe-text">Changed your mind? Resubscribe anytime</span>
+                  <span className="ffmf-cancel-resubscribe-text">Changed your mind? Resubscribe anytime</span>
                 </div>
               </div>
             ) : null}

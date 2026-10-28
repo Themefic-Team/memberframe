@@ -8,9 +8,15 @@ export interface BannerProps {
   tone?: BannerTone;
   title: string;
   message?: string;
+  /**
+   * One next step: a button (`onClick`), or a link that opens in the browser
+   * (`href`). A link for an address already known, so the panel never calls
+   * `window.open` (Marketplace audit I2).
+   */
   action?: {
     label: string;
-    onClick: () => void;
+    onClick?: () => void;
+    href?: string;
   };
 }
 
@@ -42,9 +48,15 @@ export const Banner: React.FC<BannerProps> = ({ tone = "info", title, message, a
         {message ? <p className="banner-message">{message}</p> : null}
         {action ? (
           <span className="banner-action-wrap">
-            <button type="button" className="banner-action-btn" onClick={action.onClick}>
-              {action.label}
-            </button>
+            {action.href ? (
+              <a className="banner-action-btn" href={action.href} target="_blank" rel="noopener noreferrer" onClick={action.onClick}>
+                {action.label}
+              </a>
+            ) : (
+              <button type="button" className="banner-action-btn" onClick={action.onClick}>
+                {action.label}
+              </button>
+            )}
           </span>
         ) : null}
       </div>

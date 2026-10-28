@@ -4,6 +4,8 @@ import { useConnection } from "../../hooks/useConnection";
 import { useLicense } from "../../hooks/useLicense";
 import { getPlanName, getStatusLabel, notify } from "./billingHelpers";
 import { startTrial } from "../../services/licenseService";
+import { failureMessage } from "../../services/apiClient";
+import { BRANDING } from "../../config/branding";
 
 export interface ProfilePageProps {
   onManageSubscription: () => void;
@@ -11,8 +13,8 @@ export interface ProfilePageProps {
   onSignIn: () => void;
 }
 
-const USER_ICON = <User className="beaf-profile-field-icon" aria-hidden={true} />;
-const MAIL_ICON = <Mail className="beaf-profile-field-icon" aria-hidden={true} />;
+const USER_ICON = <User className="ffmf-profile-field-icon" aria-hidden={true} />;
+const MAIL_ICON = <Mail className="ffmf-profile-field-icon" aria-hidden={true} />;
 
 /**
  * Profile, behind the account icon. F19: a clone of the BEAF plugin's
@@ -22,7 +24,9 @@ const MAIL_ICON = <Mail className="beaf-profile-field-icon" aria-hidden={true} /
  * (`syncPublishedOrigins` in useSealGuard), so the page shows neither.
  */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, onSignUp, onSignIn }) => {
-  const { state, disconnect } = useConnection();
+  const { state, disconnect, linkable, linkProject } = useConnection();
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const { view, apply } = useLicense();
   const [avatarError, setAvatarError] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
@@ -42,16 +46,46 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
 
   if (!connection) {
     return (
-      <div className="beaf-profile-page">
-        <div className="beaf-profile-header">
+      <div className="ffmf-profile-page">
+        <div className="ffmf-profile-header">
           <h3>Profile</h3>
         </div>
-        <div className="beaf-profile-auth-section">
-          <div className="beaf-profile-auth-buttons">
-            <button type="button" className="beaf-profile-auth-btn beaf-profile-primary-button" onClick={onSignUp}>
+        {linkable ? (
+          // Signed in on this browser, project not linked yet (Marketplace
+          // audit I1): nothing is sent until this click, under the consent line.
+          <div className="ffmf-profile-auth-section">
+            <p className="ffmf-auth-consent">
+              By continuing, you agree to create an account to activate your trial and manage your license.{" "}
+              <a href={BRANDING.privacyUrl} target="_blank" rel="noopener noreferrer">
+                Privacy
+              </a>
+            </p>
+            <div className="ffmf-profile-auth-buttons">
+              <button
+                type="button"
+                className="ffmf-profile-auth-btn ffmf-profile-primary-button"
+                disabled={linking}
+                onClick={() => {
+                  setLinking(true);
+                  setLinkError(null);
+                  void linkProject().then((problem) => {
+                    setLinking(false);
+                    if (problem) setLinkError(failureMessage(problem).message);
+                  });
+                }}
+              >
+                {linking ? "Linking..." : "Link This Project"}
+              </button>
+            </div>
+            {linkError ? <div className="ffmf-auth-error">{linkError}</div> : null}
+          </div>
+        ) : null}
+        <div className="ffmf-profile-auth-section">
+          <div className="ffmf-profile-auth-buttons">
+            <button type="button" className="ffmf-profile-auth-btn ffmf-profile-primary-button" onClick={onSignUp}>
               Sign Up
             </button>
-            <button type="button" className="beaf-profile-auth-btn beaf-profile-primary-button" onClick={onSignIn}>
+            <button type="button" className="ffmf-profile-auth-btn ffmf-profile-primary-button" onClick={onSignIn}>
               Sign In
             </button>
           </div>
@@ -67,22 +101,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
   const statusLabel = getStatusLabel(view?.status ?? null, hasSubscription);
 
   return (
-    <div className="beaf-profile-page">
-      <div className="beaf-profile-header">
+    <div className="ffmf-profile-page">
+      <div className="ffmf-profile-header">
         <h3>Profile</h3>
       </div>
 
-      <div className="beaf-profile-hero">
-        <div className="beaf-profile-avatar-container">
+      <div className="ffmf-profile-hero">
+        <div className="ffmf-profile-avatar-container">
           {isProUser || isTrialUser ? (
-            <svg className="beaf-avatar-segmented-ring" viewBox="0 0 100 100" shapeRendering="geometricPrecision">
+            <svg className="ffmf-avatar-segmented-ring" viewBox="0 0 100 100" shapeRendering="geometricPrecision">
               <defs>
-                <linearGradient id="beaf-pro-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="ffmf-pro-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#5271FF" />
                   <stop offset="50%" stopColor="#708AFF" />
                   <stop offset="100%" stopColor="#3B58FF" />
                 </linearGradient>
-                <linearGradient id="beaf-trial-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="ffmf-trial-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#d1a918ff" />
                   <stop offset="50%" stopColor="#a07801ff" />
                   <stop offset="100%" stopColor="#ebce2bff" />
@@ -93,7 +127,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
                 cy="50"
                 r="43"
                 fill="none"
-                stroke={isProUser ? "url(#beaf-pro-ring-grad)" : "url(#beaf-trial-ring-grad)"}
+                stroke={isProUser ? "url(#ffmf-pro-ring-grad)" : "url(#ffmf-trial-ring-grad)"}
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray="60 8"
@@ -102,7 +136,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
             </svg>
           ) : null}
 
-          <div className="beaf-profile-avatar-circle">
+          <div className="ffmf-profile-avatar-circle">
             {connection.creatorAvatarUrl && !avatarError ? (
               <img src={connection.creatorAvatarUrl} alt={displayName} referrerPolicy="no-referrer" onError={() => setAvatarError(true)} />
             ) : (
@@ -111,42 +145,42 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
           </div>
 
           {isProUser ? (
-            <div className="beaf-avatar-badge beaf-avatar-badge--pro" title="Pro Member">
+            <div className="ffmf-avatar-badge ffmf-avatar-badge--pro" title="Pro Member">
               <Crown fill="currentColor" aria-hidden={true} />
               <span>PRO</span>
             </div>
           ) : isTrialUser ? (
-            <div className="beaf-avatar-badge beaf-avatar-badge--trial" title="7-Day Free Trial Active">
+            <div className="ffmf-avatar-badge ffmf-avatar-badge--trial" title="7-Day Free Trial Active">
               <Clock aria-hidden={true} />
               <span>TRIAL</span>
             </div>
           ) : null}
         </div>
-        <div className="beaf-profile-identity">
-          <div className="beaf-profile-name">{displayName}</div>
-          <div className="beaf-profile-email">{displayEmail}</div>
+        <div className="ffmf-profile-identity">
+          <div className="ffmf-profile-name">{displayName}</div>
+          <div className="ffmf-profile-email">{displayEmail}</div>
         </div>
       </div>
 
-      <div className="beaf-profile-plan-card">
-        <div className="beaf-profile-plan-top">
-          <div className="beaf-profile-plan-info">
-            <span className="beaf-profile-plan-label">Plan Type</span>
-            <span className="beaf-profile-plan-name">{planName}</span>
+      <div className="ffmf-profile-plan-card">
+        <div className="ffmf-profile-plan-top">
+          <div className="ffmf-profile-plan-info">
+            <span className="ffmf-profile-plan-label">Plan Type</span>
+            <span className="ffmf-profile-plan-name">{planName}</span>
           </div>
-          <span className={`beaf-profile-plan-status beaf-profile-plan-status--${hasSubscription ? "active" : "inactive"}`}>{statusLabel}</span>
+          <span className={`ffmf-profile-plan-status ffmf-profile-plan-status--${hasSubscription ? "active" : "inactive"}`}>{statusLabel}</span>
         </div>
-        <div className="beaf-profile-plan-divider" />
-        <button type="button" className="beaf-profile-primary-button" onClick={onManageSubscription}>
+        <div className="ffmf-profile-plan-divider" />
+        <button type="button" className="ffmf-profile-primary-button" onClick={onManageSubscription}>
           Manage Subscription
         </button>
       </div>
 
       {/* No card until the license is known: a failed read is not a used trial. */}
       {view && !hasSubscription ? (
-        <div className="beaf-profile-trial-card">
-          <h4 className="beaf-profile-trial-title">Try Pro Free for 7 Days</h4>
-          <p className="beaf-profile-trial-desc">
+        <div className="ffmf-profile-trial-card">
+          <h4 className="ffmf-profile-trial-title">Try Pro Free for 7 Days</h4>
+          <p className="ffmf-profile-trial-desc">
             {view?.state === "trial_claimed_other_site"
               ? `Your free trial is running on ${view.claimedProjectName ?? "another project"}. Upgrade to activate this project.`
               : "Unlock every membership component, payments, and content locks. No credit card required."}
@@ -156,7 +190,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
             // the trial already; this covers one attached without it.
             <button
               type="button"
-              className="beaf-profile-trial-btn beaf-primary-cta"
+              className="ffmf-profile-trial-btn ffmf-primary-cta"
               disabled={isStartingTrial || !connection}
               onClick={() => {
                 if (!connection) return;
@@ -179,26 +213,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
               {isStartingTrial ? "Activating..." : "Start Free Trial"}
             </button>
           ) : (
-            <button type="button" disabled className="beaf-profile-trial-btn-claimed">
+            <button type="button" disabled className="ffmf-profile-trial-btn-claimed">
               Trial already claimed
             </button>
           )}
         </div>
       ) : null}
 
-      <div className="beaf-profile-section">
-        <h4 className="beaf-profile-section-title">Personal Info</h4>
-        <div className="beaf-profile-fields-card">
-          <div className="beaf-profile-field">
+      <div className="ffmf-profile-section">
+        <h4 className="ffmf-profile-section-title">Personal Info</h4>
+        <div className="ffmf-profile-fields-card">
+          <div className="ffmf-profile-field">
             <label>Name</label>
-            <div className="beaf-profile-input-wrapper">
+            <div className="ffmf-profile-input-wrapper">
               {USER_ICON}
               <input type="text" value={displayName} readOnly />
             </div>
           </div>
-          <div className="beaf-profile-field">
+          <div className="ffmf-profile-field">
             <label>Email</label>
-            <div className="beaf-profile-input-wrapper">
+            <div className="ffmf-profile-input-wrapper">
               {MAIL_ICON}
               <input type="email" value={displayEmail} readOnly />
             </div>
@@ -206,16 +240,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
         </div>
       </div>
 
-      <div className="beaf-profile-logout-wrap">
+      <div className="ffmf-profile-logout-wrap">
         <button
           type="button"
-          className="beaf-profile-logout-btn"
+          className="ffmf-profile-logout-btn"
           onClick={() => {
             void disconnect().then(() => notify({ type: "Success", message: "Signed out" }));
           }}
         >
           Sign Out
-          <LogOut className="beaf-logout-icon" aria-hidden={true} />
+          <LogOut className="ffmf-logout-icon" aria-hidden={true} />
         </button>
       </div>
     </div>

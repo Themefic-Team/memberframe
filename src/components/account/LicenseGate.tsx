@@ -15,6 +15,8 @@ export const LicenseBanner: React.FC = () => {
   const { connection } = useConnection();
   const showToast = useToast();
   const [working, setWorking] = useState(false);
+  /** The billing portal's address once fetched: shown as a link, never window.open (audit I2). */
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
   const notice = licenseNotice(view, now);
   if (!notice || notice.kind === "trial" || !connection) return null;
 
@@ -24,15 +26,28 @@ export const LicenseBanner: React.FC = () => {
         tone="danger"
         title="Your payment failed"
         message="Update your card so your plan keeps running. Stripe will try again over the next few days."
-        action={{
-          label: "Update card",
-          onClick: () => {
-            void fetchBillingPortal(connection.siteId).then((result) => {
-              if (result.kind === "ok") window.open(result.data.url, "_blank", "noopener,noreferrer");
-              else showToast({ tone: "error", message: "Could not open billing" });
-            });
-          },
-        }}
+        action={
+          portalUrl
+            ? {
+                label: "Open billing portal",
+                href: portalUrl,
+                // A portal session is short lived: fetch a fresh one next time.
+                // After the browser has followed the link, not before.
+                onClick: () => window.setTimeout(() => setPortalUrl(null), 0),
+              }
+            : {
+                label: working ? "Loading" : "Update card",
+                onClick: () => {
+                  if (working) return;
+                  setWorking(true);
+                  void fetchBillingPortal(connection.siteId).then((result) => {
+                    setWorking(false);
+                    if (result.kind === "ok") setPortalUrl(result.data.url);
+                    else showToast({ tone: "error", message: "Could not open billing" });
+                  });
+                },
+              }
+        }
       />
     );
   }

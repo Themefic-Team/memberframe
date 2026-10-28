@@ -10,6 +10,26 @@ Scope:
 
 Verdict: **not ready to submit.** 4 items must change, 8 should improve, and the rest pass. The backend is in good shape. The blockers are in the plugin and in the missing reviewer pack.
 
+## Fix Status (28 Oct 2026)
+
+Every item is addressed. The full change log, file list, and human checks are in
+[`development-docs/34-marketplace-audit-fixes.md`](development-docs/34-marketplace-audit-fixes.md).
+
+| ID | Status |
+| :--- | :--- |
+| C1 | Fixed: token in `localStorage` per project, legacy plugin data token deleted |
+| C2 | Fixed: `@stripe/stripe-js/pure`, loaded on demand, fraud signals off |
+| C3 | Fixed: consent line above sign in and Link This Project |
+| C4 | Written: [`framer-review-instructions.md`](framer-review-instructions.md), [`framer-data-justification.md`](framer-data-justification.md). **Open: create the coupon in live Stripe** |
+| I1 | Fixed: linking a project waits for a click |
+| I2 | Fixed: no `window.open` in the panel |
+| I3 | Fixed: plain placeholders |
+| I4 | Fixed: source maps, icon link |
+| I5 | Fixed (backend): no IP stored, migration clears old values |
+| I6 | Verified, hardened, and tested |
+| I7 | Justified in the letter |
+| I8 | Justified in the letter. **Open: add it to the privacy page** |
+
 ## Status Legend
 
 | Status | Meaning |

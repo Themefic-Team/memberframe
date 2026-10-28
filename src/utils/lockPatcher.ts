@@ -17,6 +17,7 @@
  */
 
 import type { CanvasLicense } from "../services/licenseService";
+import { queueCodeFileWrite } from "./codeFileQueue";
 
 /** Every component that shows the watermark or the lock: all of them, the bookmarks included since 2026-10-25. */
 export const LICENSED_FILE_NAMES: ReadonlyArray<string> = [
@@ -86,7 +87,8 @@ export async function enforceLockState(
       continue;
     }
     if (next === file.content.replace(/\r\n/g, "\n")) continue;
-    await file.setFileContent(next);
+    // Queued: a save racing another MemberFrame save makes Framer answer 502.
+    await queueCodeFileWrite(() => file.setFileContent(next));
     patched.push(file.name);
   }
   return { patched, skipped };

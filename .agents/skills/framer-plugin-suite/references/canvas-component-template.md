@@ -8,7 +8,9 @@ It seamlessly integrates:
 3. **Dual-Layer Pro-Lock**: Renders the Frosted Pro Lock Banner when locked.
 4. **1-Instance Trial Limit & Duplicate Protection**: Uses `window.__instances__` to block duplicate copies on canvas.
 5. **Trial Watermark Badge & Automatic Removal**: Renders the company watermark during trial, automatically removed when paid.
-6. **Strict Icon Standard**: Lucide React icons or Framer SVG icons only (Strictly Zero Emojis).
+6. **Strict Icon Standard**: Lucide icons or Framer SVG icons only (Strictly Zero Emojis).
+
+> **Do not import `lucide-react` in a canvas component.** Framer resolves only `react`, `react-dom`, and `framer` in a code file. Any other import fails with "Unable to resolve specifier", the file never loads, and Add to canvas stalls (seen 2026-10-28 in MemberFrame). Draw each icon as inline svg copied from Lucide and tag it `data-lucide="<name>"`. MemberFrame enforces this in `test/canvasIconImports.test.ts`.
 
 ---
 
@@ -17,7 +19,7 @@ It seamlessly integrates:
 ```tsx
 import React, { useEffect, useId, useMemo } from "react";
 import { addPropertyControls, ControlType } from "framer";
-import { Lock, Crown, ExternalLink, Sparkles } from "lucide-react";
+// Lock, Crown, ExternalLink, Sparkles: inline svg functions at the end of the file, never an import.
 
 // ============================================================================
 // LICENSING & TRIAL STATE (Managed via enforceLockState regex auto-patcher)

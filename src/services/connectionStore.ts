@@ -1,6 +1,27 @@
 /**
  * Where the connection and the creator token live between panel opens.
  *
+ * ## Current rule (Framer Marketplace audit C1, 2026-10-28)
+ *
+ * The connection (site id, site key, project id: no secrets) stays in plugin
+ * data. The creator token is in this browser's `localStorage`, keyed by the
+ * Framer project the panel is open in, and never in plugin data. Plugin data
+ * syncs to every collaborator and travels with a duplicated or remixed
+ * project, so a token there handed admin access to the site's members and
+ * payments to anyone holding a copy. The Marketplace guide forbids tokens in
+ * `setPluginData`. This reverses PRD S2 for this one value; recorded as the
+ * resolution of conflict C27 in PRD section 17.
+ *
+ * Keyed by the open project's id, not the id inside the stored connection: a
+ * duplicated project carries the original's connection, and must not find the
+ * original's token even in the same browser.
+ *
+ * A token an older version left in plugin data is deleted on first load and
+ * never copied: copying it would give it to whichever collaborator opened the
+ * plugin first. The creator signs in once more.
+ *
+ * The history below explains why plugin data was chosen first.
+ *
  * ## The token problem, stated plainly
  *
  * PRD section 14.1 S2 bars a token from `localStorage`, and it is right to: a
@@ -48,7 +69,36 @@ import type { SiteConnection } from "../types/connection";
  * payload, not for this.
  */
 const CONNECTION_KEY = "memberframe.connection";
-const TOKEN_KEY = "memberframe.creatorToken";
+/** Plugin data key an older version stored the token under. Only ever cleared now. */
+const LEGACY_TOKEN_KEY = "memberframe.creatorToken";
+/** `localStorage` key prefix; the Framer project id follows. */
+export const LOCAL_TOKEN_PREFIX = "memberframe:creatorToken:";
+
+/** The token for a project from this browser's storage, or null. Never throws. */
+export function readLocalToken(projectId: string): string | null {
+  if (!projectId) return null;
+  try {
+    const value = window.localStorage.getItem(LOCAL_TOKEN_PREFIX + projectId);
+    return value && value.trim() !== "" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Store or remove a project's token in this browser. False when storage is blocked. */
+export function writeLocalToken(projectId: string, token: string | null): boolean {
+  if (!projectId) return false;
+  try {
+    if (token) window.localStorage.setItem(LOCAL_TOKEN_PREFIX + projectId, token);
+    else window.localStorage.removeItem(LOCAL_TOKEN_PREFIX + projectId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The project the stored token belongs to, so a disconnect removes the right entry. */
+let tokenProjectId: string | null = null;
 
 /**
  * The token, in memory, for the life of this panel.
@@ -158,12 +208,16 @@ export interface StoredConnection {
  * make resolves `unauthorized`, so returning it would produce a panel that
  * looks connected and does nothing. Both or neither.
  */
-export async function loadStoredConnection(): Promise<StoredConnection | null> {
-  const [rawConnection, rawToken] = await Promise.all([
+export async function loadStoredConnection(projectId: string): Promise<StoredConnection | null> {
+  const [rawConnection, legacyToken] = await Promise.all([
     readKey(CONNECTION_KEY),
-    readKey(TOKEN_KEY),
+    readKey(LEGACY_TOKEN_KEY),
   ]);
 
+  // An older version's token in shared plugin data: delete, never adopt.
+  if (legacyToken) void writeKey(LEGACY_TOKEN_KEY, null);
+
+  const rawToken = readLocalToken(projectId);
   if (!rawConnection || !rawToken) return null;
 
   let parsed: unknown;
@@ -179,6 +233,7 @@ export async function loadStoredConnection(): Promise<StoredConnection | null> {
   if (!connection) return null;
 
   cachedToken = rawToken;
+  tokenProjectId = projectId;
   setCreatorToken(rawToken);
   return { connection, token: rawToken };
 }
@@ -219,12 +274,13 @@ function asConnection(value: unknown): SiteConnection | null {
 
 export async function saveConnection(connection: SiteConnection, token: string): Promise<void> {
   cachedToken = token;
+  tokenProjectId = connection.framerProjectId;
   setCreatorToken(token);
 
-  // The token first. If only one of the two writes lands, a stored token with
-  // no connection is recoverable (the panel re-reads the session from the
-  // server), while a stored connection with no token is the broken half.
-  await writeKey(TOKEN_KEY, token);
+  // The token in this browser only; the connection, which holds no secret, in
+  // the project. Blocked storage keeps the token for this session and asks for
+  // a code next time, which the Connect tab explains.
+  if (!writeLocalToken(connection.framerProjectId, token)) storageWorked = false;
   await writeKey(CONNECTION_KEY, JSON.stringify(connection));
 }
 
@@ -236,7 +292,8 @@ export async function saveConnectionOnly(connection: SiteConnection): Promise<vo
 export async function clearConnection(): Promise<void> {
   cachedToken = null;
   setCreatorToken(null);
-  await writeKey(TOKEN_KEY, null);
+  if (tokenProjectId) writeLocalToken(tokenProjectId, null);
+  tokenProjectId = null;
   await writeKey(CONNECTION_KEY, null);
 }
 
@@ -252,13 +309,17 @@ export function currentCreatorToken(): string | null {
 }
 
 /**
- * Drop the in-memory token without clearing storage.
+ * Drop a token the server refused, keeping the connection.
  *
- * For a 401: the stored token is no longer accepted, so the panel must stop
- * sending it, but a transient server problem should not wipe a creator's
- * connection. `clearConnection` is for a deliberate disconnect.
+ * For a 401 only: the token is no longer accepted, so the panel stops sending
+ * it and this browser forgets it, but the project's connection stays, so a
+ * sign in picks the same site up again. A server that is merely unreachable
+ * never calls this. `clearConnection` is for a deliberate disconnect.
  */
 export function forgetTokenInMemory(): void {
   cachedToken = null;
   setCreatorToken(null);
+  // The server refused it: it will never work again, so do not keep it.
+  if (tokenProjectId) writeLocalToken(tokenProjectId, null);
+  tokenProjectId = null;
 }

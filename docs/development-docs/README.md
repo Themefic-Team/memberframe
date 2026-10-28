@@ -65,6 +65,8 @@ Status values: `planned`, `in progress`, `done`.
 | `22-shared-password.md` | Shared Password Access | F22 | 3 | P2 | planned |
 | `23-localization.md` | Multi-Language Localization | F23 | 4 | P2 | planned |
 | `24-outbound-webhooks.md` | Outbound Webhooks and Zapier Events | F24 | 4 | P3 | planned |
+| `35-marketplace-review-report.md` | Marketplace Review Report: Problems and Solutions (Bangla) | sections 12, 13, 14, no F number | pre-submission | P0 | planned |
+| `36-marketplace-review-fix-workflow.md` | Marketplace Review Fix Workflow, Step by Step (Bangla) | sections 12, 13, 14, no F number | pre-submission | P0 | planned |
 
 24 features, 24 docs, plus three `00-` infrastructure docs that have no F number: the shell, the test harness, and the API client.
 

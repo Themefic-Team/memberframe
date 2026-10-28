@@ -12,16 +12,16 @@ export const WatermarkNotice: React.FC<{ onUpgrade?: () => void }> = ({ onUpgrad
 
   return (
     <div
-      className={`beaf-watermark-notice is-trial ${onUpgrade ? "is-clickable" : ""}`}
+      className={`ffmf-watermark-notice is-trial ${onUpgrade ? "is-clickable" : ""}`}
       onClick={onUpgrade}
       title={onUpgrade ? "Click to view upgrade plans" : undefined}
     >
-      <div className="beaf-watermark-notice-icon-col">
-        <Info className="beaf-watermark-notice-icon" aria-hidden={true} />
+      <div className="ffmf-watermark-notice-icon-col">
+        <Info className="ffmf-watermark-notice-icon" aria-hidden={true} />
       </div>
-      <div className="beaf-watermark-notice-text-col">
-        <div className="beaf-watermark-notice-title">Notice</div>
-        <div className="beaf-watermark-notice-desc">After purchasing, the watermark will be removed automatically</div>
+      <div className="ffmf-watermark-notice-text-col">
+        <div className="ffmf-watermark-notice-title">Notice</div>
+        <div className="ffmf-watermark-notice-desc">After purchasing, the watermark will be removed automatically</div>
       </div>
     </div>
   );

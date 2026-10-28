@@ -5,9 +5,9 @@ import { Check } from "lucide-react";
 export const PaymentSuccessModal: React.FC<{ isOpen: boolean }> = ({ isOpen }) => {
   if (!isOpen) return null;
   return (
-    <div className="beaf-payment-modal success-modal">
-      <div className="beaf-payment-box beaf-success-box">
-        <div className="beaf-success-icon">
+    <div className="ffmf-payment-modal success-modal">
+      <div className="ffmf-payment-box ffmf-success-box">
+        <div className="ffmf-success-icon">
           <Check aria-hidden={true} />
         </div>
         <h3>Payment Completed</h3>

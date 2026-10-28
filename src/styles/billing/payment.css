@@ -6,8 +6,8 @@
  * Edit it only to stay in step with BEAF.
  */
 
-/* buy now beaf Start*/
-.beaf-payment-button {
+/* buy now ffmf Start*/
+.ffmf-payment-button {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -15,12 +15,12 @@
   margin-top: 12px;
   position: sticky;
   bottom: 0;
-  background: var(--beaf-surface-2, #242323);
+  background: var(--ffmf-surface-2, #242323);
   padding: 8px 0 2px 0;
   z-index: 5;
 }
 
-.beaf-payment-modal .beaf-payment-button button {
+.ffmf-payment-modal .ffmf-payment-button button {
   flex: 1;
   border-radius: 4px;
   border: 0;
@@ -38,31 +38,31 @@
   transition: .25s all ease;
 }
 
-.beaf-payment-modal .beaf-payment-button .beaf-payment-cancel {
+.ffmf-payment-modal .ffmf-payment-button .ffmf-payment-cancel {
   background: linear-gradient(180deg, #BFBFBF 0%, #8C8C8C 100%);
-  color: var(--beaf-cancel-text);
+  color: var(--ffmf-cancel-text);
 }
 
-.beaf-payment-modal .beaf-payment-button .beaf-payment-cancel:hover {
+.ffmf-payment-modal .ffmf-payment-button .ffmf-payment-cancel:hover {
   background: linear-gradient(180deg, #D2D2D2 0%, #A5A5A5 100%);
 }
 
-.beaf-payment-modal .beaf-payment-button .beaf-buy-now-button {
+.ffmf-payment-modal .ffmf-payment-button .ffmf-buy-now-button {
   margin: 0;
   background: linear-gradient(180deg, #5271FF 0%, #004AAD 100%);
   color: #FFF;
 }
 
-.beaf-payment-modal .beaf-payment-button .beaf-buy-now-button:hover {
+.ffmf-payment-modal .ffmf-payment-button .ffmf-buy-now-button:hover {
   background: linear-gradient(180deg, #3358FF 0%, #003D8F 100%);
 }
 
-.beaf-payment-box {
+.ffmf-payment-box {
   padding: 12px;
 }
 
-.beaf-payment-box h3 {
-  color: var(--beaf-heading);
+.ffmf-payment-box h3 {
+  color: var(--ffmf-heading);
   font-family: "Mulish", sans-serif;
   font-size: 15px;
   font-style: normal;
@@ -70,8 +70,8 @@
   margin: 0 0 10px 0;
 }
 
-.beaf-payment-box p {
-  color: var(--beaf-text-muted);
+.ffmf-payment-box p {
+  color: var(--ffmf-text-muted);
   font-size: 13px;
   font-weight: 400;
   line-height: 140%;
@@ -79,11 +79,11 @@
 
 }
 
-.beaf-payment-modal {
+.ffmf-payment-modal {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: var(--beaf-overlay);
+  background: var(--ffmf-overlay);
   -webkit-backdrop-filter: blur(var(--px-glass-blur-backdrop));
   backdrop-filter: blur(var(--px-glass-blur-backdrop));
   display: flex;
@@ -93,74 +93,74 @@
   box-sizing: border-box;
 }
 
-.beaf-payment-modal .beaf-payment-box {
+.ffmf-payment-modal .ffmf-payment-box {
   width: 100%;
   max-width: 304px;
   max-height: calc(100vh - 16px);
   border-radius: 10px;
-  border: 1px solid var(--beaf-surface-border);
-  background: linear-gradient(180deg, var(--beaf-surface) 0%, var(--beaf-surface-2) 100%);
-  box-shadow: 0 14px 24px 0 var(--beaf-shadow);
+  border: 1px solid var(--ffmf-surface-border);
+  background: linear-gradient(180deg, var(--ffmf-surface) 0%, var(--ffmf-surface-2) 100%);
+  box-shadow: 0 14px 24px 0 var(--ffmf-shadow);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.beaf-payment-form {
+.ffmf-payment-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.beaf-payment-modal .beaf-payment-box button:disabled {
+.ffmf-payment-modal .ffmf-payment-box button:disabled {
   opacity: 0.65;
   pointer-events: none;
 }
 
-.beaf-success-box {
+.ffmf-success-box {
   text-align: center;
 }
 
-.beaf-success-box .beaf-success-icon {
+.ffmf-success-box .ffmf-success-icon {
   font-size: 28px;
 }
 
-.beaf-success-box h3 {
+.ffmf-success-box h3 {
   font-size: 20px;
   margin-bottom: 5px;
 }
 
-.beaf-success-box p {
+.ffmf-success-box p {
   font-size: 14px;
   margin-bottom: 5px;
 }
 
-.beaf-success-box small {
+.ffmf-success-box small {
   font-size: 12px;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-family: "Mulish", sans-serif;
 }
 
-.beaf-plans-container {
+.ffmf-plans-container {
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: 100%;
 }
 
-.beaf-interval-toggle-container {
+.ffmf-interval-toggle-container {
   display: flex;
-  background: var(--beaf-surface);
+  background: var(--ffmf-surface);
   padding: 4px;
   border-radius: 10px;
-  border: 1px solid var(--beaf-surface-border);
+  border: 1px solid var(--ffmf-surface-border);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.beaf-interval-btn {
+.ffmf-interval-btn {
   flex: 1;
   border: none;
   background: transparent;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 13px;
   font-weight: 600;
   padding: 8px 12px;
@@ -173,12 +173,12 @@
   gap: 6px;
 }
 
-.beaf-interval-btn:hover {
-  color: var(--beaf-heading);
+.ffmf-interval-btn:hover {
+  color: var(--ffmf-heading);
   background: transparent;
 }
 
-.beaf-interval-btn.active {
+.ffmf-interval-btn.active {
   color: #fff;
   /* Body/Small/Semi Bold */
   font-family: "Inter", sans-serif;
@@ -203,7 +203,7 @@
   border-radius: 10px;
 }
 
-.beaf-interval-btn .save-badge {
+.ffmf-interval-btn .save-badge {
   font-size: 10px;
   color: #22c55e;
   font-weight: 700;
@@ -213,14 +213,14 @@
   transition: all 0.2s ease;
 }
 
-.beaf-interval-btn.active .save-badge {
+.ffmf-interval-btn.active .save-badge {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.25);
 }
 
-.beaf-plan-card {
-  background: linear-gradient(180deg, var(--beaf-surface-2) 0%, var(--beaf-surface-3) 100%);
-  border: 1px solid var(--beaf-surface-border);
+.ffmf-plan-card {
+  background: linear-gradient(180deg, var(--ffmf-surface-2) 0%, var(--ffmf-surface-3) 100%);
+  border: 1px solid var(--ffmf-surface-border);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -230,59 +230,59 @@
   transition: all 0.2s ease;
 }
 
-.beaf-plan-card.current {
-  border-color: var(--beaf-color-1);
-  box-shadow: 0 0 0 1px var(--beaf-color-1), 0 12px 30px rgba(62, 103, 235, 0.15);
+.ffmf-plan-card.current {
+  border-color: var(--ffmf-color-1);
+  box-shadow: 0 0 0 1px var(--ffmf-color-1), 0 12px 30px rgba(62, 103, 235, 0.15);
 }
 
-.beaf-plan-card .plan-header {
+.ffmf-plan-card .plan-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.beaf-plan-card .plan-name {
+.ffmf-plan-card .plan-name {
   font-size: 15px;
   font-weight: 700;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
 }
 
-.beaf-plan-card .plan-price {
+.ffmf-plan-card .plan-price {
   font-size: 28px;
   font-weight: 800;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
   display: flex;
   align-items: baseline;
 }
 
-.beaf-plan-card .plan-suffix {
+.ffmf-plan-card .plan-suffix {
   font-size: 13px;
   font-weight: 500;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   margin-left: 2px;
 }
 
-.beaf-plan-card .plan-features {
+.ffmf-plan-card .plan-features {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.beaf-plan-card .feature-item {
+.ffmf-plan-card .feature-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 12px;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-plan-card .checkmark {
-  color: var(--beaf-text-muted);
+.ffmf-plan-card .checkmark {
+  color: var(--ffmf-text-muted);
   flex-shrink: 0;
 }
 
-.beaf-plan-card .plan-action-btn {
+.ffmf-plan-card .plan-action-btn {
   width: 100%;
   border-radius: 10px;
   font-size: 13px;
@@ -311,28 +311,28 @@
   transition: background 0.2s ease;
 }
 
-.beaf-plan-card .plan-action-btn:hover {
+.ffmf-plan-card .plan-action-btn:hover {
   background: linear-gradient(180deg, #4b5563 0%, #1f2937 100%);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-.beaf-plan-card .plan-action-btn:disabled {
+.ffmf-plan-card .plan-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.beaf-plan-card .plan-action-btn.current {
-  background: var(--beaf-surface-2);
-  border-color: var(--beaf-surface-border);
-  color: var(--beaf-text-muted);
+.ffmf-plan-card .plan-action-btn.current {
+  background: var(--ffmf-surface-2);
+  border-color: var(--ffmf-surface-border);
+  color: var(--ffmf-text-muted);
   cursor: default;
   opacity: 0.8;
   box-shadow: none;
 }
 
-.beaf-plans-divider {
+.ffmf-plans-divider {
   text-align: center;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 12px;
   font-weight: 500;
   margin: auto;
@@ -340,17 +340,17 @@
   opacity: 0.7;
 }
 
-.beaf-plan-card.lifetime {
-  background: linear-gradient(180deg, var(--beaf-surface-2) 0%, var(--beaf-surface-3) 100%);
+.ffmf-plan-card.lifetime {
+  background: linear-gradient(180deg, var(--ffmf-surface-2) 0%, var(--ffmf-surface-3) 100%);
 }
 
-.beaf-plan-card.lifetime .lifetime-title-row {
+.ffmf-plan-card.lifetime .lifetime-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.beaf-plan-card.lifetime .lifetime-save-badge {
+.ffmf-plan-card.lifetime .lifetime-save-badge {
   background: rgba(217, 119, 6, 0.15);
   color: #f59e0b;
   border: 1px solid rgba(217, 119, 6, 0.25);
@@ -360,23 +360,23 @@
   border-radius: 4px;
 }
 
-.beaf-plan-card .feature-item.spots-remaining {
+.ffmf-plan-card .feature-item.spots-remaining {
   color: #f59e0b;
 }
 
-.beaf-plan-card .feature-item.spots-remaining .checkmark {
+.ffmf-plan-card .feature-item.spots-remaining .checkmark {
   color: #f59e0b;
 }
 
 /* ── Coupon code section (monthly plan only) ── */
-.beaf-coupon-section {
+.ffmf-coupon-section {
   width: 100%;
 }
 
-.beaf-coupon-toggle {
+.ffmf-coupon-toggle {
   background: none;
   border: none;
-  color: var(--beaf-color-1);
+  color: var(--ffmf-color-1);
   font-size: 12px;
   font-family: "Inter", sans-serif;
   font-weight: 500;
@@ -391,24 +391,24 @@
   justify-content: flex-start;
 }
 
-.beaf-coupon-toggle:hover {
+.ffmf-coupon-toggle:hover {
   opacity: 1;
   background: transparent;
 }
 
-.beaf-coupon-input-row {
+.ffmf-coupon-input-row {
   display: flex;
   gap: 4px;
   align-items: center;
 }
 
-.beaf-coupon-input {
+.ffmf-coupon-input {
   flex: 1;
   padding: 5px 8px;
   border-radius: 4px;
-  border: 1px solid var(--beaf-surface-border);
-  background: var(--beaf-surface-3);
-  color: var(--beaf-heading);
+  border: 1px solid var(--ffmf-surface-border);
+  background: var(--ffmf-surface-3);
+  color: var(--ffmf-heading);
   font-size: 11px;
   font-family: "Inter", sans-serif;
   font-weight: 600;
@@ -417,20 +417,20 @@
   transition: border-color 0.15s;
 }
 
-.beaf-coupon-input:focus {
-  border-color: var(--beaf-color-1);
+.ffmf-coupon-input:focus {
+  border-color: var(--ffmf-color-1);
 }
 
-.beaf-coupon-input::placeholder {
-  color: var(--beaf-text-muted);
+.ffmf-coupon-input::placeholder {
+  color: var(--ffmf-text-muted);
   font-weight: 400;
 }
 
-.beaf-coupon-clear {
-  background: var(--beaf-surface-3);
-  border: 1px solid var(--beaf-surface-border);
+.ffmf-coupon-clear {
+  background: var(--ffmf-surface-3);
+  border: 1px solid var(--ffmf-surface-border);
   border-radius: 4px;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 11px;
   width: 24px;
   height: 24px;
@@ -442,16 +442,16 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.beaf-coupon-clear:hover {
-  background: var(--beaf-surface-border);
-  color: var(--beaf-heading);
+.ffmf-coupon-clear:hover {
+  background: var(--ffmf-surface-border);
+  color: var(--ffmf-heading);
 }
 
-/* buy now beaf End*/
+/* buy now ffmf End*/
 
 
 .add-slider-button,
-.beaf-buy-now-button {
+.ffmf-buy-now-button {
   color: #fff;
   font-family: "Inter", sans-serif;
   font-size: 13px;
@@ -479,7 +479,7 @@
 }
 
 .add-slider-button:hover,
-.beaf-buy-now-button:hover {
+.ffmf-buy-now-button:hover {
   filter: brightness(1.08);
 }
 
@@ -491,14 +491,14 @@
 }
 
 .add-slider-button:focus-visible,
-.beaf-buy-now-button:focus-visible,
+.ffmf-buy-now-button:focus-visible,
 .trial-badge-btn:focus-visible {
   outline: 2px solid #5271FF;
   outline-offset: 2px;
 }
 
 /* ── Sticky Trial Banner ── */
-.beaf-trial-sticky-banner {
+.ffmf-trial-sticky-banner {
   background-color: #ffd02c;
   color: #111111;
   display: flex;
@@ -514,7 +514,7 @@
   flex-shrink: 0;
 }
 
-.beaf-trial-sticky-upgrade-btn {
+.ffmf-trial-sticky-upgrade-btn {
   background: transparent !important;
   color: #111111 !important;
   border: none !important;
@@ -538,37 +538,37 @@
   }
 }
 
-.beaf-trial-sticky-upgrade-btn:hover {
+.ffmf-trial-sticky-upgrade-btn:hover {
   scale: 1.05;
 }
 
 /* ── Cancel Wizard Modal Styles ── */
-.beaf-cancel-box {
-  background: linear-gradient(180deg, var(--beaf-surface-2) 0%, var(--beaf-surface-3) 100%) !important;
-  border: 1px solid var(--beaf-surface-border) !important;
+.ffmf-cancel-box {
+  background: linear-gradient(180deg, var(--ffmf-surface-2) 0%, var(--ffmf-surface-3) 100%) !important;
+  border: 1px solid var(--ffmf-surface-border) !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5) !important;
 }
 
-.beaf-cancel-option-label:hover .beaf-cancel-radio-custom {
+.ffmf-cancel-option-label:hover .ffmf-cancel-radio-custom {
   border-color: #5271FF !important;
   background-color: rgba(82, 113, 255, 0.05) !important;
 }
 
-.beaf-cancel-text-link:hover {
-  color: var(--beaf-heading) !important;
+.ffmf-cancel-text-link:hover {
+  color: var(--ffmf-heading) !important;
   text-decoration: underline !important;
 }
 
 
-.beaf-cancel-resubscribe-text {
+.ffmf-cancel-resubscribe-text {
   text-align: center;
   margin-top: 4px;
   opacity: 0.8;
   font-size: 11px;
 }
 
-.beaf-primary-cta,
-.beaf-profile-primary-button {
+.ffmf-primary-cta,
+.ffmf-profile-primary-button {
   color: #fff;
   /* Body/Small/Semi Bold */
   font-family: "Inter", sans-serif;

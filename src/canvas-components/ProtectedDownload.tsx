@@ -36,7 +36,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
-import { Loader2, Lock } from "lucide-react";
 
 // ============================================================================
 // LICENSING AND TRIAL STATE
@@ -58,7 +57,7 @@ const IS_TRIAL = false;
 // rewritten in place by the plugin whenever the license changes, and set to
 // locked when the creator signs out of the plugin. The component also asks the
 // server: trial shows the "Made with Framefic" mark, the bottom right corner
-// copied from the BEAF slider; an ended trial or plan blurs the component
+// shared by every Framefic plugin; an ended trial or plan blurs the component
 // behind an Upgrade card. On the published site the server's answer wins. On
 // the canvas the stricter of the two wins, so a signed-out plugin locks the
 // canvas even though the site's plan is still paid, and a locked component
@@ -148,7 +147,7 @@ function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boole
  */
 function mfControls<T extends object>(controls: T): T {
   if (!IS_LOCKED) return controls;
-  // BEAF's "Status" row: the one thing a locked component shows in the panel.
+  // The "Status" row: the one thing a locked component shows in the panel.
   const locked: Record<string, unknown> = {
     mfLockedStatus: {
       type: ControlType.Enum,
@@ -199,7 +198,7 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
     };
   }, [apiBaseUrl, siteKey, seal]);
 
-  // BEAF's countdown: a running trial locks at the second it ends, on the
+  // The countdown: a running trial locks at the second it ends, on the
   // canvas and the live site, without waiting for a reload or the next check.
   useEffect(() => {
     if (license !== "trial" || typeof window === "undefined") return () => undefined;
@@ -1678,3 +1677,38 @@ addPropertyControls(ProtectedDownload, mfControls({
   ...mfAppearanceControls({ padding: 12, gap: 6, shadow: false }),
   labels: mfLabelControls(DOWNLOAD_LABELS),
 }));
+
+// ============================================================================
+// ICONS
+// ============================================================================
+// Inline, tagged with their Lucide names. Framer cannot resolve a lucide-react
+// import from a code file: the file fails to load and Add to canvas stalls
+// (test/canvasIconImports.test.ts). test/canvasIcons.test.ts holds each shape
+// equal to Lucide's. Each draws as lucide-react does: 24px, stroke 2.
+
+interface InlineIconProps {
+  className?: string | undefined;
+  stroke?: string;
+  "aria-hidden"?: boolean;
+}
+
+function iconClass(name: string, className: string | undefined): string {
+  return className ? `lucide lucide-${name} ${className}` : `lucide lucide-${name}`;
+}
+
+function Loader2({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("loader-circle", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="loader-circle">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+function Lock({ className }: InlineIconProps): React.ReactElement {
+  return (
+    <svg className={iconClass("lock", className)} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="lock">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}

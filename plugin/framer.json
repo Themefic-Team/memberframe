@@ -1,0 +1,22 @@
+{
+  "id": "memfrm",
+  "name": "MemberFrame",
+  "version": "1.0.0",
+  "description": "The ultimate native membership and recurring monetization suite for Framer.",
+  "icon": "icon.svg",
+  "main": "dist/index.html",
+  "modes": [
+    "canvas"
+  ],
+  "permissions": [
+    "addComponentInstance",
+    "cloneNode",
+    "createCodeFile",
+    "createWebPage",
+    "removeNodes2",
+    "setAttributes",
+    "setCodeFileContent",
+    "setParent",
+    "setPluginData"
+  ]
+}

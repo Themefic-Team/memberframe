@@ -33,6 +33,7 @@
  */
 
 import { withTimeout } from "../utils/withTimeout";
+import { queueCodeFileWrite } from "../utils/codeFileQueue";
 import type { Mode, ProtectedMethod, framer } from "framer-plugin";
 import type { GeneratedCanvasFile } from "./canvasComponentCodeGenerator";
 
@@ -147,6 +148,8 @@ export interface DeployOptions {
    * milliseconds. Defaults to `EXPORT_RETRY_DELAYS_MS`; the tests pass zeros.
    */
   exportRetryDelaysMs?: ReadonlyArray<number>;
+  /** Waits before each save retry. Defaults to `WRITE_RETRY_DELAYS_MS`. */
+  writeRetryDelaysMs?: ReadonlyArray<number>;
   /** Optional attributes and control values for the inserted component instance. */
   attributes?: Record<string, unknown>;
 }
@@ -183,6 +186,9 @@ export const SCAFFOLD_EXPORT_RETRY_DELAYS_MS: ReadonlyArray<number> = [
  * forever; a timed-out call fails like a refused one, with the same message.
  */
 export const FRAMER_CALL_TIMEOUT_MS = 20000;
+
+/** Waits before saving a code file again after Framer refused it. */
+export const WRITE_RETRY_DELAYS_MS: ReadonlyArray<number> = [1000, 2500];
 
 function call<T>(promise: Promise<T>, label: string): Promise<T> {
   return withTimeout(promise, FRAMER_CALL_TIMEOUT_MS, label);
@@ -345,6 +351,24 @@ type WriteResult =
  */
 async function writeFile(
   deps: CanvasDeps,
+  generated: Pick<GeneratedCanvasFile, "fileName" | "code">,
+  retryDelaysMs: ReadonlyArray<number> = WRITE_RETRY_DELAYS_MS
+): Promise<WriteResult> {
+  // Queued, so no other MemberFrame save races this one, and retried, since
+  // Framer's save service fails now and then and the next try usually lands
+  // (2026-10-28). A retry re-reads the files, so it overwrites rather than
+  // creating a second file.
+  let result = await queueCodeFileWrite(() => writeFileOnce(deps, generated));
+  for (const delay of retryDelaysMs) {
+    if (result.ok) break;
+    await wait(delay);
+    result = await queueCodeFileWrite(() => writeFileOnce(deps, generated));
+  }
+  return result;
+}
+
+async function writeFileOnce(
+  deps: CanvasDeps,
   generated: Pick<GeneratedCanvasFile, "fileName" | "code">
 ): Promise<WriteResult> {
   try {
@@ -457,19 +481,34 @@ export async function deployCanvasComponent(
     };
   }
 
-  const written = await writeFile(deps, generated);
+  const writeRetries = options.writeRetryDelaysMs ?? WRITE_RETRY_DELAYS_MS;
+  const written = await writeFile(deps, generated, writeRetries);
   if (!written.ok) return written;
-  const { file, action } = written;
+  const { action } = written;
+  let { file } = written;
 
-  let insertUrl: string | null;
+  let insertUrl: string | null = null;
   let lastSeen: CanvasCodeFile = file;
 
-  try {
-    const resolved = await resolveInsertUrl(deps, file, options.exportRetryDelaysMs ?? EXPORT_RETRY_DELAYS_MS);
-    insertUrl = resolved.url;
-    lastSeen = resolved.last;
-  } catch {
-    insertUrl = null;
+  // Two rounds: a save Framer accepted but never compiled (its save service
+  // failed behind it) offers no component however long we wait, and saving
+  // again is what a second click did by hand (2026-10-28). The second save
+  // toggles the trailing line break, so Framer compiles afresh.
+  for (const round of [0, 1]) {
+    if (round === 1) {
+      const again = await writeFile(deps, generated, writeRetries);
+      if (!again.ok) break;
+      file = again.file;
+      lastSeen = file;
+    }
+    try {
+      const resolved = await resolveInsertUrl(deps, file, options.exportRetryDelaysMs ?? EXPORT_RETRY_DELAYS_MS);
+      insertUrl = resolved.url;
+      lastSeen = resolved.last;
+    } catch {
+      insertUrl = null;
+    }
+    if (insertUrl) break;
   }
 
   if (!insertUrl) {

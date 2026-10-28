@@ -164,7 +164,7 @@ export const GATEWAY_FIELDS: Record<PaymentGateway, ReadonlyArray<GatewayField>>
     {
       key: "secretKey",
       label: "Secret key",
-      placeholder: "sk_test_...",
+      placeholder: "Paste the secret key",
       secret: true,
       required: true,
       hint: "Stripe Dashboard, Developers, API keys. A restricted key (rk_) works too. MemberFrame registers its webhook with it, so there is nothing else to set up.",

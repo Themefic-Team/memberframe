@@ -75,6 +75,14 @@ export interface ConnectionValue {
   applyConnection: (connection: SiteConnection) => Promise<void>;
   disconnect: () => Promise<void>;
   reload: () => void;
+  /**
+   * Marketplace audit I1: this browser holds a working sign in, but this
+   * project has no site yet. Nothing is sent until the creator clicks
+   * "Link this project" (Profile), which calls `linkProject`.
+   */
+  linkable: boolean;
+  /** Claims this project for the signed in creator (may start the trial). Resolves to a failure to show, or null. */
+  linkProject: () => Promise<ApiFailure | null>;
 }
 
 export const ConnectionContext = createContext<ConnectionValue | null>(null);
@@ -106,6 +114,7 @@ export function useConnectionState(): ConnectionValue {
   const [settingsVersion, setSettingsVersion] = useState(1);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [linkable, setLinkable] = useState(false);
 
   /**
    * Guards a late response from a previous load.
@@ -119,6 +128,7 @@ export function useConnectionState(): ConnectionValue {
   useEffect(() => {
     const id = ++loadId.current;
     let active = true;
+    setLinkable(false);
 
     void (async () => {
       const context = await readProjectContext();
@@ -134,7 +144,8 @@ export function useConnectionState(): ConnectionValue {
         return;
       }
 
-      const stored = await loadStoredConnection();
+      // The token is looked up for this project in this browser (audit C1).
+      const stored = await loadStoredConnection(context.projectId);
       if (!active || id !== loadId.current) return;
 
       if (!stored) {
@@ -148,10 +159,9 @@ export function useConnectionState(): ConnectionValue {
       if (!active || id !== loadId.current) return;
 
       if (result.kind !== "ok") {
-        // A 401 means the stored token is no longer accepted. Drop it from
-        // memory so nothing keeps sending it, but leave plugin data alone: a
-        // server that is merely unreachable must not cost the creator their
-        // connection.
+        // A 401 means the stored token is no longer accepted. Forget it so
+        // nothing keeps sending it, but keep the project's connection: a server
+        // that is merely unreachable must not cost the creator their connection.
         if (result.kind === "unauthorized") forgetTokenInMemory();
 
         setFailure(result.kind === "unauthorized" ? null : result);
@@ -161,27 +171,14 @@ export function useConnectionState(): ConnectionValue {
 
       const site = siteForProject(result.data.sites, context.projectId);
 
-      // A token that works, for a project it has no site for yet. Attach it
-      // (F19): the creator is signed in, and this project either starts their
-      // trial or reports that the trial is already used on another one.
+      // A token that works, for a project it has no site for yet. Linking it
+      // sends the Framer user id, project name, and published domains, and may
+      // start the trial, so it waits for a click (Marketplace audit I1): the
+      // launch itself sends nothing beyond the token.
       if (!site) {
-        const attached = await attachProject({
-          framerProjectId: context.projectId,
-          framerUserId: context.framerUserId ?? null,
-          projectName: context.projectName,
-          origins: context.publishedOrigins,
-        });
-        if (!active || id !== loadId.current) return;
-        if (attached.kind !== "ok") {
-          setFailure(attached.kind === "unauthorized" ? null : attached);
-          setState({ status: "disconnected" });
-          return;
-        }
-        const connection = toConnection(attached.data.site, attached.data.creator);
-        void saveConnectionOnly(connection);
-        setSettingsVersion(attached.data.settingsVersion);
         setFailure(null);
-        setState({ status: "connected", connection, settings: attached.data.settings });
+        setLinkable(true);
+        setState({ status: "disconnected" });
         return;
       }
 
@@ -235,6 +232,7 @@ export function useConnectionState(): ConnectionValue {
         ...(creator.avatarUrl ? { creatorAvatarUrl: creator.avatarUrl } : {}),
       };
       await saveConnection(connection, token);
+      setLinkable(false);
       setSettingsVersion(attached.data.settingsVersion);
       setFailure(null);
       setState({ status: "connected", connection, settings: attached.data.settings });
@@ -242,6 +240,30 @@ export function useConnectionState(): ConnectionValue {
     },
     [project]
   );
+
+  const linkProject = useCallback(async (): Promise<ApiFailure | null> => {
+    const context = project ?? (await readProjectContext());
+    const attached = await attachProject({
+      framerProjectId: context.projectId,
+      framerUserId: context.framerUserId ?? null,
+      projectName: context.projectName,
+      origins: context.publishedOrigins,
+    });
+    if (attached.kind !== "ok") {
+      if (attached.kind === "unauthorized") {
+        forgetTokenInMemory();
+        setLinkable(false);
+      }
+      return attached;
+    }
+    const connection = toConnection(attached.data.site, attached.data.creator);
+    void saveConnectionOnly(connection);
+    setLinkable(false);
+    setSettingsVersion(attached.data.settingsVersion);
+    setFailure(null);
+    setState({ status: "connected", connection, settings: attached.data.settings });
+    return null;
+  }, [project]);
 
   const applySettings = useCallback((settings: SiteSettingsDocument, version: number) => {
     setSettingsVersion(version);
@@ -260,6 +282,7 @@ export function useConnectionState(): ConnectionValue {
     // first would leave a live session row that nothing can revoke.
     await disconnectRequest();
     await clearConnection();
+    setLinkable(false);
     setFailure(null);
     setState({ status: "disconnected" });
   }, []);
@@ -280,8 +303,12 @@ export function useConnectionState(): ConnectionValue {
       applyConnection,
       disconnect,
       reload,
+      linkable,
+      linkProject,
     }),
     [
+      linkable,
+      linkProject,
       signInWithToken,
       state,
       project,

@@ -55,7 +55,7 @@ const IS_TRIAL = false;
 // rewritten in place by the plugin whenever the license changes, and set to
 // locked when the creator signs out of the plugin. The component also asks the
 // server: trial shows the "Made with Framefic" mark, the bottom right corner
-// copied from the BEAF slider; an ended trial or plan blurs the component
+// shared by every Framefic plugin; an ended trial or plan blurs the component
 // behind an Upgrade card. On the published site the server's answer wins. On
 // the canvas the stricter of the two wins, so a signed-out plugin locks the
 // canvas even though the site's plan is still paid, and a locked component
@@ -145,7 +145,7 @@ function mfEffectiveLicense(baked: MfLicense, answer: MfLicense, onCanvas: boole
  */
 function mfControls<T extends object>(controls: T): T {
   if (!IS_LOCKED) return controls;
-  // BEAF's "Status" row: the one thing a locked component shows in the panel.
+  // The "Status" row: the one thing a locked component shows in the panel.
   const locked: Record<string, unknown> = {
     mfLockedStatus: {
       type: ControlType.Enum,
@@ -196,7 +196,7 @@ function useMfLicense(apiBaseUrl: string, siteKey: string, seal?: string): MfLic
     };
   }, [apiBaseUrl, siteKey, seal]);
 
-  // BEAF's countdown: a running trial locks at the second it ends, on the
+  // The countdown: a running trial locks at the second it ends, on the
   // canvas and the live site, without waiting for a reload or the next check.
   useEffect(() => {
     if (license !== "trial" || typeof window === "undefined") return () => undefined;

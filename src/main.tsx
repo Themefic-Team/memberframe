@@ -15,7 +15,7 @@ import { App } from "./App";
 //   manage.css        per-feature, same reason
 //   settings.css      per-feature, same reason
 //   billing/*         F19 billing screens, copied from the BEAF plugin so every
-//                     Framefic plugin bills the same way. Own --beaf-* tokens,
+//                     Framefic plugin bills the same way. Own --ffmf-* tokens,
 //                     exempt from lint:design (design-system.md v0.4.4)
 import "./styles/fonts.css";
 import "./styles/framer-base.css";

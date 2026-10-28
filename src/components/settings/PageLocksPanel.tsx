@@ -5,6 +5,7 @@ import {
   Banner,
   Button,
   ConfirmDialog,
+  EmptyState,
   Field,
   Fields,
   Select,
@@ -380,12 +381,26 @@ export const PageLocksPanel: React.FC<PageLocksPanelProps> = ({
           ))}
         </div>
 
-        <div className="page-locks-btn-row">
-          <Button variant="secondary" onClick={handleAdd} disabled={saving}>
-            <Plus aria-hidden={true} />
-            <span>Add locked page</span>
-          </Button>
-        </div>
+        {rules.length === 0 ? (
+          <EmptyState
+            icon={<FileLock aria-hidden={true} />}
+            title="No Page Locks Yet"
+            description="Keep a page for members only. Everyone else is sent to another page."
+            action={
+              <Button variant="secondary" onClick={handleAdd} disabled={saving}>
+                <Plus aria-hidden={true} />
+                Add locked page
+              </Button>
+            }
+          />
+        ) : (
+          <div className="page-locks-btn-row">
+            <Button variant="secondary" onClick={handleAdd} disabled={saving}>
+              <Plus aria-hidden={true} />
+              <span>Add locked page</span>
+            </Button>
+          </div>
+        )}
       </section>
 
       <SectionLocksEditor

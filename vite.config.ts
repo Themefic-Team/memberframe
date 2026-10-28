@@ -28,6 +28,8 @@ export default defineConfig(({ command, mode }) => {
     build: {
       target: "esnext",
       outDir: "dist",
+      // Readable source for Marketplace reviewers (audit I4).
+      sourcemap: true,
     },
     server: {
       port: 5173,

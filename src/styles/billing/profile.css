@@ -6,27 +6,27 @@
  * Edit it only to stay in step with BEAF.
  */
 
-.beaf-profile-page {
+.ffmf-profile-page {
   padding: 20px 12px;
   flex: 1;
-  background-color: var(--beaf-page-bg2);
+  background-color: var(--ffmf-page-bg2);
   display: flex;
   flex-direction: column;
 }
 
-.beaf-profile-header {
+.ffmf-profile-header {
   margin-bottom: 24px;
 }
 
-.beaf-profile-header h3 {
+.ffmf-profile-header h3 {
   margin: 0;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
   font-size: 16px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-hero {
+.ffmf-profile-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -34,7 +34,7 @@
   margin-bottom: 15px;
 }
 
-.beaf-profile-avatar-container {
+.ffmf-profile-avatar-container {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -42,7 +42,7 @@
   padding: 8px;
 }
 
-.beaf-avatar-segmented-ring {
+.ffmf-avatar-segmented-ring {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -54,7 +54,7 @@
   transition: filter 0.3s ease;
 }
 
-.beaf-avatar-badge {
+.ffmf-avatar-badge {
   position: absolute;
   bottom: 8px;
   right: -6px;
@@ -76,11 +76,11 @@
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
-.beaf-avatar-badge:hover {
+.ffmf-avatar-badge:hover {
   transform: scale(1.05);
 }
 
-.beaf-avatar-badge--pro {
+.ffmf-avatar-badge--pro {
   color: #ffffff;
   border: 2px solid transparent;
   background:
@@ -89,7 +89,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), 0 0 10px rgba(82, 113, 255, 0.35);
 }
 
-.beaf-avatar-badge--trial {
+.ffmf-avatar-badge--trial {
   background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
   color: #ffffff;
   border: 2px solid transparent;
@@ -99,12 +99,12 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), 0 0 10px rgba(82, 113, 255, 0.35);
 }
 
-.beaf-avatar-badge svg {
+.ffmf-avatar-badge svg {
   flex-shrink: 0;
   display: block;
 }
 
-.beaf-profile-avatar-circle {
+.ffmf-profile-avatar-circle {
   width: 90px;
   height: 90px;
   border-radius: 50%;
@@ -120,10 +120,10 @@
   position: relative;
   user-select: none;
   box-sizing: border-box;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--beaf-page-bg2, #18191c);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--ffmf-page-bg2, #18191c);
 }
 
-.beaf-profile-avatar-circle img {
+.ffmf-profile-avatar-circle img {
   width: 100%;
   object-fit: cover;
   border-radius: 50%;
@@ -133,14 +133,14 @@
   transform: translateZ(0);
 }
 
-.beaf-profile-avatar-edit {
+.ffmf-profile-avatar-edit {
   position: absolute;
   right: 0;
   bottom: 0;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 2px solid var(--beaf-page-bg2);
+  border: 2px solid var(--ffmf-page-bg2);
   background: #5271FF;
   color: #ffffff;
   display: flex;
@@ -151,31 +151,31 @@
   transition: background-color 0.2s;
 }
 
-.beaf-profile-avatar-edit:hover {
+.ffmf-profile-avatar-edit:hover {
   background: #3E67EB;
 }
 
-.beaf-profile-identity {
+.ffmf-profile-identity {
   text-align: center;
 }
 
-.beaf-profile-name {
-  color: var(--beaf-heading);
+.ffmf-profile-name {
+  color: var(--ffmf-heading);
   font-size: 18px;
   font-weight: 700;
   font-family: "Inter", sans-serif;
   margin-bottom: 4px;
 }
 
-.beaf-profile-email {
-  color: var(--beaf-text-muted);
+.ffmf-profile-email {
+  color: var(--ffmf-text-muted);
   font-size: 13px;
   font-family: "Mulish", sans-serif;
 }
 
-.beaf-profile-plan-card {
-  background: var(--beaf-surface);
-  border: 1px solid var(--beaf-surface-border);
+.ffmf-profile-plan-card {
+  background: var(--ffmf-surface);
+  border: 1px solid var(--ffmf-surface-border);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 20px;
@@ -184,33 +184,33 @@
   /* border: 1px solid var(--stroke-faint); */
 }
 
-.beaf-profile-plan-top {
+.ffmf-profile-plan-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 10px;
 }
 
-.beaf-profile-plan-info {
+.ffmf-profile-plan-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.beaf-profile-plan-label {
+.ffmf-profile-plan-label {
   color: #5271FF;
   font-size: 12px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-plan-name {
-  color: var(--beaf-heading);
+.ffmf-profile-plan-name {
+  color: var(--ffmf-heading);
   font-size: 14px;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-plan-status {
+.ffmf-profile-plan-status {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 10px;
@@ -218,24 +218,24 @@
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-plan-status--active {
+.ffmf-profile-plan-status--active {
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
 }
 
-.beaf-profile-plan-status--inactive {
+.ffmf-profile-plan-status--inactive {
   background: rgba(148, 163, 184, 0.15);
   color: #94a3b8;
 }
 
-.beaf-profile-plan-divider {
+.ffmf-profile-plan-divider {
   height: 1px;
-  background: var(--beaf-surface-border);
+  background: var(--ffmf-surface-border);
   margin-bottom: 16px;
   opacity: 0.5;
 }
 
-.beaf-profile-primary-button {
+.ffmf-profile-primary-button {
   width: 100%;
   padding: 10px;
   border-radius: 10px;
@@ -250,25 +250,25 @@
   box-shadow: 0 2px 8px rgba(82, 113, 255, 0.25);
 }
 
-.beaf-profile-primary-button:hover {
+.ffmf-profile-primary-button:hover {
   opacity: 0.95;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(82, 113, 255, 0.35);
 }
 
-.beaf-profile-primary-button:active {
+.ffmf-profile-primary-button:active {
   transform: translateY(0);
 }
 
-.beaf-profile-section-title {
+.ffmf-profile-section-title {
   margin: 0 0 16px 0;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
   font-size: 16px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-fields-card {
+.ffmf-profile-fields-card {
   border-radius: 10px;
   /* padding: 16px; */
   display: flex;
@@ -277,7 +277,7 @@
 
 }
 
-.beaf-profile-field {
+.ffmf-profile-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -287,37 +287,37 @@
   }
 }
 
-.beaf-profile-field label {
-  color: var(--beaf-heading);
+.ffmf-profile-field label {
+  color: var(--ffmf-heading);
   font-size: 13px;
   font-weight: 600;
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-input-wrapper {
+.ffmf-profile-input-wrapper {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid var(--beaf-surface-border);
-  background: var(--beaf-page-bg2);
+  border: 1px solid var(--ffmf-surface-border);
+  background: var(--ffmf-page-bg2);
   box-shadow: 0 2px 4px 0 rgba(90, 90, 90, 0.21) inset, 0 2px 4px 0 rgba(0, 0, 0, 0.28);
   border-radius: 10px;
   /* border: 1px solid var(--stroke-faint); */
   height: 38px;
 }
 
-.beaf-profile-input-wrapper svg {
-  color: var(--beaf-text-muted);
+.ffmf-profile-input-wrapper svg {
+  color: var(--ffmf-text-muted);
   flex-shrink: 0;
 }
 
-.beaf-profile-input-wrapper input {
+.ffmf-profile-input-wrapper input {
   background: transparent;
   border: none !important;
   padding: 0;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 14px;
   font-family: "Inter", sans-serif;
   width: 100%;
@@ -326,15 +326,15 @@
   font-size: 13px;
 }
 
-.beaf-profile-input-wrapper input:focus {
-  color: var(--beaf-heading);
+.ffmf-profile-input-wrapper input:focus {
+  color: var(--ffmf-heading);
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
 }
 
 /* Logout Button & Animated Icon */
-.beaf-profile-logout-btn {
+.ffmf-profile-logout-btn {
   height: 32px;
   display: flex;
   align-items: center;
@@ -343,7 +343,7 @@
   width: 100%;
 
   border-radius: 10px;
-  background: var(--beaf-warning-btn);
+  background: var(--ffmf-warning-btn);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -355,73 +355,73 @@
 
 }
 
-.beaf-profile-logout-btn:hover {
-  background: var(--beaf-warning-btn);
+.ffmf-profile-logout-btn:hover {
+  background: var(--ffmf-warning-btn);
   opacity: 0.92;
 }
 
-.beaf-profile-logout-btn:active {
+.ffmf-profile-logout-btn:active {
   transform: scale(0.98);
 }
 
-.beaf-logout-icon {
+.ffmf-logout-icon {
   flex-shrink: 0;
   overflow: visible;
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Lucide LogOut: the door is its path, the arrow its polyline and line. */
-.beaf-logout-icon path {
+.ffmf-logout-icon path {
   transition: transform 0.3s ease, opacity 0.3s ease;
   transform-origin: left center;
 }
 
-.beaf-logout-icon polyline,
-.beaf-logout-icon line {
+.ffmf-logout-icon polyline,
+.ffmf-logout-icon line {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Hover & Active Micro-animations */
-.beaf-profile-logout-btn:hover .beaf-logout-icon {
+.ffmf-profile-logout-btn:hover .ffmf-logout-icon {
   transform: scale(1.05);
 }
 
-.beaf-profile-logout-btn:hover .beaf-logout-icon polyline,
-.beaf-profile-logout-btn:hover .beaf-logout-icon line {
+.ffmf-profile-logout-btn:hover .ffmf-logout-icon polyline,
+.ffmf-profile-logout-btn:hover .ffmf-logout-icon line {
   transform: translateX(3px);
 }
 
-.beaf-profile-logout-btn:hover .beaf-logout-icon path {
+.ffmf-profile-logout-btn:hover .ffmf-logout-icon path {
   opacity: 0.8;
 }
 
-.beaf-profile-logout-btn:active .beaf-logout-icon polyline,
-.beaf-profile-logout-btn:active .beaf-logout-icon line {
+.ffmf-profile-logout-btn:active .ffmf-logout-icon polyline,
+.ffmf-profile-logout-btn:active .ffmf-logout-icon line {
   transform: translateX(5px);
 }
 
 
 
-.beaf-profile-auth-description {
+.ffmf-profile-auth-description {
   margin: 0 0 12px;
-  color: var(--beaf-text-muted);
+  color: var(--ffmf-text-muted);
   font-size: 12px;
   font-family: "Inter", sans-serif;
   line-height: 1.45;
 }
 
-.beaf-profile-auth-buttons {
+.ffmf-profile-auth-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 8px;
 }
 
-.beaf-profile-auth-buttons--single {
+.ffmf-profile-auth-buttons--single {
   grid-template-columns: 1fr;
 }
 
-.beaf-profile-auth-btn {
+.ffmf-profile-auth-btn {
   width: 100%;
   padding: 10px;
   border-radius: 6px;
@@ -432,7 +432,7 @@
   transition: all 0.2s ease;
 }
 
-.beaf-profile-auth-btn-primary {
+.ffmf-profile-auth-btn-primary {
   cursor: pointer;
   color: #fff;
   background: linear-gradient(#5271ff 0%, #004aad 100%);
@@ -445,22 +445,22 @@
   font-weight: 500;
 }
 
-.beaf-profile-auth-btn-primary:hover {
+.ffmf-profile-auth-btn-primary:hover {
   opacity: 0.92;
 }
 
-.beaf-profile-auth-btn-secondary {
-  border: 1px solid var(--beaf-surface-border);
+.ffmf-profile-auth-btn-secondary {
+  border: 1px solid var(--ffmf-surface-border);
   background: transparent;
-  color: var(--beaf-heading);
+  color: var(--ffmf-heading);
 }
 
-.beaf-profile-auth-btn-secondary:hover {
+.ffmf-profile-auth-btn-secondary:hover {
   background: rgba(82, 113, 255, 0.08);
 }
 
 /* ── Profile Trial Card ── */
-.beaf-profile-trial-card {
+.ffmf-profile-trial-card {
   background: linear-gradient(135deg, rgb(30, 41, 59) 0%, rgb(15, 23, 42) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -470,7 +470,7 @@
   box-sizing: border-box;
 }
 
-.beaf-profile-trial-title {
+.ffmf-profile-trial-title {
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 700;
@@ -480,7 +480,7 @@
   -webkit-text-fill-color: transparent;
 }
 
-.beaf-profile-trial-desc {
+.ffmf-profile-trial-desc {
   margin: 0 0 14px;
   font-size: 12px;
   color: #94a3b8;
@@ -488,7 +488,7 @@
   font-family: "Inter", sans-serif;
 }
 
-.beaf-profile-trial-btn {
+.ffmf-profile-trial-btn {
   width: 100%;
   height: 36px;
   display: flex;
@@ -501,7 +501,7 @@
   border-radius: 8px;
 }
 
-.beaf-profile-trial-btn-claimed {
+.ffmf-profile-trial-btn-claimed {
   width: 100%;
   height: 36px;
   background: rgba(255, 255, 255, 0.05);

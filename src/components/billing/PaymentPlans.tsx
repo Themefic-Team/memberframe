@@ -64,17 +64,17 @@ export const PaymentPlans: React.FC<PaymentPlansProps> = ({ plans, isCreatingPay
   ));
 
   return (
-    <div className="beaf-plans-container">
-      <div className="beaf-interval-toggle-container">
-        <button type="button" className={`beaf-interval-btn ${activeInterval === "monthly" ? "active" : ""}`} onClick={() => setActiveInterval("monthly")}>
+    <div className="ffmf-plans-container">
+      <div className="ffmf-interval-toggle-container">
+        <button type="button" className={`ffmf-interval-btn ${activeInterval === "monthly" ? "active" : ""}`} onClick={() => setActiveInterval("monthly")}>
           Monthly
         </button>
-        <button type="button" className={`beaf-interval-btn ${activeInterval === "yearly" ? "active" : ""}`} onClick={() => setActiveInterval("yearly")}>
+        <button type="button" className={`ffmf-interval-btn ${activeInterval === "yearly" ? "active" : ""}`} onClick={() => setActiveInterval("yearly")}>
           Yearly {saving > 0 ? <span className="save-badge">Save {saving}%</span> : null}
         </button>
       </div>
 
-      <div className={`beaf-plan-card ${isSubCurrentPlan ? "current" : ""}`}>
+      <div className={`ffmf-plan-card ${isSubCurrentPlan ? "current" : ""}`}>
         <div className="plan-header">
           <span className="plan-name">{activeInterval === "monthly" ? "Monthly" : "Yearly"}</span>
           <span className="plan-price">
@@ -93,9 +93,9 @@ export const PaymentPlans: React.FC<PaymentPlansProps> = ({ plans, isCreatingPay
         </button>
       </div>
 
-      <div className="beaf-plans-divider">or, pay once</div>
+      <div className="ffmf-plans-divider">or, pay once</div>
 
-      <div className={`beaf-plan-card lifetime ${isLtCurrentPlan ? "current" : ""}`}>
+      <div className={`ffmf-plan-card lifetime ${isLtCurrentPlan ? "current" : ""}`}>
         <div className="plan-header">
           <div className="lifetime-title-row">
             <span className="plan-name">Lifetime</span>

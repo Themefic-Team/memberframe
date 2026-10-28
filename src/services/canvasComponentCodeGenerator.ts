@@ -128,16 +128,21 @@ function sanitizeText(value: string, maxLength: number): string {
 const CUSTOM_TIER_KEY_PATTERN = /^[a-z][a-z0-9_]{1,49}$/;
 
 
+/** U+2028 and U+2029, built from char codes so this file never holds them raw. */
+const LINE_SEPARATORS = new RegExp("[" + String.fromCharCode(0x2028, 0x2029) + "]", "g");
+
 /**
  * A string as a JavaScript string literal.
  *
  * `JSON.stringify` handles the quotes, the backslashes, and every control
  * character, which is the whole of what makes creator free text dangerous
  * inside generated code. The two invisible line separators it would pass
- * through raw are removed earlier, by `sanitizeText`.
+ * through raw are removed earlier, by `sanitizeText`, and escaped here as well,
+ * for a field that skips it (the dashboard's headline): the value is kept and
+ * no parser can read either as a line break (Marketplace audit I6).
  */
 function encodeLiteral(value: string): string {
-  return JSON.stringify(value);
+  return JSON.stringify(value).replace(LINE_SEPARATORS, (char) => "\\u" + char.charCodeAt(0).toString(16));
 }
 
 /**

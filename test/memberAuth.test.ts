@@ -66,11 +66,12 @@ describe("the component is standalone", () => {
     // A relative import resolves here and typechecks here, then fails on the
     // creator's published site where this file sits alone in their project.
     // `react-dom` is Framer's own, for the modal's portal, as Protected Download uses it.
-    expect(specifiers.sort()).toEqual(["framer", "lucide-react", "react", "react-dom"]);
+    // Never `lucide-react`: Framer cannot resolve it (test/canvasIconImports.test.ts).
+    expect(specifiers.sort()).toEqual(["framer", "react", "react-dom"]);
   });
 
   it("found some imports, so the match is not vacuously empty", () => {
-    expect(specifiers.length).toBe(4);
+    expect(specifiers.length).toBe(3);
   });
 });
 

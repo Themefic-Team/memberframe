@@ -4,6 +4,7 @@ import { useConnection } from "../../hooks/useConnection";
 import { failureMessage } from "../../services/apiClient";
 import { accountPageUrl, newSessionId, pollHandoff } from "../../services/connectService";
 import { detectTheme } from "./billingHelpers";
+import { BRANDING } from "../../config/branding";
 
 const MAX_ATTEMPTS = 60;
 
@@ -32,6 +33,13 @@ export interface AuthModalProps {
  * Collects no credential in the plugin iframe: MemberFrame's account page
  * opens in a browser tab with a one-time session id, and this modal polls for
  * the hand-off, then attaches this Framer project, which starts the trial.
+ *
+ * Marketplace audit, 2026-10-28:
+ * - C3: a consent line sits directly above the button, because finishing sign
+ *   in sends the creator's email, Framer user id, project name, and published
+ *   domains, and starts the trial.
+ * - I2: the button is a real link (`target="_blank"`), not `window.open`. The
+ *   address is known before the click, so nothing can be blocked as a popup.
  */
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "register", onClose, onAuthenticated }) => {
   const { signInWithToken } = useConnection();
@@ -60,19 +68,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "reg
     }
   }, [isOpen, initialMode]);
 
-  const openAuthWindow = useCallback(() => {
-    const id = sessionId || newSessionId();
-    setSessionId(id);
+  /** The browser opens the link itself; this only starts waiting for the hand-off. */
+  const onAuthLinkOpened = useCallback(() => {
     setTimedOut(false);
     setError(null);
     completed.current = false;
-    try {
-      window.open(accountPageUrl(authMode, id, detectTheme()), "_blank", "noopener,noreferrer");
-      setHasOpenedWindow(true);
-    } catch {
-      setHasOpenedWindow(false);
-    }
-  }, [authMode, sessionId]);
+    setHasOpenedWindow(true);
+  }, []);
 
   // The hand-off poll: every 2 seconds for 2 minutes, and on focus.
   useEffect(() => {
@@ -150,22 +152,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "reg
   const isRegister = authMode === "register";
 
   return (
-    <div className="beaf-auth-overlay" onClick={onClose}>
-      <div className="beaf-auth-panel beaf-external-auth-panel" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-        <button type="button" className="beaf-auth-close" onClick={onClose} aria-label="Close" title="Close">
+    <div className="ffmf-auth-overlay" onClick={onClose}>
+      <div className="ffmf-auth-panel ffmf-external-auth-panel" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+        <button type="button" className="ffmf-auth-close" onClick={onClose} aria-label="Close" title="Close">
           <X aria-hidden={true} />
         </button>
 
-        <div className="beaf-external-auth-icon-wrap">
-          <div className="beaf-external-auth-icon">
-            <img src="/memberframe-icon.svg" width="44" height="44" alt="MemberFrame" className="beaf-external-favicon-img" />
+        <div className="ffmf-external-auth-icon-wrap">
+          <div className="ffmf-external-auth-icon">
+            <img src="/memberframe-icon.svg" width="44" height="44" alt="MemberFrame" className="ffmf-external-favicon-img" />
           </div>
-          <div className="beaf-external-auth-pulse-ring" />
+          <div className="ffmf-external-auth-pulse-ring" />
         </div>
 
-        <div className="beaf-auth-header">
+        <div className="ffmf-auth-header">
           <h3>{isRegister ? "You Get 7-Day Free Trial" : "Sign In to Framefic"}</h3>
-          <p className="beaf-auth-header-sub">
+          <p className="ffmf-auth-header-sub">
             {isRegister
               ? "This plugin is full PRO. Start your 7-day free trial to unlock every membership feature."
               : "Sign in to reconnect your account and restore your active subscription."}
@@ -173,10 +175,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "reg
         </div>
 
         {isRegister ? (
-          <div className="beaf-external-auth-features">
+          <div className="ffmf-external-auth-features">
             {FEATURES.map((feature) => (
-              <div key={feature} className="beaf-external-feature-item">
-                <span className="beaf-external-feature-check">
+              <div key={feature} className="ffmf-external-feature-item">
+                <span className="ffmf-external-feature-check">
                   <Check aria-hidden={true} />
                 </span>
                 <span>{feature}</span>
@@ -186,47 +188,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = "reg
         ) : null}
 
         {hasOpenedWindow ? (
-          <div className="beaf-external-auth-status-card">
-            <div className="beaf-external-spinner-row">
-              <div className="beaf-social-spinner" />
-              <span className="beaf-external-status-text">Waiting for browser completion...</span>
+          <div className="ffmf-external-auth-status-card">
+            <div className="ffmf-external-spinner-row">
+              <div className="ffmf-social-spinner" />
+              <span className="ffmf-external-status-text">Waiting for browser completion...</span>
             </div>
-            <p className="beaf-external-status-hint">
+            <p className="ffmf-external-status-hint">
               Complete your sign-up in the opened browser tab. Your plugin will automatically connect once finished.
             </p>
           </div>
         ) : null}
 
-        {error ? <div className="beaf-auth-error">{error}</div> : null}
+        {error ? <div className="ffmf-auth-error">{error}</div> : null}
 
         {timedOut ? (
-          <div className="beaf-external-timeout-banner">
+          <div className="ffmf-external-timeout-banner">
             <p>Authentication window timed out. Click below to reopen.</p>
           </div>
         ) : null}
 
-        <div className="beaf-external-action-stack">
-          <button type="button" className="beaf-auth-submit-btn" onClick={openAuthWindow}>
-            {hasOpenedWindow ? "Re-open Browser Window" : isRegister ? "Start 7-Day Free Trial" : "Sign In with Browser"}
-          </button>
-          <button type="button" className="beaf-external-cancel-btn" onClick={onClose}>
+        <p className="ffmf-auth-consent">
+          By continuing, you agree to create an account to activate your trial and manage your license.{" "}
+          <a href={BRANDING.privacyUrl} target="_blank" rel="noopener noreferrer">
+            Privacy
+          </a>
+        </p>
+
+        <div className="ffmf-external-action-stack">
+          {sessionId ? (
+            <a
+              className="ffmf-auth-submit-btn"
+              href={accountPageUrl(authMode, sessionId, detectTheme())}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onAuthLinkOpened}
+            >
+              {hasOpenedWindow ? "Re-open Browser Window" : isRegister ? "Start 7-Day Free Trial" : "Sign In with Browser"}
+            </a>
+          ) : null}
+          <button type="button" className="ffmf-external-cancel-btn" onClick={onClose}>
             Cancel
           </button>
         </div>
 
-        <div className="beaf-auth-footer">
+        <div className="ffmf-auth-footer">
           <p>
             {isRegister ? (
               <>
                 Already have an account?{" "}
-                <button type="button" className="beaf-auth-link-btn" onClick={() => switchMode("login")}>
+                <button type="button" className="ffmf-auth-link-btn" onClick={() => switchMode("login")}>
                   Sign in
                 </button>
               </>
             ) : (
               <>
                 Don&apos;t have an account?{" "}
-                <button type="button" className="beaf-auth-link-btn" onClick={() => switchMode("register")}>
+                <button type="button" className="ffmf-auth-link-btn" onClick={() => switchMode("register")}>
                   Start 7-day free trial
                 </button>
               </>
