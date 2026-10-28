@@ -342,7 +342,7 @@
   gap: 8px;
   width: 100%;
 
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--beaf-warning-btn);
   color: #fff;
   font-size: 13px;

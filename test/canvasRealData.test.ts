@@ -102,6 +102,19 @@ describe("each component on the canvas", () => {
     expect(sources.MemberDashboard).toContain("tier.rank > best.rank ? tier : best");
   });
 
+  it("the Dashboard bills the preview member for that same tier, at its own price", () => {
+    // A canvas that says "Free" in the badge and "Silver $9" in the plan card
+    // shows nothing the published page would.
+    expect(sources.MemberDashboard).toContain('setBilling({ phase: "ready", summary: previewBilling(previewPlans) });');
+    expect(sources.MemberDashboard).toContain('if (top.rank === 0 || interval === null) return { subscription: null');
+    expect(sources.MemberDashboard).not.toMatch(/tierName: "Silver",\n/);
+  });
+
+  it("the Dashboard's Email and Status switches work with every other setting", () => {
+    expect(sources.MemberDashboard).toContain('{showEmail && displayName !== member.email ? <p className="mf-acct-email">');
+    expect(sources.MemberDashboard).toContain("{showStatus || pastDue ? <span");
+  });
+
   it("Protected Download shows the chosen file's real label and plan", () => {
     expect(sources.ProtectedDownload).toContain("mfCanvasPreview(CONFIG.apiBaseUrl, CONFIG.siteKey, id)");
     expect(sources.ProtectedDownload).toContain("canvasAsset ? fileMeta(canvasAsset)");

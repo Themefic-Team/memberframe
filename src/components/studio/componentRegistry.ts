@@ -137,7 +137,7 @@ export const CANVAS_COMPONENTS: ReadonlyArray<CanvasComponentEntry> = [
     previewReady: false,
     deployable: true,
     previewNote:
-      "A member's account: profile, plan, billing, and sign out.",
+      "A full account area: overview, plan, billing, bookmarks, profile, and security.",
     placement: "/dashboard",
   },
   {

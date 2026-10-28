@@ -32,6 +32,7 @@
  * the typecheck.
  */
 
+import { withTimeout } from "../utils/withTimeout";
 import type { Mode, ProtectedMethod, framer } from "framer-plugin";
 import type { GeneratedCanvasFile } from "./canvasComponentCodeGenerator";
 
@@ -49,11 +50,20 @@ export interface CanvasCodeFileExport {
   readonly insertURL?: string;
 }
 
+/** One problem Framer reports in a code file. `category` 1 is an error. */
+export interface CanvasCodeDiagnostic {
+  readonly message: string;
+  readonly category: number;
+  readonly span?: { readonly start: { readonly line: number } };
+}
+
 export interface CanvasCodeFile {
   readonly id: string;
   readonly name: string;
   readonly exports: ReadonlyArray<CanvasCodeFileExport>;
   setFileContent(code: string): Promise<CanvasCodeFile>;
+  /** Optional: the mock has none. Read only to explain a file that never compiles. */
+  typecheck?(): Promise<ReadonlyArray<CanvasCodeDiagnostic>>;
 }
 
 export interface CanvasNode {
@@ -68,6 +78,8 @@ export interface CanvasDeps {
   createCodeFile(name: string, code: string): Promise<CanvasCodeFile>;
   addComponentInstance(options: Parameters<typeof framer.addComponentInstance>[0]): Promise<CanvasNode>;
   setParent(nodeId: string, parentId: string, index?: number): Promise<void>;
+  /** Optional: the mock has none. Framer pushes the file list when a compile finishes. */
+  subscribeToCodeFiles?(callback: (codeFiles: ReadonlyArray<CanvasCodeFile>) => void): () => void;
 }
 
 /**
@@ -111,6 +123,8 @@ export interface DeployFailure {
   title: string;
   /** One sentence saying what happened and what the creator can do. */
   message: string;
+  /** Framer's own first error in the file, when it reports one. */
+  detail?: string;
 }
 
 export type DeployOutcome = DeploySuccess | DeployFailure;
@@ -149,6 +163,31 @@ export const EXPORT_RETRY_DELAYS_MS: ReadonlyArray<number> = [
   150, 250, 400, 600, 800, 1000, 1250, 1500, 2000, 2000, 2500, 2500,
 ];
 
+/**
+ * Re-read schedule for the Builder's inserts, Add to canvas and Create pages,
+ * about 60 seconds in all.
+ *
+ * In a new project Framer's first compile of a file (fetching its packages
+ * included) runs well past the 15 second default (2026-10-27). Create pages
+ * writes every file first, so they compile side by side and once the first is
+ * ready the rest usually are.
+ */
+export const SCAFFOLD_EXPORT_RETRY_DELAYS_MS: ReadonlyArray<number> = [
+  ...EXPORT_RETRY_DELAYS_MS,
+  ...Array.from({ length: 15 }, () => 3000),
+];
+
+/**
+ * The longest one SDK call may take before the deploy stops waiting for it.
+ * A call Framer never answers would otherwise hold the Builder's spinner
+ * forever; a timed-out call fails like a refused one, with the same message.
+ */
+export const FRAMER_CALL_TIMEOUT_MS = 20000;
+
+function call<T>(promise: Promise<T>, label: string): Promise<T> {
+  return withTimeout(promise, FRAMER_CALL_TIMEOUT_MS, label);
+}
+
 function wait(ms: number): Promise<void> {
   return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
@@ -181,23 +220,100 @@ async function resolveInsertUrl(
   deps: CanvasDeps,
   file: CanvasCodeFile,
   delays: ReadonlyArray<number>
-): Promise<string | null> {
-  const fromFile = pickComponentExport(file);
-  if (fromFile) return fromFile;
+): Promise<{ url: string | null; last: CanvasCodeFile }> {
+  const state: { url: string | null; last: CanvasCodeFile; wake: (() => void) | null } = {
+    url: pickComponentExport(file),
+    last: file,
+    wake: null,
+  };
+  if (state.url) return { url: state.url, last: state.last };
 
-  for (const delay of [0, ...delays]) {
-    await wait(delay);
+  const isThisFile = (candidate: CanvasCodeFile) => candidate.id === file.id || candidate.name === file.name;
+
+  // Framer pushes the file list when a compile finishes: listen as well as
+  // re-read, so a list the re-read gets from a stale cache cannot hide it.
+  let unsubscribe: (() => void) | null = null;
+  try {
+    unsubscribe =
+      deps.subscribeToCodeFiles?.((files) => {
+        const match = files.find(isThisFile);
+        if (!match) return;
+        state.last = match;
+        const url = pickComponentExport(match);
+        if (url) {
+          state.url = url;
+          state.wake?.();
+        }
+      }) ?? null;
+  } catch {
+    unsubscribe = null;
+  }
+
+  try {
+    for (const delay of [0, ...delays]) {
+      if (state.url) break;
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, delay);
+        state.wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      state.wake = null;
+      if (state.url) break;
+      try {
+        const refreshed = (await call(deps.getCodeFiles(), "Reading code files")).find(isThisFile);
+        if (refreshed) {
+          state.last = refreshed;
+          const url = pickComponentExport(refreshed);
+          if (url) state.url = url;
+        }
+      } catch {
+        // A failed read is one missed attempt, not the end of the wait.
+      }
+    }
+  } finally {
+    unsubscribe?.();
+  }
+
+  return { url: state.url, last: state.last };
+}
+
+/**
+ * What Framer says about a file that never offered a component, for the
+ * message (2026-10-27). "Still compiling" was all a creator saw, whatever the
+ * cause: no exports at all, exports but no component, a component with no
+ * insert address, or a problem the type check reports. Best effort, never
+ * throws, and null only when Framer gave nothing to go on.
+ */
+async function describeMissingExport(file: CanvasCodeFile, written: CanvasCodeFile): Promise<string | null> {
+  const parts: string[] = [];
+  const exports = Array.isArray(file.exports) ? file.exports : [];
+  // The latest copy for the export list; the type check from whichever copy has one.
+  const checked = typeof file.typecheck === "function" ? file : written;
+  const components = exports.filter((entry) => entry.type === "component");
+  if (exports.length > 0 && components.length === 0) {
+    const listed = exports.slice(0, 4).map((entry) => `${entry.name} (${entry.type})`).join(", ");
+    parts.push(`Framer lists its exports as ${listed}, with no component among them.`);
+  } else if (components.length > 0) {
+    parts.push("Framer found the component but gave it no insert address yet.");
+  }
+
+  if (typeof checked.typecheck === "function") {
     try {
-      const files = await deps.getCodeFiles();
-      const refreshed = files.find((candidate) => candidate.id === file.id || candidate.name === file.name);
-      const url = refreshed ? pickComponentExport(refreshed) : null;
-      if (url) return url;
+      const diagnostics = await withTimeout(checked.typecheck(), 10000, "Checking the component");
+      // An error first, else the first warning: either can be why it never built.
+      const found = diagnostics.find((entry) => entry.category === 1) ?? diagnostics.find((entry) => entry.category === 0);
+      if (found) {
+        const line = found.span ? ` (line ${found.span.start.line + 1})` : "";
+        parts.push(`The first problem it reports: ${found.message.slice(0, 160)}${line}`);
+      }
     } catch {
-      // A failed read is one missed attempt, not the end of the wait.
+      // No type check answer: the export state alone still says something.
     }
   }
 
-  return null;
+  return parts.length > 0 ? parts.join(" ") : null;
 }
 
 function pickComponentExport(file: CanvasCodeFile): string | null {
@@ -216,19 +332,37 @@ type WriteResult =
   | { ok: true; file: CanvasCodeFile; action: DeploySuccess["action"] }
   | DeployFailure;
 
-/** Create the code file, or overwrite the one with the same name. */
+/**
+ * Create the code file, or overwrite the one with the same name.
+ *
+ * An unchanged file is left alone only when Framer already offers its
+ * component. Skipping every unchanged file (as of earlier on 2026-10-27) meant
+ * a file whose first compile failed or stalled was never compiled again: each
+ * retry found the same content, wrote nothing, and waited for an export that
+ * could not come. Writing identical content may not make Framer compile, so
+ * the code is written with its trailing line break toggled: a real change
+ * that changes nothing the component does.
+ */
 async function writeFile(
   deps: CanvasDeps,
   generated: Pick<GeneratedCanvasFile, "fileName" | "code">
 ): Promise<WriteResult> {
   try {
-    const existing = await deps.getCodeFiles();
+    const existing = await call(deps.getCodeFiles(), "Reading code files");
     const match = existing.find((candidate) => candidate.name === generated.fileName);
 
     if (match) {
-      return { ok: true, file: await match.setFileContent(generated.code), action: "updated" };
+      const current = "content" in match ? (match as { content?: unknown }).content : undefined;
+      const unchanged = current === generated.code || current === `${generated.code}\n`;
+      if (unchanged && pickComponentExport(match)) return { ok: true, file: match, action: "updated" };
+      const code = unchanged ? (current === generated.code ? `${generated.code}\n` : generated.code) : generated.code;
+      return { ok: true, file: await call(match.setFileContent(code), "Saving the component"), action: "updated" };
     }
-    return { ok: true, file: await deps.createCodeFile(generated.fileName, generated.code), action: "created" };
+    return {
+      ok: true,
+      file: await call(deps.createCodeFile(generated.fileName, generated.code), "Saving the component"),
+      action: "created",
+    };
   } catch {
     return {
       ok: false,
@@ -328,9 +462,12 @@ export async function deployCanvasComponent(
   const { file, action } = written;
 
   let insertUrl: string | null;
+  let lastSeen: CanvasCodeFile = file;
 
   try {
-    insertUrl = await resolveInsertUrl(deps, file, options.exportRetryDelaysMs ?? EXPORT_RETRY_DELAYS_MS);
+    const resolved = await resolveInsertUrl(deps, file, options.exportRetryDelaysMs ?? EXPORT_RETRY_DELAYS_MS);
+    insertUrl = resolved.url;
+    lastSeen = resolved.last;
   } catch {
     insertUrl = null;
   }
@@ -338,12 +475,15 @@ export async function deployCanvasComponent(
   if (!insertUrl) {
     // The file is written and correct, so this is recoverable by hand. Say so,
     // rather than reporting a failure that sounds like nothing happened.
+    const detail = await describeMissingExport(lastSeen, file);
     return {
       ok: false,
       reason: "no_component_export",
       title: "Component saved, not inserted",
-      message:
-        `${generated.fileName} is in the project, but Framer is still compiling it. Click Add to canvas again in a moment, or drag it in from the components panel.`,
+      message: detail
+        ? `${generated.fileName} is in the project but Framer has not offered its component. ${detail}`
+        : `${generated.fileName} is in the project, but Framer reports no exports for it yet. Click Add to canvas again: it is saved again so Framer compiles it afresh.`,
+      ...(detail ? { detail } : {}),
     };
   }
 
@@ -355,10 +495,10 @@ export async function deployCanvasComponent(
       ...(options.parentId ? { parentId: options.parentId } : {}),
       ...(options.attributes ? { attributes: options.attributes as any } : {}),
     };
-    node = await deps.addComponentInstance(addOptions);
+    node = await call(deps.addComponentInstance(addOptions), "Inserting the component");
     if (options.attributes && typeof (node as any)?.setAttributes === "function") {
       try {
-        await (node as any).setAttributes(options.attributes);
+        await call((node as any).setAttributes(options.attributes) as Promise<unknown>, "Sizing the component");
       } catch {
         // Ignored if Framer does not support setAttributes on this instance
       }
@@ -377,7 +517,7 @@ export async function deployCanvasComponent(
 
   if (options.parentId) {
     try {
-      await deps.setParent(node.id, options.parentId, options.index);
+      await call(deps.setParent(node.id, options.parentId, options.index), "Placing the component");
       reparented = true;
     } catch {
       // The instance exists and the creator can drag it. Losing the requested

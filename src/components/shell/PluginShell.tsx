@@ -3,6 +3,7 @@ import { PluginFooter } from "./PluginFooter";
 import { TabBar } from "./TabBar";
 import { BRANDING, PLUGIN_VERSION } from "../../config/branding";
 import { cn } from "../../utils/cn";
+import { useScrollbarGutter } from "../../hooks/useScrollbarGutter";
 import { ACCOUNT_VIEW, type TabId, type ViewId } from "../tabs/tabs";
 
 export interface PluginShellProps {
@@ -45,7 +46,10 @@ export const PluginShell: React.FC<PluginShellProps> = ({
   topBanner,
   flush = false,
   children,
-}) => (
+}) => {
+  // Content 16px from both edges whatever the system's scrollbar takes (kit.css).
+  useScrollbarGutter(!collapsed);
+  return (
   <div className={cn("framefic-shell", collapsed && "is-collapsed")}>
     {collapsed ? null : topBanner}
     <TabBar
@@ -85,4 +89,5 @@ export const PluginShell: React.FC<PluginShellProps> = ({
       </>
     )}
   </div>
-);
+  );
+};

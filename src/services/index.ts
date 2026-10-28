@@ -79,7 +79,10 @@ export {
   BREAKPOINT_RETRY_DELAYS_MS,
   SCAFFOLD_COMPONENT_SPACING,
   SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER,
+  SCAFFOLD_COMPONENT_SPACING_CENTERED,
   applyPageChrome,
+  authPathsForPages,
+  centerPageLayout,
   findPageChrome,
   heightWithMargin,
   pickPageChrome,
@@ -107,7 +110,13 @@ export type {
   ScaffoldSuccess,
 } from "./pageScaffoldService";
 
-export { REPARENT_METHOD, WRITE_METHODS, deployCanvasComponent, writeCodeFile } from "./framerCanvasService";
+export {
+  REPARENT_METHOD,
+  SCAFFOLD_EXPORT_RETRY_DELAYS_MS,
+  WRITE_METHODS,
+  deployCanvasComponent,
+  writeCodeFile,
+} from "./framerCanvasService";
 export type {
   CanvasCodeFile,
   CanvasCodeFileExport,

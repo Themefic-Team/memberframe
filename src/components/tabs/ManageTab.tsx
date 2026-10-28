@@ -31,7 +31,8 @@ import { readDefinitions } from "../../utils/customFields";
 import { rememberSiteTiers } from "../../types/member";
 import { resolvedTierKey } from "../manage/tierValidation";
 
-type Segment = "members" | "tiers" | "payments";
+export type ManageSegment = "members" | "tiers" | "payments";
+type Segment = ManageSegment;
 
 /**
  * Payments sits beside Tiers, FP-16 section 9.4: a tier's prices only sell
@@ -68,7 +69,12 @@ const SEGMENTS = [
  * who has not connected has done nothing wrong, and a failure banner would send
  * them looking for a problem that is not there.
  */
-export const ManageTab: React.FC = () => {
+export interface ManageTabProps {
+  /** The view it opens on: Home's Quick Start links straight to Tiers or Payments. */
+  initialSegment?: ManageSegment;
+}
+
+export const ManageTab: React.FC<ManageTabProps> = ({ initialSegment = "members" }) => {
   const { connection, settings } = useConnection();
 
   // FP-09. The definitions say which values a member's flyout shows and how
@@ -76,7 +82,7 @@ export const ManageTab: React.FC = () => {
   const profileFields = useMemo(() => readDefinitions(settings?.customFields), [settings]);
   const siteId = connection?.siteId ?? null;
 
-  const [segment, setSegment] = useState<Segment>("members");
+  const [segment, setSegment] = useState<Segment>(initialSegment);
   const [filters, setFilters] = useState<MemberFilters>(NO_MEMBER_FILTERS);
   const [page, setPageNumber] = useState(1);
 

@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXPORT_RETRY_DELAYS_MS,
   REPARENT_METHOD,
+  SCAFFOLD_EXPORT_RETRY_DELAYS_MS,
   WRITE_METHODS,
   deployCanvasComponent,
   type CanvasDeps,
@@ -99,6 +100,16 @@ describe("deployCanvasComponent: a second deploy updates rather than duplicating
     const files = await mock.getCodeFiles();
     expect(files).toHaveLength(1);
     expect(files[0].content).toContain("Second pass");
+    expect(mock.calls.addComponentInstance).toHaveLength(2);
+  });
+
+  it("leaves an unchanged file alone, so Framer does not compile it again", async () => {
+    const mock = createFramerMock();
+    await deployCanvasComponent(deps(mock), generated);
+    const outcome = await deployCanvasComponent(deps(mock), generated);
+
+    expect(outcome.ok).toBe(true);
+    expect(mock.calls.setFileContent).toHaveLength(0);
     expect(mock.calls.addComponentInstance).toHaveLength(2);
   });
 
@@ -237,6 +248,12 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
     expect(total).toBeLessThanOrEqual(20_000);
   });
 
+  it("waits longer, still bounded, when Create pages places several at once", () => {
+    const total = SCAFFOLD_EXPORT_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBeGreaterThanOrEqual(45_000);
+    expect(total).toBeLessThanOrEqual(90_000);
+  });
+
   it("says the file was saved but not inserted when the export never appears", async () => {
     const mock = mockWithDelayedExports(false);
     const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0, 0] });
@@ -248,6 +265,89 @@ describe("deployCanvasComponent: the insert URL may not be ready yet", () => {
     // The file really is in the project, so the copy must not imply otherwise.
     expect(outcome.message).toContain("MeteredPaywall.tsx is in the project");
     expect(mock.calls.addComponentInstance).toHaveLength(0);
+  });
+
+  it("names Framer's own first error when the file never compiles", async () => {
+    const base = createFramerMock();
+    const broken = async (name: string, code: string) => ({
+      ...(await base.createCodeFile(name, code)),
+      exports: [],
+      typecheck: async () => [
+        { message: "A warning", category: 0 },
+        { message: "Cannot find module 'lucide-react'.", category: 1, span: { start: { line: 4 } } },
+      ],
+    });
+    const mock = createFramerMock({
+      createCodeFile: broken,
+      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => ({ ...file, exports: [] })),
+    });
+    const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0] });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.reason).toBe("no_component_export");
+    expect(outcome.detail).toBe("The first problem it reports: Cannot find module 'lucide-react'. (line 5)");
+    expect(outcome.message).toContain("MeteredPaywall.tsx is in the project but Framer has not offered its component.");
+  });
+
+  it("says what Framer exports when none of it is a component", async () => {
+    const base = createFramerMock();
+    const helperOnly = (file: MockCodeFile) => ({
+      ...file,
+      exports: [{ name: "helper", isDefaultExport: false, type: "override" }],
+    });
+    const mock = createFramerMock({
+      createCodeFile: async (name: string, code: string) => helperOnly(await base.createCodeFile(name, code)),
+      getCodeFiles: async () => (await base.getCodeFiles()).map(helperOnly),
+    });
+    const outcome = await deployCanvasComponent(deps(mock), generated, { exportRetryDelaysMs: [0] });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.detail).toBe("Framer lists its exports as helper (override), with no component among them.");
+  });
+
+  it("saves an unchanged file again when Framer offers no component, so a stalled compile restarts", async () => {
+    const base = createFramerMock();
+    await base.createCodeFile(generated.fileName, generated.code);
+    const noExports = createFramerMock({
+      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => ({ ...file, exports: [] })),
+    });
+    // The first retry: same content, no component, so it is written with the line break toggled.
+    // The file object comes from the first mock, so its save is recorded there.
+    await deployCanvasComponent(deps(noExports), generated, { exportRetryDelaysMs: [0] });
+    expect(base.calls.setFileContent).toHaveLength(1);
+    expect(base.calls.setFileContent[0]!.code).toBe(`${generated.code}\n`);
+  });
+
+  it("inserts as soon as Framer pushes the compiled file, without waiting out the schedule", async () => {
+    const base = createFramerMock();
+    let push: ((files: ReadonlyArray<MockCodeFile>) => void) | null = null;
+    const mock = createFramerMock({
+      createCodeFile: async (name: string, code: string) => ({ ...(await base.createCodeFile(name, code)), exports: [] }),
+      getCodeFiles: async () => (await base.getCodeFiles()).map((file) => ({ ...file, exports: [] })),
+    });
+    const withPush: CanvasDeps = {
+      ...deps(mock),
+      getCodeFiles: mock.getCodeFiles,
+      createCodeFile: mock.createCodeFile,
+      addComponentInstance: mock.addComponentInstance,
+      setParent: mock.setParent,
+      isAllowedTo: mock.isAllowedTo,
+      subscribeToCodeFiles: (callback) => {
+        push = callback as (files: ReadonlyArray<MockCodeFile>) => void;
+        return () => {
+          push = null;
+        };
+      },
+    };
+    const started = Date.now();
+    const outcome = deployCanvasComponent(withPush, generated, { exportRetryDelaysMs: [60_000] });
+    setTimeout(() => void base.getCodeFiles().then((files) => push?.(files)), 20);
+    const result = await outcome;
+
+    expect(result.ok).toBe(true);
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 
   it("ignores an override export, which carries no insert URL", async () => {

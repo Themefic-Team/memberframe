@@ -304,7 +304,7 @@ the user commits it.
 | FP-05 | GitHub Sign In | F05 | `canvas-components/MemberAuth.tsx` | todo | |
 | FP-06 | ReCAPTCHA Bot Defense | F21 | not started | todo | |
 | FP-07 | Soft Paywall, Read More | F07, F08 | not started | todo | |
-| FP-08 | Member Dashboard | F06 | `canvas-components/MemberDashboard.tsx`, `services/pageScaffoldService.ts` | awaiting review, partial | |
+| FP-08 | Member Dashboard | F06 | `canvas-components/MemberDashboard.tsx`, `services/pageScaffoldService.ts`; account area 2026-10-27 ([33-member-account.md](development-docs/33-member-account.md)), backend `routes/memberAccount.ts`, `lib/memberAccount.ts` | awaiting review | |
 | FP-09 | Custom Profile Fields | F16 | `utils/customFields.ts`, `components/settings/CustomFieldsPanel.tsx`, `components/manage/MemberFlyout.tsx`, `canvas-components/OnboardingModal.tsx`, `canvas-components/MemberDashboard.tsx`; backend `lib/memberMetadata.ts`, `lib/siteSettings.ts`, `routes/site.ts` | awaiting review | |
 | FP-10 | Member Bookmarking | F14 | not started | todo | |
 | FP-11 | LMS Mark As Complete | F11 | not started | todo | |

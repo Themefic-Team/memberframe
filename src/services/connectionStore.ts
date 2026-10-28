@@ -90,7 +90,53 @@ async function readKey(key: string): Promise<string | null> {
   }
 }
 
+/**
+ * Asked before every write: Framer shows the creator a warning for a protected
+ * call made without checking first, and on a project's first open the
+ * permission is not granted yet. Not allowed counts as a failed write.
+ */
+function mayWritePluginData(): boolean {
+  try {
+    return framer.isAllowedTo("setPluginData");
+  } catch {
+    return false;
+  }
+}
+
+/** Writes asked for before the permission was granted: the latest value per key. */
+const pendingWrites = new Map<string, string | null>();
+let waitingForPermission: (() => void) | null = null;
+
+/** Hold a write until Framer grants setPluginData, then make it, once. */
+function deferWrite(key: string, value: string | null): void {
+  pendingWrites.set(key, value);
+  if (waitingForPermission) return;
+  try {
+    // Framer may answer at once, inside the subscribe call, before it returns.
+    let granted = false;
+    const unsubscribe = framer.subscribeToIsAllowedTo("setPluginData", (allowed) => {
+      if (!allowed || granted) return;
+      granted = true;
+      waitingForPermission?.();
+      waitingForPermission = null;
+      const writes = [...pendingWrites];
+      pendingWrites.clear();
+      for (const [pendingKey, pendingValue] of writes) void writeKey(pendingKey, pendingValue);
+    });
+    if (granted) unsubscribe();
+    else waitingForPermission = unsubscribe;
+  } catch {
+    // Outside Framer: nothing will ever grant it.
+    storageWorked = false;
+  }
+}
+
 async function writeKey(key: string, value: string | null): Promise<boolean> {
+  if (!mayWritePluginData()) {
+    deferWrite(key, value);
+    return false;
+  }
+  pendingWrites.delete(key);
   try {
     await framer.setPluginData(key, value);
     return true;

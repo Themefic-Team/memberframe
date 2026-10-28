@@ -231,6 +231,37 @@ export function membershipPages(
   return specs;
 }
 
+/** Which Settings path each predefined page answers to. */
+const AUTH_PATH_FOR_PAGE: Readonly<Record<string, "loginPath" | "signupPath" | "resetPath" | "afterLoginPath">> = {
+  login: "loginPath",
+  signup: "signupPath",
+  reset: "resetPath",
+  dashboard: "afterLoginPath",
+};
+
+/**
+ * The Settings paths to save once Create pages has run (product owner,
+ * 2026-10-27): each page that now exists becomes the path its setting points
+ * at, so a creator never has to copy `/signup` or `/dashboard` into Settings
+ * by hand. Only real changes come back, and a page that failed to create
+ * changes nothing. After sign out is never touched: no page is made for it.
+ */
+export function authPathsForPages(
+  results: ReadonlyArray<PageResult>,
+  auth: Pick<AuthSettings, "loginPath" | "signupPath" | "resetPath" | "afterLoginPath"> | null | undefined
+): Partial<AuthSettings> {
+  const patch: Partial<AuthSettings> = {};
+  for (const result of results) {
+    if (result.status === "failed") continue;
+    const key = AUTH_PATH_FOR_PAGE[result.id];
+    if (!key) continue;
+    const path = normalizePagePath(result.path);
+    if (path === "" || path === "/") continue;
+    if (normalizePagePath(auth?.[key] ?? "") !== path) patch[key] = path;
+  }
+  return patch;
+}
+
 export type PageResult =
   | { path: string; id: string; status: "created"; nodeId: string; component?: ScaffoldComponent }
   | { path: string; id: string; status: "skipped"; reason: "already_exists"; nodeId: string; component?: ScaffoldComponent }
@@ -597,6 +628,39 @@ export async function applyPageChrome(
 
   return { header, footer, stacked };
 }
+
+/**
+ * The layout an empty page gets when the site has no header and footer to
+ * borrow (a new or blank project): a vertical stack that centres its children
+ * both ways. The component then flows into the middle of the Desktop frame,
+ * and Tablet and Phone inherit it, with no coordinates to get wrong. A site
+ * with its own chrome gets that page's layout instead (`applyPageChrome`).
+ */
+export const CENTERED_PAGE_LAYOUT = {
+  layout: "stack",
+  stackDirection: "vertical",
+  stackDistribution: "center",
+  stackAlignment: "center",
+  stackWrapEnabled: false,
+  gap: "0px",
+  padding: "0px",
+} as const;
+
+/** Give a page's breakpoint `CENTERED_PAGE_LAYOUT`. False when Framer refuses it. */
+export async function centerPageLayout(
+  deps: Pick<PageChromeDeps, "setAttributes">,
+  breakpointId: string
+): Promise<boolean> {
+  try {
+    await deps.setAttributes(breakpointId, { ...CENTERED_PAGE_LAYOUT });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The Spacing a component starts with on a centred page: nothing to clear, even space above and below. */
+export const SCAFFOLD_COMPONENT_SPACING_CENTERED = { margin: "64px 0px 64px 0px" } as const;
 
 /**
  * The Spacing a component starts with when a real header sits above it in the

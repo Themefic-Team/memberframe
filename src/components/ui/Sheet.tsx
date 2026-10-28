@@ -9,9 +9,9 @@ export interface SheetProps {
   description?: string;
   /** Beside the title: a status such as Connected. */
   badge?: React.ReactNode;
-  /** A 32px tile left of the title: a provider's mark, a member's avatar. */
+  /** A 32px tile in the row under the head: a provider's logo, a member's avatar. */
   icon?: React.ReactNode;
-  /** A link to the setup guide for what the sheet configures, opened in the browser. */
+  /** A link to the setup guide, right of the icon row, opened in the browser. */
   guide?: { href: string; label?: string };
   /**
    * Omit to make the sheet impossible to dismiss: no close button, no Escape,
@@ -32,7 +32,9 @@ let lastSheet = 0;
 /**
  * A dialog over the panel, framefic-ui-kit's `Sheet` (design-system.md section
  * 8), always centered: the user chose that over the kit's bottom sheet
- * (2026-10-25). The title and close, a scrolling body, and a pinned footer,
+ * (2026-10-25). The head (title, badge, description, close), then under a
+ * hairline the icon row (the icon left, the setup guide right; product owner
+ * 2026-10-27), a scrolling body, and a pinned footer,
  * 16px from the panel's edges and 16px inside. The scrim is the overlay token
  * with the glass backdrop blur (section 6.1).
  *
@@ -67,7 +69,7 @@ export const Sheet: React.FC<SheetProps> = ({ title, description, badge, icon, g
       [...(element?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])].filter((node) => !node.hasAttribute("disabled"));
     // The first field, so typing can start at once. Never an info tip's icon:
     // focus opens its bubble, and it sat over the field it describes (2026-10-25).
-    const inBody = focusables().filter((node) => !node.closest(".kit-sheet-head") && !node.closest(".info-tip"));
+    const inBody = focusables().filter((node) => !node.closest(".kit-sheet-head") && !node.closest(".kit-sheet-brand") && !node.closest(".info-tip"));
     const first = inBody.find((node) => node.matches("input, select, textarea")) ?? inBody[0];
     (first ?? element)?.focus();
 
@@ -108,17 +110,26 @@ export const Sheet: React.FC<SheetProps> = ({ title, description, badge, icon, g
     >
       <div ref={sheet} className="kit-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <div className="kit-sheet-head">
-          {icon ? (
-            <span className="kit-sheet-icon" aria-hidden={true}>
-              {icon}
-            </span>
-          ) : null}
           <div className="kit-sheet-heading">
             <h2 id={titleId} className="kit-sheet-title">
               {title}
               {badge}
             </h2>
             {description ? <p className="kit-sheet-desc">{description}</p> : null}
+          </div>
+          {onClose ? (
+            <IconButton label="Close" variant="ghost" onClick={onClose}>
+              <X aria-hidden={true} />
+            </IconButton>
+          ) : null}
+        </div>
+        {icon || guide ? (
+          <div className="kit-sheet-brand">
+            {icon ? (
+              <span className="kit-sheet-icon" aria-hidden={true}>
+                {icon}
+              </span>
+            ) : null}
             {guide ? (
               <a
                 className="kit-sheet-guide"
@@ -132,12 +143,7 @@ export const Sheet: React.FC<SheetProps> = ({ title, description, badge, icon, g
               </a>
             ) : null}
           </div>
-          {onClose ? (
-            <IconButton label="Close" variant="ghost" onClick={onClose}>
-              <X aria-hidden={true} />
-            </IconButton>
-          ) : null}
-        </div>
+        ) : null}
         <div className="kit-sheet-body">{children}</div>
         {footer ? <div className="kit-sheet-footer">{footer}</div> : null}
       </div>

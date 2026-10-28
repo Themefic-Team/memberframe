@@ -932,8 +932,18 @@ describe("modal triggers (05-member-auth.md)", () => {
   it("opens from a link to #id or a layer named id, before the link can navigate", () => {
     expect(code).toContain('node.getAttribute("data-framer-name") === id');
     expect(code).toContain('href === "#" + id || href.endsWith("#" + id)');
-    expect(code).toContain('document.addEventListener("click", onClick, true);');
+    // Window capture through the prototype: a published Framer page defers
+    // listeners added with document.addEventListener for clicks, and a late
+    // preventDefault let ./#sign-in carry a visitor to the home page.
+    expect(code).toContain("EventTarget.prototype.addEventListener.call(window, type, handler, true);");
+    expect(code).toContain('const stopClick = listenAtOnce("click", onClick);');
+    expect(code).not.toContain('document.addEventListener("click"');
     expect(code).toContain("event.preventDefault();");
+  });
+
+  it("drops #id from the address on close, so the same link opens it again", () => {
+    expect(code).toContain('window.location.hash === "#" + triggerId');
+    expect(code).toContain("window.history.replaceState(window.history.state, \"\", window.location.pathname + window.location.search);");
   });
 
   it("never opens by itself for a signed-in member, and closes on backdrop, Escape, and its button", () => {

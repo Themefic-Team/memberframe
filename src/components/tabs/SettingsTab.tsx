@@ -37,9 +37,11 @@ import {
 export interface SettingsTabProps {
   themePreference: ThemePreference;
   onChangeThemePreference: (preference: ThemePreference) => void;
+  /** The view it opens on: Home's Gate a frame links straight to Page locks. */
+  initialView?: SettingsView;
 }
 
-type SettingsView = "config" | "locks" | "fields" | "integration";
+export type SettingsView = "config" | "locks" | "fields" | "integration";
 
 const VIEWS = [
   { value: "config", label: "Config" },
@@ -93,12 +95,13 @@ const SECRETS_SUPPORTED = true;
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   themePreference,
   onChangeThemePreference,
+  initialView = "config",
 }) => {
   const { connection, settings, settingsVersion, applySettings } = useConnection();
   const siteTierList = useSiteTiers(connection?.siteId ?? null);
   const siteId = connection?.siteId ?? null;
 
-  const [view, setView] = useState<SettingsView>("config");
+  const [view, setView] = useState<SettingsView>(initialView);
 
   /**
    * A local copy of the membership settings, edited until Save.

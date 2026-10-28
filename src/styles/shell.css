@@ -59,3 +59,37 @@ button {
   width: 100%;
   box-sizing: border-box;
 }
+
+/* Quick guide (QuickGuide.tsx): progress on top, then the kit's step rows in
+   a numbered list. The footer is the Sheet's own: the "Don't show this again"
+   box at its natural width, the one primary button filling the rest. */
+.quick-guide-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quick-guide-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* Home, Quick Start: the Setup guide row's bar, under its one line. */
+.home-setup-progress {
+  margin-top: var(--space-6);
+}
+
+.quick-guide-progress-label {
+  font: var(--text-body-sm-strong);
+  color: var(--framer-color-text-secondary);
+}
+
+/* Publish happens in Framer itself: a row to read, not one to click. */
+.step-row.is-static,
+.step-row.is-static:hover {
+  border-color: var(--framer-color-divider);
+  box-shadow: none;
+  transform: none;
+  cursor: default;
+}

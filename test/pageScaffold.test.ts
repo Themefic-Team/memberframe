@@ -15,7 +15,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  CENTERED_PAGE_LAYOUT,
   applyPageChrome,
+  authPathsForPages,
+  centerPageLayout,
   findPageChrome,
   findPageContentParent,
   heightWithMargin,
@@ -489,5 +492,68 @@ describe("page chrome", () => {
     expect(heightWithMargin("440px", "120px 0px 80px 0px")).toBe("640px");
     expect(heightWithMargin("fit-content", "64px 0px 96px 0px")).toBe("fit-content");
     expect(heightWithMargin("400px", "24px")).toBe("448px");
+  });
+});
+
+describe("centerPageLayout: an empty page centres its component", () => {
+  it("makes the breakpoint a vertical stack centred both ways", async () => {
+    const writes: Array<{ id: string; attributes: Record<string, unknown> }> = [];
+    const ok = await centerPageLayout(
+      { setAttributes: async (id, attributes) => void writes.push({ id, attributes }) },
+      "desktop-1"
+    );
+
+    expect(ok).toBe(true);
+    expect(writes).toEqual([{ id: "desktop-1", attributes: { ...CENTERED_PAGE_LAYOUT } }]);
+    expect(CENTERED_PAGE_LAYOUT).toMatchObject({
+      layout: "stack",
+      stackDirection: "vertical",
+      stackDistribution: "center",
+      stackAlignment: "center",
+    });
+  });
+
+  it("reports a refusal instead of throwing, so the caller can fall back", async () => {
+    const ok = await centerPageLayout(
+      {
+        setAttributes: async () => {
+          throw new Error("refused");
+        },
+      },
+      "desktop-1"
+    );
+
+    expect(ok).toBe(false);
+  });
+});
+
+describe("authPathsForPages: Settings follow the created pages", () => {
+  const auth = { loginPath: "/login", signupPath: "/login", resetPath: "/reset-password", afterLoginPath: "/" };
+
+  it("points Sign up and After sign in at the new pages, and changes nothing else", () => {
+    const patch = authPathsForPages(
+      [
+        { id: "login", path: "/login", status: "skipped", reason: "already_exists", nodeId: "a" },
+        { id: "signup", path: "/signup", status: "created", nodeId: "b" },
+        { id: "reset", path: "/reset-password", status: "created", nodeId: "c" },
+        { id: "dashboard", path: "/dashboard", status: "created", nodeId: "d" },
+        { id: "pricing", path: "/pricing", status: "created", nodeId: "e" },
+      ],
+      auth
+    );
+
+    expect(patch).toEqual({ signupPath: "/signup", afterLoginPath: "/dashboard" });
+  });
+
+  it("ignores a page that failed to create", () => {
+    expect(
+      authPathsForPages([{ id: "dashboard", path: "/dashboard", status: "failed", reason: "refused" }], auth)
+    ).toEqual({});
+  });
+
+  it("compares normalised paths, so /signup/ is not a change from /signup", () => {
+    expect(
+      authPathsForPages([{ id: "signup", path: "/signup", status: "created", nodeId: "b" }], { ...auth, signupPath: "/signup/" })
+    ).toEqual({});
   });
 });

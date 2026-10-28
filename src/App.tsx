@@ -3,6 +3,10 @@ import { framer } from "framer-plugin";
 import { PluginShell } from "./components/shell";
 import { ConnectionProvider } from "./components/ConnectionProvider";
 import { ACCOUNT_VIEW, BuilderTab, ConnectTab, HomeTab, ManageTab, ReportsTab, SettingsTab } from "./components/tabs";
+import type { ManageSegment } from "./components/tabs/ManageTab";
+import type { SettingsView } from "./components/tabs/SettingsTab";
+import { QuickGuide, quickGuideHidden } from "./components/QuickGuide";
+import { useSetupProgress } from "./hooks/useSetupProgress";
 import { SkeletonList, ToastProvider } from "./components/ui";
 import { LicenseProvider } from "./components/account/LicenseProvider";
 import { LicenseBanner } from "./components/account/LicenseGate";
@@ -130,9 +134,32 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
     [openAuth, setStoredTab, signedOut]
   );
 
+  // The view Manage and Settings open on. Home's Quick Start sets them; the
+  // tab bar puts them back, so a tab chosen there opens as it always has.
+  const [manageStart, setManageStart] = useState<ManageSegment>("members");
+  const [settingsStart, setSettingsStart] = useState<SettingsView>("config");
+  const selectTab = useCallback(
+    (next: ViewId) => {
+      setManageStart("members");
+      setSettingsStart("config");
+      setActiveTab(next);
+    },
+    [setActiveTab]
+  );
   const openBuilder = useCallback(() => setActiveTab("builder"), [setActiveTab]);
-  const openManage = useCallback(() => setActiveTab("manage"), [setActiveTab]);
-  const openSettings = useCallback(() => setActiveTab("settings"), [setActiveTab]);
+  const openManageAt = useCallback(
+    (segment: ManageSegment) => {
+      setManageStart(segment);
+      setActiveTab("manage");
+    },
+    [setActiveTab]
+  );
+  const openTiers = useCallback(() => openManageAt("tiers"), [openManageAt]);
+  const openPayments = useCallback(() => openManageAt("payments"), [openManageAt]);
+  const openPageLocks = useCallback(() => {
+    setSettingsStart("locks");
+    setActiveTab("settings");
+  }, [setActiveTab]);
   const openConnect = useCallback(() => {
     setAccountView("profile");
     setActiveTab(ACCOUNT_VIEW);
@@ -148,12 +175,40 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
     justSignedIn.current = true;
   }, []);
 
+  // The quick guide, after every sign in until "Don't show this again" is
+  // ticked (product owner, 2026-10-27). Waits for "You're all set!" to close.
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guideAfterStarted = useRef(false);
+
   // "You're all set!": the first license after signing in, when its trial is new.
   useEffect(() => {
     if (!justSignedIn.current || !view) return;
     justSignedIn.current = false;
-    if (view.state === "trial" && view.startedAt && Date.now() - Date.parse(view.startedAt) < JUST_STARTED_MS) setStartedModal(true);
+    const showGuide = !quickGuideHidden();
+    if (view.state === "trial" && view.startedAt && Date.now() - Date.parse(view.startedAt) < JUST_STARTED_MS) {
+      setStartedModal(true);
+      guideAfterStarted.current = showGuide;
+    } else if (showGuide) {
+      setGuideOpen(true);
+    }
   }, [view]);
+
+  // Checked while it can be seen: the Home tab's Setup guide row, or the guide.
+  const setup = useSetupProgress(state.status === "connected" && (activeTab === "home" || guideOpen));
+  const openGuide = useCallback(() => {
+    setGuideOpen(true);
+    setup.refresh();
+  }, [setup.refresh]);
+
+  const closeStartedModal = useCallback(() => {
+    setStartedModal(false);
+    if (guideAfterStarted.current) setGuideOpen(true);
+    guideAfterStarted.current = false;
+  }, []);
+  const openSignInOptions = useCallback(() => {
+    setSettingsStart("integration");
+    setActiveTab("settings");
+  }, [setActiveTab]);
 
   const lockedStatus: TrialModalStatus | null =
     state.status === "connected" && view && !unlocked && activeTab !== ACCOUNT_VIEW
@@ -168,7 +223,7 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
     <>
       <PluginShell
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={selectTab}
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
         onOpenAccount={openConnect}
@@ -205,9 +260,14 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
               <TabContent
                 activeTab={activeTab}
                 onOpenBuilder={openBuilder}
-                onOpenManage={openManage}
-                onOpenSettings={openSettings}
+                onOpenPageLocks={openPageLocks}
+                onOpenTiers={openTiers}
+                onOpenPayments={openPayments}
+                manageStart={manageStart}
+                settingsStart={settingsStart}
                 onOpenConnect={openConnect}
+                onOpenGuide={openGuide}
+                setupDone={setup.known ? setup.count : null}
                 themePreference={preference}
                 onChangeThemePreference={setPreference}
               />
@@ -220,13 +280,27 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
       <TrialStatusModal
         status={startedModal ? "started" : lockedStatus}
         claimedProjectName={view?.claimedProjectName ?? null}
-        onClose={() => setStartedModal(false)}
+        onClose={closeStartedModal}
         onUpgrade={() => {
           setStartedModal(false);
+          guideAfterStarted.current = false;
           openSubscription();
         }}
         onLogout={() => void disconnect()}
       />
+      {/* Never over a lock or the trial modal: those must be answered first. */}
+      {guideOpen && !startedModal && lockedStatus === null && state.status === "connected" ? (
+        <QuickGuide
+          done={setup.done}
+          known={setup.known}
+          onClose={() => setGuideOpen(false)}
+          onOpenPages={openBuilder}
+          onOpenTiers={openTiers}
+          onOpenPayments={openPayments}
+          onOpenSignIn={openSignInOptions}
+          onOpenPageLocks={openPageLocks}
+        />
+      ) : null}
     </>
   );
 };
@@ -234,9 +308,14 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
 const TabContent: React.FC<{
   activeTab: ViewId;
   onOpenBuilder: () => void;
-  onOpenManage: () => void;
-  onOpenSettings: () => void;
+  onOpenPageLocks: () => void;
+  onOpenTiers: () => void;
+  onOpenPayments: () => void;
+  manageStart: ManageSegment;
+  settingsStart: SettingsView;
   onOpenConnect: () => void;
+  onOpenGuide: () => void;
+  setupDone: number | null;
   themePreference: ReturnType<typeof useFramerTheme>["preference"];
   onChangeThemePreference: ReturnType<typeof useFramerTheme>["setPreference"];
 }> = (props) => (
@@ -244,15 +323,22 @@ const TabContent: React.FC<{
     {props.activeTab === "home" ? (
       <HomeTab
         onOpenBuilder={props.onOpenBuilder}
-        onOpenManage={props.onOpenManage}
-        onOpenSettings={props.onOpenSettings}
+        onOpenPageLocks={props.onOpenPageLocks}
+        onOpenTiers={props.onOpenTiers}
+        onOpenPayments={props.onOpenPayments}
         onOpenConnect={props.onOpenConnect}
+        onOpenGuide={props.onOpenGuide}
+        setupDone={props.setupDone}
       />
     ) : null}
     {props.activeTab === "builder" ? <BuilderTab /> : null}
-    {props.activeTab === "manage" ? <ManageTab /> : null}
+    {props.activeTab === "manage" ? <ManageTab initialSegment={props.manageStart} /> : null}
     {props.activeTab === "settings" ? (
-      <SettingsTab themePreference={props.themePreference} onChangeThemePreference={props.onChangeThemePreference} />
+      <SettingsTab
+        themePreference={props.themePreference}
+        onChangeThemePreference={props.onChangeThemePreference}
+        initialView={props.settingsStart}
+      />
     ) : null}
     {props.activeTab === "reports" ? <ReportsTab /> : null}
   </>

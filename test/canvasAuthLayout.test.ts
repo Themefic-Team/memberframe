@@ -19,7 +19,7 @@ describe("the auth card fills its frame", () => {
       member_register: ["400px", "680px"],
       member_password_reset: ["400px", "440px"],
       member_otp_verify: ["400px", "420px"],
-      member_dashboard: ["480px", "fit-content"],
+      member_dashboard: ["960px", "fit-content"],
       member_pricing: ["960px", "600px"],
       metered_paywall: ["640px", "fit-content"],
       protected_download: ["340px", "88px"],

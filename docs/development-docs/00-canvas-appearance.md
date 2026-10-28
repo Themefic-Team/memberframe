@@ -29,9 +29,9 @@ Unchanged in the plugin. In Framer's sidebar every component now shows, after it
 | Group | Controls |
 | :--- | :--- |
 | Accent Color, Corner Radius | As before (new on `<MemberGate>`) |
-| Theme | Light (default), Dark, Match visitor |
+| Theme | Removed 2026-10-27 (product owner): always Light, every colour is set in Colors. An older instance's saved value is ignored |
 | Colors | Background, Text, Muted text, Border, Field, Button text. All optional: unset follows the theme |
-| Typography | Custom font (on or off), Font (Framer's picker, loads the font), Text size 70 to 160% |
+| Typography | Font (Framer's picker, loads the font; applied as soon as it is picked, the Custom font switch removed 2026-10-27), Text size 70 to 160%. Untouched, the font is Inter on the canvas and the published site alike, no longer `--framer-font-family` |
 | Layout | Padding, Spacing, Border width 0 to 4, Shadow |
 | Labels | Every visible string, `{name}` placeholders where a value is inserted |
 
@@ -57,9 +57,9 @@ Visitors see exactly what the creator saw on the canvas, in the chosen theme. Ma
 
 | Control Title | Control Type | Default Value | Description |
 | :--- | :--- | :--- | :--- |
-| Theme | `Enum` | `light` | Light, Dark, Match visitor |
+| Theme | removed | | Removed 2026-10-27; `MF_THEME_CLASS` is always Light |
 | Colors | `Object` of 6 `Color`, `optional` | unset | Overrides the theme palette per colour |
-| Typography | `Object`: `Boolean`, `Font`, `Number` | off, sans-serif, 100% | Custom font and text scale |
+| Typography | `Object`: `Font`, `Number` | Inter, 100% | Font and text scale |
 | Layout | `Object`: 3 `Number`, `Boolean` | per component (Auth 24/14/1/on, Gate 24/10/1/on, Dashboard 24/20/1/off, Onboarding 24/16/1/on) | Padding, spacing, border width, shadow |
 | Labels | `Object` of `String` | the shipped copy | One per visible string |
 
@@ -99,7 +99,7 @@ The agent cannot see the Framer canvas, the sidebar, or a published site.
 | Check | Status | Who |
 | :--- | :--- | :--- |
 | Theme Light on canvas and published page look identical | needs human | |
-| Theme Dark and Match visitor render correctly | needs human | |
+| Theme Dark and Match visitor render correctly | removed 2026-10-27 | |
 | Accent Color, including a colour style, changes the Sign in button | needs human | |
 | Colors, Typography (custom font loads), Layout, and Labels groups appear and apply | needs human | |
 | A new instance is Fixed size and the card fills the frame | needs human | |

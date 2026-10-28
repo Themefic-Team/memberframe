@@ -9,6 +9,7 @@ import {
   AUTH_SCREEN_DEFAULTS,
   deployCanvasComponent,
   writeCodeFile,
+  SCAFFOLD_EXPORT_RETRY_DELAYS_MS,
   generateAuthScreenCode,
   generateMemberAuthCode,
   generateMemberDashboardCode,
@@ -19,7 +20,10 @@ import {
   generateBookmarksTrayCode,
   SCAFFOLD_COMPONENT_SPACING,
   SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER,
+  SCAFFOLD_COMPONENT_SPACING_CENTERED,
   applyPageChrome,
+  authPathsForPages,
+  centerPageLayout,
   heightWithMargin,
   findPageChrome,
   type PageChrome,
@@ -62,8 +66,34 @@ async function sealForInsert(componentId: string, siteId: string | undefined): P
   if (!SEALED_COMPONENTS.has(componentId)) return null;
   if (!siteId) throw new Error("Sign in to MemberFrame before adding components.");
   const result = await requestSeal(siteId);
-  if (result.kind !== "ok") throw new Error("Could not reach MemberFrame to add this component. Check your connection and try again.");
-  return result.data.seal;
+  if (result.kind === "ok") return result.data.seal;
+  throw new Error(sealFailureMessage(result));
+}
+
+/**
+ * Why the server gave no seal, in words the creator can act on. One message
+ * for every case read "Could not reach MemberFrame" even when the server had
+ * answered: a signed-out session, a project owned by another account, or the
+ * per-minute limit (2026-10-27).
+ */
+function sealFailureMessage(result: Exclude<Awaited<ReturnType<typeof requestSeal>>, { kind: "ok" }>): string {
+  switch (result.kind) {
+    case "unauthorized":
+      return "Your MemberFrame session ended. Sign in again from the Account icon, then add the component.";
+    case "forbidden":
+      return "This project belongs to another MemberFrame account. Sign in with the account that connected it.";
+    case "rate_limited":
+      return result.retryAfterSeconds === null
+        ? "Too many components were added in a minute. Wait a moment and try again."
+        : `Too many components were added in a minute. Try again in ${result.retryAfterSeconds} seconds.`;
+    case "unavailable":
+      if (result.status === 404) {
+        return "MemberFrame does not know this project under the signed-in account. Sign out and sign in again in this project.";
+      }
+      return result.status === null
+        ? "Could not reach MemberFrame. Check your connection and try again."
+        : `MemberFrame could not add this component (server answered ${result.status}). Try again in a moment.`;
+  }
 }
 
 /** How often the predefined page list is read again, as a fallback to Framer's own change events. */
@@ -104,7 +134,9 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   member_otp_verify: { width: "400px", height: "420px", position: "relative", top: null, centerX: null },
   // Grows with its content (product owner, 2026-10-20): the profile form is
   // long, and a fixed height made the account card scroll inside the page.
-  member_dashboard: { width: "480px", height: "fit-content", position: "relative", top: null, centerX: null },
+  // 960 wide for the account area's sidebar (33-member-account.md); below
+  // 720px of width the menu moves on top by itself.
+  member_dashboard: { width: "960px", height: "fit-content", position: "relative", top: null, centerX: null },
   member_pricing: { width: "960px", height: "600px", position: "relative", top: null, centerX: null },
   // The one exception to a fixed height: the paywall wraps the article, so its
   // height is the article's. A fixed height would cut the article off or let
@@ -117,6 +149,7 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   bookmarks_tray: { width: "44px", height: "44px", position: "relative", top: null, centerX: null },
 };
 import { fetchPayments } from "../../services/paymentsService";
+import { saveSiteSettings } from "../../services/siteSettingsService";
 import { useConnection } from "../../hooks/useConnection";
 import { recordSeal } from "../../hooks/useSealGuard";
 import { SEAL_CONTROL, requestSeal } from "../../services/instanceSealService";
@@ -160,13 +193,17 @@ const COMPONENT_OPTIONS = CANVAS_COMPONENTS.map((component) => ({
  * live in Settings, Page Locks, and the Route Shield enforces both.
  */
 export const BuilderTab: React.FC = () => {
-  const { connection, settings } = useConnection();
+  const { connection, settings, settingsVersion, applySettings } = useConnection();
   const siteTierList = useSiteTiers(connection?.siteId ?? null);
   const [componentId, setComponentId] = useState<CanvasComponentId>(DEFAULT_COMPONENT_ID);
   // The site's pricing page, from Payments, for the paywall's buttons.
   const [pricingPath, setPricingPath] = useState<string | undefined>(undefined);
   const [scaffolding, setScaffolding] = useState(false);
+  /** What Create pages is doing now, on its button. Null when idle. */
+  const [scaffoldStep, setScaffoldStep] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
+  /** Add to canvas has waited long enough that Framer is compiling the file. */
+  const [slowDeploy, setSlowDeploy] = useState(false);
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
   const showToast = useToast();
 
@@ -309,6 +346,7 @@ export const BuilderTab: React.FC = () => {
     if (selectedSpecs.length === 0) return;
 
     setScaffolding(true);
+    setScaffoldStep("Creating pages...");
     setFailure(null);
 
     try {
@@ -321,6 +359,53 @@ export const BuilderTab: React.FC = () => {
 
       let componentsDeployed = 0;
       const componentDeployErrors: string[] = [];
+      /** Components saved but not compiled in time: one line for all of them, not one each. */
+      const stillCompiling: string[] = [];
+
+      // Settings follow the pages (product owner, 2026-10-27): a new /signup
+      // or /dashboard becomes the Sign up page or After sign in path. Saved
+      // before the components are generated, so the paths baked into each
+      // match Settings. A failed save only leaves Settings as they were.
+      let placeContext = deployContext;
+      let pathsSaved = false;
+      const pathPatch = authPathsForPages(outcome.results, settings?.auth);
+      if (Object.keys(pathPatch).length > 0) {
+        placeContext = {
+          ...deployContext,
+          ...(pathPatch.loginPath ? { loginPath: pathPatch.loginPath } : {}),
+          ...(pathPatch.signupPath ? { signupPath: pathPatch.signupPath } : {}),
+          ...(pathPatch.resetPath ? { resetPath: pathPatch.resetPath } : {}),
+          ...(pathPatch.afterLoginPath ? { afterLoginPath: pathPatch.afterLoginPath } : {}),
+        };
+        if (connection?.siteId) {
+          const saved = await saveSiteSettings(connection.siteId, settingsVersion, { auth: pathPatch });
+          if (saved.kind === "ok") {
+            applySettings(saved.data.settings, saved.data.version);
+            pathsSaved = true;
+          }
+        }
+      }
+
+      // Only pages created in this run get a component.
+      const toPlace = outcome.results.flatMap((result) => {
+        if (result.status !== "created") return [];
+        const spec = selectedSpecs.find((p) => p.id === result.id);
+        if (!spec || spec.component === "none") return [];
+        try {
+          return [{ result, spec, generated: generateForComponent(spec.component, placeContext) }];
+        } catch (err) {
+          componentDeployErrors.push(`${spec.title}: ${err instanceof Error ? err.message : String(err)}`);
+          return [];
+        }
+      });
+
+      // Every file first, then the inserts. Framer compiles each new file in
+      // the background, so saving them all up front lets them compile side by
+      // side while the first insert waits, instead of one wait per page.
+      if (toPlace.length > 0) setScaffoldStep("Saving components...");
+      for (const { generated } of toPlace) {
+        await writeCodeFile(framer, generated.fileName, generated.code).catch(() => undefined);
+      }
 
       // The site's own header and footer, borrowed from an existing page, so a
       // new page looks like the rest of the site rather than a bare frame.
@@ -333,82 +418,100 @@ export const BuilderTab: React.FC = () => {
         chrome = await findPageChrome(framerPageChromeDeps, createdPageIds).catch(() => null);
       }
 
-      for (const result of outcome.results) {
-        // ONLY deploy components for pages that were actually newly created in this run
-        if (result.status === "created") {
-          const spec = selectedSpecs.find((p) => p.id === result.id);
-          if (spec && spec.component !== "none") {
-            try {
-              // The page's own children are its breakpoints. Parenting to the
-              // page leaves the component floating beside the Desktop frame
-              // and absent from the published site, so it goes inside it.
-              const contentParent = await findPageContentParent(framer, result.nodeId);
-              if (!contentParent) {
-                componentDeployErrors.push(
-                  `${spec.title}: the page has no Desktop frame yet. Add the component from Components.`
-                );
-                continue;
-              }
-
-              // Header first and footer last, so the component lands between them.
-              const applied = chrome
-                ? await applyPageChrome(framerPageChromeDeps, contentParent.id, chrome)
-                : { header: false, footer: false, stacked: false };
-
-              const generated = generateForComponent(spec.component, deployContext);
-              const flowAttrs = COMPONENT_LAYOUT_DEFAULTS[spec.component] ?? {
-                width: "100%",
-                height: "fit-content",
-                position: "relative",
-                top: null,
-                centerX: null,
-              };
-              // A stack or grid flows the child between the layout's header and
-              // footer. A plain frame does not, so pin it to the top, centred.
-              const flows = applied.stacked || contentParent.layout === "stack" || contentParent.layout === "grid";
-              const layoutAttrs = flows
-                ? flowAttrs
-                : { ...flowAttrs, position: "absolute" as const, top: "0px", centerX: "50%" };
-              // A header in the stack already pushes the component down. One laid
-              // over the page (absolute or fixed) does not, so keep the larger gap.
-              const headerInFlow =
-                applied.header && chrome?.header?.position !== "absolute" && chrome?.header?.position !== "fixed";
-              const spacing = headerInFlow ? SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER : SCAFFOLD_COMPONENT_SPACING;
-              const seal = await sealForInsert(spec.component, connection?.siteId);
-              const deployResult = await deployCanvasComponent(framer, generated, {
-                parentId: contentParent.id,
-                ...(flows ? { index: applied.header ? 1 : 0 } : {}),
-                attributes: {
-                  ...layoutAttrs,
-                  // The margin is drawn inside the frame, so the frame grows by it.
-                  height: heightWithMargin(layoutAttrs.height, spacing.margin),
-                  controls: { spacing, ...(seal ? { [SEAL_CONTROL]: seal } : {}) },
-                },
-              });
-              if (deployResult.ok) {
-                if (seal) await recordSeal(seal, deployResult.nodeId);
-                componentsDeployed++;
-              } else {
-                componentDeployErrors.push(`${spec.title}: ${deployResult.message}`);
-              }
-            } catch (err) {
-              componentDeployErrors.push(
-                `${spec.title}: ${err instanceof Error ? err.message : String(err)}`
-              );
-            }
+      for (const [index, { result, spec, generated }] of toPlace.entries()) {
+        setScaffoldStep(`Adding component ${index + 1} of ${toPlace.length}`);
+        try {
+          // The page's own children are its breakpoints. Parenting to the
+          // page leaves the component floating beside the Desktop frame
+          // and absent from the published site, so it goes inside it.
+          const contentParent = await findPageContentParent(framer, result.nodeId);
+          if (!contentParent) {
+            componentDeployErrors.push(
+              `${spec.title}: the page has no Desktop frame yet. Add the component from Components.`
+            );
+            continue;
           }
+
+          // Header first and footer last, so the component lands between them.
+          const applied = chrome
+            ? await applyPageChrome(framerPageChromeDeps, contentParent.id, chrome)
+            : { header: false, footer: false, stacked: false };
+
+          const flowAttrs = COMPONENT_LAYOUT_DEFAULTS[spec.component] ?? {
+            width: "100%",
+            height: "fit-content",
+            position: "relative",
+            top: null,
+            centerX: null,
+          };
+          // No site layout to follow (an empty project, or a site whose pages
+          // have no header and footer): the page becomes a centring stack, so
+          // the component sits in the middle of every breakpoint.
+          const centered =
+            !applied.stacked &&
+            contentParent.layout !== "stack" &&
+            contentParent.layout !== "grid" &&
+            (await centerPageLayout(framerPageChromeDeps, contentParent.id));
+          // A stack or grid flows the child between the layout's header and
+          // footer. A plain frame does not, so pin it to the top, centred.
+          const flows =
+            centered || applied.stacked || contentParent.layout === "stack" || contentParent.layout === "grid";
+          const layoutAttrs = flows
+            ? flowAttrs
+            : { ...flowAttrs, position: "absolute" as const, top: "0px", centerX: "50%" };
+          // A header in the stack already pushes the component down. One laid
+          // over the page (absolute or fixed) does not, so keep the larger gap.
+          const headerInFlow =
+            applied.header && chrome?.header?.position !== "absolute" && chrome?.header?.position !== "fixed";
+          const spacing = centered
+            ? SCAFFOLD_COMPONENT_SPACING_CENTERED
+            : headerInFlow
+              ? SCAFFOLD_COMPONENT_SPACING_BELOW_HEADER
+              : SCAFFOLD_COMPONENT_SPACING;
+          const seal = await sealForInsert(spec.component, connection?.siteId);
+          const deployResult = await deployCanvasComponent(framer, generated, {
+            parentId: contentParent.id,
+            ...(flows ? { index: applied.header ? 1 : 0 } : {}),
+            exportRetryDelaysMs: SCAFFOLD_EXPORT_RETRY_DELAYS_MS,
+            attributes: {
+              ...layoutAttrs,
+              // The margin is drawn inside the frame, so the frame grows by it.
+              height: heightWithMargin(layoutAttrs.height, spacing.margin),
+              controls: { spacing, ...(seal ? { [SEAL_CONTROL]: seal } : {}) },
+            },
+          });
+          if (deployResult.ok) {
+            if (seal) await recordSeal(seal, deployResult.nodeId);
+            componentsDeployed++;
+          } else if (deployResult.reason === "no_component_export" && !deployResult.detail) {
+            stillCompiling.push(`${generated.fileName} on ${spec.path}`);
+          } else {
+            componentDeployErrors.push(`${spec.title}: ${deployResult.message}`);
+          }
+        } catch (err) {
+          componentDeployErrors.push(
+            `${spec.title}: ${err instanceof Error ? err.message : String(err)}`
+          );
         }
       }
 
       const failedPages = outcome.results.filter((result) => result.status === "failed");
 
-      if (failedPages.length > 0 || componentDeployErrors.length > 0) {
+      if (failedPages.length > 0 || componentDeployErrors.length > 0 || stillCompiling.length > 0) {
         const errors = [
           ...failedPages.map((r) => `${r.path}: ${r.reason}`),
           ...componentDeployErrors,
+          ...(stillCompiling.length > 0
+            ? [
+                `Framer is still compiling ${stillCompiling.join(", ")}. Once it finishes, drag each onto its page from Assets, Code.`,
+              ]
+            : []),
         ];
         setFailure({
-          title: "Some pages or components had issues",
+          title:
+            failedPages.length === 0 && componentDeployErrors.length === 0
+              ? "Pages created, some components not placed"
+              : "Some pages or components had issues",
           message: errors.join(" "),
         });
       }
@@ -429,6 +532,7 @@ export const BuilderTab: React.FC = () => {
         tone: failedPages.length > 0 ? "error" : "success",
         message: toastMessage.slice(0, 45),
       });
+      if (pathsSaved) showToast({ tone: "success", message: "Page paths saved in Settings" });
     } catch (error) {
       setFailure({
         title: "Could not create the pages",
@@ -437,8 +541,9 @@ export const BuilderTab: React.FC = () => {
       });
     } finally {
       setScaffolding(false);
+      setScaffoldStep(null);
     }
-  }, [checkExistingPages, connection?.siteId, deployContext, selectedSpecs, showToast]);
+  }, [applySettings, checkExistingPages, connection?.siteId, deployContext, selectedSpecs, settings?.auth, settingsVersion, showToast]);
 
   const entry = findComponent(componentId);
 
@@ -452,7 +557,10 @@ export const BuilderTab: React.FC = () => {
    */
   const handleAddToCanvas = useCallback(async () => {
     setDeploying(true);
+    setSlowDeploy(false);
     setFailure(null);
+    // Past a few seconds Framer is compiling the file: say so, so the wait does not read as a freeze.
+    const slowTimer = window.setTimeout(() => setSlowDeploy(true), 4000);
 
     try {
       /*
@@ -473,7 +581,10 @@ export const BuilderTab: React.FC = () => {
       const controls: Record<string, unknown> = {
         ...(seal ? { [SEAL_CONTROL]: seal } : {}),
       };
+      // The longer wait: in a new project Framer's first compile of a file
+      // (its packages fetched too) runs past the 15 second default.
       const outcome = await deployCanvasComponent(framer, generated, {
+        exportRetryDelaysMs: SCAFFOLD_EXPORT_RETRY_DELAYS_MS,
         attributes: {
           ...layoutAttrs,
           ...(Object.keys(controls).length > 0 ? { controls } : {}),
@@ -500,7 +611,9 @@ export const BuilderTab: React.FC = () => {
         message: error instanceof Error ? error.message : "An unexpected error stopped the insert.",
       });
     } finally {
+      window.clearTimeout(slowTimer);
       setDeploying(false);
+      setSlowDeploy(false);
     }
   }, [connection?.siteId, deployContext, entry, showToast]);
 
@@ -513,7 +626,11 @@ export const BuilderTab: React.FC = () => {
               id="builder-component"
               value={componentId}
               options={COMPONENT_OPTIONS}
-              onChange={setComponentId}
+              onChange={(next) => {
+                setComponentId(next);
+                // A banner about the last component says nothing about this one.
+                setFailure(null);
+              }}
               fill
             />
           </Field>
@@ -557,7 +674,7 @@ export const BuilderTab: React.FC = () => {
             onClick={handleAddToCanvas}
           >
             <Plus aria-hidden={true} />
-            {deploying ? "Adding" : "Add to canvas"}
+            {deploying ? (slowDeploy ? "Framer is compiling..." : "Adding") : "Add to canvas"}
           </Button>
           <p className="studio-cta-note">{ctaNote(entry)}</p>
         </div>
@@ -624,7 +741,7 @@ export const BuilderTab: React.FC = () => {
           >
             <FileStack aria-hidden={true} />
             {scaffolding
-              ? "Creating pages..."
+              ? (scaffoldStep ?? "Creating pages...")
               : allPagesExist
                 ? "This page already exists"
                 : selectedSpecs.length > 0

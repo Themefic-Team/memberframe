@@ -390,8 +390,9 @@ function mfNumber(value: unknown, min: number, max: number, fallback: number): n
 /**
  * The family out of a Font control value, or null.
  *
- * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
- * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ * Applied whenever the creator picks a font: there is no Custom font switch
+ * any more (2026-10-27), which ignored a font chosen while it was off. Framer
+ * loads the chosen font itself, in the editor and on the published site.
  */
 function mfFontFamily(font: unknown): string | null {
   let family = "";
@@ -403,7 +404,12 @@ function mfFontFamily(font: unknown): string | null {
 
   family = family.trim();
   if (family === "" || family.length > 300) return null;
-  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  // Any name a font can have (accents, digits, "&"), but nothing that can end
+  // the declaration, open a rule or a comment, or load a url.
+  if (/[;{}<>()\\@\n\r]|\/\*/.test(family)) return null;
+  // An untouched Font control can hand over only the generic fallback: keep
+  // the component's own default rather than the browser's.
+  if (/^(sans-serif|serif|monospace|system-ui)$/i.test(family.replace(/["']/g, ""))) return null;
   return family;
 }
 
@@ -413,6 +419,13 @@ function mfThemeClass(theme: unknown): string {
   if (theme === "auto") return "is-auto";
   return "is-light";
 }
+
+/**
+ * Always Light: the Theme control was removed (product owner, 2026-10-27).
+ * Every colour is in the Colors group, so a dark card is set there. A value
+ * an older instance saved is ignored.
+ */
+const MF_THEME_CLASS = mfThemeClass("light");
 
 /** `{name}` placeholders in a creator's label, filled with plain text. */
 function mfFill(template: string, values: Record<string, string | number>): string {
@@ -458,7 +471,7 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   }
 
   const typography = input.typography || {};
-  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-font", mfFontFamily(typography.font));
   set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
 
   const layout = input.layout || {};
@@ -573,7 +586,7 @@ function mfThemeCss(root: string): string {
   return `
 ${root} {${MF_LIGHT}
   --mf-c-radius: var(--mf-radius, 10px);
-  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  --mf-c-font: var(--mf-font, "Inter", "Inter Placeholder", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-family: var(--mf-c-font);
 }
 ${root}.is-dark {${MF_DARK}
@@ -598,40 +611,32 @@ ${root}.is-dark {${MF_DARK}
  */
 function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
   return {
-    theme: {
-      type: ControlType.Enum,
-      title: "Theme",
-      options: ["light", "dark", "auto"],
-      optionTitles: ["Light", "Dark", "Match visitor"],
-      defaultValue: "light",
-    },
     colors: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Colors",
       buttonTitle: "Colors",
       controls: {
-        surface: { type: ControlType.Color, title: "Background", optional: true },
-        text: { type: ControlType.Color, title: "Text", optional: true },
-        muted: { type: ControlType.Color, title: "Muted text", optional: true },
-        border: { type: ControlType.Color, title: "Border", optional: true },
-        field: { type: ControlType.Color, title: "Field", optional: true },
-        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+        surface: { type: ControlType.Color as typeof ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color as typeof ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color as typeof ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color as typeof ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color as typeof ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color as typeof ControlType.Color, title: "Button text", optional: true },
       },
     },
     typography: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Typography",
       buttonTitle: "Typography",
       controls: {
-        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
         font: {
-          type: ControlType.Font,
+          type: ControlType.Font as typeof ControlType.Font,
           title: "Font",
           controls: "basic" as const,
           defaultFontType: "sans-serif" as const,
         },
         textScale: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Text size",
           min: 70,
           max: 160,
@@ -642,12 +647,12 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
       },
     },
     layout: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Layout",
       buttonTitle: "Layout",
       controls: {
         padding: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Padding",
           min: 0,
           max: 64,
@@ -656,7 +661,7 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: defaults.padding,
         },
         gap: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Spacing",
           min: 0,
           max: 48,
@@ -665,7 +670,7 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: defaults.gap,
         },
         borderWidth: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Border",
           min: 0,
           max: 4,
@@ -673,18 +678,18 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           unit: "px",
           defaultValue: 1,
         },
-        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+        shadow: { type: ControlType.Boolean as typeof ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
       },
     },
     spacing: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Spacing",
       buttonTitle: "Spacing",
       controls: {
-        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
-        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        margin: { type: ControlType.Padding as typeof ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean as typeof ControlType.Boolean, title: "Custom padding", defaultValue: false },
         padding: {
-          type: ControlType.Padding,
+          type: ControlType.Padding as typeof ControlType.Padding,
           title: "Padding",
           defaultValue: "24px",
           description: "Used when Custom padding is on.",
@@ -701,9 +706,9 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
     { type: typeof ControlType.String; title: string; defaultValue: string }
   > = {};
   for (const key of Object.keys(defaults)) {
-    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+    controls[key] = { type: ControlType.String as typeof ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
   }
-  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+  return { type: ControlType.Object as typeof ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
 /** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
 const MF_SCOPE_SLOT = "@mf-scope";
@@ -733,10 +738,9 @@ interface BookmarkButtonConfig {
   loginPath: string;
 }
 
-const ENV_API_BASE_URL =
-  (typeof import.meta !== "undefined" &&
-    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
-  "";
+// The generator writes the API address into CONFIG. No import.meta here: a
+// Framer code file has no Vite env, and Framer reports the read as an error.
+const ENV_API_BASE_URL = "";
 
 // @memberframe-config-start
 const CONFIG: BookmarkButtonConfig = {
@@ -1350,7 +1354,6 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
     iconSize = 20,
     iconPosition = "left",
     animateSave = true,
-    theme = "light",
     colors,
     typography,
     layout,
@@ -1498,7 +1501,7 @@ export default function BookmarkButton(props: BookmarkButtonProps) {
     (showLabel && iconPosition === "right" ? " is-icon-right" : "");
 
   return (
-    <div className={`mf-bookmark ${mfThemeClass(theme)}`} data-mf-bookmark={styled.scope}>
+    <div className={`mf-bookmark ${MF_THEME_CLASS}`} data-mf-bookmark={styled.scope}>
       <style>{mfThemeCss(".mf-bookmark")}</style>
       <style>{cssContent}</style>
       <style>{styled.css}</style>

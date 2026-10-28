@@ -187,6 +187,17 @@ describe("mfFontFamily", () => {
       '"Inter", "Inter Placeholder", sans-serif'
     );
     expect(mf.mfFontFamily("Space Grotesk, sans-serif")).toBe("Space Grotesk, sans-serif");
+    // Names the old letters-only filter dropped without a word.
+    expect(mf.mfFontFamily('"Montserrat Alternates 2", "Noto Sans JP", sans-serif')).toBe(
+      '"Montserrat Alternates 2", "Noto Sans JP", sans-serif'
+    );
+    expect(mf.mfFontFamily('"Söhne", sans-serif')).toBe('"Söhne", sans-serif');
+  });
+
+  it("keeps the component default for a bare generic fallback", () => {
+    for (const generic of ["sans-serif", "serif", "monospace", '"sans-serif"']) {
+      expect(mf.mfFontFamily({ fontFamily: generic }), generic).toBeNull();
+    }
   });
 
   it("refuses anything that is not a plain family list", () => {
@@ -195,6 +206,9 @@ describe("mfFontFamily", () => {
       "Inter</style>",
       "url(https://evil.example.com/font.woff)",
       "Inter\\",
+      "Inter /* x */",
+      "@import x",
+      "Inter\n}",
       "",
       { fontFamily: 12 },
       null,
@@ -290,10 +304,11 @@ describe("mfAppearanceVars", () => {
     expect(out["--mf-text-scale"]).toBe("1");
   });
 
-  it("uses a custom font only when Custom font is on", () => {
+  it("uses the chosen font with no switch, an older saved Custom font No included", () => {
     const font = { fontFamily: '"Space Grotesk", sans-serif' };
-    expect(vars({ typography: { customFont: false, font } })["--mf-font"]).toBe("initial");
-    expect(vars({ typography: { customFont: true, font } })["--mf-font"]).toBe('"Space Grotesk", sans-serif');
+    expect(vars({ typography: { font } })["--mf-font"]).toBe('"Space Grotesk", sans-serif');
+    expect(vars({ typography: { customFont: false, font } } as never)["--mf-font"]).toBe('"Space Grotesk", sans-serif');
+    expect(vars({ typography: {} })["--mf-font"]).toBe("initial");
   });
 
   it("clamps radius, layout, and text size", () => {
@@ -395,9 +410,8 @@ describe("mfThemeCss", () => {
 describe("the shared controls", () => {
   const controls = mf.mfAppearanceControls({ padding: 24, gap: 14, shadow: true });
 
-  it("offers Theme with Light as the default", () => {
-    expect(controls.theme.defaultValue).toBe("light");
-    expect(controls.theme.options).toEqual(["light", "dark", "auto"]);
+  it("offers no Theme: every colour is set in Colors (product owner, 2026-10-27)", () => {
+    expect(controls).not.toHaveProperty("theme");
   });
 
   it("groups Colors, Typography, Layout, and Spacing, with optional colours", () => {
@@ -432,11 +446,12 @@ describe.each(NAMES)("%s", (name) => {
   const rest = outside(source);
   const { labels, root } = COMPONENTS[name];
 
-  it("switches palette on the Theme control, never on the visitor's OS alone", () => {
+  it("is always Light, never switched by a saved Theme or the visitor's OS", () => {
     expect(rest).not.toContain("@media (prefers-color-scheme");
-    expect(rest).toContain("mfThemeClass(theme)");
+    expect(rest).toContain("MF_THEME_CLASS");
+    expect(rest).not.toContain("mfThemeClass(theme)");
+    expect(rest).not.toMatch(/theme = "light"/);
     expect(rest).toContain(`mfThemeCss("${root}")`);
-    expect(rest).toMatch(/theme = "light"/);
   });
 
   it("is a fixed size by default, the Dashboard's height alone fitting its content", () => {

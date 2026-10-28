@@ -606,7 +606,7 @@ Requested by the product owner, 2026-10-20. Applies to `<MemberAuth>` and the fo
 | Control | Values | Default |
 | :--- | :--- | :--- |
 | Opens | On Click, On Page Load, On Scroll | On Click |
-| Trigger ID | Letters, digits, dash, underscore | `sign-in` |
+| Trigger ID | Letters, digits, dash, underscore, On Click only (2026-10-27) | `sign-in` |
 | Delay | 0 to 60 seconds, On Page Load only | 0 |
 | Scroll Depth | 0 to 100 percent of the page, On Scroll only | 50 |
 | Once Per Visit | Yes or No, On Page Load and On Scroll only | Yes |
@@ -621,7 +621,7 @@ A click opens the modal when the clicked element, or any parent, is:
 - a link whose address is `#<id>` or ends in `#<id>` (Framer: select the button, Link, type `#sign-in`), or
 - a layer named `<id>` (Framer writes the layer name to `data-framer-name` on the published page).
 
-The listener is on `document` in the capture phase and calls `preventDefault` and `stopPropagation`, so the trigger's own `#sign-in` link never scrolls or navigates. Visiting the page with `#sign-in` in the address also opens it. The Trigger ID works in every Opens mode, so a header "Sign in" button can open a modal that also opens on scroll.
+The listener is on `window` in the capture phase, added through `EventTarget.prototype.addEventListener` (`listenAtOnce`), and calls `preventDefault` and `stopPropagation`, so the trigger's own `#sign-in` link never scrolls or navigates. Not `document.addEventListener`: a published Framer page replaces it for click, auxclick, mousedown, keyup, and submit and runs those listeners after the event, so the cancel came too late and Framer followed `./#sign-in` to the home page from every other page (found 2026-10-27; `test/canvasFramerDeferredEvents.test.ts` keeps it out). Closing a popup opened from `#sign-in` in the address drops the hash with `history.replaceState`, keeping Framer's history state. Visiting the page with `#sign-in` in the address also opens it. The Trigger ID applies to On Click only (product owner, 2026-10-27): it is hidden in the sidebar and ignored at runtime for On Page Load and On Scroll, which open by themselves. A header button that should open a popup uses a separate On Click copy, for example the one in the Navigation component (section 11.6). The sidebar carries no help text under Trigger ID or Show On Canvas (same date).
 
 ### 11.4. Rules
 

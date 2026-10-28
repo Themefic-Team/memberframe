@@ -1338,8 +1338,7 @@ select option {
 }
 
 /* Home Tab Layout & Sections */
-.home-tab-container {
-  padding: 16px;
+.home-tab-container { 
   display: flex;
   flex-direction: column;
   gap: 20px;

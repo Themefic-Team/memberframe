@@ -405,8 +405,9 @@ function mfNumber(value: unknown, min: number, max: number, fallback: number): n
 /**
  * The family out of a Font control value, or null.
  *
- * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
- * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ * Applied whenever the creator picks a font: there is no Custom font switch
+ * any more (2026-10-27), which ignored a font chosen while it was off. Framer
+ * loads the chosen font itself, in the editor and on the published site.
  */
 function mfFontFamily(font: unknown): string | null {
   let family = "";
@@ -418,7 +419,12 @@ function mfFontFamily(font: unknown): string | null {
 
   family = family.trim();
   if (family === "" || family.length > 300) return null;
-  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  // Any name a font can have (accents, digits, "&"), but nothing that can end
+  // the declaration, open a rule or a comment, or load a url.
+  if (/[;{}<>()\\@\n\r]|\/\*/.test(family)) return null;
+  // An untouched Font control can hand over only the generic fallback: keep
+  // the component's own default rather than the browser's.
+  if (/^(sans-serif|serif|monospace|system-ui)$/i.test(family.replace(/["']/g, ""))) return null;
   return family;
 }
 
@@ -428,6 +434,13 @@ function mfThemeClass(theme: unknown): string {
   if (theme === "auto") return "is-auto";
   return "is-light";
 }
+
+/**
+ * Always Light: the Theme control was removed (product owner, 2026-10-27).
+ * Every colour is in the Colors group, so a dark card is set there. A value
+ * an older instance saved is ignored.
+ */
+const MF_THEME_CLASS = mfThemeClass("light");
 
 /** `{name}` placeholders in a creator's label, filled with plain text. */
 function mfFill(template: string, values: Record<string, string | number>): string {
@@ -473,7 +486,7 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   }
 
   const typography = input.typography || {};
-  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-font", mfFontFamily(typography.font));
   set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
 
   const layout = input.layout || {};
@@ -588,7 +601,7 @@ function mfThemeCss(root: string): string {
   return `
 ${root} {${MF_LIGHT}
   --mf-c-radius: var(--mf-radius, 10px);
-  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  --mf-c-font: var(--mf-font, "Inter", "Inter Placeholder", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-family: var(--mf-c-font);
 }
 ${root}.is-dark {${MF_DARK}
@@ -613,40 +626,32 @@ ${root}.is-dark {${MF_DARK}
  */
 function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
   return {
-    theme: {
-      type: ControlType.Enum,
-      title: "Theme",
-      options: ["light", "dark", "auto"],
-      optionTitles: ["Light", "Dark", "Match visitor"],
-      defaultValue: "light",
-    },
     colors: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Colors",
       buttonTitle: "Colors",
       controls: {
-        surface: { type: ControlType.Color, title: "Background", optional: true },
-        text: { type: ControlType.Color, title: "Text", optional: true },
-        muted: { type: ControlType.Color, title: "Muted text", optional: true },
-        border: { type: ControlType.Color, title: "Border", optional: true },
-        field: { type: ControlType.Color, title: "Field", optional: true },
-        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+        surface: { type: ControlType.Color as typeof ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color as typeof ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color as typeof ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color as typeof ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color as typeof ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color as typeof ControlType.Color, title: "Button text", optional: true },
       },
     },
     typography: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Typography",
       buttonTitle: "Typography",
       controls: {
-        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
         font: {
-          type: ControlType.Font,
+          type: ControlType.Font as typeof ControlType.Font,
           title: "Font",
           controls: "basic" as const,
           defaultFontType: "sans-serif" as const,
         },
         textScale: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Text size",
           min: 70,
           max: 160,
@@ -657,12 +662,12 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
       },
     },
     layout: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Layout",
       buttonTitle: "Layout",
       controls: {
         padding: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Padding",
           min: 0,
           max: 64,
@@ -671,7 +676,7 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: defaults.padding,
         },
         gap: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Spacing",
           min: 0,
           max: 48,
@@ -680,7 +685,7 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: defaults.gap,
         },
         borderWidth: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Border",
           min: 0,
           max: 4,
@@ -688,18 +693,18 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           unit: "px",
           defaultValue: 1,
         },
-        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+        shadow: { type: ControlType.Boolean as typeof ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
       },
     },
     spacing: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Spacing",
       buttonTitle: "Spacing",
       controls: {
-        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
-        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        margin: { type: ControlType.Padding as typeof ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean as typeof ControlType.Boolean, title: "Custom padding", defaultValue: false },
         padding: {
-          type: ControlType.Padding,
+          type: ControlType.Padding as typeof ControlType.Padding,
           title: "Padding",
           defaultValue: "24px",
           description: "Used when Custom padding is on.",
@@ -716,9 +721,9 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
     { type: typeof ControlType.String; title: string; defaultValue: string }
   > = {};
   for (const key of Object.keys(defaults)) {
-    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+    controls[key] = { type: ControlType.String as typeof ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
   }
-  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+  return { type: ControlType.Object as typeof ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
 /** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
 const MF_SCOPE_SLOT = "@mf-scope";
@@ -812,10 +817,9 @@ interface AuthConfig {
   otpPath: string;
 }
 
-const ENV_API_BASE_URL =
-  (typeof import.meta !== "undefined" &&
-    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
-  "";
+// The generator writes the API address into CONFIG. No import.meta here: a
+// Framer code file has no Vite env, and Framer reports the read as an error.
+const ENV_API_BASE_URL = "";
 
 // @memberframe-config-start
 const CONFIG: AuthConfig = {
@@ -2445,6 +2449,23 @@ export interface MemberAuthProps extends MfAppearanceProps {
 type ModalTrigger = "click" | "load" | "scroll";
 
 /** A click on a link to `#id`, or on a layer named `id` (`data-framer-name`). */
+/**
+ * Listen on `window` in the capture phase, through the browser's own method.
+ *
+ * A published Framer page replaces `document.addEventListener` for click,
+ * auxclick, mousedown, keyup, and submit, and runs a listener added that way
+ * later, after the click has finished. Its `preventDefault` then comes too
+ * late: a trigger linked to `./#sign-in` had already sent a visitor on
+ * /about to the home page (2026-10-27). Framer's own runtime calls the
+ * prototype's method for the same reason. Window capture is also the first
+ * stop of every click, ahead of any listener on the page.
+ */
+function listenAtOnce(type: "click", listener: (event: MouseEvent) => void): () => void {
+  const handler = listener as EventListener;
+  EventTarget.prototype.addEventListener.call(window, type, handler, true);
+  return () => EventTarget.prototype.removeEventListener.call(window, type, handler, true);
+}
+
 function isModalTrigger(target: EventTarget | null, id: string): boolean {
   let node = target instanceof Element ? target : null;
   while (node) {
@@ -2547,7 +2568,6 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     modalScrollPercent = CONFIG.modalScrollPercent,
     modalOncePerSession = CONFIG.modalOncePerSession,
     modalCanvasPreview = CONFIG.modalCanvasPreview,
-    theme = "light",
     colors,
     typography,
     layout,
@@ -2601,7 +2621,8 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   const isModal = authMode === "modal";
   const [modalOpen, setModalOpen] = useState(false);
   const showCard = !isModal || onCanvas || modalOpen;
-  const triggerId = String(modalTriggerId || "").trim().replace(/^#/, "");
+  // Only On Click listens for its trigger; load and scroll open by themselves.
+  const triggerId = modalTrigger === "click" ? String(modalTriggerId || "").trim().replace(/^#/, "") : "";
   const modalKey = triggerId || "auto-" + modalTrigger;
   /** In place on the page, so a copy in a hidden breakpoint knows it is hidden. */
   const anchorRef = useRef<HTMLSpanElement>(null);
@@ -2624,8 +2645,18 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       heldKey.current = null;
     }
     setModalOpen(false);
+    // A popup opened from `#sign-in` in the address leaves it there. Drop it,
+    // keeping Framer's history state, so the address is the page again and
+    // the same link opens the popup next time (an unchanged hash fires nothing).
+    if (triggerId !== "" && typeof window !== "undefined" && window.location.hash === "#" + triggerId) {
+      try {
+        window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+      } catch {
+        // Only the address keeps the hash.
+      }
+    }
     onClose?.();
-  }, [onClose]);
+  }, [onClose, triggerId]);
 
   // A copy removed while open (a page change) frees its trigger for the next.
   useEffect(
@@ -2672,7 +2703,8 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
     const cleanups: Array<() => void> = [];
 
     if (id !== "") {
-      // Capture phase, so the trigger's own `#id` link never navigates.
+      // Synchronous (listenAtOnce), so the trigger's own `#id` link
+      // never navigates: the popup opens on the page the visitor is on.
       const onClick = (event: MouseEvent) => {
         if (!isModalTrigger(event.target, id)) return;
         event.preventDefault();
@@ -2682,11 +2714,11 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
       const onHash = () => {
         if (window.location.hash === "#" + id) openModal();
       };
-      document.addEventListener("click", onClick, true);
+      const stopClick = listenAtOnce("click", onClick);
       window.addEventListener("hashchange", onHash);
       onHash();
       cleanups.push(() => {
-        document.removeEventListener("click", onClick, true);
+        stopClick();
         window.removeEventListener("hashchange", onHash);
       });
     }
@@ -4139,7 +4171,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
   */
   if (isModal && onCanvas && !modalCanvasPreview) {
     return (
-      <div className={`memberframe-auth-root is-chip ${mfThemeClass(theme)}`} data-memberframe-auth={styled.scope}>
+      <div className={`memberframe-auth-root is-chip ${MF_THEME_CLASS}`} data-memberframe-auth={styled.scope}>
         <style>{mfThemeCss(".memberframe-auth-root")}</style>
         <style>{cssContent}</style>
         <style>{styled.css}</style>
@@ -4153,7 +4185,7 @@ export default function MemberAuth(props: MemberAuthProps & MfSealProps) {
 
   const root = (
     <div
-      className={`memberframe-auth-root ${mfThemeClass(theme)}${authMode === "modal" ? " is-modal" : ""}${license === "trial" ? " has-mf-wm" : ""}`}
+      className={`memberframe-auth-root ${MF_THEME_CLASS}${authMode === "modal" ? " is-modal" : ""}${license === "trial" ? " has-mf-wm" : ""}`}
       onClick={
         isModal && !onCanvas
           ? (event) => {
@@ -4230,8 +4262,9 @@ addPropertyControls(MemberAuth, mfControls({
     title: "Trigger ID",
     placeholder: "sign-in",
     defaultValue: CONFIG.modalTriggerId,
-    description: "Set a button's link to #sign-in, or name its layer sign-in. Clicking it opens this modal, whichever Opens you choose.",
-    hidden: (props) => props.authMode !== "modal",
+    // A button linked to #sign-in, or a layer named sign-in, opens it. Only for
+    // On Click: a popup that opens by itself needs no trigger.
+    hidden: (props) => props.authMode !== "modal" || props.modalTrigger !== "click",
   },
   modalDelay: {
     type: ControlType.Number,
@@ -4264,7 +4297,7 @@ addPropertyControls(MemberAuth, mfControls({
     type: ControlType.Boolean,
     title: "Show On Canvas",
     defaultValue: CONFIG.modalCanvasPreview,
-    description: "No shows a small chip on the canvas instead of the card, for a popup kept in your menu. The live site is the same.",
+    // No shows a small chip on the canvas instead of the card. The live site is the same.
     hidden: (props) => props.authMode !== "modal",
   },
   headline: {

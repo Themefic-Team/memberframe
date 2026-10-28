@@ -247,6 +247,8 @@ function showsNoPassword(node: InstanceNode, controls: DownloadState, synced: Re
  */
 async function secureDownloadsOnce(siteId: string, state: GuardState): Promise<number> {
   if (waiting(state.downloads)) return 0;
+  // Both writes below are protected: ask first, or Framer warns the creator.
+  if (!framer.isAllowedTo("Node.setAttributes", "setPluginData")) return 0;
   const file = (await framer.getCodeFiles()).find((candidate) => candidate.name === PROTECTED_DOWNLOAD_FILE_NAME);
   if (!file) return 0;
 

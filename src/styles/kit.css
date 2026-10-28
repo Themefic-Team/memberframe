@@ -221,6 +221,47 @@
   color: var(--framer-color-text-tertiary);
 }
 
+/* A finished step: its icon becomes a check on the success tint. */
+.step-row-icon.is-done {
+  background: var(--px-color-success-subtle);
+  color: var(--px-color-success);
+}
+
+/* --------------------------------------------------------------------------
+   Progress (kit extension, ProgressSteps.tsx): one 4px segment per step,
+   bg/tertiary until done, brand/primary once done.
+   -------------------------------------------------------------------------- */
+.kit-progress {
+  display: flex;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.kit-progress-seg {
+  flex: 1 1 0;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--framer-color-bg-tertiary);
+  transition: background-color var(--px-ease);
+}
+
+.kit-progress-seg.is-done {
+  background: var(--px-brand-primary);
+}
+
+/* Read by a screen reader, never shown: the word a visual mark stands for. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* --------------------------------------------------------------------------
    Tab bar: Account icon and tab focus.
    The Account icon opens the account view (Connect). While that view is open
@@ -476,7 +517,19 @@
   padding-top: var(--space-4);
 }
 
-/* The icon tile left of the title: the kit's 32px brand icon circle, squared. */
+/* The icon row under the head (product owner 2026-10-27): a hairline above,
+   the icon tile left, the setup guide right. Either may be absent. */
+.kit-sheet-brand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid var(--framer-color-divider);
+}
+
+/* The icon tile: the kit's 32px brand icon circle, squared. */
 .kit-sheet-icon {
   display: flex;
   align-items: center;
@@ -494,13 +547,13 @@
   height: 16px;
 }
 
-/* The setup guide: a kit .link, brand text, opening the browser. */
+/* The setup guide: a kit .link, brand text, opening the browser. Pinned right
+   even when the row has no icon. */
 .kit-sheet-guide {
   display: inline-flex;
   align-items: center;
-  align-self: flex-start;
   gap: var(--space-4);
-  margin-top: var(--space-2);
+  margin-left: auto;
   font: var(--text-body-sm-strong);
   color: var(--px-color-text-brand);
   text-decoration: none;
@@ -563,6 +616,13 @@
 .kit-sheet-footer > .primary-cta {
   flex: 1 1 0;
   min-width: 0;
+}
+
+/* A checkbox beside the action ("Don't show this again") keeps its one line;
+   the button fills what is left. */
+.kit-sheet-footer > .framefic-checkbox {
+  flex: none;
+  white-space: nowrap;
 }
 
 @keyframes kit-fade-in {
@@ -933,9 +993,20 @@
   }
 }
 
-/* The reserved 6px gutter: content stays 16px from both edges. */
+/* The reserved scrollbar gutter, measured (useScrollbarGutter): 6px with the
+   slim WebKit bar, 0 with overlay scrollbars (macOS, Firefox on Windows 11).
+   The right padding is 16px less the gutter, so the content sits 16px from
+   both edges on every system. 6px until measured. */
+:root {
+  --mf-scrollbar-gutter: 6px;
+}
+
 .framefic-content-area .tab-panel:not(.is-flush) {
-  padding-right: var(--space-10);
+  padding-right: max(0px, calc(var(--space-16) - var(--mf-scrollbar-gutter)));
+}
+
+.kit-sheet-body {
+  padding-right: max(0px, calc(var(--space-16) - var(--mf-scrollbar-gutter)));
 }
 
 /* --------------------------------------------------------------------------

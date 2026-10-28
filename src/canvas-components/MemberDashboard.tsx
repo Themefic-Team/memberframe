@@ -24,18 +24,18 @@
  * or looking at a broken page. This component names the state in words, every
  * time, in all five cases.
  *
- * ## What it deliberately does not do yet
+ * ## An account area with sections (2026-10-27)
  *
- * FP-08 specifies billing and invoice tabs. Both need the `subscriptions` and
- * `invoices` tables, which are backend PRD phase B3 and do not exist. So the
- * billing section renders an honest "not available yet" rather than an empty
- * table or, worse, plausible-looking zeroes. A member reading "$0.00 / Next
- * billing: never" would reasonably conclude their subscription had lapsed.
+ * A section menu (a sidebar, a top row below 720px of width) over Overview,
+ * Membership, Billing, Bookmarks, Profile, and Security, in the shape of a
+ * WooCommerce account page. docs/development-docs/33-member-account.md has the
+ * sections, the endpoints behind each, and the rules. The address carries the
+ * section as `#account-<name>`, so a link opens one and Back returns.
  */
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
-import { CreditCard, LogOut, ShieldCheck, User } from "lucide-react";
+import { ArrowRight, Check, CreditCard, Crown, LogOut, ShieldCheck, User } from "lucide-react";
 
 // ============================================================================
 // LICENSING AND TRIAL STATE
@@ -393,8 +393,9 @@ function mfNumber(value: unknown, min: number, max: number, fallback: number): n
 /**
  * The family out of a Font control value, or null.
  *
- * Letters, digits, spaces, quotes, commas, dots, and hyphens only: enough for
- * `"Inter", "Inter Placeholder", sans-serif` and nothing that can end a rule.
+ * Applied whenever the creator picks a font: there is no Custom font switch
+ * any more (2026-10-27), which ignored a font chosen while it was off. Framer
+ * loads the chosen font itself, in the editor and on the published site.
  */
 function mfFontFamily(font: unknown): string | null {
   let family = "";
@@ -406,7 +407,12 @@ function mfFontFamily(font: unknown): string | null {
 
   family = family.trim();
   if (family === "" || family.length > 300) return null;
-  if (!/^[A-Za-z0-9 "',._-]+$/.test(family)) return null;
+  // Any name a font can have (accents, digits, "&"), but nothing that can end
+  // the declaration, open a rule or a comment, or load a url.
+  if (/[;{}<>()\\@\n\r]|\/\*/.test(family)) return null;
+  // An untouched Font control can hand over only the generic fallback: keep
+  // the component's own default rather than the browser's.
+  if (/^(sans-serif|serif|monospace|system-ui)$/i.test(family.replace(/["']/g, ""))) return null;
   return family;
 }
 
@@ -416,6 +422,13 @@ function mfThemeClass(theme: unknown): string {
   if (theme === "auto") return "is-auto";
   return "is-light";
 }
+
+/**
+ * Always Light: the Theme control was removed (product owner, 2026-10-27).
+ * Every colour is in the Colors group, so a dark card is set there. A value
+ * an older instance saved is ignored.
+ */
+const MF_THEME_CLASS = mfThemeClass("light");
 
 /** `{name}` placeholders in a creator's label, filled with plain text. */
 function mfFill(template: string, values: Record<string, string | number>): string {
@@ -461,7 +474,7 @@ function mfAppearanceVars(input: MfAppearanceInput): string {
   }
 
   const typography = input.typography || {};
-  set("--mf-font", typography.customFont === true ? mfFontFamily(typography.font) : null);
+  set("--mf-font", mfFontFamily(typography.font));
   set("--mf-text-scale", String(mfNumber(typography.textScale, 70, 160, 100) / 100));
 
   const layout = input.layout || {};
@@ -576,7 +589,7 @@ function mfThemeCss(root: string): string {
   return `
 ${root} {${MF_LIGHT}
   --mf-c-radius: var(--mf-radius, 10px);
-  --mf-c-font: var(--mf-font, var(--framer-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif));
+  --mf-c-font: var(--mf-font, "Inter", "Inter Placeholder", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-family: var(--mf-c-font);
 }
 ${root}.is-dark {${MF_DARK}
@@ -601,40 +614,32 @@ ${root}.is-dark {${MF_DARK}
  */
 function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: boolean }) {
   return {
-    theme: {
-      type: ControlType.Enum,
-      title: "Theme",
-      options: ["light", "dark", "auto"],
-      optionTitles: ["Light", "Dark", "Match visitor"],
-      defaultValue: "light",
-    },
     colors: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Colors",
       buttonTitle: "Colors",
       controls: {
-        surface: { type: ControlType.Color, title: "Background", optional: true },
-        text: { type: ControlType.Color, title: "Text", optional: true },
-        muted: { type: ControlType.Color, title: "Muted text", optional: true },
-        border: { type: ControlType.Color, title: "Border", optional: true },
-        field: { type: ControlType.Color, title: "Field", optional: true },
-        onAccent: { type: ControlType.Color, title: "Button text", optional: true },
+        surface: { type: ControlType.Color as typeof ControlType.Color, title: "Background", optional: true },
+        text: { type: ControlType.Color as typeof ControlType.Color, title: "Text", optional: true },
+        muted: { type: ControlType.Color as typeof ControlType.Color, title: "Muted text", optional: true },
+        border: { type: ControlType.Color as typeof ControlType.Color, title: "Border", optional: true },
+        field: { type: ControlType.Color as typeof ControlType.Color, title: "Field", optional: true },
+        onAccent: { type: ControlType.Color as typeof ControlType.Color, title: "Button text", optional: true },
       },
     },
     typography: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Typography",
       buttonTitle: "Typography",
       controls: {
-        customFont: { type: ControlType.Boolean, title: "Custom font", defaultValue: false },
         font: {
-          type: ControlType.Font,
+          type: ControlType.Font as typeof ControlType.Font,
           title: "Font",
           controls: "basic" as const,
           defaultFontType: "sans-serif" as const,
         },
         textScale: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Text size",
           min: 70,
           max: 160,
@@ -645,12 +650,12 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
       },
     },
     layout: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Layout",
       buttonTitle: "Layout",
       controls: {
         padding: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Padding",
           min: 0,
           max: 64,
@@ -659,7 +664,7 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: defaults.padding,
         },
         gap: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Spacing",
           min: 0,
           max: 48,
@@ -668,7 +673,7 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           defaultValue: defaults.gap,
         },
         borderWidth: {
-          type: ControlType.Number,
+          type: ControlType.Number as typeof ControlType.Number,
           title: "Border",
           min: 0,
           max: 4,
@@ -676,18 +681,18 @@ function mfAppearanceControls(defaults: { padding: number; gap: number; shadow: 
           unit: "px",
           defaultValue: 1,
         },
-        shadow: { type: ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
+        shadow: { type: ControlType.Boolean as typeof ControlType.Boolean, title: "Shadow", defaultValue: defaults.shadow },
       },
     },
     spacing: {
-      type: ControlType.Object,
+      type: ControlType.Object as typeof ControlType.Object,
       title: "Spacing",
       buttonTitle: "Spacing",
       controls: {
-        margin: { type: ControlType.Padding, title: "Margin", defaultValue: "0px" },
-        customPadding: { type: ControlType.Boolean, title: "Custom padding", defaultValue: false },
+        margin: { type: ControlType.Padding as typeof ControlType.Padding, title: "Margin", defaultValue: "0px" },
+        customPadding: { type: ControlType.Boolean as typeof ControlType.Boolean, title: "Custom padding", defaultValue: false },
         padding: {
-          type: ControlType.Padding,
+          type: ControlType.Padding as typeof ControlType.Padding,
           title: "Padding",
           defaultValue: "24px",
           description: "Used when Custom padding is on.",
@@ -704,9 +709,9 @@ function mfLabelControls(defaults: Record<string, readonly [string, string]>) {
     { type: typeof ControlType.String; title: string; defaultValue: string }
   > = {};
   for (const key of Object.keys(defaults)) {
-    controls[key] = { type: ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
+    controls[key] = { type: ControlType.String as typeof ControlType.String, title: defaults[key][0], defaultValue: defaults[key][1] };
   }
-  return { type: ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
+  return { type: ControlType.Object as typeof ControlType.Object, title: "Labels", buttonTitle: "Labels", controls };
 }
 /** Scope named by a hash of the rule, not useId, so server and browser agree (00-canvas-appearance.md). */
 const MF_SCOPE_SLOT = "@mf-scope";
@@ -855,6 +860,81 @@ const DASH_LABELS: Record<string, readonly [string, string]> = {
   signIn: ["Sign in button", "Sign in"],
   signOut: ["Sign out button", "Sign out"],
   signingOut: ["Signing out", "Signing out"],
+  // The account area (33-member-account.md).
+  navOverview: ["Menu: overview", "Overview"],
+  navMembership: ["Menu: membership", "Membership"],
+  navBilling: ["Menu: billing", "Billing"],
+  navBookmarks: ["Menu: bookmarks", "Bookmarks"],
+  navProfile: ["Menu: profile", "Profile"],
+  navSecurity: ["Menu: security", "Security"],
+  overviewTitle: ["Overview title", "Welcome back, {name}"],
+  overviewDesc: ["Overview description", "Your membership at a glance."],
+  statPlan: ["Stat: plan", "Plan"],
+  statSaved: ["Stat: saved", "Saved items"],
+  statSince: ["Stat: member since", "Member since"],
+  recentSaved: ["Recently saved title", "Recently saved"],
+  seeAll: ["See all link", "See all"],
+  managePlan: ["Manage plan button", "Manage plan"],
+  membershipDesc: ["Membership description", "Your plan, its renewal, and plan changes."],
+  billingDesc: ["Billing description", "Payments, receipts, and your payment method."],
+  noPayments: ["No payments", "No payments yet."],
+  bookmarksDesc: ["Bookmarks description", "Everything you saved on this site."],
+  searchSaved: ["Search placeholder", "Search saved items"],
+  noBookmarks: ["No bookmarks", "Nothing saved yet. Use the bookmark button on any page to keep it here."],
+  noMatches: ["No search results", "No saved items match your search."],
+  removeBookmark: ["Remove bookmark button", "Remove"],
+  bookmarksFailed: ["Bookmarks failed", "Your saved items could not be loaded."],
+  savedOn: ["Saved on", "Saved {date}"],
+  profileDesc: ["Profile description", "Your name, photo, and details."],
+  photoTitle: ["Photo title", "Photo"],
+  uploadPhoto: ["Upload photo button", "Upload photo"],
+  changePhoto: ["Change photo button", "Change photo"],
+  removePhoto: ["Remove photo button", "Remove"],
+  photoHint: ["Photo hint", "PNG, JPEG, or WebP, up to 2 MB."],
+  photoTooLarge: ["Photo too large", "That photo is larger than 2 MB."],
+  photoWrongType: ["Photo wrong type", "Use a PNG, JPEG, or WebP image."],
+  photoFailed: ["Photo failed", "The photo could not be saved. Try again."],
+  removePhotoQuestion: ["Remove photo question", "Remove your photo?"],
+  emailLabel: ["Email label", "Email"],
+  emailFixed: ["Email note", "Contact the site owner to change your email."],
+  securityDesc: ["Security description", "Your password, sign-in methods, and devices."],
+  passwordTitle: ["Password title", "Password"],
+  passwordSetNote: ["Set password note", "You sign in with a connected account. Set a password to sign in with your email too."],
+  currentPassword: ["Current password label", "Current password"],
+  newPassword: ["New password label", "New password"],
+  confirmPassword: ["Confirm password label", "Confirm new password"],
+  changePassword: ["Change password button", "Change password"],
+  setPassword: ["Set password button", "Set password"],
+  passwordMismatch: ["Passwords differ", "The new passwords do not match."],
+  passwordWrong: ["Wrong password", "Your current password is not right."],
+  passwordWeak: ["Weak password", "Choose a stronger password."],
+  passwordChanged: ["Password changed", "Password saved. Your other devices were signed out."],
+  passwordFailed: ["Password failed", "Your password could not be saved. Try again."],
+  methodsTitle: ["Sign-in methods title", "Sign-in methods"],
+  methodsNone: ["No sign-in methods", "You sign in with your email."],
+  connectedOn: ["Connected on", "Connected {date}"],
+  unlink: ["Unlink button", "Unlink"],
+  unlinkLast: ["Last sign-in method", "Set a password first: this is your only way to sign in."],
+  unlinkQuestion: ["Unlink question", "Unlink {provider}?"],
+  unlinkNote: ["Unlink note", "You will no longer be able to sign in with {provider}."],
+  devicesTitle: ["Devices title", "Devices"],
+  thisDevice: ["This device", "This device"],
+  lastActive: ["Last active", "Last active {date}"],
+  signOutDevice: ["Sign out device button", "Sign out"],
+  signOutDeviceQuestion: ["Sign out device question", "Sign out {device}?"],
+  signOutEverywhere: ["Sign out everywhere button", "Sign out everywhere"],
+  signOutDeviceNote: ["Sign out device note", "That device will need to sign in again."],
+  signOutEverywhereNote: ["Sign out everywhere note", "Every device, this one included, will need to sign in again."],
+  dangerTitle: ["Delete account title", "Delete account"],
+  deleteNote: ["Delete account note", "Deletes your account and saved items for good. This cannot be undone."],
+  deleteButton: ["Delete account button", "Delete account"],
+  deleteConfirmLabel: ["Delete confirm label", "Type {email} to confirm"],
+  deleteFinal: ["Delete for good button", "Delete for good"],
+  deleteBlocked: ["Delete blocked", "Cancel your plan in Membership first. Your account can be deleted once it no longer renews."],
+  deleteFailed: ["Delete failed", "Your account could not be deleted. Try again."],
+  cancelAction: ["Cancel button in dialogs", "Cancel"],
+  actionFailed: ["Action failed", "That did not work. Try again in a moment."],
+  sessionExpired: ["Session expired", "Your session has expired. Please sign in to access your dashboard."],
 };
 
 interface DashboardConfig {
@@ -999,10 +1079,9 @@ function formatDate(iso: string | null): string {
     : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-const ENV_API_BASE_URL =
-  (typeof import.meta !== "undefined" &&
-    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_APP_BASE_URL)) ||
-  "";
+// The generator writes the API address into CONFIG. No import.meta here: a
+// Framer code file has no Vite env, and Framer reports the read as an error.
+const ENV_API_BASE_URL = "";
 
 // @memberframe-config-start
 const CONFIG: DashboardConfig = {
@@ -1273,7 +1352,7 @@ function readMetadata(value: unknown): MemberMetadata {
       typeof entry === "number" ||
       typeof entry === "boolean"
     ) {
-      out[key] = entry;
+      out[key] = entry as MetadataValue;
     }
   }
 
@@ -1569,15 +1648,27 @@ function ProfileControl({
 // One string, injected once. PRD section 9.3 requirement 1: a canvas component
 // consolidates its styling rather than using inline style objects, which the
 // repository's `lint:css` gate forbids everywhere.
+//
+// Every rule reads the shared appearance variables (--mf-c-* and --mf-*), so
+// Colors, Typography, Layout, and Spacing style every section.
 
-/*
- * The stylesheet, static. It used to be a function that interpolated the accent
- * and radius into the text, with its own hardcoded palette and font and a
- * prefers-color-scheme block that only touched the error colour. Now the
- * shared appearance block (mfThemeCss) resolves Theme plus the creator's
- * Colors, Typography, and Layout into --mf-c-* and --mf-*, and every rule
- * reads those, the same as the other three components.
- */
+/** The top menu, for Navigation: Top, and for Auto below 720px of width. */
+function topNavRules(root: string): string {
+  return `
+${root} { grid-template-columns: minmax(0, 1fr); }
+${root} .mf-acct-side { flex-direction: column; gap: 12px; padding: 16px 16px 0; border-right: 0; border-bottom: 1px solid var(--mf-c-border); }
+${root} .mf-acct-who { padding: 0; margin: 0; border-bottom: 0; }
+${root} .mf-acct-caption { display: none; }
+${root} .mf-acct-nav { flex: none; flex-direction: row; gap: 2px; overflow-x: auto; scrollbar-width: none; margin: 0 -4px; }
+${root} .mf-acct-nav::-webkit-scrollbar { display: none; }
+${root} .mf-acct-tab { flex: 0 0 auto; width: auto; padding: 10px 12px 12px; border-radius: 0; }
+${root} .mf-acct-tab.is-active { background: transparent; }
+${root} .mf-acct-tab.is-active::before { left: 10px; right: 10px; top: auto; bottom: 0; width: auto; height: 2px; border-radius: 2px 2px 0 0; }
+${root} .mf-acct-signout { margin: 0; }
+${root} .mf-acct-main { padding: 20px 16px; }
+`;
+}
+
 const cssContent = `
 .mf-dash {
   position: relative;
@@ -1594,165 +1685,202 @@ const cssContent = `
   border: var(--mf-border-width, 1px) solid var(--mf-c-border);
   border-radius: var(--mf-c-radius);
   box-shadow: var(--mf-c-shadow);
+  container-type: inline-size;
+  /* Set here, not inherited: the published page's own line-height differs from
+     the canvas, and the canvas must match the site exactly. */
+  line-height: 1.4;
 }
-.mf-dash-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: var(--mf-gap, 20px);
+.mf-dash.is-account { padding: 0; max-width: none; overflow-x: hidden; }
+.mf-dash * { box-sizing: border-box; }
+
+/* ---- The shell: menu and content ---- */
+.mf-acct { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100%; }
+.mf-acct-side {
+  display: flex; flex-direction: column; gap: 6px; padding: 22px 14px;
+  border-right: 1px solid var(--mf-c-border);
+  background: color-mix(in srgb, var(--mf-c-field) 55%, var(--mf-c-surface));
+  border-radius: var(--mf-c-radius) 0 0 var(--mf-c-radius);
 }
+.mf-acct-who { display: flex; align-items: center; gap: 12px; padding: 0 8px 18px; margin-bottom: 6px; border-bottom: 1px solid var(--mf-c-border); min-width: 0; }
+.mf-acct-who-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mf-acct-name { margin: 0; font-size: calc(15px * var(--mf-text-scale, 1)); font-weight: 650; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-acct-email { margin: 0; font-size: calc(12px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-acct-caption { margin: 8px 12px 4px; font-size: calc(11px * var(--mf-text-scale, 1)); font-weight: 600; letter-spacing: 0.02em; color: var(--mf-c-muted); }
+.mf-acct-avatar {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 44px; height: 44px; border-radius: 999px; overflow: hidden;
+  background: var(--mf-c-accent); color: var(--mf-c-on-accent);
+  font-weight: 650; font-size: calc(16px * var(--mf-text-scale, 1));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mf-c-accent) 18%, transparent);
+}
+.mf-acct-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mf-acct-avatar.is-large { width: 72px; height: 72px; font-size: calc(24px * var(--mf-text-scale, 1)); }
+.mf-acct-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.mf-acct-tab {
+  appearance: none; position: relative; display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 12px; border: 0; border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
+  background: transparent; color: var(--mf-c-muted); font: inherit; font-size: calc(14px * var(--mf-text-scale, 1));
+  font-weight: 550; text-align: left; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.mf-acct-tab:hover { background: var(--mf-c-field); color: var(--mf-c-text); }
+.mf-acct-tab:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 1px; }
+.mf-acct-tab.is-active { background: color-mix(in srgb, var(--mf-c-accent) 12%, transparent); color: var(--mf-c-accent); }
+.mf-acct-tab.is-active::before {
+  content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--mf-c-accent);
+}
+.mf-acct-tab svg, .mf-acct-ico { width: 18px; height: 18px; flex: 0 0 18px; stroke: currentColor; stroke-width: 2; fill: none; }
+.mf-acct-signout { margin-top: auto; }
+.mf-acct-signout.is-outline { border: 1px solid var(--mf-c-border); justify-content: center; }
+.mf-acct-signout.is-filled { background: var(--mf-c-accent); color: var(--mf-c-on-accent); justify-content: center; }
+.mf-acct-signout.is-filled:hover { background: var(--mf-c-accent); color: var(--mf-c-on-accent); filter: brightness(1.07); }
+.mf-acct-main { display: flex; flex-direction: column; gap: var(--mf-gap, 20px); min-width: 0; padding: var(--mf-pad, 28px); }
+
+/* ---- Section content ---- */
+.mf-acct-heading { display: flex; flex-direction: column; gap: 4px; }
+.mf-acct-title { margin: 0; font-size: calc(22px * var(--mf-text-scale, 1)); font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; }
+.mf-acct-desc { margin: 0; font-size: calc(14px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); line-height: 1.5; }
+.mf-acct-card {
+  display: flex; flex-direction: column; gap: 14px; padding: 20px;
+  border: 1px solid var(--mf-c-border); border-radius: var(--mf-c-radius); background: var(--mf-c-surface);
+  box-shadow: 0 1px 2px rgba(15, 18, 24, 0.04), 0 8px 24px -16px rgba(15, 18, 24, 0.18);
+}
+.mf-acct-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mf-acct-card-title { margin: 0; font-size: calc(15px * var(--mf-text-scale, 1)); font-weight: 600; }
+.mf-acct-card.is-danger { border-color: color-mix(in srgb, var(--mf-c-danger) 40%, var(--mf-c-border)); }
+.mf-acct-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.mf-acct-stat {
+  display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0;
+  border: 1px solid var(--mf-c-border); border-radius: var(--mf-c-radius); background: var(--mf-c-surface);
+}
+.mf-acct-stat-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px;
+  background: color-mix(in srgb, var(--mf-c-accent) 12%, transparent); color: var(--mf-c-accent);
+}
+.mf-acct-stat-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.mf-acct-stat-label { margin: 0; font-size: calc(12px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); }
+.mf-acct-stat .mf-acct-pill { align-self: flex-start; }
+.mf-acct-stat-value { margin: 0; font-size: calc(18px * var(--mf-text-scale, 1)); font-weight: 650; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-acct-plan { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.mf-acct-plan-name { margin: 0; font-size: calc(17px * var(--mf-text-scale, 1)); font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.mf-acct-plan-price { margin: 0; font-size: calc(14px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); }
+.mf-acct-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mf-acct-list { display: flex; flex-direction: column; }
+.mf-acct-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0;
+  border-top: 1px solid var(--mf-c-border); font-size: calc(14px * var(--mf-text-scale, 1)); min-width: 0;
+}
+.mf-acct-item:first-child { border-top: 0; padding-top: 0; }
+.mf-acct-item-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mf-acct-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mf-acct-item-title { font-weight: 550; color: var(--mf-c-text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.mf-acct-item-title:hover { color: var(--mf-c-accent); }
+.mf-acct-item-sub { font-size: calc(12px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-acct-item-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 36px; width: 36px; height: 36px;
+  border-radius: 10px; background: var(--mf-c-field); color: var(--mf-c-muted);
+}
+.mf-acct-item-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.mf-acct-item-end { display: flex; align-items: center; gap: 8px; flex-shrink: 0; font-weight: 550; }
+.mf-acct-pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  font-size: calc(11px * var(--mf-text-scale, 1)); font-weight: 600; background: var(--mf-c-field); color: var(--mf-c-muted);
+}
+.mf-acct-pill.is-good { background: color-mix(in srgb, #16a34a 14%, transparent); color: #15803d; }
+.mf-acct-pill.is-accent { background: color-mix(in srgb, var(--mf-c-accent) 14%, transparent); color: var(--mf-c-accent); }
+.mf-acct-search { position: relative; }
+.mf-acct-search svg { position: absolute; left: 12px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); stroke: var(--mf-c-muted); fill: none; pointer-events: none; }
+.mf-acct-search .mf-dash-input { padding-left: 36px; }
+.mf-acct-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 12px; text-align: center; }
+.mf-acct-empty p { margin: 0; max-width: 360px; font-size: calc(14px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); line-height: 1.5; }
+.mf-acct-empty .mf-acct-item-icon { width: 44px; height: 44px; flex-basis: 44px; border-radius: 12px; }
+.mf-acct-photo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mf-acct-photo-text { display: flex; flex-direction: column; gap: 8px; }
+.mf-acct-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.mf-acct-form { display: flex; flex-direction: column; gap: var(--mf-gap, 14px); }
+.mf-acct-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.mf-acct-readonly { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: max(0px, calc(var(--mf-c-radius) - 4px)); background: var(--mf-c-field); }
+.mf-acct-readonly strong { font-weight: 550; font-size: calc(14px * var(--mf-text-scale, 1)); }
+.mf-acct-readonly span { font-size: calc(12px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); }
+.mf-acct-skel { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--mf-c-field), color-mix(in srgb, var(--mf-c-field) 40%, var(--mf-c-surface)), var(--mf-c-field)); background-size: 200% 100%; animation: mf-acct-shimmer 1.2s ease-in-out infinite; }
+.mf-acct-skel.is-wide { width: 70%; }
+.mf-acct-skel.is-mid { width: 45%; }
+@keyframes mf-acct-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .mf-acct-skel { animation: none; } .mf-acct-tab { transition: none; } }
+.mf-acct .mf-dash-button { width: auto; margin-top: 0; }
+.mf-acct .mf-dash-button.is-block { width: 100%; }
+.mf-acct .mf-dash-confirm-actions { grid-template-columns: auto auto; justify-content: start; }
+.mf-acct .mf-dash-saved, .mf-acct .mf-dash-error { font-size: calc(13px * var(--mf-text-scale, 1)); }
+.mf-acct-link { appearance: none; padding: 0; border: 0; background: none; color: var(--mf-c-accent); font: inherit; font-size: calc(13px * var(--mf-text-scale, 1)); font-weight: 550; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.mf-acct-link svg { width: 14px; height: 14px; stroke: currentColor; }
+${topNavRules(".mf-acct.is-nav-top")}
+@container (max-width: 719px) {
+${topNavRules(".mf-acct.is-nav-auto")}
+}
+@container (max-width: 560px) {
+  .mf-acct-stats { grid-template-columns: minmax(0, 1fr); }
+  .mf-acct-grid { grid-template-columns: minmax(0, 1fr); }
+  .mf-acct-item { flex-wrap: wrap; }
+}
+
+/* ---- Shared controls (kept from the single-card layout) ---- */
 .mf-dash-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border-radius: 999px;
-  background: var(--mf-c-accent);
-  color: var(--mf-c-on-accent);
-  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: 0 0 40px;
+  border-radius: 999px; background: var(--mf-c-accent); color: var(--mf-c-on-accent); font-weight: 600;
   font-size: calc(15px * var(--mf-text-scale, 1));
 }
-.mf-dash-avatar svg { width: 20px; height: 20px; stroke: currentColor; }
-.mf-dash-title { margin: 0; font-size: calc(17px * var(--mf-text-scale, 1)); font-weight: 600; }
-.mf-dash-sub { margin: 2px 0 0; font-size: calc(13px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); word-break: break-all; }
 .mf-dash-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--mf-c-border);
-  font-size: calc(14px * var(--mf-text-scale, 1));
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0;
+  border-top: 1px solid var(--mf-c-border); font-size: calc(14px * var(--mf-text-scale, 1));
 }
 .mf-dash-row-label { color: var(--mf-c-muted); }
 .mf-dash-row-value { font-weight: 500; text-align: right; }
 .mf-dash-badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--mf-c-accent);
-  color: var(--mf-c-on-accent);
-  font-size: calc(12px * var(--mf-text-scale, 1));
-  font-weight: 600;
+  display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--mf-c-accent); color: var(--mf-c-on-accent);
+  font-size: calc(12px * var(--mf-text-scale, 1)); font-weight: 600; width: fit-content;
 }
 .mf-dash-note {
-  margin: 16px 0 0;
-  padding: 12px;
-  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
-  background: var(--mf-c-field);
-  color: var(--mf-c-muted);
-  font-size: calc(13px * var(--mf-text-scale, 1));
-  line-height: 1.5;
+  margin: 0; padding: 12px; border-radius: max(0px, calc(var(--mf-c-radius) - 4px)); background: var(--mf-c-field);
+  color: var(--mf-c-muted); font-size: calc(13px * var(--mf-text-scale, 1)); line-height: 1.5;
 }
 .mf-dash-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: var(--mf-gap, 20px);
-  padding: 11px 16px;
-  border: 1px solid var(--mf-c-border);
-  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: calc(14px * var(--mf-text-scale, 1));
-  font-weight: 500;
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: var(--mf-gap, 20px);
+  padding: 10px 16px; border: 1px solid var(--mf-c-border); border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
+  background: transparent; color: inherit; font: inherit; font-size: calc(14px * var(--mf-text-scale, 1)); font-weight: 550; cursor: pointer;
 }
 .mf-dash-button:hover:not(:disabled) { background: var(--mf-c-field); }
 .mf-dash-button:disabled { opacity: 0.55; cursor: default; }
-.mf-dash-button svg { width: 16px; height: 16px; stroke: currentColor; }
+.mf-dash-button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
 .mf-dash-button:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
-.mf-dash-button-primary {
-  background: var(--mf-c-accent);
-  border-color: var(--mf-c-accent);
-  color: var(--mf-c-on-accent);
-}
+.mf-dash-button-primary { background: var(--mf-c-accent); border-color: var(--mf-c-accent); color: var(--mf-c-on-accent); }
 .mf-dash-button-primary:hover:not(:disabled) { background: var(--mf-c-accent); filter: brightness(1.07); }
 .mf-dash-button-text { border-color: transparent; color: var(--mf-c-muted); }
 .mf-dash-button-text:hover:not(:disabled) { background: transparent; color: var(--mf-c-text); }
-.mf-dash-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  padding: 16px 0;
-}
+.mf-dash-button.mf-dash-button-small { width: auto; margin-top: 0; padding: 6px 12px; flex-shrink: 0; font-size: calc(13px * var(--mf-text-scale, 1)); }
+.mf-dash-button-danger { color: var(--mf-c-danger); border-color: var(--mf-c-border); }
+.mf-dash-button-danger:hover:not(:disabled) { border-color: var(--mf-c-danger); background: transparent; }
+.mf-dash-button-danger.is-solid { color: #ffffff; background: var(--mf-c-danger); border-color: var(--mf-c-danger); }
+.mf-dash-button-danger.is-solid:hover:not(:disabled) { background: var(--mf-c-danger); filter: brightness(1.06); }
+.mf-dash-state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 16px 0; }
 .mf-dash-state svg { width: 26px; height: 26px; stroke: currentColor; color: var(--mf-c-muted); }
 .mf-dash-state p { margin: 0; font-size: calc(14px * var(--mf-text-scale, 1)); line-height: 1.5; color: var(--mf-c-muted); }
-.mf-dash-profile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mf-gap, 14px);
-  margin-top: 4px;
-  padding-top: 16px;
-  border-top: 1px solid var(--mf-c-border);
-}
-.mf-dash-profile-title { margin: 0; font-size: calc(15px * var(--mf-text-scale, 1)); font-weight: 600; }
+.mf-dash-state + .mf-dash-button { margin-top: 8px; }
 .mf-dash-field { display: flex; flex-direction: column; gap: 6px; }
-.mf-dash-label { font-size: calc(13px * var(--mf-text-scale, 1)); font-weight: 500; }
+.mf-dash-label { font-size: calc(13px * var(--mf-text-scale, 1)); font-weight: 550; }
 .mf-dash-optional { margin-left: 6px; font-weight: 400; color: var(--mf-c-muted); }
 .mf-dash-input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 40px;
-  padding: 9px 12px;
-  border: 1px solid var(--mf-c-border);
-  border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
-  background: var(--mf-c-field);
-  color: inherit;
-  font: inherit;
+  width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid var(--mf-c-border);
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px)); background: var(--mf-c-field); color: inherit; font: inherit;
   font-size: calc(14px * var(--mf-text-scale, 1));
 }
 textarea.mf-dash-input { min-height: 88px; resize: vertical; }
-.mf-dash-input:focus-visible {
-  outline: none;
-  border-color: var(--mf-c-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mf-c-accent) 25%, transparent);
-}
+.mf-dash-input:focus-visible { outline: none; border-color: var(--mf-c-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mf-c-accent) 25%, transparent); }
 .mf-dash-input.is-invalid { border-color: var(--mf-c-danger); }
 .mf-dash-check { display: flex; align-items: flex-start; gap: 10px; font-size: calc(14px * var(--mf-text-scale, 1)); cursor: pointer; }
 .mf-dash-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--mf-c-accent); }
 .mf-dash-check input:focus-visible { outline: 2px solid var(--mf-c-accent); outline-offset: 2px; }
 .mf-dash-error { margin: 0; font-size: calc(12px * var(--mf-text-scale, 1)); line-height: 1.4; color: var(--mf-c-danger); }
 .mf-dash-saved { margin: 0; font-size: calc(13px * var(--mf-text-scale, 1)); color: var(--mf-c-muted); }
-.mf-dash-billing { margin-top: var(--mf-gap, 20px); display: flex; flex-direction: column; gap: 10px; }
-.mf-dash-billing-plan { display: flex; flex-direction: column; gap: 10px; }
-.mf-dash-billing-plan .mf-dash-button { margin-top: 0; }
-.mf-dash-history { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
-/* The subscription popup (2026-10-20). */
-.mf-dash-modal {
-  position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: var(--mf-c-backdrop, rgba(15, 18, 24, 0.55));
-}
-.mf-dash-modal-card {
-  box-sizing: border-box; width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 16px; padding: var(--mf-pad, 24px);
-  color: var(--mf-c-text); background: var(--mf-c-surface); border: 1px solid var(--mf-c-border);
-  border-radius: var(--mf-c-radius); box-shadow: 0 24px 48px -12px rgba(15, 18, 24, 0.35); text-align: left;
-}
-.mf-dash-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.mf-dash-modal-head .mf-dash-profile-title { margin: 0; }
-.mf-dash-modal-close {
-  appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
-  padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--mf-c-muted); cursor: pointer;
-}
-.mf-dash-modal-close:hover { background: var(--mf-c-field); color: var(--mf-c-text); }
-.mf-dash-modal-close svg { width: 16px; height: 16px; stroke: currentColor; }
-.mf-dash-modal-plan, .mf-dash-modal-section { display: flex; flex-direction: column; gap: 6px; }
-.mf-dash-modal-section { padding-top: 12px; border-top: 1px solid var(--mf-c-border); }
-.mf-dash-modal-actions { display: flex; flex-direction: column; gap: 8px; }
-.mf-dash-modal-actions .mf-dash-button { margin-top: 0; }
-.mf-dash-button.mf-dash-button-small { width: auto; margin-top: 0; padding: 6px 12px; flex-shrink: 0; }
-.mf-dash-button-danger { color: var(--mf-c-danger); border-color: var(--mf-c-border); }
-.mf-dash-button-danger:hover:not(:disabled) { border-color: var(--mf-c-danger); background: transparent; }
-.mf-dash-button-danger.is-solid { color: #ffffff; background: var(--mf-c-danger); border-color: var(--mf-c-danger); }
-.mf-dash-button-danger.is-solid:hover:not(:disabled) { background: var(--mf-c-danger); filter: brightness(1.06); }
 .mf-dash-confirm {
   display: flex; flex-direction: column; gap: 6px; padding: 12px 14px;
   border: 1px solid var(--mf-c-danger); border-radius: max(0px, calc(var(--mf-c-radius) - 4px));
@@ -1768,12 +1896,223 @@ textarea.mf-dash-input { min-height: 88px; resize: vertical; }
 .mf-dash-muted { color: var(--mf-c-muted); }
 .mf-dash-scheduled {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px;
-  border-radius: max(0px, calc(var(--mf-c-radius) - 4px)); background: var(--mf-c-field);
-  font-size: calc(12px * var(--mf-text-scale, 1));
+  border-radius: max(0px, calc(var(--mf-c-radius) - 4px)); background: var(--mf-c-field); font-size: calc(12px * var(--mf-text-scale, 1));
 }
 .mf-dash-history-row .mf-dash-row-label { display: flex; flex-direction: column; gap: 2px; }
 .mf-dash-link { color: var(--mf-c-accent); text-decoration: underline; }
 `;
+
+// @memberframe-account-start
+// ============================================================================
+// THE ACCOUNT AREA: SECTIONS, ADDRESS, AND CHECKS
+// ============================================================================
+// Pure, so test/memberAccountArea.test.ts runs each one (33-member-account.md).
+
+type AccountSection = "overview" | "membership" | "billing" | "bookmarks" | "profile" | "security";
+
+const ACCOUNT_SECTIONS: ReadonlyArray<AccountSection> = ["overview", "membership", "billing", "bookmarks", "profile", "security"];
+
+interface AccountSectionToggles {
+  overview?: boolean;
+  membership?: boolean;
+  billing?: boolean;
+  bookmarks?: boolean;
+  profile?: boolean;
+  security?: boolean;
+  photoUpload?: boolean;
+  deleteAccount?: boolean;
+}
+
+/**
+ * The sections shown, in menu order. Each toggle in Sections hides one, and
+ * the older controls still apply: Billing off hides Membership and Billing,
+ * Profile Form off hides Profile. Overview stays when everything else is off.
+ */
+function visibleSections(toggles: AccountSectionToggles | null | undefined, legacy: { showBilling: boolean; showProfile: boolean }): AccountSection[] {
+  const shown = ACCOUNT_SECTIONS.filter((section) => {
+    if (toggles && toggles[section] === false) return false;
+    if ((section === "membership" || section === "billing") && !legacy.showBilling) return false;
+    if (section === "profile" && !legacy.showProfile) return false;
+    return true;
+  });
+  return shown.length > 0 ? shown : ["overview"];
+}
+
+const ACCOUNT_HASH_PREFIX = "#account-";
+
+/** The section an address names (`#account-billing`), when it is one that shows. */
+function sectionFromHash(hash: string, shown: ReadonlyArray<AccountSection>): AccountSection | null {
+  if (typeof hash !== "string" || !hash.startsWith(ACCOUNT_HASH_PREFIX)) return null;
+  const name = hash.slice(ACCOUNT_HASH_PREFIX.length) as AccountSection;
+  return shown.includes(name) ? name : null;
+}
+
+/** The preferred section when it shows, otherwise the first that does. */
+function pickSection(preferred: unknown, shown: ReadonlyArray<AccountSection>): AccountSection {
+  return shown.includes(preferred as AccountSection) ? (preferred as AccountSection) : shown[0] ?? "overview";
+}
+
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/webp"];
+
+/** Why a chosen photo cannot be uploaded, before sending it. The server checks again. */
+function avatarProblem(file: { type: string; size: number }): "type" | "size" | null {
+  if (!AVATAR_TYPES.includes(file.type)) return "type";
+  if (file.size > AVATAR_MAX_BYTES) return "size";
+  return null;
+}
+
+/** Deleting the account asks for the member's own address, typed in. */
+function confirmsDeleteEmail(typed: string, email: string): boolean {
+  return typed.trim().toLowerCase() === email.trim().toLowerCase() && email.trim() !== "";
+}
+
+const PROVIDER_NAMES: Record<string, string> = { google: "Google", github: "GitHub", apple: "Apple", discord: "Discord" };
+
+function providerName(provider: string): string {
+  return PROVIDER_NAMES[provider] ?? provider;
+}
+
+/** A link a saved item may open: an https address or a page on this site. */
+function safeItemHref(url: string): string | null {
+  if (/^https:\/\//i.test(url)) return url;
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  return null;
+}
+// @memberframe-account-end
+
+// ============================================================================
+// ICONS
+// ============================================================================
+// Inline, tagged with their Lucide names: Framer's bundled lucide-react is
+// older than this repository's, and an icon it lacks stops the file compiling
+// (test/canvasIconImports.test.ts). test/canvasIcons.test.ts holds each shape
+// equal to Lucide's.
+
+function OverviewIcon(): React.ReactElement {
+  return (
+    <svg className="mf-acct-ico" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="layout-dashboard">
+      <rect width="7" height="9" x="3" y="3" rx="1" />
+      <rect width="7" height="5" x="14" y="3" rx="1" />
+      <rect width="7" height="9" x="14" y="12" rx="1" />
+      <rect width="7" height="5" x="3" y="16" rx="1" />
+    </svg>
+  );
+}
+
+function ReceiptIcon(): React.ReactElement {
+  return (
+    <svg className="mf-acct-ico" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="receipt">
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+      <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+      <path d="M12 17.5v-11" />
+    </svg>
+  );
+}
+
+function BookmarkIcon(): React.ReactElement {
+  return (
+    <svg className="mf-acct-ico" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="bookmark">
+      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+    </svg>
+  );
+}
+
+function ShieldIcon(): React.ReactElement {
+  return (
+    <svg className="mf-acct-ico" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="shield">
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+    </svg>
+  );
+}
+
+function SearchIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="search">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function TrashIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="trash-2">
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+      <line x1="10" x2="10" y1="11" y2="17" />
+      <line x1="14" x2="14" y1="11" y2="17" />
+    </svg>
+  );
+}
+
+function CameraIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="camera">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  );
+}
+
+function KeyIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="key-round">
+      <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />
+      <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function MonitorIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="monitor">
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <line x1="8" x2="16" y1="21" y2="21" />
+      <line x1="12" x2="12" y1="17" y2="21" />
+    </svg>
+  );
+}
+
+function PhoneIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="smartphone">
+      <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+      <path d="M12 18h.01" />
+    </svg>
+  );
+}
+
+function LinkIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="link-2">
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" />
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
+      <line x1="8" x2="16" y1="12" y2="12" />
+    </svg>
+  );
+}
+
+function AlertIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="triangle-alert">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+function ExternalIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={true} data-lucide="external-link">
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
 
 // ============================================================================
 // COMPONENT
@@ -1784,22 +2123,188 @@ interface MfSealProps {
   mfSeal?: string;
 }
 
+/** The account area's own controls (33-member-account.md section 4). */
+interface AccountProps {
+  sections?: AccountSectionToggles | null;
+  defaultSection?: AccountSection;
+  navigation?: "auto" | "sidebar" | "top";
+  canvasSection?: AccountSection;
+}
+
+interface BookmarkItem {
+  itemSlug: string;
+  title: string;
+  url: string;
+  savedAt: number;
+}
+
+type BookmarksState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "ready"; items: BookmarkItem[] }
+  | { phase: "failed" };
+
+interface AccountSummary {
+  hasPassword: boolean;
+  memberSince: string | null;
+  avatarUrl: string | null;
+  identities: Array<{ provider: string; email: string; createdAt: string }>;
+  sessions: Array<{ id: string; current: boolean; device: string; lastSeenAt: string | null; createdAt: string }>;
+}
+
+type AccountState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "ready"; account: AccountSummary }
+  | { phase: "failed" };
+
+type ConfirmState =
+  | { kind: "unlink"; provider: string }
+  | { kind: "device"; id: string; device: string }
+  | { kind: "everywhere" }
+  | { kind: "photo" }
+  | { kind: "delete" }
+  | null;
+
+const BOOKMARKS_PATH = "/api/member/bookmarks";
+const ACCOUNT_PATH = "/api/member/account";
+const PASSWORD_PATH = "/api/member/password";
+const IDENTITIES_PATH = "/api/member/identities/";
+const SESSIONS_PATH = "/api/member/sessions/";
+const AVATAR_PATH = "/api/member/avatar";
+const LOGOUT_EVERYWHERE_PATH = "/api/member/logout-everywhere";
+
+function readBookmarks(value: unknown): BookmarkItem[] {
+  const list = value && typeof value === "object" ? (value as { bookmarks?: unknown }).bookmarks : null;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((entry) => {
+    const item = entry as Partial<BookmarkItem>;
+    if (typeof item.itemSlug !== "string") return [];
+    return [{
+      itemSlug: item.itemSlug,
+      title: typeof item.title === "string" && item.title.trim() !== "" ? item.title : item.itemSlug,
+      url: typeof item.url === "string" ? item.url : "",
+      savedAt: typeof item.savedAt === "number" ? item.savedAt : 0,
+    }];
+  });
+}
+
+function readAccount(value: unknown): AccountSummary | null {
+  if (!value || typeof value !== "object") return null;
+  const body = value as Record<string, unknown>;
+  const text = (input: unknown) => (typeof input === "string" ? input : "");
+  return {
+    hasPassword: body["hasPassword"] === true,
+    memberSince: typeof body["memberSince"] === "string" ? (body["memberSince"] as string) : null,
+    avatarUrl: typeof body["avatarUrl"] === "string" && /^https:\/\//.test(body["avatarUrl"] as string) ? (body["avatarUrl"] as string) : null,
+    identities: Array.isArray(body["identities"])
+      ? (body["identities"] as Array<Record<string, unknown>>).map((row) => ({ provider: text(row["provider"]), email: text(row["email"]), createdAt: text(row["createdAt"]) }))
+      : [],
+    sessions: Array.isArray(body["sessions"])
+      ? (body["sessions"] as Array<Record<string, unknown>>).map((row) => ({
+          id: text(row["id"]),
+          current: row["current"] === true,
+          device: text(row["device"]) || "Unknown device",
+          lastSeenAt: typeof row["lastSeenAt"] === "string" ? (row["lastSeenAt"] as string) : null,
+          createdAt: text(row["createdAt"]),
+        }))
+      : [],
+  };
+}
+
+/** A sample account for the canvas, so every section can be designed. */
+const PREVIEW_ACCOUNT: AccountSummary = {
+  hasPassword: true,
+  memberSince: "2026-02-14T09:00:00.000Z",
+  avatarUrl: null,
+  identities: [{ provider: "google", email: "member@example.com", createdAt: "2026-02-14T09:00:00.000Z" }],
+  sessions: [
+    { id: "preview-1", current: true, device: "Chrome on Mac", lastSeenAt: null, createdAt: "2026-10-20T09:00:00.000Z" },
+    { id: "preview-2", current: false, device: "Safari on iPhone", lastSeenAt: "2026-10-24T18:30:00.000Z", createdAt: "2026-09-02T09:00:00.000Z" },
+  ],
+};
+
+const PREVIEW_BOOKMARKS: BookmarkItem[] = [
+  { itemSlug: "designing-for-members", title: "Designing for members", url: "/articles/designing-for-members", savedAt: Date.parse("2026-10-22T10:00:00Z") },
+  { itemSlug: "pricing-that-converts", title: "Pricing that converts", url: "/articles/pricing-that-converts", savedAt: Date.parse("2026-10-18T10:00:00Z") },
+  { itemSlug: "a-calmer-inbox", title: "A calmer inbox", url: "/articles/a-calmer-inbox", savedAt: Date.parse("2026-10-09T10:00:00Z") },
+  { itemSlug: "writing-weekly", title: "Writing weekly", url: "/articles/writing-weekly", savedAt: Date.parse("2026-09-30T10:00:00Z") },
+];
+
+/** The site's tiers as `GET /api/preview` lists them, or [] when the answer is not that shape. */
+function readPreviewPlans(data: Record<string, unknown> | null): BillingPlanOption[] {
+  const pricing = data ? (data["pricing"] as { tiers?: unknown } | undefined) : undefined;
+  if (!pricing || !Array.isArray(pricing.tiers)) return [];
+  const price = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+  return (pricing.tiers as Array<Record<string, unknown>>).flatMap((tier) => {
+    if (typeof tier["key"] !== "string" || typeof tier["name"] !== "string" || typeof tier["rank"] !== "number") return [];
+    const prices = (tier["prices"] && typeof tier["prices"] === "object" ? tier["prices"] : {}) as Record<string, unknown>;
+    return [{
+      key: tier["key"],
+      name: tier["name"],
+      rank: tier["rank"],
+      currency: typeof tier["currency"] === "string" ? tier["currency"] : "USD",
+      prices: { month: price(prices["month"]), year: price(prices["year"]), lifetime: price(prices["lifetime"]) },
+    }];
+  });
+}
+
 /**
- * Fixed width, height from its content (2026-10-20): the page scrolls, not the
- * panel. A fixed height chosen in the sidebar still works, and scrolls inside.
+ * The billing the canvas shows: the preview member on the site's top tier, at
+ * that tier's own price, so the canvas looks like the published page for that
+ * member. A top tier with no price is a free plan, shown as the published page
+ * shows one. Before the site answers (or when it cannot), a sample paid plan.
+ */
+function previewBilling(plans: BillingPlanOption[] | null): BillingSummary {
+  const day = 86_400_000;
+  const paid = (amountMinor: number, currency: string, planName: string, count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `p${index + 1}`, amountMinor, currency, status: "paid", receiptUrl: null,
+      paidAt: new Date(Date.now() - (12 + index * 30) * day).toISOString(), gateway: "stripe", planName,
+    }));
+  const subscription = (tierKey: string, tierName: string, interval: string, amountMinor: number, currency: string) => ({
+    tierKey, tierName, interval, gateway: "stripe", status: "active", amountMinor, currency,
+    currentPeriodEnd: interval === "lifetime" ? null : new Date(Date.now() + 18 * day).toISOString(),
+    gracePeriodEndsAt: null, cancelAtPeriodEnd: false, mode: "live",
+    canCancel: interval !== "lifetime", canResume: false, canManage: true,
+  });
+
+  if (!plans || plans.length === 0) {
+    return { subscription: subscription("tier_1", "Silver", "month", 900, "USD"), payments: paid(900, "USD", "Silver", 3), pricingPath: "/pricing" };
+  }
+
+  const top = plans.reduce((best, tier) => (tier.rank > best.rank ? tier : best), plans[0]);
+  const interval = top.prices.month !== null ? "month" : top.prices.year !== null ? "year" : top.prices.lifetime !== null ? "lifetime" : null;
+  if (top.rank === 0 || interval === null) return { subscription: null, payments: [], plans, pricingPath: "/pricing" };
+
+  const amount = top.prices[interval as "month" | "year" | "lifetime"] as number;
+  return {
+    subscription: subscription(top.key, top.name, interval, amount, top.currency),
+    payments: paid(amount, top.currency, top.name, interval === "lifetime" ? 1 : 3),
+    plans,
+    pricingPath: "/pricing",
+  };
+}
+
+/**
+ * The account area: a section menu and one section at a time. 960 wide by
+ * default; below 720px of its own width the menu becomes a row on top. Height
+ * from its content (2026-10-20): the page scrolls, not the panel. A fixed
+ * height chosen in the sidebar still works, and scrolls inside.
  *
- * @framerIntrinsicWidth 480
- * @framerIntrinsicHeight 560
+ * @framerIntrinsicWidth 960
+ * @framerIntrinsicHeight 640
  * @framerSupportedLayoutWidth any-prefer-fixed
  * @framerSupportedLayoutHeight any-prefer-auto
  */
 export default function MemberDashboard(
-  props: Partial<DashboardConfig> & MfAppearanceProps & DashboardDisplayProps & MfSealProps
+  props: Partial<DashboardConfig> & MfAppearanceProps & DashboardDisplayProps & MfSealProps & AccountProps
 ): React.ReactElement {
   const config: DashboardConfig = { ...CONFIG, ...props };
-  const { theme = "light", colors, typography, layout, spacing, labels } = props;
+  const { colors, typography, layout, spacing, labels } = props;
   const { showAvatar = true, showEmail = true, showStatus = true, signOutStyle = "outline" } = props;
   const { showPaymentHistory = true, allowCancel = true } = props;
+  const { sections, defaultSection = "overview", navigation = "auto", canvasSection = "overview" } = props;
   const t = (key: string) => mfLabel(labels, DASH_LABELS, key);
 
   /** A CSS-safe per-instance scope, as in the other three components. */
@@ -1807,7 +2312,11 @@ export default function MemberDashboard(
   const scope = useMemo(() => `mfd${rawId.replace(/[^a-zA-Z0-9]/g, "")}`, [rawId]);
 
   const [state, setState] = useState<DashboardState>({ phase: "loading" });
+  /** Canvas only: the site's tiers and prices, once `GET /api/preview` answers. */
+  const [previewPlans, setPreviewPlans] = useState<BillingPlanOption[] | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Signed out by the server mid-visit (a 401 after signing in): says so. */
+  const [expired, setExpired] = useState(false);
 
   const [profile, setProfile] = useState<ProfileState>({ phase: "idle" });
   const [profileName, setProfileName] = useState("");
@@ -1819,8 +2328,6 @@ export default function MemberDashboard(
   const [billing, setBilling] = useState<BillingState>({ phase: "idle" });
   const [billingBusy, setBillingBusy] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
-  /** The subscription popup (2026-10-20): plan, change plan, every payment. */
-  const [billingOpen, setBillingOpen] = useState(false);
   /** A plan picked to switch to: loading its numbers, then waiting for Confirm. */
   const [switchTo, setSwitchTo] = useState<{
     key: string;
@@ -1830,11 +2337,97 @@ export default function MemberDashboard(
     effectiveAt?: string | null;
   } | null>(null);
   const [billingNotice, setBillingNotice] = useState<{ text: string; error: boolean } | null>(null);
-  const billingRef = useRef<HTMLDivElement>(null);
 
+  const [bookmarks, setBookmarks] = useState<BookmarksState>({ phase: "idle" });
+  const [bookmarkQuery, setBookmarkQuery] = useState("");
+  const [account, setAccount] = useState<AccountState>({ phase: "idle" });
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<{ text: string; error: boolean; where: string } | null>(null);
+  const [password, setPassword] = useState({ current: "", next: "", again: "" });
+  const [deleteEmail, setDeleteEmail] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const license = useMfLicense(CONFIG.apiBaseUrl, CONFIG.siteKey, props.mfSeal);
   const onCanvas = RenderTarget.current() === RenderTarget.canvas;
+  const apiBase = (config.apiBaseUrl || ENV_API_BASE_URL || "").replace(/\/+$/, "");
+
+  // ------------------------------------------------------------------------
+  // Sections and the address
+  // ------------------------------------------------------------------------
+
+  const shown = visibleSections(sections, { showBilling: config.showBilling, showProfile: config.showProfile });
+  const shownKey = shown.join(",");
+  const photoUpload = sections?.photoUpload !== false;
+  const deleteAllowed = sections?.deleteAccount !== false;
+
+  const [section, setSection] = useState<AccountSection>(() =>
+    typeof window === "undefined" ? pickSection(defaultSection, shown) : sectionFromHash(window.location.hash, shown) ?? pickSection(defaultSection, shown)
+  );
+  // The canvas shows the section the creator picked; the published site the one chosen.
+  const active: AccountSection = onCanvas ? pickSection(canvasSection, shown) : shown.includes(section) ? section : pickSection(defaultSection, shown);
+
+  const goTo = useCallback(
+    (next: AccountSection) => {
+      setSection(next);
+      setConfirm(null);
+      setAccountNotice(null);
+      if (onCanvas || typeof window === "undefined") return;
+      try {
+        // Framer's own history state is kept, so its router is not disturbed.
+        if (window.location.hash !== ACCOUNT_HASH_PREFIX + next) {
+          window.history.pushState(window.history.state, "", window.location.pathname + window.location.search + ACCOUNT_HASH_PREFIX + next);
+        }
+      } catch {
+        // A sandboxed frame can refuse; the section still changes.
+      }
+    },
+    [onCanvas]
+  );
+
+  // Back and Forward, and a link to another section on the same page.
+  useEffect(() => {
+    if (onCanvas || typeof window === "undefined") return;
+    const follow = () => {
+      const list = shownKey.split(",") as AccountSection[];
+      const named = sectionFromHash(window.location.hash, list);
+      setSection(named ?? pickSection(defaultSection, list));
+    };
+    window.addEventListener("popstate", follow);
+    window.addEventListener("hashchange", follow);
+    return () => {
+      window.removeEventListener("popstate", follow);
+      window.removeEventListener("hashchange", follow);
+    };
+  }, [defaultSection, onCanvas, shownKey]);
+
+  /** One request for the member's own data. A 401 means the session ended: say so. */
+  const memberCall = useCallback(
+    async (path: string, init: { method?: string; json?: unknown; raw?: Blob } = {}): Promise<{ status: number; body: Record<string, unknown> } | null> => {
+      if (onCanvas || apiBase === "") return null;
+      try {
+        const headers = init.raw
+          ? { ...apiHeaders(false), "Content-Type": init.raw.type || "application/octet-stream" }
+          : apiHeaders(init.json !== undefined);
+        const response = await fetch(`${apiBase}${path}`, {
+          method: init.method ?? "GET",
+          credentials: "include",
+          headers,
+          body: init.raw ?? (init.json !== undefined ? JSON.stringify(init.json) : undefined),
+        });
+        const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+        if (response.status === 401) {
+          setExpired(true);
+          setState({ phase: "signed_out" });
+          syncShieldSession(false);
+        }
+        return { status: response.status, body };
+      } catch {
+        return null;
+      }
+    },
+    [apiBase, onCanvas]
+  );
 
   // ------------------------------------------------------------------------
   // Load the session
@@ -1875,9 +2468,11 @@ export default function MemberDashboard(
           const pricing = data ? (data["pricing"] as { tiers?: Array<{ key: string; rank: number; name: string }> } | undefined) : undefined;
           const tiers = pricing && Array.isArray(pricing.tiers) ? pricing.tiers.map((tier) => ({ key: tier.key, rank: tier.rank, name: tier.name })) : [];
           if (!active || tiers.length === 0) return;
-          const next = JSON.stringify(tiers);
+          const plans = readPreviewPlans(data);
+          const next = JSON.stringify(plans.length > 0 ? plans : tiers);
           if (next === shown) return;
           shown = next;
+          if (plans.length > 0) setPreviewPlans(plans);
           const top = tiers.reduce((best, tier) => (tier.rank > best.rank ? tier : best), tiers[0]);
           setState((current) =>
             current.phase === "signed_in" && current.member.memberId === "preview"
@@ -2086,6 +2681,8 @@ export default function MemberDashboard(
       }
 
       if (response.status === 401) {
+        // The answers stay in the form for when the member signs in again.
+        setExpired(true);
         setState({ phase: "signed_out" });
         return;
       }
@@ -2122,6 +2719,17 @@ export default function MemberDashboard(
   // Sign out
   // ------------------------------------------------------------------------
 
+  /** Signed out here, or by a deleted account: the page says so, and moves on. */
+  const finishSignOut = useCallback(() => {
+    setExpired(false);
+    setState({ phase: "signed_out" });
+    syncShieldSession(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("memberframe:session-updated", { detail: { signedIn: false } }));
+    }
+    if (safePath(config.afterLogoutPath)) navigate(config.afterLogoutPath);
+  }, [config.afterLogoutPath]);
+
   const handleSignOut = useCallback(async () => {
     if (onCanvas) return;
 
@@ -2142,52 +2750,23 @@ export default function MemberDashboard(
     }
 
     setBusy(false);
-    setState({ phase: "signed_out" });
-    syncShieldSession(false);
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("memberframe:session-updated", { detail: { signedIn: false } })
-      );
-    }
-
-    if (safePath(config.afterLogoutPath)) navigate(config.afterLogoutPath);
-  }, [config.afterLogoutPath, config.apiBaseUrl, onCanvas]);
+    finishSignOut();
+  }, [config.apiBaseUrl, finishSignOut, onCanvas]);
 
   // ------------------------------------------------------------------------
   // Billing, FP-16
   // ------------------------------------------------------------------------
 
   // `signedInMemberId` is declared with the profile effects above.
+  const needsBilling = config.showBilling && (shown.includes("overview") || shown.includes("membership") || shown.includes("billing"));
 
   useEffect(() => {
-    if (!config.showBilling || signedInMemberId === null) return;
+    if (!needsBilling || signedInMemberId === null) return;
 
-    // A representative plan on the canvas, so the section can be designed.
+    // The preview member's plan, from the site's own tiers, so the canvas shows
+    // what the published page shows a member on that plan.
     if (onCanvas) {
-      setBilling({
-        phase: "ready",
-        summary: {
-          subscription: {
-            tierName: "Silver",
-            interval: "month",
-            status: "active",
-            amountMinor: 900,
-            currency: "USD",
-            currentPeriodEnd: new Date(Date.now() + 18 * 86_400_000).toISOString(),
-            gracePeriodEndsAt: null,
-            cancelAtPeriodEnd: false,
-            mode: "live",
-            canCancel: true,
-            canResume: false,
-            canManage: true,
-          },
-          payments: [
-            { id: "p1", amountMinor: 900, currency: "USD", status: "paid", receiptUrl: null, paidAt: new Date(Date.now() - 12 * 86_400_000).toISOString() },
-          ],
-          pricingPath: "/pricing",
-        },
-      });
+      setBilling({ phase: "ready", summary: previewBilling(previewPlans) });
       return;
     }
 
@@ -2213,7 +2792,7 @@ export default function MemberDashboard(
     return () => {
       active = false;
     };
-  }, [config.apiBaseUrl, config.showBilling, onCanvas, signedInMemberId]);
+  }, [config.apiBaseUrl, needsBilling, onCanvas, previewPlans, signedInMemberId]);
 
   const billingAction = useCallback(
     async (action: "portal" | "cancel" | "resume" | "undo-change") => {
@@ -2340,23 +2919,164 @@ export default function MemberDashboard(
     [config.apiBaseUrl, onCanvas, switchTo]
   );
 
-  // The popup keeps the page still behind it and starts on its close button.
-  useEffect(() => {
-    if (!billingOpen || onCanvas || typeof document === "undefined") return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    billingRef.current?.querySelector<HTMLElement>("button")?.focus();
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [billingOpen, onCanvas]);
+  // ------------------------------------------------------------------------
+  // Bookmarks, FP-10, and the account itself (33-member-account.md)
+  // ------------------------------------------------------------------------
 
-  const closeBilling = useCallback(() => {
-    setBillingOpen(false);
-    setSwitchTo(null);
-    setConfirmingCancel(false);
-    setBillingNotice(null);
-  }, []);
+  const needsBookmarks = shown.includes("overview") || shown.includes("bookmarks");
+
+  const loadAccount = useCallback(async () => {
+    const answer = await memberCall(ACCOUNT_PATH);
+    const parsed = answer && answer.status === 200 ? readAccount(answer.body) : null;
+    setAccount(parsed ? { phase: "ready", account: parsed } : { phase: "failed" });
+  }, [memberCall]);
+
+  useEffect(() => {
+    if (signedInMemberId === null) return;
+    if (onCanvas) {
+      setAccount({ phase: "ready", account: PREVIEW_ACCOUNT });
+      setBookmarks({ phase: "ready", items: PREVIEW_BOOKMARKS });
+      return;
+    }
+    setAccount({ phase: "loading" });
+    void loadAccount();
+    if (!needsBookmarks) return;
+    setBookmarks({ phase: "loading" });
+    void memberCall(BOOKMARKS_PATH).then((answer) => {
+      setBookmarks(answer && answer.status === 200 ? { phase: "ready", items: readBookmarks(answer.body) } : { phase: "failed" });
+    });
+  }, [loadAccount, memberCall, needsBookmarks, onCanvas, signedInMemberId]);
+
+  const removeBookmark = useCallback(
+    async (item: BookmarkItem) => {
+      if (onCanvas) return;
+      const answer = await memberCall(BOOKMARKS_PATH, {
+        method: "PATCH",
+        json: { action: "remove", item: { itemSlug: item.itemSlug, title: item.title, url: item.url } },
+      });
+      if (answer && answer.status === 200) {
+        setBookmarks({ phase: "ready", items: readBookmarks(answer.body) });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("memberframe:bookmarks-updated", { detail: { itemSlug: item.itemSlug, saved: false } }));
+        }
+      } else if (answer?.status !== 401) {
+        setAccountNotice({ text: t("actionFailed"), error: true, where: "bookmarks" });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [memberCall, onCanvas]
+  );
+
+  const changePassword = useCallback(
+    async (hasPassword: boolean) => {
+      if (onCanvas) return;
+      if (password.next !== password.again) {
+        setAccountNotice({ text: t("passwordMismatch"), error: true, where: "password" });
+        return;
+      }
+      setAccountBusy(true);
+      setAccountNotice(null);
+      const answer = await memberCall(PASSWORD_PATH, {
+        method: "POST",
+        json: { ...(hasPassword ? { currentPassword: password.current } : {}), newPassword: password.next },
+      });
+      setAccountBusy(false);
+      if (answer?.status === 200) {
+        setPassword({ current: "", next: "", again: "" });
+        setAccountNotice({ text: t("passwordChanged"), error: false, where: "password" });
+        void loadAccount();
+        return;
+      }
+      if (answer?.status === 401) return;
+      const reason = answer?.body["reason"];
+      setAccountNotice({
+        text: reason === "wrong_password" ? t("passwordWrong") : reason === "weak_password" ? t("passwordWeak") : t("passwordFailed"),
+        error: true,
+        where: "password",
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadAccount, memberCall, onCanvas, password]
+  );
+
+  /** Every confirmed action in Security and Profile: unlink, sign out a device or all, the photo, the account. */
+  const runConfirmed = useCallback(
+    async (memberEmail: string) => {
+      if (onCanvas || !confirm) return;
+      setAccountBusy(true);
+      setAccountNotice(null);
+      const current = confirm;
+      let answer: { status: number; body: Record<string, unknown> } | null = null;
+      if (current.kind === "unlink") answer = await memberCall(IDENTITIES_PATH + encodeURIComponent(current.provider), { method: "DELETE" });
+      if (current.kind === "device") answer = await memberCall(SESSIONS_PATH + encodeURIComponent(current.id), { method: "DELETE" });
+      if (current.kind === "everywhere") answer = await memberCall(LOGOUT_EVERYWHERE_PATH, { method: "POST" });
+      if (current.kind === "photo") answer = await memberCall(AVATAR_PATH, { method: "DELETE" });
+      if (current.kind === "delete") {
+        if (!confirmsDeleteEmail(deleteEmail, memberEmail)) {
+          setAccountBusy(false);
+          return;
+        }
+        answer = await memberCall(ACCOUNT_PATH, { method: "DELETE", json: { confirmEmail: deleteEmail } });
+      }
+      setAccountBusy(false);
+
+      if (answer?.status === 200) {
+        setConfirm(null);
+        setDeleteEmail("");
+        if (current.kind === "everywhere" || current.kind === "delete") {
+          finishSignOut();
+          return;
+        }
+        void loadAccount();
+        return;
+      }
+      if (answer?.status === 401) return;
+      const reason = answer?.body["reason"];
+      const where = current.kind === "photo" ? "photo" : current.kind === "delete" ? "delete" : "security";
+      setAccountNotice({
+        text:
+          reason === "last_sign_in_method"
+            ? t("unlinkLast")
+            : reason === "active_plan"
+              ? t("deleteBlocked")
+              : current.kind === "delete"
+                ? t("deleteFailed")
+                : t("actionFailed"),
+        error: true,
+        where,
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [confirm, deleteEmail, finishSignOut, loadAccount, memberCall, onCanvas]
+  );
+
+  const uploadPhoto = useCallback(
+    async (file: File) => {
+      if (onCanvas) return;
+      const problem = avatarProblem(file);
+      if (problem) {
+        setAccountNotice({ text: problem === "size" ? t("photoTooLarge") : t("photoWrongType"), error: true, where: "photo" });
+        return;
+      }
+      setAccountBusy(true);
+      setAccountNotice(null);
+      const answer = await memberCall(AVATAR_PATH, { method: "POST", raw: file });
+      setAccountBusy(false);
+      if (answer?.status === 200) {
+        void loadAccount();
+        return;
+      }
+      if (answer?.status === 401) return;
+      const reason = answer?.body["reason"];
+      setAccountNotice({
+        text: reason === "image_too_large" ? t("photoTooLarge") : reason === "unsupported_image" ? t("photoWrongType") : t("photoFailed"),
+        error: true,
+        where: "photo",
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadAccount, memberCall, onCanvas]
+  );
 
   // ------------------------------------------------------------------------
   // Render
@@ -2378,7 +3098,7 @@ export default function MemberDashboard(
     }) +
     " }";
   const styled = mfStyleScope("mfd", scopedVars);
-  const rootClass = `mf-dash ${mfThemeClass(theme)}`;
+  const rootClass = `mf-dash ${MF_THEME_CLASS}`;
   const style = (
     <>
       <style>{mfThemeCss(".mf-dash")}</style>
@@ -2430,7 +3150,7 @@ export default function MemberDashboard(
         {style}
         <div className="mf-dash-state">
           <User aria-hidden={true} />
-          <p>{config.signedOutMessage}</p>
+          <p>{expired ? t("sessionExpired") : config.signedOutMessage}</p>
         </div>
         {safePath(config.loginPath) ? (
           <button
@@ -2447,63 +3167,674 @@ export default function MemberDashboard(
 
   const { member, tiers } = state;
   const displayName = member.name && member.name.trim() !== "" ? member.name : member.email;
+  const firstName = displayName.includes("@") ? displayName : displayName.trim().split(/\s+/)[0];
   const initial = displayName.trim().charAt(0).toUpperCase() || "M";
+  const accountData = account.phase === "ready" ? account.account : null;
+  const avatarUrl = accountData?.avatarUrl ?? null;
+  const memberTier = tierName(member.activeTier, tiers);
+  const summary = billing.phase === "ready" ? billing.summary : null;
+  const plan = summary?.subscription ?? null;
+  const savedItems = bookmarks.phase === "ready" ? bookmarks.items : [];
 
-  return (
-    <div className={rootClass} data-mf-dash={styled.scope}>
-      {style}
+  const avatar = (large: boolean) => (
+    <span className={large ? "mf-acct-avatar is-large" : "mf-acct-avatar"} aria-hidden={true}>
+      {avatarUrl ? <img src={avatarUrl} alt="" /> : initial}
+    </span>
+  );
 
-      <div className="mf-dash-head">
-        {showAvatar ? <span className="mf-dash-avatar">{initial}</span> : null}
-        <div>
-          <p className="mf-dash-title">{config.headline}</p>
-          <p className="mf-dash-sub">{displayName}</p>
+  const skeleton = (
+    <div className="mf-acct-card" aria-busy={true}>
+      <div className="mf-acct-skel is-mid" />
+      <div className="mf-acct-skel is-wide" />
+      <div className="mf-acct-skel" />
+    </div>
+  );
+
+  const notice = (where: string) =>
+    accountNotice && accountNotice.where === where ? (
+      <p className={accountNotice.error ? "mf-dash-error" : "mf-dash-saved"} role={accountNotice.error ? "alert" : "status"}>
+        {accountNotice.text}
+      </p>
+    ) : null;
+
+  /** Asks once, in place, before anything is removed or signed out. */
+  const confirmBlock = (title: string, note: string, action: string, extra?: React.ReactNode) => (
+    <div className="mf-dash-confirm" role="group" aria-label={title}>
+      <p className="mf-dash-confirm-title">{title}</p>
+      <p className="mf-dash-note">{note}</p>
+      {extra}
+      <div className="mf-dash-confirm-actions">
+        <button type="button" className="mf-dash-button" disabled={accountBusy} onClick={() => setConfirm(null)}>
+          {t("cancelAction")}
+        </button>
+        <button
+          type="button"
+          className="mf-dash-button mf-dash-button-danger is-solid"
+          disabled={accountBusy || onCanvas || (confirm?.kind === "delete" && !confirmsDeleteEmail(deleteEmail, member.email))}
+          onClick={() => void runConfirmed(member.email)}
+        >
+          {action}
+        </button>
+      </div>
+    </div>
+  );
+
+  const heading = (title: string, description: string) => (
+    <div className="mf-acct-heading">
+      <p className="mf-acct-title">{title}</p>
+      <p className="mf-acct-desc">{description}</p>
+    </div>
+  );
+
+  const periodSuffix = (interval: string) => (interval === "month" ? " / month" : interval === "year" ? " / year" : "");
+
+  /** When the plan renews, ends, or is past due, in one line. */
+  const renewalLine = (current: NonNullable<BillingSummary["subscription"]>) =>
+    current.status === "past_due"
+      ? t("pastDue").split("{date}").join(formatDate(current.gracePeriodEndsAt))
+      : current.interval === "lifetime"
+        ? t("lifetime")
+        : current.cancelAtPeriodEnd
+          ? t("endsOn").split("{date}").join(formatDate(current.currentPeriodEnd))
+          : renewalOverdue(current.currentPeriodEnd)
+            ? t("renewalPending")
+            : t("renewsOn").split("{date}").join(formatDate(current.currentPeriodEnd));
+
+  const noPlanCard = (current: BillingSummary) => (
+    <div className="mf-acct-card">
+      <p className="mf-dash-saved">{t("noPlan")}</p>
+      {safePath(current.pricingPath) ? (
+        <div className="mf-acct-actions">
+          <button type="button" className="mf-dash-button mf-dash-button-primary" onClick={() => navigate(current.pricingPath)}>
+            {t("seePlans")}
+            <ArrowRight aria-hidden={true} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const navLabel: Record<AccountSection, string> = {
+    overview: t("navOverview"),
+    membership: t("navMembership"),
+    billing: t("navBilling"),
+    bookmarks: t("navBookmarks"),
+    profile: t("navProfile"),
+    security: t("navSecurity"),
+  };
+  const navIcon: Record<AccountSection, React.ReactNode> = {
+    overview: <OverviewIcon />,
+    membership: <Crown aria-hidden={true} />,
+    billing: <ReceiptIcon />,
+    bookmarks: <BookmarkIcon />,
+    profile: <User aria-hidden={true} />,
+    security: <ShieldIcon />,
+  };
+
+  // ---- Overview ----------------------------------------------------------
+
+  const overviewSection = () => (
+    <>
+      {heading(t("overviewTitle").split("{name}").join(firstName), t("overviewDesc"))}
+      <div className="mf-acct-stats">
+        {config.showTier ? (
+          <div className="mf-acct-stat">
+            <span className="mf-acct-stat-icon"><Crown aria-hidden={true} /></span>
+            <div>
+              <p className="mf-acct-stat-label">{t("statPlan")}</p>
+              <p className="mf-acct-stat-value">{memberTier}</p>
+            </div>
+            {showStatus ? <span className={`mf-acct-pill${member.status === "active" ? " is-good" : ""}`}>{statusLabel(member.status, labels)}</span> : null}
+          </div>
+        ) : null}
+        {shown.includes("bookmarks") ? (
+          <div className="mf-acct-stat">
+            <span className="mf-acct-stat-icon"><BookmarkIcon /></span>
+            <div>
+              <p className="mf-acct-stat-label">{t("statSaved")}</p>
+              <p className="mf-acct-stat-value">{bookmarks.phase === "ready" ? savedItems.length : ""}</p>
+            </div>
+          </div>
+        ) : null}
+        <div className="mf-acct-stat">
+          <span className="mf-acct-stat-icon"><Check aria-hidden={true} /></span>
+          <div>
+            <p className="mf-acct-stat-label">{t("statSince")}</p>
+            <p className="mf-acct-stat-value">{accountData ? formatDate(accountData.memberSince) : ""}</p>
+          </div>
         </div>
       </div>
 
-      {showEmail ? (
-        <div className="mf-dash-row">
-          <span className="mf-dash-row-label">{t("emailRow")}</span>
-          <span className="mf-dash-row-value">{member.email}</span>
-        </div>
+      {config.showBilling ? (
+        billing.phase === "loading" || billing.phase === "idle" ? (
+          skeleton
+        ) : summary && plan ? (
+          <div className="mf-acct-card">
+            <div className="mf-acct-plan">
+              <div>
+                <p className="mf-acct-plan-name">
+                  {plan.tierName}
+                  {plan.mode === "test" ? <span className="mf-acct-pill">{t("testPurchase")}</span> : null}
+                </p>
+                <p className="mf-acct-plan-price">
+                  {formatMoney(plan.amountMinor, plan.currency)}
+                  {periodSuffix(plan.interval)}
+                </p>
+              </div>
+              {shown.includes("membership") ? (
+                <button type="button" className="mf-dash-button" onClick={() => goTo("membership")}>
+                  {t("managePlan")}
+                  <ArrowRight aria-hidden={true} />
+                </button>
+              ) : null}
+            </div>
+            <p className={plan.status === "past_due" ? "mf-dash-error" : "mf-dash-saved"}>{renewalLine(plan)}</p>
+          </div>
+        ) : summary ? (
+          noPlanCard(summary)
+        ) : null
       ) : null}
 
-      {config.showTier ? (
-        <div className="mf-dash-row">
-          <span className="mf-dash-row-label">{t("membershipRow")}</span>
-          <span className="mf-dash-row-value">
-            <span className="mf-dash-badge">{tierName(member.activeTier, tiers)}</span>
-          </span>
+      {shown.includes("bookmarks") ? (
+        <div className="mf-acct-card">
+          <div className="mf-acct-card-head">
+            <p className="mf-acct-card-title">{t("recentSaved")}</p>
+            {savedItems.length > 0 ? (
+              <button type="button" className="mf-acct-link" onClick={() => goTo("bookmarks")}>
+                {t("seeAll")}
+                <ArrowRight aria-hidden={true} />
+              </button>
+            ) : null}
+          </div>
+          {bookmarks.phase === "loading" ? (
+            <div className="mf-acct-skel is-wide" />
+          ) : savedItems.length === 0 ? (
+            <p className="mf-dash-saved">{bookmarks.phase === "failed" ? t("bookmarksFailed") : t("noBookmarks")}</p>
+          ) : (
+            <div className="mf-acct-list">
+              {savedItems.slice(0, 3).map((item) => {
+                const href = safeItemHref(item.url);
+                return (
+                  <div className="mf-acct-item" key={item.itemSlug}>
+                    <div className="mf-acct-item-main">
+                      <span className="mf-acct-item-icon"><BookmarkIcon /></span>
+                      <div className="mf-acct-item-text">
+                        {href ? <a className="mf-acct-item-title" href={href}>{item.title}</a> : <span className="mf-acct-item-title">{item.title}</span>}
+                        <span className="mf-acct-item-sub">{t("savedOn").split("{date}").join(formatDate(item.savedAt ? new Date(item.savedAt).toISOString() : null))}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : null}
+    </>
+  );
 
-      {showStatus ? (
-        <div className="mf-dash-row">
-          <span className="mf-dash-row-label">{t("statusRow")}</span>
-          <span className="mf-dash-row-value">{statusLabel(member.status, labels)}</span>
-        </div>
-      ) : null}
+  // ---- Membership --------------------------------------------------------
 
-      {config.showProfile && profile.phase !== "idle" ? (
-        <form
-          className="mf-dash-profile"
-          noValidate
-          aria-labelledby={`mf-dash-profile-${member.memberId}`}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void handleSaveProfile();
-          }}
-        >
-          <p className="mf-dash-profile-title" id={`mf-dash-profile-${member.memberId}`}>
-            {t("profileTitle")}
+  const membershipSection = () => {
+    if (billing.phase === "loading" || billing.phase === "idle") return <>{heading(t("navMembership"), t("membershipDesc"))}{skeleton}</>;
+    if (billing.phase === "failed") {
+      return (
+        <>
+          {heading(t("navMembership"), t("membershipDesc"))}
+          <div className="mf-acct-card"><p className="mf-dash-saved">{t("billingFailed")}</p></div>
+        </>
+      );
+    }
+    const current = billing.summary;
+    if (!current.subscription) return <>{heading(t("navMembership"), t("membershipDesc"))}{noPlanCard(current)}</>;
+    const subscription = current.subscription;
+    const pastDue = subscription.status === "past_due";
+    const currentRank = (current.plans ?? []).find((option) => option.key === subscription.tierKey)?.rank ?? -1;
+    // Paid plans priced for this period, other than the current one.
+    const period = subscription.interval === "year" ? "year" : subscription.interval === "lifetime" ? "lifetime" : "month";
+    const others = (current.plans ?? []).filter(
+      (option) => option.rank > 0 && option.key !== subscription.tierKey && option.prices[period] !== null
+    );
+    return (
+      <>
+        {heading(t("navMembership"), t("membershipDesc"))}
+        <div className="mf-acct-card">
+          <div className="mf-acct-plan">
+            <div>
+              <p className="mf-acct-plan-name">
+                <Crown aria-hidden={true} />
+                {subscription.tierName}
+                {subscription.mode === "test" ? <span className="mf-acct-pill">{t("testPurchase")}</span> : null}
+              </p>
+              <p className="mf-acct-plan-price">
+                {formatMoney(subscription.amountMinor, subscription.currency)}
+                {periodSuffix(subscription.interval)}
+                {subscription.gateway ? ` · ${t("paidWith").split("{gateway}").join(gatewayName(subscription.gateway))}` : ""}
+              </p>
+            </div>
+            {showStatus || pastDue ? <span className={`mf-acct-pill${pastDue ? "" : " is-good"}`}>{statusLabel(pastDue ? "past_due" : member.status, labels)}</span> : null}
+          </div>
+
+          <p className={pastDue ? "mf-dash-error" : "mf-dash-saved"} role={pastDue ? "alert" : undefined}>
+            {renewalLine(subscription)}
           </p>
 
-          {profile.phase === "loading" ? (
-            <p className="mf-dash-saved">{t("profileLoading")}</p>
-          ) : profile.phase === "unavailable" ? (
-            <p className="mf-dash-saved">{t("profileUnavailable")}</p>
-          ) : (
+          {subscription.scheduledTierName ? (
+            <div className="mf-dash-scheduled" role="status">
+              <span>
+                {t("changesTo").split("{tier}").join(subscription.scheduledTierName).split("{date}").join(formatDate(subscription.currentPeriodEnd))}
+              </span>
+              <button
+                type="button"
+                className="mf-dash-button mf-dash-button-small"
+                disabled={billingBusy}
+                onClick={() => void billingAction("undo-change")}
+              >
+                {t("undoChange")}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mf-acct-actions">
+            {/* A failed payment goes straight to the card update. */}
+            {pastDue && subscription.canManage ? (
+              <button
+                type="button"
+                className="mf-dash-button mf-dash-button-primary"
+                disabled={billingBusy || onCanvas}
+                onClick={() => void billingAction("portal")}
+              >
+                <CreditCard aria-hidden={true} />
+                {t("updatePayment")}
+              </button>
+            ) : null}
+            {subscription.canResume ? (
+              <button
+                type="button"
+                className="mf-dash-button mf-dash-button-primary"
+                disabled={billingBusy}
+                onClick={() => void billingAction("resume")}
+              >
+                {t("resumePlan")}
+              </button>
+            ) : null}
+            {allowCancel && subscription.canCancel && !confirmingCancel ? (
+              <button
+                type="button"
+                className="mf-dash-button mf-dash-button-danger"
+                disabled={billingBusy}
+                onClick={() => setConfirmingCancel(true)}
+              >
+                {t("cancelPlan")}
+              </button>
+            ) : null}
+          </div>
+
+          {allowCancel && subscription.canCancel && confirmingCancel ? (
+            // Cancel asks once, in place, with what it means.
+            <div className="mf-dash-confirm" role="group" aria-label={t("cancelPlan")}>
+              <p className="mf-dash-confirm-title">{t("cancelQuestion").split("{tier}").join(subscription.tierName)}</p>
+              <p className="mf-dash-note">{t("cancelKeeps").split("{date}").join(formatDate(subscription.currentPeriodEnd))}</p>
+              <div className="mf-dash-confirm-actions">
+                <button
+                  type="button"
+                  className="mf-dash-button"
+                  disabled={billingBusy}
+                  onClick={() => setConfirmingCancel(false)}
+                >
+                  {t("keepPlan")}
+                </button>
+                <button
+                  type="button"
+                  className="mf-dash-button mf-dash-button-danger is-solid"
+                  disabled={billingBusy}
+                  onClick={() => void billingAction("cancel")}
+                >
+                  {t("confirmCancel")}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {billingNotice ? (
+            <p className={billingNotice.error ? "mf-dash-error" : "mf-dash-saved"} role={billingNotice.error ? "alert" : "status"}>
+              {billingNotice.text}
+            </p>
+          ) : null}
+        </div>
+
+        {others.length > 0 && subscription.interval !== "lifetime" ? (
+          <div className="mf-acct-card">
+            <p className="mf-acct-card-title">{t("changePlan")}</p>
+            <div className="mf-acct-list">
+              {others.map((option) => {
+                const up = option.rank > currentRank;
+                return (
+                  <div className="mf-acct-item" key={option.key}>
+                    <div className="mf-acct-item-text">
+                      <span className="mf-acct-item-title">{option.name}</span>
+                      <span className="mf-acct-item-sub">
+                        {formatMoney(option.prices[period] ?? 0, option.currency)}
+                        {period === "month" ? " / month" : " / year"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`mf-dash-button mf-dash-button-small${up ? " mf-dash-button-primary" : ""}`}
+                      disabled={billingBusy || switchTo?.kind === "loading" || Boolean(subscription.scheduledTierName && !up)}
+                      onClick={() => void previewChange(option.key, option.name, period)}
+                    >
+                      {up ? t("upgrade") : t("downgrade")}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {switchTo && switchTo.kind !== "loading" ? (
+              // What the switch costs, before it happens.
+              <div className="mf-dash-confirm mf-dash-confirm-change" role="group" aria-label={switchTo.name}>
+                {switchTo.kind === "downgrade" ? (
+                  <p className="mf-dash-note">
+                    {t("downgradeNote").split("{tier}").join(switchTo.name).split("{date}").join(formatDate(switchTo.effectiveAt ?? null))}
+                  </p>
+                ) : switchTo.summary ? (
+                  <div className="mf-dash-breakdown">
+                    <span>{switchTo.name}</span>
+                    <span>{formatMoney(switchTo.summary.amountMinor, switchTo.summary.currency)}</span>
+                    {(switchTo.summary.creditMinor ?? 0) > 0 ? (
+                      <>
+                        <span className="mf-dash-muted">{t("creditLine").split("{plan}").join(switchTo.summary.creditFrom ?? subscription.tierName)}</span>
+                        <span className="mf-dash-muted">-{formatMoney(switchTo.summary.creditMinor ?? 0, switchTo.summary.currency)}</span>
+                      </>
+                    ) : null}
+                    <strong>{t("dueToday")}</strong>
+                    <strong>{formatMoney(switchTo.summary.dueMinor ?? switchTo.summary.amountMinor, switchTo.summary.currency)}</strong>
+                    <span className="mf-dash-muted mf-dash-breakdown-wide">
+                      {t("thenEvery")
+                        .split("{price}")
+                        .join(formatMoney(switchTo.summary.amountMinor, switchTo.summary.currency))
+                        .split("{period}")
+                        .join(switchTo.summary.interval === "year" ? "year" : "month")}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="mf-dash-confirm-actions">
+                  <button type="button" className="mf-dash-button" disabled={billingBusy} onClick={() => setSwitchTo(null)}>
+                    {t("notNow")}
+                  </button>
+                  <button
+                    type="button"
+                    className="mf-dash-button mf-dash-button-primary"
+                    disabled={billingBusy}
+                    onClick={() => void confirmChange(current.pricingPath)}
+                  >
+                    {switchTo.kind === "downgrade" ? t("confirmDowngrade") : t("confirmUpgrade")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
+  // ---- Billing -----------------------------------------------------------
+
+  const billingSection = () => {
+    if (billing.phase === "loading" || billing.phase === "idle") return <>{heading(t("navBilling"), t("billingDesc"))}{skeleton}</>;
+    if (billing.phase === "failed") {
+      return (
+        <>
+          {heading(t("navBilling"), t("billingDesc"))}
+          <div className="mf-acct-card"><p className="mf-dash-saved">{t("billingFailed")}</p></div>
+        </>
+      );
+    }
+    const current = billing.summary;
+    const subscription = current.subscription;
+    const historyPlans = current.history?.plans ?? [];
+    const credits = current.history?.credits ?? [];
+    return (
+      <>
+        {heading(t("navBilling"), t("billingDesc"))}
+        {subscription && subscription.canManage ? (
+          <div className="mf-acct-card">
+            <div className="mf-acct-plan">
+              <div className="mf-acct-item-main">
+                <span className="mf-acct-item-icon"><CreditCard aria-hidden={true} /></span>
+                <div className="mf-acct-item-text">
+                  <span className="mf-acct-item-title">{t("updateMethod")}</span>
+                  {subscription.gateway ? <span className="mf-acct-item-sub">{t("paidWith").split("{gateway}").join(gatewayName(subscription.gateway))}</span> : null}
+                </div>
+              </div>
+              <button type="button" className="mf-dash-button" disabled={billingBusy || onCanvas} onClick={() => void billingAction("portal")}>
+                {t("manageBilling")}
+                <ExternalIcon />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {showPaymentHistory ? (
+          <div className="mf-acct-card">
+            <p className="mf-acct-card-title">{t("history")}</p>
+            {current.payments.length === 0 ? (
+              <p className="mf-dash-saved">{t("noPayments")}</p>
+            ) : (
+              <div className="mf-acct-list">
+                {current.payments.map((payment) => (
+                  <div className="mf-acct-item" key={payment.id}>
+                    <div className="mf-acct-item-main">
+                      <span className="mf-acct-item-icon"><ReceiptIcon /></span>
+                      <div className="mf-acct-item-text">
+                        <span className="mf-acct-item-title">{formatDate(payment.paidAt)}</span>
+                        <span className="mf-acct-item-sub">
+                          {[payment.planName, gatewayName(payment.gateway), payment.mode === "test" ? t("testPurchase") : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mf-acct-item-end">
+                      {payment.status === "refunded" ? <span className="mf-acct-pill">{t("refunded")}</span> : null}
+                      <span>
+                        {payment.status === "credited" ? "-" : ""}
+                        {formatMoney(payment.amountMinor, payment.currency)}
+                      </span>
+                      {payment.receiptUrl && /^https:\/\//.test(payment.receiptUrl) ? (
+                        <a className="mf-dash-link" href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
+                          {t("receipt")}
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {showPaymentHistory && historyPlans.length > 0 ? (
+          <div className="mf-acct-card">
+            <p className="mf-acct-card-title">{t("plansTitle")}</p>
+            <div className="mf-acct-list">
+              {current.history!.plans.map((entry, index) => (
+                <div className="mf-acct-item" key={`plan-${index}`}>
+                  <div className="mf-acct-item-text">
+                    <span className="mf-acct-item-title">
+                      {entry.planName}
+                      {entry.interval === "month" ? ", monthly" : entry.interval === "year" ? ", yearly" : ", lifetime"}
+                    </span>
+                    <span className="mf-acct-item-sub">
+                      {[gatewayName(entry.gateway), formatDate(entry.startedAt), entry.mode === "test" ? t("testPurchase") : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </div>
+                  <span className={`mf-acct-pill${entry.status === "ended" ? "" : " is-good"}`}>{entry.status === "ended" ? t("planEnded") : t("planActive")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {showPaymentHistory && credits.length > 0 ? (
+          <div className="mf-acct-card">
+            <div className="mf-acct-list">
+              {current.history!.credits.map((credit, index) => (
+                <div className="mf-acct-item" key={`credit-${index}`}>
+                  <div className="mf-acct-item-text">
+                    <span className="mf-acct-item-title">{t("creditedLine")}</span>
+                    <span className="mf-acct-item-sub">
+                      {[credit.planName, gatewayName(credit.gateway), formatDate(credit.at)].filter(Boolean).join(" · ")}
+                    </span>
+                  </div>
+                  <span className="mf-acct-item-end">-{formatMoney(credit.amountMinor, credit.currency)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
+  // ---- Bookmarks ---------------------------------------------------------
+
+  const bookmarksSection = () => {
+    const query = bookmarkQuery.trim().toLowerCase();
+    const matching = query === "" ? savedItems : savedItems.filter((item) => `${item.title} ${item.url}`.toLowerCase().includes(query));
+    return (
+      <>
+        {heading(t("navBookmarks"), t("bookmarksDesc"))}
+        <div className="mf-acct-card">
+          {savedItems.length > 0 ? (
+            <div className="mf-acct-search">
+              <SearchIcon />
+              <input
+                className="mf-dash-input"
+                type="search"
+                placeholder={t("searchSaved")}
+                aria-label={t("searchSaved")}
+                value={bookmarkQuery}
+                onChange={(event) => setBookmarkQuery(event.currentTarget.value)}
+              />
+            </div>
+          ) : null}
+          {notice("bookmarks")}
+          {bookmarks.phase === "loading" || bookmarks.phase === "idle" ? (
             <>
+              <div className="mf-acct-skel is-wide" />
+              <div className="mf-acct-skel is-mid" />
+            </>
+          ) : bookmarks.phase === "failed" ? (
+            <p className="mf-dash-saved">{t("bookmarksFailed")}</p>
+          ) : matching.length === 0 ? (
+            <div className="mf-acct-empty">
+              <span className="mf-acct-item-icon"><BookmarkIcon /></span>
+              <p>{savedItems.length === 0 ? t("noBookmarks") : t("noMatches")}</p>
+            </div>
+          ) : (
+            <div className="mf-acct-list">
+              {matching.map((item) => {
+                const href = safeItemHref(item.url);
+                return (
+                  <div className="mf-acct-item" key={item.itemSlug}>
+                    <div className="mf-acct-item-main">
+                      <span className="mf-acct-item-icon"><BookmarkIcon /></span>
+                      <div className="mf-acct-item-text">
+                        {href ? <a className="mf-acct-item-title" href={href}>{item.title}</a> : <span className="mf-acct-item-title">{item.title}</span>}
+                        <span className="mf-acct-item-sub">{t("savedOn").split("{date}").join(formatDate(item.savedAt ? new Date(item.savedAt).toISOString() : null))}</span>
+                      </div>
+                    </div>
+                    <div className="mf-acct-item-end">
+                      <button
+                        type="button"
+                        className="mf-dash-button mf-dash-button-small mf-dash-button-danger"
+                        disabled={onCanvas}
+                        aria-label={`${t("removeBookmark")} ${item.title}`}
+                        onClick={() => void removeBookmark(item)}
+                      >
+                        <TrashIcon />
+                        {t("removeBookmark")}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
+
+  // ---- Profile -----------------------------------------------------------
+
+  const profileSection = () => (
+    <>
+      {heading(t("navProfile"), t("profileDesc"))}
+
+      {photoUpload ? (
+        <div className="mf-acct-card">
+          <p className="mf-acct-card-title">{t("photoTitle")}</p>
+          <div className="mf-acct-photo">
+            {avatar(true)}
+            <div className="mf-acct-photo-text">
+              <div className="mf-acct-actions">
+                <button type="button" className="mf-dash-button" disabled={accountBusy || onCanvas} onClick={() => fileRef.current?.click()}>
+                  <CameraIcon />
+                  {avatarUrl ? t("changePhoto") : t("uploadPhoto")}
+                </button>
+                {avatarUrl ? (
+                  <button type="button" className="mf-dash-button mf-dash-button-danger" disabled={accountBusy} onClick={() => setConfirm({ kind: "photo" })}>
+                    {t("removePhoto")}
+                  </button>
+                ) : null}
+              </div>
+              <p className="mf-dash-saved">{t("photoHint")}</p>
+            </div>
+            <input
+              ref={fileRef}
+              className="mf-acct-file"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              tabIndex={-1}
+              aria-hidden={true}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (file) void uploadPhoto(file);
+              }}
+            />
+          </div>
+          {confirm?.kind === "photo" ? confirmBlock(t("removePhotoQuestion"), t("photoHint"), t("removePhoto")) : null}
+          {notice("photo")}
+        </div>
+      ) : null}
+
+      <form
+        className="mf-acct-card mf-acct-form"
+        noValidate
+        aria-labelledby={`mf-dash-profile-${member.memberId}`}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSaveProfile();
+        }}
+      >
+        <p className="mf-acct-card-title" id={`mf-dash-profile-${member.memberId}`}>
+          {t("profileTitle")}
+        </p>
+
+        {profile.phase === "loading" || profile.phase === "idle" ? (
+          <p className="mf-dash-saved">{t("profileLoading")}</p>
+        ) : profile.phase === "unavailable" ? (
+          <p className="mf-dash-saved">{t("profileUnavailable")}</p>
+        ) : (
+          <>
+            <div className="mf-acct-grid">
               <div className="mf-dash-field">
                 <label className="mf-dash-label" htmlFor={`mf-dash-name-${member.memberId}`}>
                   {t("nameLabel")}
@@ -2522,29 +3853,40 @@ export default function MemberDashboard(
                   }}
                 />
               </div>
-
-              {profile.fields
-                .filter((field) => isFieldVisible(field, profileValues))
-                .map((field) => (
-                  <ProfileControl
-                    key={field.key}
-                    id={`mf-dash-${member.memberId}-${field.key}`}
-                    field={field}
-                    value={profileValues[field.key]}
-                    error={profileProblems[field.key]}
-                    disabled={profileSaving}
-                    onChange={(value) => setProfileValue(field.key, value)}
-                    optionalLabel={t("optional")}
-                    chooseLabel={t("chooseOne")}
-                  />
-                ))}
-
-              {profileNotice ? (
-                <p className={profileNotice.ok ? "mf-dash-saved" : "mf-dash-error"} role="status">
-                  {profileNotice.text}
-                </p>
+              {showEmail ? (
+                <div className="mf-dash-field">
+                  <span className="mf-dash-label">{t("emailLabel")}</span>
+                  <div className="mf-acct-readonly">
+                    <strong>{member.email}</strong>
+                    <span>{t("emailFixed")}</span>
+                  </div>
+                </div>
               ) : null}
+            </div>
 
+            {profile.fields
+              .filter((field) => isFieldVisible(field, profileValues))
+              .map((field) => (
+                <ProfileControl
+                  key={field.key}
+                  id={`mf-dash-${member.memberId}-${field.key}`}
+                  field={field}
+                  value={profileValues[field.key]}
+                  error={profileProblems[field.key]}
+                  disabled={profileSaving}
+                  onChange={(value) => setProfileValue(field.key, value)}
+                  optionalLabel={t("optional")}
+                  chooseLabel={t("chooseOne")}
+                />
+              ))}
+
+            {profileNotice ? (
+              <p className={profileNotice.ok ? "mf-dash-saved" : "mf-dash-error"} role="status">
+                {profileNotice.text}
+              </p>
+            ) : null}
+
+            <div className="mf-acct-actions">
               <button
                 type="submit"
                 className="mf-dash-button mf-dash-button-primary"
@@ -2552,400 +3894,278 @@ export default function MemberDashboard(
               >
                 {profileSaving ? t("saving") : t("saveProfile")}
               </button>
-            </>
-          )}
-        </form>
-      ) : null}
-
-      {config.showBilling && billing.phase !== "idle" ? (
-        <section className="mf-dash-billing" aria-labelledby={`mf-dash-billing-${member.memberId}`}>
-          <p className="mf-dash-profile-title" id={`mf-dash-billing-${member.memberId}`}>
-            {t("billingTitle")}
-          </p>
-
-          {billing.phase === "loading" ? (
-            <p className="mf-dash-saved">{t("profileLoading")}</p>
-          ) : billing.phase === "failed" ? (
-            <p className="mf-dash-saved">{t("billingFailed")}</p>
-          ) : billing.summary.subscription === null ? (
-            <div className="mf-dash-billing-plan">
-              <p className="mf-dash-note">{t("noPlan")}</p>
-              {safePath(billing.summary.pricingPath) ? (
-                <button
-                  type="button"
-                  className="mf-dash-button mf-dash-button-primary"
-                  onClick={() => navigate(billing.summary.pricingPath)}
-                >
-                  {t("seePlans")}
-                </button>
-              ) : null}
             </div>
+          </>
+        )}
+      </form>
+    </>
+  );
+
+  // ---- Security ----------------------------------------------------------
+
+  const securitySection = () => {
+    if (!accountData) {
+      return (
+        <>
+          {heading(t("navSecurity"), t("securityDesc"))}
+          {account.phase === "failed" ? <div className="mf-acct-card"><p className="mf-dash-saved">{t("actionFailed")}</p></div> : skeleton}
+        </>
+      );
+    }
+    const hasPassword = accountData.hasPassword;
+    const others = accountData.sessions.filter((entry) => !entry.current);
+    return (
+      <>
+        {heading(t("navSecurity"), t("securityDesc"))}
+
+        <form
+          className="mf-acct-card mf-acct-form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            void changePassword(hasPassword);
+          }}
+        >
+          <div className="mf-acct-card-head">
+            <p className="mf-acct-card-title">{t("passwordTitle")}</p>
+            <span className="mf-acct-item-icon"><KeyIcon /></span>
+          </div>
+          {!hasPassword ? <p className="mf-dash-saved">{t("passwordSetNote")}</p> : null}
+          {hasPassword ? (
+            <div className="mf-dash-field">
+              <label className="mf-dash-label" htmlFor={`mf-acct-current-${member.memberId}`}>{t("currentPassword")}</label>
+              <input
+                id={`mf-acct-current-${member.memberId}`}
+                className="mf-dash-input"
+                type="password"
+                autoComplete="current-password"
+                value={password.current}
+                disabled={accountBusy}
+                onChange={(event) => setPassword({ ...password, current: event.currentTarget.value })}
+              />
+            </div>
+          ) : null}
+          <div className="mf-acct-grid">
+            <div className="mf-dash-field">
+              <label className="mf-dash-label" htmlFor={`mf-acct-new-${member.memberId}`}>{t("newPassword")}</label>
+              <input
+                id={`mf-acct-new-${member.memberId}`}
+                className="mf-dash-input"
+                type="password"
+                autoComplete="new-password"
+                value={password.next}
+                disabled={accountBusy}
+                onChange={(event) => setPassword({ ...password, next: event.currentTarget.value })}
+              />
+            </div>
+            <div className="mf-dash-field">
+              <label className="mf-dash-label" htmlFor={`mf-acct-again-${member.memberId}`}>{t("confirmPassword")}</label>
+              <input
+                id={`mf-acct-again-${member.memberId}`}
+                className="mf-dash-input"
+                type="password"
+                autoComplete="new-password"
+                value={password.again}
+                disabled={accountBusy}
+                onChange={(event) => setPassword({ ...password, again: event.currentTarget.value })}
+              />
+            </div>
+          </div>
+          {notice("password")}
+          <div className="mf-acct-actions">
+            <button
+              type="submit"
+              className="mf-dash-button mf-dash-button-primary"
+              disabled={accountBusy || onCanvas || password.next === "" || (hasPassword && password.current === "")}
+            >
+              {hasPassword ? t("changePassword") : t("setPassword")}
+            </button>
+          </div>
+        </form>
+
+        <div className="mf-acct-card">
+          <p className="mf-acct-card-title">{t("methodsTitle")}</p>
+          {accountData.identities.length === 0 ? (
+            <p className="mf-dash-saved">{t("methodsNone")}</p>
           ) : (
-            (() => {
-              const plan = billing.summary.subscription;
-              const pastDue = plan.status === "past_due";
-              return (
-                <div className="mf-dash-billing-plan">
-                  <div className="mf-dash-row">
-                    <span className="mf-dash-row-label">
-                      {plan.tierName}
-                      {plan.mode === "test" ? <span className="mf-dash-optional">{t("testPurchase")}</span> : null}
-                    </span>
-                    <span className="mf-dash-row-value">
-                      {formatMoney(plan.amountMinor, plan.currency)}
-                      {plan.interval === "month" ? " / month" : plan.interval === "year" ? " / year" : ""}
-                    </span>
-                  </div>
-
-                  <p className={pastDue ? "mf-dash-error" : "mf-dash-saved"} role={pastDue ? "alert" : undefined}>
-                    {pastDue
-                      ? t("pastDue").split("{date}").join(formatDate(plan.gracePeriodEndsAt))
-                      : plan.interval === "lifetime"
-                        ? t("lifetime")
-                        : plan.cancelAtPeriodEnd
-                          ? t("endsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))
-                          : renewalOverdue(plan.currentPeriodEnd)
-                            ? t("renewalPending")
-                            : t("renewsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))}
-                  </p>
-
-                  {/* A failed payment goes straight to the card update; everything
-                      else opens the subscription popup. */}
-                  {pastDue && plan.canManage ? (
+            <div className="mf-acct-list">
+              {accountData.identities.map((identity) => {
+                const lastWay = !hasPassword && accountData.identities.length === 1;
+                return (
+                  <div className="mf-acct-item" key={identity.provider}>
+                    <div className="mf-acct-item-main">
+                      <span className="mf-acct-item-icon"><LinkIcon /></span>
+                      <div className="mf-acct-item-text">
+                        <span className="mf-acct-item-title">{providerName(identity.provider)}</span>
+                        <span className="mf-acct-item-sub">
+                          {[identity.email, identity.createdAt ? t("connectedOn").split("{date}").join(formatDate(identity.createdAt)) : null].filter(Boolean).join(" · ")}
+                        </span>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      className="mf-dash-button mf-dash-button-primary"
-                      disabled={billingBusy || onCanvas}
-                      onClick={() => void billingAction("portal")}
+                      className="mf-dash-button mf-dash-button-small"
+                      disabled={accountBusy || lastWay}
+                      title={lastWay ? t("unlinkLast") : undefined}
+                      onClick={() => setConfirm({ kind: "unlink", provider: identity.provider })}
                     >
-                      <CreditCard aria-hidden={true} />
-                      {t("updatePayment")}
+                      {t("unlink")}
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="mf-dash-button"
-                    disabled={onCanvas}
-                    onClick={() => setBillingOpen(true)}
-                  >
-                    <CreditCard aria-hidden={true} />
-                    {t("manageBilling")}
-                  </button>
-
-                </div>
-              );
-            })()
-          )}
-
-          {billingOpen && billing.phase === "ready" && billing.summary.subscription ? (
-            (() => {
-              const plan = billing.summary.subscription;
-              const summary = billing.summary;
-              const currentRank = (summary.plans ?? []).find((option) => option.key === plan.tierKey)?.rank ?? -1;
-              // Paid plans priced for this period, other than the current one.
-              const period = plan.interval === "year" ? "year" : plan.interval === "lifetime" ? "lifetime" : "month";
-              const others = (summary.plans ?? []).filter(
-                (option) => option.rank > 0 && option.key !== plan.tierKey && option.prices[period] !== null
-              );
-              return (
-                <div
-                  className="mf-dash-modal"
-                  onClick={(event) => {
-                    if (event.target === event.currentTarget) closeBilling();
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      event.stopPropagation();
-                      closeBilling();
-                    }
-                  }}
-                >
-                  <div
-                    className="mf-dash-modal-card"
-                    ref={billingRef}
-                    role="dialog"
-                    aria-modal={true}
-                    aria-labelledby={`mf-dash-sub-${member.memberId}`}
-                  >
-                    <div className="mf-dash-modal-head">
-                      <p className="mf-dash-profile-title" id={`mf-dash-sub-${member.memberId}`}>
-                        {t("subscriptionTitle")}
-                      </p>
-                      <button type="button" className="mf-dash-modal-close" aria-label={t("closeBilling")} onClick={closeBilling}>
-                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" aria-hidden={true} data-lucide="x">
-                          <path d="M18 6 6 18" />
-                          <path d="m6 6 12 12" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    <div className="mf-dash-modal-plan">
-                      <div className="mf-dash-row">
-                        <span className="mf-dash-row-label">
-                          {plan.tierName}
-                          {plan.mode === "test" ? <span className="mf-dash-optional">{t("testPurchase")}</span> : null}
-                        </span>
-                        <span className="mf-dash-row-value">
-                          {formatMoney(plan.amountMinor, plan.currency)}
-                          {plan.interval === "month" ? " / month" : plan.interval === "year" ? " / year" : ""}
-                        </span>
-                      </div>
-                      {plan.gateway ? (
-                        <p className="mf-dash-saved">{t("paidWith").split("{gateway}").join(gatewayName(plan.gateway))}</p>
-                      ) : null}
-                      {plan.scheduledTierName ? (
-                        <div className="mf-dash-scheduled" role="status">
-                          <span>
-                            {t("changesTo").split("{tier}").join(plan.scheduledTierName).split("{date}").join(formatDate(plan.currentPeriodEnd))}
-                          </span>
-                          <button
-                            type="button"
-                            className="mf-dash-button mf-dash-button-small"
-                            disabled={billingBusy}
-                            onClick={() => void billingAction("undo-change")}
-                          >
-                            {t("undoChange")}
-                          </button>
-                        </div>
-                      ) : null}
-                      <p className="mf-dash-saved">
-                        {plan.interval === "lifetime"
-                          ? t("lifetime")
-                          : plan.cancelAtPeriodEnd
-                            ? t("endsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))
-                            : renewalOverdue(plan.currentPeriodEnd)
-                            ? t("renewalPending")
-                            : t("renewsOn").split("{date}").join(formatDate(plan.currentPeriodEnd))}
-                      </p>
-                      <div className="mf-dash-modal-actions">
-                        {plan.canManage ? (
-                          <button
-                            type="button"
-                            className="mf-dash-button"
-                            disabled={billingBusy}
-                            onClick={() => void billingAction("portal")}
-                          >
-                            <CreditCard aria-hidden={true} />
-                            {t("updateMethod")}
-                          </button>
-                        ) : null}
-                        {plan.canResume ? (
-                          <button
-                            type="button"
-                            className="mf-dash-button mf-dash-button-primary"
-                            disabled={billingBusy}
-                            onClick={() => void billingAction("resume")}
-                          >
-                            {t("resumePlan")}
-                          </button>
-                        ) : null}
-                        {allowCancel && plan.canCancel && !confirmingCancel ? (
-                          <button
-                            type="button"
-                            className="mf-dash-button mf-dash-button-danger"
-                            disabled={billingBusy}
-                            onClick={() => setConfirmingCancel(true)}
-                          >
-                            {t("cancelPlan")}
-                          </button>
-                        ) : null}
-                        {allowCancel && plan.canCancel && confirmingCancel ? (
-                          // Cancel asks once, in place, with what it means.
-                          <div className="mf-dash-confirm" role="group" aria-label={t("cancelPlan")}>
-                            <p className="mf-dash-confirm-title">{t("cancelQuestion").split("{tier}").join(plan.tierName)}</p>
-                            <p className="mf-dash-note">{t("cancelKeeps").split("{date}").join(formatDate(plan.currentPeriodEnd))}</p>
-                            <div className="mf-dash-confirm-actions">
-                              <button
-                                type="button"
-                                className="mf-dash-button"
-                                disabled={billingBusy}
-                                onClick={() => setConfirmingCancel(false)}
-                              >
-                                {t("keepPlan")}
-                              </button>
-                              <button
-                                type="button"
-                                className="mf-dash-button mf-dash-button-danger is-solid"
-                                disabled={billingBusy}
-                                onClick={() => void billingAction("cancel")}
-                              >
-                                {t("confirmCancel")}
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {billingNotice ? (
-                      <p className={billingNotice.error ? "mf-dash-error" : "mf-dash-saved"} role={billingNotice.error ? "alert" : "status"}>
-                        {billingNotice.text}
-                      </p>
-                    ) : null}
-
-                    {others.length > 0 && plan.interval !== "lifetime" ? (
-                      <div className="mf-dash-modal-section">
-                        <p className="mf-dash-label">{t("changePlan")}</p>
-                        {others.map((option) => {
-                          const up = option.rank > currentRank;
-                          return (
-                            <div className="mf-dash-row" key={option.key}>
-                              <span className="mf-dash-row-label">
-                                {option.name}
-                                <span className="mf-dash-optional">
-                                  {formatMoney(option.prices[period] ?? 0, option.currency)}
-                                  {period === "month" ? " / month" : " / year"}
-                                </span>
-                              </span>
-                              <button
-                                type="button"
-                                className={`mf-dash-button mf-dash-button-small${up ? " mf-dash-button-primary" : ""}`}
-                                disabled={billingBusy || switchTo?.kind === "loading" || Boolean(plan.scheduledTierName && !up)}
-                                onClick={() => void previewChange(option.key, option.name, period)}
-                              >
-                                {up ? t("upgrade") : t("downgrade")}
-                              </button>
-                            </div>
-                          );
-                        })}
-
-                        {switchTo && switchTo.kind !== "loading" ? (
-                          // What the switch costs, before it happens.
-                          <div className="mf-dash-confirm mf-dash-confirm-change" role="group" aria-label={switchTo.name}>
-                            {switchTo.kind === "downgrade" ? (
-                              <p className="mf-dash-note">
-                                {t("downgradeNote").split("{tier}").join(switchTo.name).split("{date}").join(formatDate(switchTo.effectiveAt ?? null))}
-                              </p>
-                            ) : switchTo.summary ? (
-                              <div className="mf-dash-breakdown">
-                                <span>{switchTo.name}</span>
-                                <span>{formatMoney(switchTo.summary.amountMinor, switchTo.summary.currency)}</span>
-                                {(switchTo.summary.creditMinor ?? 0) > 0 ? (
-                                  <>
-                                    <span className="mf-dash-muted">{t("creditLine").split("{plan}").join(switchTo.summary.creditFrom ?? plan.tierName)}</span>
-                                    <span className="mf-dash-muted">-{formatMoney(switchTo.summary.creditMinor ?? 0, switchTo.summary.currency)}</span>
-                                  </>
-                                ) : null}
-                                <strong>{t("dueToday")}</strong>
-                                <strong>{formatMoney(switchTo.summary.dueMinor ?? switchTo.summary.amountMinor, switchTo.summary.currency)}</strong>
-                                <span className="mf-dash-muted mf-dash-breakdown-wide">
-                                  {t("thenEvery")
-                                    .split("{price}")
-                                    .join(formatMoney(switchTo.summary.amountMinor, switchTo.summary.currency))
-                                    .split("{period}")
-                                    .join(switchTo.summary.interval === "year" ? "year" : "month")}
-                                </span>
-                              </div>
-                            ) : null}
-                            <div className="mf-dash-confirm-actions">
-                              <button type="button" className="mf-dash-button" disabled={billingBusy} onClick={() => setSwitchTo(null)}>
-                                {t("notNow")}
-                              </button>
-                              <button
-                                type="button"
-                                className="mf-dash-button mf-dash-button-primary"
-                                disabled={billingBusy}
-                                onClick={() => void confirmChange(summary.pricingPath)}
-                              >
-                                {switchTo.kind === "downgrade" ? t("confirmDowngrade") : t("confirmUpgrade")}
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {showPaymentHistory && (summary.history?.plans.length ?? 0) > 0 ? (
-                      <div className="mf-dash-modal-section">
-                        <p className="mf-dash-label">{t("plansTitle")}</p>
-                        {summary.history!.plans.map((entry, index) => (
-                          <div className="mf-dash-row mf-dash-history-row" key={`plan-${index}`}>
-                            <span className="mf-dash-row-label">
-                              {entry.planName}
-                              {entry.interval === "month" ? ", monthly" : entry.interval === "year" ? ", yearly" : ", lifetime"}
-                              <span className="mf-dash-optional">
-                                {[gatewayName(entry.gateway), formatDate(entry.startedAt), entry.mode === "test" ? t("testPurchase") : null]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </span>
-                            </span>
-                            <span className="mf-dash-row-value">{entry.status === "ended" ? t("planEnded") : t("planActive")}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {showPaymentHistory && (summary.history?.credits.length ?? 0) > 0 ? (
-                      <div className="mf-dash-modal-section">
-                        {summary.history!.credits.map((credit, index) => (
-                          <div className="mf-dash-row mf-dash-history-row" key={`credit-${index}`}>
-                            <span className="mf-dash-row-label">
-                              {t("creditedLine")}
-                              <span className="mf-dash-optional">
-                                {[credit.planName, gatewayName(credit.gateway), formatDate(credit.at)].filter(Boolean).join(" · ")}
-                              </span>
-                            </span>
-                            <span className="mf-dash-row-value">-{formatMoney(credit.amountMinor, credit.currency)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {showPaymentHistory && summary.payments.length > 0 ? (
-                      <div className="mf-dash-modal-section">
-                        <p className="mf-dash-label">{t("history")}</p>
-                        {summary.payments.map((payment) => (
-                          <div className="mf-dash-row mf-dash-history-row" key={payment.id}>
-                            <span className="mf-dash-row-label">
-                              {formatDate(payment.paidAt)}
-                              <span className="mf-dash-optional">
-                                {[payment.planName, gatewayName(payment.gateway), payment.mode === "test" ? t("testPurchase") : null]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </span>
-                            </span>
-                            <span className="mf-dash-row-value">
-                              {payment.status === "refunded" ? `${t("refunded")} ` : ""}
-                              {payment.status === "credited" ? "-" : ""}
-                              {formatMoney(payment.amountMinor, payment.currency)}
-                              {payment.receiptUrl && /^https:\/\//.test(payment.receiptUrl) ? (
-                                <>
-                                  {" "}
-                                  <a className="mf-dash-link" href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
-                                    {t("receipt")}
-                                  </a>
-                                </>
-                              ) : null}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
+                );
+              })}
+            </div>
+          )}
+          {confirm?.kind === "unlink"
+            ? confirmBlock(
+                t("unlinkQuestion").split("{provider}").join(providerName(confirm.provider)),
+                t("unlinkNote").split("{provider}").join(providerName(confirm.provider)),
+                t("unlink")
+              )
+            : null}
+          {notice("security")}
+        </div>
+
+        <div className="mf-acct-card">
+          <div className="mf-acct-card-head">
+            <p className="mf-acct-card-title">{t("devicesTitle")}</p>
+            {others.length > 0 ? (
+              <button type="button" className="mf-acct-link" disabled={accountBusy} onClick={() => setConfirm({ kind: "everywhere" })}>
+                {t("signOutEverywhere")}
+              </button>
+            ) : null}
+          </div>
+          <div className="mf-acct-list">
+            {accountData.sessions.map((entry) => {
+              const phone = /iPhone|Android|iPad/.test(entry.device);
+              return (
+                <div className="mf-acct-item" key={entry.id}>
+                  <div className="mf-acct-item-main">
+                    <span className="mf-acct-item-icon">{phone ? <PhoneIcon /> : <MonitorIcon />}</span>
+                    <div className="mf-acct-item-text">
+                      <span className="mf-acct-item-title">{entry.device}</span>
+                      <span className="mf-acct-item-sub">
+                        {entry.current ? t("thisDevice") : t("lastActive").split("{date}").join(formatDate(entry.lastSeenAt ?? entry.createdAt))}
+                      </span>
+                    </div>
+                  </div>
+                  {entry.current ? (
+                    <span className="mf-acct-pill is-accent">{t("thisDevice")}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="mf-dash-button mf-dash-button-small"
+                      disabled={accountBusy}
+                      onClick={() => setConfirm({ kind: "device", id: entry.id, device: entry.device })}
+                    >
+                      {t("signOutDevice")}
+                    </button>
+                  )}
                 </div>
               );
-            })()
-          ) : null}
-        </section>
-      ) : null}
+            })}
+          </div>
+          {confirm?.kind === "device"
+            ? confirmBlock(t("signOutDeviceQuestion").split("{device}").join(confirm.device), t("signOutDeviceNote"), t("signOutDevice"))
+            : null}
+          {confirm?.kind === "everywhere" ? confirmBlock(t("signOutEverywhere"), t("signOutEverywhereNote"), t("signOutEverywhere")) : null}
+        </div>
 
-      {config.showSignOut ? (
-        <button
-          type="button"
-          className={
-            signOutStyle === "filled"
-              ? "mf-dash-button mf-dash-button-primary"
-              : signOutStyle === "text"
-                ? "mf-dash-button mf-dash-button-text"
-                : "mf-dash-button"
-          }
-          disabled={busy}
-          onClick={() => void handleSignOut()}
-        >
-          <LogOut aria-hidden={true} />
-          {busy ? t("signingOut") : t("signOut")}
-        </button>
-      ) : null}
+        {deleteAllowed ? (
+          <div className="mf-acct-card is-danger">
+            <div className="mf-acct-card-head">
+              <p className="mf-acct-card-title">{t("dangerTitle")}</p>
+              <span className="mf-acct-item-icon"><AlertIcon /></span>
+            </div>
+            <p className="mf-dash-saved">{t("deleteNote")}</p>
+            {confirm?.kind === "delete" ? (
+              confirmBlock(
+                t("dangerTitle"),
+                t("deleteNote"),
+                t("deleteFinal"),
+                <div className="mf-dash-field">
+                  <label className="mf-dash-label" htmlFor={`mf-acct-delete-${member.memberId}`}>
+                    {t("deleteConfirmLabel").split("{email}").join(member.email)}
+                  </label>
+                  <input
+                    id={`mf-acct-delete-${member.memberId}`}
+                    className="mf-dash-input"
+                    type="email"
+                    autoComplete="off"
+                    value={deleteEmail}
+                    disabled={accountBusy}
+                    onChange={(event) => setDeleteEmail(event.currentTarget.value)}
+                  />
+                </div>
+              )
+            ) : (
+              <div className="mf-acct-actions">
+                <button type="button" className="mf-dash-button mf-dash-button-danger" disabled={accountBusy} onClick={() => setConfirm({ kind: "delete" })}>
+                  <TrashIcon />
+                  {t("deleteButton")}
+                </button>
+              </div>
+            )}
+            {notice("delete")}
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
+  const renderSection: Record<AccountSection, () => React.ReactNode> = {
+    overview: overviewSection,
+    membership: membershipSection,
+    billing: billingSection,
+    bookmarks: bookmarksSection,
+    profile: profileSection,
+    security: securitySection,
+  };
+
+  return (
+    <div className={`${rootClass} is-account`} data-mf-dash={styled.scope} data-mf-instance={scope}>
+      {style}
+      <div className={`mf-acct is-nav-${navigation === "sidebar" || navigation === "top" ? navigation : "auto"}`}>
+        <div className="mf-acct-side">
+          <div className="mf-acct-who">
+            {showAvatar ? avatar(false) : null}
+            <div className="mf-acct-who-text">
+              <p className="mf-acct-name">{displayName}</p>
+              {showEmail && displayName !== member.email ? <p className="mf-acct-email">{member.email}</p> : null}
+              {config.showTier ? <span className="mf-dash-badge">{memberTier}</span> : null}
+            </div>
+          </div>
+          <p className="mf-acct-caption">{config.headline}</p>
+          <nav className="mf-acct-nav" aria-label={config.headline}>
+            {shown.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`mf-acct-tab${active === name ? " is-active" : ""}`}
+                aria-current={active === name ? "page" : undefined}
+                onClick={() => goTo(name)}
+              >
+                {navIcon[name]}
+                {navLabel[name]}
+              </button>
+            ))}
+            {config.showSignOut ? (
+              <button
+                type="button"
+                className={`mf-acct-tab mf-acct-signout is-${signOutStyle === "filled" ? "filled" : signOutStyle === "text" ? "text" : "outline"}`}
+                disabled={busy}
+                onClick={() => void handleSignOut()}
+              >
+                <LogOut aria-hidden={true} />
+                {busy ? t("signingOut") : t("signOut")}
+              </button>
+            ) : null}
+          </nav>
+        </div>
+        <div className="mf-acct-main" role="region" aria-label={navLabel[active]} aria-live="polite">
+          {renderSection[active]()}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2959,10 +4179,22 @@ export default function MemberDashboard(
 // a creator editing either by hand would break the component with no way to
 // know why.
 
+const SECTION_OPTIONS = [...ACCOUNT_SECTIONS];
+const SECTION_TITLES = ["Overview", "Membership", "Billing", "Bookmarks", "Profile", "Security"];
+
 addPropertyControls(MemberDashboard, mfControls({
   // The Builder's seal for this instance (27-instance-seal.md). Hidden: it is
   // set on insert and a pasted copy loses it.
   mfSeal: { type: ControlType.String, title: "Seal", hidden: () => true },
+  // First in the sidebar: the canvas cannot take clicks, so this is how a
+  // creator sees and styles each tab. The published site ignores it.
+  canvasSection: {
+    type: ControlType.Enum,
+    title: "Canvas Preview",
+    options: SECTION_OPTIONS,
+    optionTitles: SECTION_TITLES,
+    defaultValue: "overview",
+  },
   headline: {
     type: ControlType.String,
     title: "Headline",
@@ -2974,6 +4206,38 @@ addPropertyControls(MemberDashboard, mfControls({
     defaultValue: CONFIG.signedOutMessage,
   },
 
+  /* ---- The account area (33-member-account.md) ---- */
+
+  sections: {
+    type: ControlType.Object,
+    title: "Sections",
+    buttonTitle: "Sections",
+    controls: {
+      overview: { type: ControlType.Boolean, title: "Overview", defaultValue: true },
+      membership: { type: ControlType.Boolean, title: "Membership", defaultValue: true },
+      billing: { type: ControlType.Boolean, title: "Billing", defaultValue: true },
+      bookmarks: { type: ControlType.Boolean, title: "Bookmarks", defaultValue: true },
+      profile: { type: ControlType.Boolean, title: "Profile", defaultValue: true },
+      security: { type: ControlType.Boolean, title: "Security", defaultValue: true },
+      photoUpload: { type: ControlType.Boolean, title: "Photo Upload", defaultValue: true },
+      deleteAccount: { type: ControlType.Boolean, title: "Delete Account", defaultValue: true },
+    },
+  },
+  defaultSection: {
+    type: ControlType.Enum,
+    title: "Default Section",
+    options: SECTION_OPTIONS,
+    optionTitles: SECTION_TITLES,
+    defaultValue: "overview",
+  },
+  navigation: {
+    type: ControlType.Enum,
+    title: "Navigation",
+    options: ["auto", "sidebar", "top"],
+    optionTitles: ["Auto", "Sidebar", "Top"],
+    defaultValue: "auto",
+  },
+
   /* ---- What the panel shows ---- */
 
   showAvatar: {
@@ -2983,17 +4247,17 @@ addPropertyControls(MemberDashboard, mfControls({
   },
   showEmail: {
     type: ControlType.Boolean,
-    title: "Email Row",
+    title: "Email",
     defaultValue: true,
   },
   showTier: {
     type: ControlType.Boolean,
-    title: "Membership Row",
+    title: "Membership Badge",
     defaultValue: CONFIG.showTier,
   },
   showStatus: {
     type: ControlType.Boolean,
-    title: "Status Row",
+    title: "Status",
     defaultValue: true,
   },
   showProfile: {
@@ -3061,9 +4325,8 @@ addPropertyControls(MemberDashboard, mfControls({
     unit: "px",
   },
 
-  /* ---- Shared appearance: Theme, Colors, Typography, Layout, then Labels ---- */
+  /* ---- Shared appearance: Colors, Typography, Layout, then Labels ---- */
 
   ...mfAppearanceControls({ padding: 24, gap: 20, shadow: false }),
   labels: mfLabelControls(DASH_LABELS),
 }));
-
