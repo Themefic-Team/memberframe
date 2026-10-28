@@ -6,6 +6,7 @@ import { getPlanName, getStatusLabel, notify } from "./billingHelpers";
 import { startTrial } from "../../services/licenseService";
 import { failureMessage } from "../../services/apiClient";
 import { BRANDING } from "../../config/branding";
+import { SiteDomainsPanel } from "../settings/SiteDomainsPanel";
 
 export interface ProfilePageProps {
   onManageSubscription: () => void;
@@ -19,9 +20,9 @@ const MAIL_ICON = <Mail className="ffmf-profile-field-icon" aria-hidden={true} /
 /**
  * Profile, behind the account icon. F19: a clone of the BEAF plugin's
  * ProfilePage (avatar ring and PRO or TRIAL badge, Plan Type, Personal Info,
- * Sign Out), and nothing more: the site key is internal, and the allowed
- * domains are kept by the plugin itself from Framer's publish info
- * (`syncPublishedOrigins` in useSealGuard), so the page shows neither.
+ * Sign Out), plus Site Domains (`SiteDomainsPanel`, 2026-10-28): the domains
+ * are typed by the creator here since the panel stopped reading them from
+ * Framer. The site key is internal and not shown.
  */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, onSignUp, onSignIn }) => {
   const { state, disconnect, linkable, linkProject } = useConnection();
@@ -239,6 +240,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onManageSubscription, 
           </div>
         </div>
       </div>
+
+      {connection ? <SiteDomainsPanel /> : null}
 
       <div className="ffmf-profile-logout-wrap">
         <button

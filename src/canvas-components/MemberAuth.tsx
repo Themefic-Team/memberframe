@@ -255,8 +255,18 @@ function MfWatermark(): React.ReactElement {
 const MF_LOCK_COPY: Record<"locked" | "copied" | "domain", { title: string; text: string }> = {
   locked: { title: "Upgrade to Pro", text: "MemberFrame is locked: the trial or plan has ended, or the plugin is signed out. Open the MemberFrame plugin to sign in or upgrade." },
   copied: { title: "Insert from MemberFrame", text: "This component was copied, not inserted. Add it from the Builder in the MemberFrame plugin." },
-  domain: { title: "Domain not allowed yet", text: "This address is not allowed for this site. Open the MemberFrame plugin in this project, then publish again." },
+  // {host} is this page's own address, from the visitor's browser: the domain
+  // the creator has to add. Nothing is read from Framer.
+  domain: {
+    title: "Add this domain to MemberFrame",
+    text: "{host} is not on this site's list of domains, so sign in, payments, and locked content are off here. In Framer, open MemberFrame, then Profile, Site Domains, add {host}, and reload this page.",
+  },
 };
+
+/** This page's host, for the domain lock: what the creator types in Site Domains. */
+function mfPageHost(): string {
+  return typeof window !== "undefined" && window.location && window.location.host ? window.location.host : "This address";
+}
 
 function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
   const copy = MF_LOCK_COPY[props.kind];
@@ -270,7 +280,7 @@ function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.R
           </svg>
         </span>
         <p className="mf-lock-title">{copy.title}</p>
-        <p className="mf-lock-text">{copy.text}</p>
+        <p className="mf-lock-text">{copy.text.split("{host}").join(mfPageHost())}</p>
       </div>
     </div>
   );
@@ -847,10 +857,9 @@ const CONFIG: AuthConfig = {
  *
  * CONFLICT C11, and these are **proposals, not quotations**. PRD section 10.4
  * lists the member runtime endpoints and none of them sends or verifies an OTP.
- * The only OTP routes in the PRD are in section 10.2, which serves the plugin
- * panel: its send route takes a `framerUserId`, which a site visitor does not
- * have, and its verify route returns a token in the body where F05 requires an
- * HTTP-only cookie.
+ * The only OTP routes in the PRD are in section 10.2, which served the plugin
+ * panel, not a site visitor, and returned a token in the body where F05
+ * requires an HTTP-only cookie.
  *
  * Written up in `docs/development-docs/05-member-auth.md` section 5.1. They
  * need confirming before the backend routes are built.

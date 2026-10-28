@@ -17,8 +17,6 @@ import { useEffect, useRef } from "react";
 import { framer } from "framer-plugin";
 import { useConnection } from "./useConnection";
 import { deployBaseUrl } from "../config/backend";
-import { missingPublishedOrigins } from "../services/framerProjectService";
-import { addAllowedOrigins } from "../services/siteSettingsService";
 import { syncSiteConfig, type PatchableFile } from "../utils/configPatcher";
 import {
   LEGACY_SECTION_LOCKS_FILE_NAME,
@@ -81,7 +79,6 @@ interface GuardState {
   /** The fingerprint of the last pass that finished with nothing left to do. */
   settled: string | null;
   seals: Backoff;
-  origins: Backoff;
   downloads: Backoff;
   /** Messages already shown this session, so a waiting download does not repeat its toast. */
   told: Set<string>;
@@ -324,31 +321,8 @@ export async function recordSeal(seal: string, nodeId: string): Promise<void> {
   }
 }
 
-/**
- * Allow every address this project is published at. Without it, a site first
- * published after connecting answers `foreign` on its own domain, and every
- * component there draws the "copied, not inserted" lock. Asks the server only
- * when an address is missing, and waits after a failure.
- */
-async function syncPublishedOrigins(
-  siteId: string,
-  allowed: ReadonlyArray<string>,
-  backoff: Backoff,
-  onUpdated: (origins: string[]) => Promise<void>
-): Promise<void> {
-  const missing = missingPublishedOrigins(await framer.getPublishInfo(), allowed);
-  if (missing.length === 0 || waiting(backoff)) return;
-  const result = await addAllowedOrigins(siteId, missing);
-  if (result.kind !== "ok") {
-    failed(backoff);
-    return;
-  }
-  succeeded(backoff);
-  await onUpdated(result.data.allowedOrigins);
-}
-
 export function useSealGuard(): void {
-  const { connection, applyConnection, settings } = useConnection();
+  const { connection, settings } = useConnection();
   const siteId = connection?.siteId ?? null;
   const siteKey = connection?.siteKey ?? null;
   // Read inside the pass, so a change to the list does not restart the guard.
@@ -366,7 +340,6 @@ export function useSealGuard(): void {
     const state: GuardState = {
       settled: null,
       seals: { failures: 0, retryAt: 0 },
-      origins: { failures: 0, retryAt: 0 },
       downloads: { failures: 0, retryAt: 0 },
       told: new Set(),
     };
@@ -415,10 +388,8 @@ export function useSealGuard(): void {
             framer.notify("Updated MemberArticle for this site. Publish to update your live site.", { variant: "info" });
           }
         }
-        await syncPublishedOrigins(siteId, connectionRef.current?.allowedOrigins ?? [], state.origins, async (origins) => {
-          const current = connectionRef.current;
-          if (current && !stopped) await applyConnection({ ...current, allowedOrigins: origins });
-        }).catch(() => undefined);
+        // Published domains are no longer read from Framer (Marketplace
+        // review, 2026-10-28): the creator types them in Profile, Site Domains.
         const securedFiles = await secureDownloadsOnce(siteId, state).catch(() => 0);
         if (securedFiles > 0 && !stopped) {
           framer.notify(
@@ -474,5 +445,5 @@ export function useSealGuard(): void {
       window.removeEventListener("focus", schedule);
       for (const unsubscribe of unsubscribes) unsubscribe();
     };
-  }, [applyConnection, siteId, siteKey]);
+  }, [siteId, siteKey]);
 }

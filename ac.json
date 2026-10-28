@@ -1,0 +1,1 @@
+{"passwordPolicy":{"minLength":8,"requireNumber":true,"requireUppercase":false,"requireLowercase":false,"requireSymbol":false}}

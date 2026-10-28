@@ -36,8 +36,9 @@ export interface AuthModalProps {
  *
  * Marketplace audit, 2026-10-28:
  * - C3: a consent line sits directly above the button, because finishing sign
- *   in sends the creator's email, Framer user id, project name, and published
- *   domains, and starts the trial.
+ *   in creates the creator's account and starts the trial. Since the second
+ *   Marketplace review (2026-10-28) nothing read from Framer is sent: no Framer
+ *   user, no project id or name, no published domains.
  * - I2: the button is a real link (`target="_blank"`), not `window.open`. The
  *   address is known before the click, so nothing can be blocked as a popup.
  */

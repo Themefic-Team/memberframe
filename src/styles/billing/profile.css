@@ -268,6 +268,19 @@
   font-family: "Inter", sans-serif;
 }
 
+/* Site Domains under Personal Info (2026-10-28): not part of the BEAF copy.
+   The heading matches Personal Info; the rows and the field are kit parts. */
+.site-domains-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.site-domains-section .ffmf-profile-section-title {
+  margin: 0;
+}
+
 .ffmf-profile-fields-card {
   border-radius: 10px;
   /* padding: 16px; */

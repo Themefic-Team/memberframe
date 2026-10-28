@@ -83,6 +83,24 @@ export function addAllowedOrigins(
   return client.post("/api/site/origins", { siteId, origins: [...origins] });
 }
 
+/** A domain this site's components have called from, and whether it is on the list. */
+export interface OriginSighting {
+  origin: string;
+  lastSeenAt: string;
+  allowed: boolean;
+}
+
+export interface OriginStatusResponse {
+  allowedOrigins: string[];
+  /** Newest first. Recorded by our server from our own components' requests, never from Framer. */
+  seen: OriginSighting[];
+}
+
+/** The domains, and where this site's components have really been seen (Profile, Site Domains). */
+export function fetchOriginStatus(siteId: string, client: ApiClient = apiClient): Promise<ApiResult<OriginStatusResponse>> {
+  return client.get("/api/site/origins", { siteId });
+}
+
 export function replaceAllowedOrigins(
   siteId: string,
   origins: ReadonlyArray<string>,

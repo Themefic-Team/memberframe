@@ -496,7 +496,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             siteId={siteId}
             tiers={siteTierList}
             profileFields={storedFields}
-            siteName={connection?.siteName ?? "Your site"}
+            siteName={connection?.siteName || "Your site"}
           />
         </>
       )}

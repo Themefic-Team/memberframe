@@ -146,6 +146,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         />
       ) : null}
 
+      {/*
+        Domains are typed by the creator since the panel stopped reading them
+        from Framer (Marketplace review, 2026-10-28). With none, the live site
+        refuses every member request, so Home says so.
+      */}
+      {state.status === "connected" && state.connection.allowedOrigins.length === 0 ? (
+        <Banner
+          tone="warning"
+          title="Add your domain to go live"
+          message="Visitors on your published site cannot sign up, sign in, pay, or open locked content until its domain is in Profile, Site Domains. Copy the address from Framer's Publish menu."
+          action={{ label: "Add domain", onClick: onOpenConnect }}
+        />
+      ) : null}
+
       <HeroCard
         title="Welcome to MemberFrame"
         description="Gate any frame, sell a membership, and manage members without leaving the canvas."
@@ -170,7 +184,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 <span className="step-row-title">Setup guide</span>
                 <span className="step-row-desc">
                   {setupDone === null
-                    ? "Six steps to a working membership."
+                    ? "Seven steps to a working membership."
                     : setupDone === total
                       ? `All ${total} steps done.`
                       : `${setupDone} of ${total} steps done.`}

@@ -239,6 +239,28 @@ export async function loadStoredConnection(projectId: string): Promise<StoredCon
 }
 
 /**
+ * The site id this project keeps in its plugin data, for `attachProject`.
+ *
+ * Only when the stored connection was written for this very project. Plugin
+ * data travels with a duplicated or remixed project, so a copy carries the
+ * original's site id under a different project id: a copy gets undefined, and
+ * with it a site of its own. The comparison happens here, inside Framer; the
+ * project id is never sent (Marketplace review, 2026-10-28).
+ */
+export async function storedSiteIdFor(projectId: string): Promise<string | undefined> {
+  const raw = await readKey(CONNECTION_KEY);
+  if (!raw || !projectId) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  const connection = asConnection(parsed);
+  return connection && connection.framerProjectId === projectId ? connection.siteId : undefined;
+}
+
+/**
  * Narrow parsed JSON to a connection.
  *
  * Hand written rather than trusted, because the source is a string that a
@@ -262,7 +284,7 @@ function asConnection(value: unknown): SiteConnection | null {
     siteId,
     siteKey,
     framerProjectId,
-    siteName: text("siteName") ?? "Untitled project",
+    siteName: text("siteName") ?? "",
     creatorEmail: text("creatorEmail") ?? "",
     creatorName: text("creatorName") ?? "",
     ...(text("creatorAvatarUrl") ? { creatorAvatarUrl: text("creatorAvatarUrl")! } : {}),

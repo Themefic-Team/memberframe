@@ -161,7 +161,9 @@ export interface SiteConnection {
   siteId: string;
   /** Public. See the file header. */
   siteKey: string;
+  /** Empty for a site created since 2026-10-28: the name is no longer read from Framer. */
   siteName: string;
+  /** This project's own id, kept in its plugin data to spot a duplicate. Never sent to the server. */
   framerProjectId: string;
   creatorEmail: string;
   creatorName: string;
@@ -171,24 +173,14 @@ export interface SiteConnection {
 }
 
 /**
- * What the plugin learned from the Framer SDK about the open project.
- *
- * `creatorEmail` is absent on purpose and that absence is the reason the
- * connect flow needs an email step at all: blocker B7 records that
- * `framer.getCurrentUser()` exposes a name and an id and no address. So the
- * creator types one, and a typed address is a claim until a code proves it.
+ * What the plugin reads from the Framer SDK about the open project: its id,
+ * and nothing else (Marketplace review, 2026-10-28). The id never leaves the
+ * panel. It keys this browser's token and tells a duplicated project apart
+ * from the original (`storedSiteIdFor` in `connectionStore.ts`). The Framer
+ * user, the project name, and the published domains are not read at all.
  */
 export interface FramerProjectContext {
   projectId: string;
-  projectName: string;
-  creatorName: string | null;
-  /**
-   * `getCurrentUser().id`: Framer's id for whoever has the project open. F19
-   * uses it, with the account and the project, to allow one trial per person.
-   */
-  framerUserId?: string | null;
-  /** From `getPublishInfo()`. Production and staging, whichever exist. */
-  publishedOrigins: string[];
   /** True when the SDK could not be reached, for example in a browser preview. */
   unavailable: boolean;
 }

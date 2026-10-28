@@ -64,10 +64,10 @@ export interface ApiClientDeps {
   /**
    * The creator session token, or null when there is none.
    *
-   * F02 says the creator is "verified via `framer.getCurrentUser()` and
-   * `framer.getProjectInfo()`, exchanged for a creator session token". No task
-   * in the plan builds that exchange, so this returns null for now and the
-   * server decides, which is the correct place for the decision.
+   * The creator signs in on the hosted account page and the panel receives
+   * the token through the hand-off. Nothing from the Framer user is involved
+   * (Marketplace review, 2026-10-28). Null when signed out, and the server
+   * decides, which is the correct place for the decision.
    */
   getCreatorToken: () => string | null;
   /** Injected for tests. Production passes nothing and gets the global. */

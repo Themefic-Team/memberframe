@@ -1,97 +1,34 @@
 /**
- * What the Framer SDK can tell us about the open project.
+ * What the Framer SDK tells us about the open project: its id, and nothing else.
  *
- * Three calls, none of which needs a declared permission: `getProjectInfo`,
- * `getCurrentUser`, and `getPublishInfo` are all unprotected in the installed
- * SDK (3.10.3), which is worth stating because `framer.json` lists permissions
- * and a reader will wonder why these are not among them.
+ * Since 2026-10-28 (Marketplace review, docs/development-docs/
+ * 35-marketplace-review-report.md) the panel reads only `getProjectInfo().id`.
+ * It does not call `getCurrentUser`, and it does not read the project's name or
+ * its published domains, so none of them can reach our server. The id itself
+ * stays in the panel: it keys this browser's token and lets the panel tell a
+ * duplicated project from the original. The server knows a project only by the
+ * site id kept in the project's plugin data.
  *
- * ## The one thing the SDK will not tell us
- *
- * The creator's email address. `getCurrentUser()` returns a name, a hashed id,
- * an avatar, and initials. That is blocker B7, and it is the entire reason the
- * connect flow has an email field and a verification code rather than being a
- * single button: the plugin cannot learn who the creator is, so the creator
- * says, and a code turns the claim into a fact.
+ * `getPublishInfo` is still read by `useSetupProgress`, inside the panel, to
+ * tick the "Publish" setup step. Nothing from it is sent anywhere.
  *
  * ## Every call is wrapped
  *
  * The panel also runs in a plain browser during development, where `framer` is
  * a singleton whose messages go to a parent window that does not exist and
- * every call rejects. A failure here means a degraded Connect tab with the
- * fields typed by hand, not a blank panel.
+ * every call rejects. A failure here means a signed-out panel, not a blank one.
  */
 
 import { framer } from "framer-plugin";
 import type { FramerProjectContext } from "../types/connection";
 
-/**
- * Read everything at once.
- *
- * `Promise.allSettled` rather than `all`: `getPublishInfo` fails on a project
- * that has never been published, and that must not take the project id down
- * with it. An unpublished project is the ordinary case for a creator setting
- * membership up before launch.
- */
 export async function readProjectContext(): Promise<FramerProjectContext> {
-  const [project, user, publish] = await Promise.allSettled([
-    framer.getProjectInfo(),
-    framer.getCurrentUser(),
-    framer.getPublishInfo(),
-  ]);
-
-  if (project.status !== "fulfilled") {
-    return {
-      projectId: "",
-      projectName: "",
-      creatorName: null,
-      publishedOrigins: [],
-      unavailable: true,
-    };
+  try {
+    const project = await framer.getProjectInfo();
+    return { projectId: project.id, unavailable: false };
+  } catch {
+    return { projectId: "", unavailable: true };
   }
-
-  return {
-    projectId: project.value.id,
-    projectName: project.value.name,
-    creatorName: user.status === "fulfilled" ? user.value.name : null,
-    framerUserId: user.status === "fulfilled" ? user.value.id : null,
-    publishedOrigins:
-      publish.status === "fulfilled" ? originsFromPublishInfo(publish.value) : [],
-    unavailable: false,
-  };
-}
-
-/**
- * Turn published URLs into origins.
- *
- * These go straight into the site's allowlist, which is what stands between a
- * public site key and a request from anywhere. The server normalizes again and
- * refuses anything it does not like, so this is the convenience half: a creator
- * should not have to type their own domain.
- *
- * Both production and staging, because a creator testing membership on the
- * staging URL before publishing is the normal order of work, and a staging
- * request refused with a CORS error gives them nothing to go on.
- */
-export function originsFromPublishInfo(info: {
-  production: { url: string } | null;
-  staging: { url: string } | null;
-}): string[] {
-  const origins: string[] = [];
-
-  for (const publish of [info.production, info.staging]) {
-    if (!publish?.url) continue;
-
-    try {
-      const origin = new URL(publish.url).origin;
-      if (origin !== "null" && !origins.includes(origin)) origins.push(origin);
-    } catch {
-      // A URL the SDK reported that does not parse. Nothing useful to do with
-      // it, and the creator can add the origin by hand from the Connect tab.
-    }
-  }
-
-  return origins;
 }
 
 /**
@@ -103,19 +40,4 @@ export function originsFromPublishInfo(info: {
 export function shortProjectId(projectId: string): string {
   if (projectId.length <= 12) return projectId;
   return `${projectId.slice(0, 6)}...${projectId.slice(-4)}`;
-}
-
-/**
- * The published addresses the site does not allow yet.
- *
- * A site's allowed domains are read from the publish info when the project is
- * connected. A site first published later (a new `*.framer.app` address, a
- * staging URL, a custom domain) would answer `foreign` and draw every component
- * as a pasted copy. Comparing again while the panel is open closes that gap.
- */
-export function missingPublishedOrigins(
-  info: { production: { url: string } | null; staging: { url: string } | null },
-  allowed: ReadonlyArray<string>
-): string[] {
-  return originsFromPublishInfo(info).filter((origin) => !allowed.includes(origin));
 }

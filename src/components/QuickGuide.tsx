@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, ChevronRight, CreditCard, FileStack, KeyRound, Layers, Lock, Rocket } from "lucide-react";
+import { Check, ChevronRight, CreditCard, FileStack, Globe, KeyRound, Layers, Lock, Rocket } from "lucide-react";
 import { Button, Checkbox, ProgressSteps, Sheet } from "./ui";
 import { SETUP_STEP_IDS, type SetupDone, type SetupStepId } from "../hooks/useSetupProgress";
 
@@ -43,6 +43,8 @@ export interface QuickGuideProps {
   onOpenPayments: () => void;
   onOpenSignIn: () => void;
   onOpenPageLocks: () => void;
+  /** Profile, Site Domains. */
+  onOpenDomains: () => void;
 }
 
 interface GuideStep {
@@ -63,6 +65,7 @@ export const QuickGuide: React.FC<QuickGuideProps> = ({
   onOpenPayments,
   onOpenSignIn,
   onOpenPageLocks,
+  onOpenDomains,
 }) => {
   // Starts from what was saved, so reopening the guide from Home and closing
   // it does not quietly undo "Don't show this again".
@@ -117,6 +120,13 @@ export const QuickGuide: React.FC<QuickGuideProps> = ({
       description: "Sign in, checkout, and locks run on the published site.",
       icon: <Rocket aria-hidden={true} />,
     },
+    {
+      id: "domain",
+      title: "Add your site's domain",
+      description: "Profile, Site Domains: your Framer address and any custom domain. Until then the live site stays locked.",
+      icon: <Globe aria-hidden={true} />,
+      open: onOpenDomains,
+    },
   ];
 
   const count = SETUP_STEP_IDS.filter((id) => done[id]).length;
@@ -139,7 +149,7 @@ export const QuickGuide: React.FC<QuickGuideProps> = ({
   return (
     <Sheet
       title="Get started with MemberFrame"
-      description="Six steps to a working membership. Click a step to go there."
+      description="Seven steps to a working membership. Click a step to go there."
       onClose={() => close()}
       footer={
         <>

@@ -11,8 +11,10 @@ const settings = (patch: Partial<SiteSettingsDocument> = {}) =>
   ({ integrations: {}, gatedPages: [], sectionLocks: [], ...patch }) as unknown as SiteSettingsDocument;
 
 describe("setup progress: each step is ticked by the real state, never by a click", () => {
-  it("has the guide's six steps, in order", () => {
-    expect(SETUP_STEP_IDS).toEqual(["pages", "tiers", "payments", "signIn", "locks", "publish"]);
+  it("has the guide's seven steps, in order, the site's domain last", () => {
+    // Domains are typed in Profile since 2026-10-28 (Marketplace review): the
+    // live site answers only on them, so adding one is a setup step.
+    expect(SETUP_STEP_IDS).toEqual(["pages", "tiers", "payments", "signIn", "locks", "publish", "domain"]);
   });
 
   it("member pages: done only when every page the Builder offers exists", () => {

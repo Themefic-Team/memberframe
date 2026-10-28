@@ -1,23 +1,17 @@
 /**
  * The connect handshake, from the panel's side.
  *
- * Four calls against `/api/connect/*`, each returning `ApiResult` so a caller
- * handles all five PRD section 10.6 cases or fails the typecheck.
+ * The creator signs in on the hosted account page (a browser tab), the panel
+ * receives a token through the hand-off poll, and `attachProject` gives this
+ * project its site. Each call returns `ApiResult` so a caller handles all five
+ * PRD section 10.6 cases or fails the typecheck.
  *
- * ## Two steps, and the reason is that the SDK has no email
+ * ## The server learns nothing about the Framer project
  *
- * `framer.getCurrentUser()` exposes a name and a hashed id and no address
- * (blocker B7). So the creator types one, which is a claim rather than a fact,
- * and `startConnect` sends a six-digit code that turns it into one. Without
- * that step, anyone who learned a Framer project id could type any address and
- * receive a token that reads every member of that site.
- *
- * ## The first two calls are unauthenticated, deliberately
- *
- * They have to be: there is no token yet. `start` is rate limited per address
- * and per IP on the server because it sends mail to an address the caller
- * chose, which makes it the one endpoint in the API that could be pointed at a
- * third party.
+ * Since 2026-10-28 (Marketplace review) the only thing sent is the site id
+ * this project already keeps in its plugin data. Not the Framer user, not the
+ * project id or name, not its published domains. A project is matched to its
+ * site by that id, inside the panel (`siteById`).
  */
 
 import type { ApiClient, ApiResult } from "./apiClient";
@@ -26,63 +20,15 @@ import type { SiteConnection, SiteSettingsDocument } from "../types/connection";
 import type { LicenseView } from "./licenseService";
 import { API_BASE_URL } from "../config/backend";
 
-export interface StartConnectInput {
-  email: string;
-  framerProjectId: string;
-}
-
-/**
- * Send the code.
- *
- * A 200 says nothing about whether the address exists or whether mail was
- * actually delivered, and the panel's copy must not imply otherwise. The
- * server is deliberately incapable of telling us, so "Check your email" is the
- * only honest thing to show.
- */
-export function startConnect(
-  input: StartConnectInput,
-  client: ApiClient = apiClient
-): Promise<ApiResult<Record<string, never>>> {
-  return client.post("/api/connect/start", input);
-}
-
-export interface VerifyConnectInput {
-  email: string;
-  code: string;
-  framerProjectId: string;
-  projectName: string;
-  creatorName: string | null;
-  origins: string[];
-}
-
-export interface VerifyConnectResponse {
-  token: string;
-  expiresAt: string;
-  creator: { email: string; name: string };
-  site: {
-    siteId: string;
-    siteKey: string;
-    siteName: string;
-    framerProjectId: string;
-    allowedOrigins: string[];
-  };
-  settings: SiteSettingsDocument;
-  settingsVersion: number;
-}
-
-export function verifyConnect(
-  input: VerifyConnectInput,
-  client: ApiClient = apiClient
-): Promise<ApiResult<VerifyConnectResponse>> {
-  return client.post("/api/connect/verify", input);
-}
-
-export interface ConnectSessionSite {
+/** A site as the server describes it. `siteName` is null for a site created since 2026-10-28. */
+export interface ConnectedSite {
   siteId: string;
   siteKey: string;
-  siteName: string;
-  framerProjectId: string | null;
+  siteName: string | null;
   allowedOrigins: string[];
+}
+
+export interface ConnectSessionSite extends ConnectedSite {
   memberCount: number;
   settings: SiteSettingsDocument;
   settingsVersion: number;
@@ -127,15 +73,13 @@ export function disconnect(
 /**
  * Pick the site for the project that is currently open.
  *
- * By Framer project id, never by position. A creator with several connected
- * projects would otherwise get whichever site happens to sort first, which
+ * By the site id this project keeps in its plugin data, never by position. A
+ * creator with several sites would otherwise get whichever sorts first, which
  * would show them another site's members inside this project's panel.
  */
-export function siteForProject(
-  sites: ReadonlyArray<ConnectSessionSite>,
-  framerProjectId: string
-): ConnectSessionSite | null {
-  return sites.find((site) => site.framerProjectId === framerProjectId) ?? null;
+export function siteById(sites: ReadonlyArray<ConnectSessionSite>, siteId: string | undefined): ConnectSessionSite | null {
+  if (!siteId) return null;
+  return sites.find((site) => site.siteId === siteId) ?? null;
 }
 
 // ============================================================================
@@ -163,36 +107,41 @@ export function pollHandoff(sessionId: string, client: ApiClient = apiClient): P
   return client.get("/api/connect/handoff", { sessionId });
 }
 
+/** The site id from this project's plugin data, or nothing for a new project or a copy. */
 export interface AttachProjectInput {
-  framerProjectId: string;
-  framerUserId: string | null;
-  projectName: string;
-  origins: string[];
+  siteId?: string;
 }
 
 export interface AttachProjectResponse {
   creator: { email: string; name: string };
-  site: VerifyConnectResponse["site"];
+  site: ConnectedSite;
   settings: SiteSettingsDocument;
   settingsVersion: number;
   license: LicenseView;
 }
 
-/** Claim this project for the signed-in creator, and start its trial if they have none. */
+/** This project's site for the signed-in creator (made if new), and its trial if they have none. */
 export function attachProject(input: AttachProjectInput, client: ApiClient = apiClient): Promise<ApiResult<AttachProjectResponse>> {
   return client.post("/api/connect/attach-project", input);
 }
 
-/** The session response, reduced to what the panel stores. */
+/**
+ * The session response, reduced to what the panel stores.
+ *
+ * `framerProjectId` is the open project's own id, from the SDK, never from the
+ * server: it goes into this project's plugin data so a duplicate can be told
+ * apart later.
+ */
 export function toConnection(
-  site: ConnectSessionSite | VerifyConnectResponse["site"],
-  creator: { email: string; name: string }
+  site: ConnectedSite,
+  creator: { email: string; name: string },
+  framerProjectId: string
 ): SiteConnection {
   return {
     siteId: site.siteId,
     siteKey: site.siteKey,
-    siteName: site.siteName,
-    framerProjectId: site.framerProjectId ?? "",
+    siteName: site.siteName ?? "",
+    framerProjectId,
     creatorEmail: creator.email,
     creatorName: creator.name,
     allowedOrigins: site.allowedOrigins,

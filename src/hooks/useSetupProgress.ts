@@ -3,23 +3,25 @@ import { framer } from "framer-plugin";
 import { useConnection } from "./useConnection";
 import { fetchTiers } from "../services/siteService";
 import { fetchPayments } from "../services/paymentsService";
+import { fetchOriginStatus } from "../services/siteSettingsService";
+import { isWorking } from "../utils/siteDomains";
 import { membershipPages, normalizePagePath } from "../services/pageScaffoldService";
 import type { SiteSettingsDocument } from "../types/connection";
 
-/** The quick guide's six steps, in order. */
-export const SETUP_STEP_IDS = ["pages", "tiers", "payments", "signIn", "locks", "publish"] as const;
+/** The quick guide's seven steps, in order. */
+export const SETUP_STEP_IDS = ["pages", "tiers", "payments", "signIn", "locks", "publish", "domain"] as const;
 export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
 export type SetupDone = Record<SetupStepId, boolean>;
 
 export interface SetupProgress {
   done: SetupDone;
-  /** How many of the six are done. */
+  /** How many of the seven are done. */
   count: number;
   /** False until the first check has answered. */
   known: boolean;
 }
 
-const NONE_DONE: SetupDone = { pages: false, tiers: false, payments: false, signIn: false, locks: false, publish: false };
+const NONE_DONE: SetupDone = { pages: false, tiers: false, payments: false, signIn: false, locks: false, publish: false, domain: false };
 
 /** Re-checked this often while the Home tab or the guide is showing. */
 const REFRESH_MS = 15_000;
@@ -73,11 +75,13 @@ export function useSetupProgress(active: boolean): SetupProgress & { refresh: ()
     let live = true;
 
     void (async () => {
-      const [pages, tiers, payments, publish] = await Promise.allSettled([
+      // getPublishInfo stays inside the panel: it only ticks the Publish step.
+      const [pages, tiers, payments, publish, domains] = await Promise.allSettled([
         framer.getNodesWithType("WebPageNode"),
         fetchTiers(siteId),
         fetchPayments(siteId),
         framer.getPublishInfo(),
+        fetchOriginStatus(siteId),
       ]);
       if (!live) return;
 
@@ -95,6 +99,11 @@ export function useSetupProgress(active: boolean): SetupProgress & { refresh: ()
           locks: locksDone(settings),
           // getPublishInfo throws on a project that was never published.
           publish: publish.status === "fulfilled" && Boolean(publish.value.production || publish.value.staging),
+          // Done once a listed domain has really served a MemberFrame component.
+          domain:
+            domains.status === "fulfilled" &&
+            domains.value.kind === "ok" &&
+            domains.value.data.seen.some((entry) => entry.allowed && isWorking(entry.lastSeenAt)),
         },
       });
     })();

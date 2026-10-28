@@ -33,7 +33,7 @@ const store = new Map<string, string>();
   },
 };
 
-const { LOCAL_TOKEN_PREFIX, clearConnection, currentCreatorToken, loadStoredConnection, saveConnection } = await import(
+const { LOCAL_TOKEN_PREFIX, clearConnection, currentCreatorToken, loadStoredConnection, saveConnection, storedSiteIdFor } = await import(
   "../src/services/connectionStore"
 );
 
@@ -96,5 +96,23 @@ describe("creator token storage (audit C1)", () => {
     await clearConnection();
     expect(store.has(LOCAL_TOKEN_PREFIX + PROJECT)).toBe(false);
     expect(currentCreatorToken()).toBeNull();
+  });
+});
+
+describe("the site id sent to attach a project (Marketplace review, 2026-10-28)", () => {
+  // The server learns only this id. The project id stays in the panel and
+  // decides whether the stored id belongs to this project at all.
+  it("is the stored site id for the project that saved it", async () => {
+    await saveConnection(connection, TOKEN);
+    expect(await storedSiteIdFor(PROJECT)).toBe("site-1");
+  });
+
+  it("is nothing in a duplicated project, whose plugin data came from the original", async () => {
+    await saveConnection(connection, TOKEN);
+    expect(await storedSiteIdFor("project-copy")).toBeUndefined();
+  });
+
+  it("is nothing in a project that never had a site", async () => {
+    expect(await storedSiteIdFor(PROJECT)).toBeUndefined();
   });
 });

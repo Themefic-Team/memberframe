@@ -271,7 +271,6 @@
   stroke: currentColor;
 }
 
-
 .integration-card-desc {
   margin: 0;
   color: var(--framer-color-text-secondary);
@@ -393,7 +392,6 @@
   box-sizing: border-box;
 }
 
-
 /* ---------------------------------------------------------------------------
    Route Shield script: an inner well, bg/secondary, radius 8
    --------------------------------------------------------------------------- */
@@ -426,6 +424,42 @@
   flex-shrink: 0;
 }
 
+/* ---------------------------------------------------------------------------
+   Site Domains (Profile): built from the Settings card list. A domain card is
+   not a button, so it drops the card header's pointer and hover.
+   --------------------------------------------------------------------------- */
+.site-domains-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.site-domain-card .page-rule-card-header {
+  cursor: default;
+  user-select: auto;
+}
+
+.site-domain-card .page-rule-card-header:hover {
+  background-color: transparent;
+}
+
+.site-domain-card .page-rule-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-domains-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.site-domains-suggest-title {
+  margin: 0;
+  font: var(--text-body-strong);
+  color: var(--framer-color-text);
+}
 
 /* ---------------------------------------------------------------------------
    Rule cards
@@ -1056,3 +1090,4 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+

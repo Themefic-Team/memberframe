@@ -11,8 +11,8 @@
  *
  *   1. Read the Framer project id. Everything is keyed on it.
  *   2. Read the stored connection and token from plugin data.
- *   3. If there is a token, ask the server whether it still works, and which
- *      site it reaches for THIS project.
+ *   3. If there is a token, ask the server whether it still works, and pick
+ *      the site whose id this project keeps in its plugin data.
  *   4. If the server says no, or the stored connection is for a different
  *      project, show the connect form.
  *
@@ -29,7 +29,7 @@ import {
   attachProject,
   disconnect as disconnectRequest,
   fetchConnectSession,
-  siteForProject,
+  siteById,
   toConnection,
 } from "../services/connectService";
 import {
@@ -38,6 +38,7 @@ import {
   loadStoredConnection,
   saveConnection,
   saveConnectionOnly,
+  storedSiteIdFor,
 } from "../services/connectionStore";
 import { readProjectContext } from "../services/framerProjectService";
 import type {
@@ -169,12 +170,14 @@ export function useConnectionState(): ConnectionValue {
         return;
       }
 
-      const site = siteForProject(result.data.sites, context.projectId);
+      // This project's site, by the id its plugin data holds. The stored
+      // connection was written for this project (the token is keyed by its
+      // id), so it is not a duplicate's.
+      const site = siteById(result.data.sites, stored.connection.siteId);
 
-      // A token that works, for a project it has no site for yet. Linking it
-      // sends the Framer user id, project name, and published domains, and may
-      // start the trial, so it waits for a click (Marketplace audit I1): the
-      // launch itself sends nothing beyond the token.
+      // A token that works, for a project it has no site for (the site was
+      // removed). Linking may create a site and start the trial, so it waits
+      // for a click (Marketplace audit I1): the launch sends only the token.
       if (!site) {
         setFailure(null);
         setLinkable(true);
@@ -182,7 +185,7 @@ export function useConnectionState(): ConnectionValue {
         return;
       }
 
-      const connection = toConnection(site, result.data.creator);
+      const connection = toConnection(site, result.data.creator, context.projectId);
 
       // Refresh the stored copy. The site name, the origin list, and the member
       // count all change outside this panel.
@@ -217,18 +220,15 @@ export function useConnectionState(): ConnectionValue {
     async (token: string, creator: { email: string; name: string; avatarUrl: string | null }): Promise<ApiFailure | null> => {
       const context = project ?? (await readProjectContext());
       setCreatorToken(token);
-      const attached = await attachProject({
-        framerProjectId: context.projectId,
-        framerUserId: context.framerUserId ?? null,
-        projectName: context.projectName,
-        origins: context.publishedOrigins,
-      });
+      // Only the site id this project already holds, or nothing (Marketplace review).
+      const siteId = await storedSiteIdFor(context.projectId);
+      const attached = await attachProject(siteId ? { siteId } : {});
       if (attached.kind !== "ok") {
         setCreatorToken(null);
         return attached;
       }
       const connection = {
-        ...toConnection(attached.data.site, attached.data.creator),
+        ...toConnection(attached.data.site, attached.data.creator, context.projectId),
         ...(creator.avatarUrl ? { creatorAvatarUrl: creator.avatarUrl } : {}),
       };
       await saveConnection(connection, token);
@@ -243,12 +243,8 @@ export function useConnectionState(): ConnectionValue {
 
   const linkProject = useCallback(async (): Promise<ApiFailure | null> => {
     const context = project ?? (await readProjectContext());
-    const attached = await attachProject({
-      framerProjectId: context.projectId,
-      framerUserId: context.framerUserId ?? null,
-      projectName: context.projectName,
-      origins: context.publishedOrigins,
-    });
+    const siteId = await storedSiteIdFor(context.projectId);
+    const attached = await attachProject(siteId ? { siteId } : {});
     if (attached.kind !== "ok") {
       if (attached.kind === "unauthorized") {
         forgetTokenInMemory();
@@ -256,7 +252,7 @@ export function useConnectionState(): ConnectionValue {
       }
       return attached;
     }
-    const connection = toConnection(attached.data.site, attached.data.creator);
+    const connection = toConnection(attached.data.site, attached.data.creator, context.projectId);
     void saveConnectionOnly(connection);
     setLinkable(false);
     setSettingsVersion(attached.data.settingsVersion);

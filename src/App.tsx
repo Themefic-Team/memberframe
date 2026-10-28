@@ -299,6 +299,7 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
           onOpenPayments={openPayments}
           onOpenSignIn={openSignInOptions}
           onOpenPageLocks={openPageLocks}
+          onOpenDomains={openConnect}
         />
       ) : null}
     </>
