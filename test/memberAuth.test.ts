@@ -1040,3 +1040,14 @@ describe("a signed-in member on a sign-in page (2026-10-22)", () => {
     expect(code).toContain("if (onCanvas || handoff || readResetToken() !== null) return;");
   });
 });
+
+describe("a signed-in member on a page with the sign in popup (2026-10-28)", () => {
+  it("is sent to the After sign in page only by the inline form, never by a popup", () => {
+    // A popup lives in a header on every page; leaving from it bounced a
+    // member from /pricing (and every page with that header) to /dashboard.
+    const mount = source.slice(source.indexOf("// Check for existing active session on mount."));
+    const effect = mount.slice(0, mount.indexOf("}, [onCanvas, handoff, submitCredentials, isModal]);"));
+    expect(effect).toContain("if (isModal) return;");
+    expect(effect.indexOf("if (isModal) return;")).toBeLessThan(effect.indexOf("leaveForAfterLogin()"));
+  });
+});

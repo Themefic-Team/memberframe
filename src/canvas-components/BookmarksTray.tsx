@@ -211,13 +211,13 @@ const MF_LICENSE_CSS = `
 .mf-wm-text { color: #94a3b8; font-weight: 500; letter-spacing: 0.1px; transition: color 0.2s ease; }
 .mf-wm:hover .mf-wm-text { color: rgba(255, 255, 255, 0.85); }
 .mf-wm-brand { color: #ffffff; font-weight: 600; letter-spacing: 0.2px; }
-.mf-lock { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: inherit; container-type: size; }
-.mf-lock-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
-.mf-lock-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
-.mf-lock-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
-.mf-lock-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
-@container (max-height: 150px) { .mf-lock-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lock-icon { width: 24px; height: 24px; } .mf-lock-icon svg { width: 14px; height: 14px; } .mf-lock-text { display: none; } .mf-lock-title { font-size: 12px; } }
-@container (max-height: 64px) or (max-width: 140px) { .mf-lock { padding: 0; } .mf-lock-card { padding: 0; background: transparent; border: 0; box-shadow: none; } .mf-lock-title, .mf-lock-text { display: none; } .mf-lock-icon { width: 24px; height: 24px; background: rgba(18, 18, 20, 0.85); } .mf-lock-icon svg { width: 14px; height: 14px; } }
+.mf-lic { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(15, 16, 20, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: inherit; container-type: size; }
+.mf-lic-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 18px 20px; border-radius: 14px; background: #121214; border: 1px dashed rgba(255, 255, 255, 0.25); color: #ffffff; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5); }
+.mf-lic-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
+.mf-lic-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.mf-lic-text { margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8; }
+@container (max-height: 150px) { .mf-lic-card { flex-direction: row; padding: 8px 12px; gap: 8px; } .mf-lic-icon { width: 24px; height: 24px; } .mf-lic-icon svg { width: 14px; height: 14px; } .mf-lic-text { display: none; } .mf-lic-title { font-size: 12px; } }
+@container (max-height: 64px) or (max-width: 140px) { .mf-lic { padding: 0; } .mf-lic-card { padding: 0; background: transparent; border: 0; box-shadow: none; } .mf-lic-title, .mf-lic-text { display: none; } .mf-lic-icon { width: 24px; height: 24px; background: rgba(18, 18, 20, 0.85); } .mf-lic-icon svg { width: 14px; height: 14px; } }
 .mf-wm-frame { position: absolute; inset: 0; z-index: 30; pointer-events: none; container-type: size; }
 @container (max-height: 64px) or (max-width: 200px) { .mf-wm { bottom: 2px; right: 2px; padding: 3px; gap: 0; } .mf-wm-text, .mf-wm-brand { display: none; } }
 `;
@@ -259,16 +259,16 @@ function mfPageHost(): string {
 function MfLockOverlay(props: { kind: "locked" | "copied" | "domain" }): React.ReactElement {
   const copy = MF_LOCK_COPY[props.kind];
   return (
-    <div className="mf-lock" role="note" aria-label={copy.title}>
-      <div className="mf-lock-card">
-        <span className="mf-lock-icon" aria-hidden={true}>
+    <div className="mf-lic" role="note" aria-label={copy.title}>
+      <div className="mf-lic-card">
+        <span className="mf-lic-icon" aria-hidden={true}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#708AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-lucide="lock">
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </span>
-        <p className="mf-lock-title">{copy.title}</p>
-        <p className="mf-lock-text">{copy.text.split("{host}").join(mfPageHost())}</p>
+        <p className="mf-lic-title">{copy.title}</p>
+        <p className="mf-lic-text">{copy.text.split("{host}").join(mfPageHost())}</p>
       </div>
     </div>
   );

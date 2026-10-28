@@ -458,7 +458,7 @@ describe.each(NAMES)("%s", (name) => {
     expect(rest).toContain("@framerSupportedLayoutWidth any-prefer-fixed");
     // The Dashboard grows with its profile form (2026-10-20), so the page scrolls, not the panel.
     expect(rest).toContain(
-      `@framerSupportedLayoutHeight ${name === "MemberDashboard" ? "any-prefer-auto" : "any-prefer-fixed"}`
+      `@framerSupportedLayoutHeight ${name === "MemberDashboard" || name === "MemberAuth" ? "any-prefer-auto" : "any-prefer-fixed"}`
     );
     expect(rest).toMatch(/@framerIntrinsicWidth \d+/);
     expect(rest).toMatch(/@framerIntrinsicHeight \d+/);

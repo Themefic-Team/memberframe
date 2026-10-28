@@ -12,13 +12,15 @@ const auth = readFileSync(join(__dirname, "..", "src", "canvas-components", "Mem
 const builder = readFileSync(join(__dirname, "..", "src", "components", "tabs", "BuilderTab.tsx"), "utf8");
 
 describe("the auth card fills its frame", () => {
-  it("inserts every component at a fixed width and height, the paywall and dashboard fitting their content", () => {
+  it("inserts every component at a fixed width; the sign in cards, paywall, and dashboard fit their content in height", () => {
+    // Sign in cards fit since 2026-10-28: a fixed frame let a raised Spacing
+    // margin squeeze the card instead of growing the frame.
     const sizes: Record<string, [string, string]> = {
-      member_auth: ["400px", "620px"],
-      member_login: ["400px", "600px"],
-      member_register: ["400px", "680px"],
-      member_password_reset: ["400px", "440px"],
-      member_otp_verify: ["400px", "420px"],
+      member_auth: ["400px", "fit-content"],
+      member_login: ["400px", "fit-content"],
+      member_register: ["400px", "fit-content"],
+      member_password_reset: ["400px", "fit-content"],
+      member_otp_verify: ["400px", "fit-content"],
       member_dashboard: ["960px", "fit-content"],
       member_pricing: ["960px", "600px"],
       metered_paywall: ["640px", "fit-content"],

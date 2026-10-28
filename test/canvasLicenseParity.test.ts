@@ -60,8 +60,14 @@ describe("the shared license block", () => {
 
   it("shrinks the mark and the lock to an icon on a small component, such as a bookmark button", () => {
     expect(reference).toContain("@container (max-height: 64px) or (max-width: 200px) { .mf-wm {");
-    expect(reference).toContain("@container (max-height: 64px) or (max-width: 140px) { .mf-lock {");
+    expect(reference).toContain("@container (max-height: 64px) or (max-width: 140px) { .mf-lic {");
     expect(reference).toContain('<div className="mf-wm-frame">');
+  });
+
+  it("uses no class the Route Shield takes for a section lock (2026-10-28)", () => {
+    // The shield matches [class*="mf-lock-"]; the lock card once used mf-lock-card
+    // and was blurred and scrambled on locked pages.
+    expect(reference).not.toMatch(/mf-lock-/);
   });
 
   it("keeps a locked tray shut, since its drawer opens outside the lock card", () => {

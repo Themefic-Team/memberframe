@@ -121,17 +121,18 @@ export const COMPONENT_LAYOUT_DEFAULTS: Record<
   }
 > = {
   /*
-    Fixed width and fixed height by default, for every component (product
-    owner, 2026-10-19), so what lands on the canvas is a known size the
-    creator can see in the sidebar and change. The auth card fills its frame,
-    centres its form when there is room to spare, and scrolls if a site turns
-    on more sign in buttons than the height allows.
+    Fixed width and fixed height by default (product owner, 2026-10-19), so
+    what lands on the canvas is a known size the creator can see and change.
+    Except the sign in cards, which fit their content since 2026-10-28 (product
+    owner): a fixed frame did not grow when the creator raised the Spacing
+    margin, so the margin ate the card's room and the card scrolled, which read
+    as a bottom margin that did nothing. Fit grows the frame by card and margin.
   */
-  member_auth: { width: "400px", height: "620px", position: "relative", top: null, centerX: null },
-  member_login: { width: "400px", height: "600px", position: "relative", top: null, centerX: null },
-  member_register: { width: "400px", height: "680px", position: "relative", top: null, centerX: null },
-  member_password_reset: { width: "400px", height: "440px", position: "relative", top: null, centerX: null },
-  member_otp_verify: { width: "400px", height: "420px", position: "relative", top: null, centerX: null },
+  member_auth: { width: "400px", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_login: { width: "400px", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_register: { width: "400px", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_password_reset: { width: "400px", height: "fit-content", position: "relative", top: null, centerX: null },
+  member_otp_verify: { width: "400px", height: "fit-content", position: "relative", top: null, centerX: null },
   // Grows with its content (product owner, 2026-10-20): the profile form is
   // long, and a fixed height made the account card scroll inside the page.
   // 960 wide for the account area's sidebar (33-member-account.md); below
