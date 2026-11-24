@@ -20,26 +20,44 @@ The plugin has five tabs across the top and an account icon at the top right. He
 
 | Tab | What you do there |
 | --- | --- |
-| **Home** | See the quick start steps, and open the **Guide**, **Contact us**, and **Changelog** links. |
+| **Home** | Open the **Setup guide** and see how many steps are done, jump to **Gate a frame**, **Set up tiers**, or **Connect payments**, and open the **Guide**, **Contact us**, and **Changelog** links. |
 | **Builder** | Choose a component, preview it, add it to your page, and create your member pages. |
 | **Manage** | Run your membership day to day in three views: **Members**, **Tiers**, and **Payments**. |
 | **Settings** | Set site-wide rules in four views: **Config**, **Page locks**, **Fields**, and **Integration**. |
 | **Reports** | See your members, revenue, and subscriptions, and export them as CSV or PDF. |
-| Account icon | Sign in to MemberFrame, start your free trial, and manage your MemberFrame plan. |
+| Account icon | Open your **Profile**, where you sign in, start your free trial, add your **Site Domains**, and manage your MemberFrame plan. |
 
 ## Step 2: Create your account and start your free trial
 
-Click the account icon at the top right, or click **Start free trial** on the **Home** tab, and create your MemberFrame account in the browser tab that opens. When you come back to Framer, your 7-day free trial will start and this project will be connected to your account, which is where your members and settings are stored.
+Click the account icon at the top right, or click **Start free trial** in the yellow banner on the **Home** tab, and create your MemberFrame account in the browser tab that opens. When you come back to Framer, your 7-day free trial will start and this project will be connected to your account, which is where your members and settings are stored.
 
 Read [How to create your account and start your free trial](02-how-to-create-your-account-and-start-your-free-trial.md) for the details.
 
-## Step 3: Choose your membership pages
+## Step 3: Follow the Setup guide
 
-Go to **Settings**, then **Config**, and check the addresses of your sign in, sign up, and reset pages, and where members land after they sign in and sign out. Every component and lock uses these addresses, so set them before you create any pages. Click **Save settings** when you are done.
+After you sign in, a **Get started with MemberFrame** window will open with the seven steps a working membership needs. Click any step to go straight to the place in the plugin where you do it, and each step gets a tick once it is really done in your project, not just opened.
+
+[Add Setup Guide Screenshot]
+
+| Step | Where you do it |
+| --- | --- |
+| **1. Create the member pages** | **Builder**, **Predefined Pages**. |
+| **2. Set up tiers** | **Manage**, **Tiers**. It is ticked once a tier has a price. |
+| **3. Connect payments** | **Manage**, **Payments**. |
+| **4. Turn on sign in options** | **Settings**, **Integration**, for Google, GitHub, Apple, or Discord. |
+| **5. Lock your content** | **Settings**, **Page locks**. |
+| **6. Publish your site** | Framer's **Publish** button. |
+| **7. Add your site's domain** | **Profile**, **Site Domains**. It is ticked once your live site has loaded a MemberFrame component. |
+
+The guide opens again each time you sign in. Tick **Don't show this again** and click **Got it** if you would rather not see it, and you can always open it later from the **Setup guide** row on the **Home** tab, which also shows how many of the seven steps are done.
+
+The steps below follow the same order and point you to the page in these docs for each one.
 
 ## Step 4: Create your member pages
 
-Go to **Builder** and scroll down to **Predefined Pages**, tick the pages you want, and click **Create Pages**. MemberFrame will add the sign in, sign up, reset password, dashboard, and pricing pages to your project with the right component already on each one.
+Go to **Builder** and scroll down to **Predefined Pages**, tick the pages you want, and click **Create Pages**. MemberFrame will add the sign in, sign up, reset password, dashboard, and pricing pages to your project with the right component already on each one, and it will save the new page addresses in **Settings**, **Config** for you.
+
+Read [How to create your member pages](05-how-to-create-your-member-pages.md), and check the addresses afterwards as shown in [How to set up your membership pages](04-how-to-set-up-your-membership-pages.md).
 
 ## Step 5: Create your tiers
 
@@ -62,18 +80,26 @@ These are optional, so add only the ones that fit your site.
 
 Paste the Route Shield script into your site once, then lock pages, lock sections, add a Soft Paywall to your articles, or share files with a Protected Download. Each of these has its own page in these docs.
 
-## Step 9: Publish and test, then go live
+## Step 9: Publish and add your domain
 
-Publish your site in Framer and test everything in a private browser window, using a test card for purchases. When everything works, switch **Manage**, **Payments** to **Live**, connect your live keys, and click **Go live**, so buyers will be charged for real from then on.
+Publish your site in Framer, then copy the address it is published at and add it in **Profile**, **Site Domains**. MemberFrame only works on the domains on that list, so this step is what switches your live site on.
+
+Read [How to add your site's domain](03-how-to-add-your-site-domain.md) for the details.
+
+> Until your domain is added, visitors on your live site see an **Add this domain to MemberFrame** card in place of your sign in forms and pricing table.
+
+## Step 10: Test, then go live
+
+Test everything on your published site in a private browser window, using a test card for purchases. When everything works, switch **Manage**, **Payments** to **Live**, connect your live keys, and click **Go live**, so buyers will be charged for real from then on.
 
 > Always finish testing in Test mode before you go live. In Live mode buyers pay real money, and purchases made in Test mode stop giving access.
 
 ## Check that it works
 
-Open your published site in a private window, sign up as a new member, and open a locked page. You should land on the page you chose in Settings, and the new member should appear in **Manage**, then **Members**.
+Open your published site in a private window, sign up as a new member, and open a locked page. You should land on the page you chose in Settings, the new member should appear in **Manage**, then **Members**, and the **Setup guide** row on the **Home** tab should show all seven steps done.
 
 ## What to read next
 
 - [How to create your account and start your free trial](02-how-to-create-your-account-and-start-your-free-trial.md)
-- [How to set up your membership pages](03-how-to-set-up-your-membership-pages.md)
-- [How to create your member pages](04-how-to-create-your-member-pages.md)
+- [How to add your site's domain](03-how-to-add-your-site-domain.md)
+- [How to create your member pages](05-how-to-create-your-member-pages.md)

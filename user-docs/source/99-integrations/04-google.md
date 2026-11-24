@@ -51,6 +51,6 @@ Open your sign in page on your published site in a private window and click the 
 
 ## What to read next
 
-- [How to turn on social sign in](../09-how-to-turn-on-social-sign-in.md)
+- [How to turn on social sign in](../10-how-to-turn-on-social-sign-in.md)
 - [GitHub](05-github.md)
 - [Apple](06-apple.md)

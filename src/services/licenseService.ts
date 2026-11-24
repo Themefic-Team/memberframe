@@ -27,11 +27,24 @@ export interface LicenseView {
   subscriptionId: string | null;
 }
 
+/** A plan's own discount (the backend's <PLAN>_DISCOUNT_CODE, a Stripe promotion code). */
+export interface PlanDiscount {
+  code: string;
+  percentOff: number | null;
+  amountOffMinor: number | null;
+  /** The price it leaves. */
+  amountMinor: number;
+}
+
 export interface PlanOffer {
   id: PlanId;
+  /** False when the plan is switched off in the backend's env (ENABLE_<PLAN>_PLAN). Absent from an older backend: sold. */
+  enabled?: boolean;
   amountMinor: number;
   currency: string;
   interval: "month" | "year" | null;
+  /** Absent from an older backend. */
+  discount?: PlanDiscount | null;
 }
 
 export interface PlansResponse {
@@ -48,6 +61,8 @@ export interface CheckoutResponse {
   creditMinor: number;
   currency: string;
   complete: boolean;
+  /** The promotion code on this checkout (typed, or the plan's own), or null. Absent from an older backend. */
+  couponCode?: string | null;
 }
 
 export interface UpgradePreview {
@@ -57,6 +72,9 @@ export interface UpgradePreview {
   amountDueMinor: number;
   currency: string;
   nextRenewal: string | null;
+  /** The code on the upgrade (typed, or the plan's own), and what it takes off. Absent from an older backend. */
+  couponCode?: string | null;
+  discountMinor?: number | null;
 }
 
 export const fetchLicense = (siteId: string, client: ApiClient = apiClient): Promise<ApiResult<{ license: LicenseView }>> =>
@@ -64,12 +82,21 @@ export const fetchLicense = (siteId: string, client: ApiClient = apiClient): Pro
 
 export const fetchPlans = (client: ApiClient = apiClient): Promise<ApiResult<PlansResponse>> => client.get("/api/plugin/plans");
 
+/**
+ * The Home promo campaign card, set in the backend's env (37-promo-campaign-card.md).
+ * Public: answered signed out too. Read as `unknown` and checked by
+ * `parseCampaign` (utils/announcementRules.ts): only `campaign` is used.
+ */
+export const fetchAnnouncement = (client: ApiClient = apiClient): Promise<ApiResult<unknown>> => client.get("/api/plugin/announcement");
+
+/** `coupon`: a typed code; undefined, the plan's own applies; null, no code at all (the creator removed it). */
 export const startCheckout = (
   siteId: string,
   plan: PlanId,
-  coupon: string | undefined,
+  coupon: string | null | undefined,
   client: ApiClient = apiClient
-): Promise<ApiResult<CheckoutResponse>> => client.post("/api/plugin/checkout", { siteId, plan, ...(coupon ? { coupon } : {}) });
+): Promise<ApiResult<CheckoutResponse>> =>
+  client.post("/api/plugin/checkout", { siteId, plan, ...(coupon ? { coupon } : coupon === null ? { noDiscount: true } : {}) });
 
 export const confirmCheckout = (
   siteId: string,
@@ -77,14 +104,16 @@ export const confirmCheckout = (
   client: ApiClient = apiClient
 ): Promise<ApiResult<{ license: LicenseView }>> => client.post("/api/plugin/checkout/confirm", { siteId, paymentIntentId });
 
+/** What an upgrade costs today. `coupon`: a typed code; absent, the plan's own applies. */
 export const fetchUpgradePreview = (
   siteId: string,
   targetPlan: PlanId,
+  coupon?: string,
   client: ApiClient = apiClient
-): Promise<ApiResult<{ preview: UpgradePreview }>> => client.get("/api/plugin/upgrade-preview", { siteId, targetPlan });
+): Promise<ApiResult<{ preview: UpgradePreview }>> => client.get("/api/plugin/upgrade-preview", { siteId, targetPlan, ...(coupon ? { coupon } : {}) });
 
-export const upgradePlan = (siteId: string, targetPlan: PlanId, client: ApiClient = apiClient): Promise<ApiResult<CheckoutResponse>> =>
-  client.post("/api/plugin/upgrade", { siteId, targetPlan });
+export const upgradePlan = (siteId: string, targetPlan: PlanId, coupon?: string, client: ApiClient = apiClient): Promise<ApiResult<CheckoutResponse>> =>
+  client.post("/api/plugin/upgrade", { siteId, targetPlan, ...(coupon ? { coupon } : {}) });
 
 export const cancelPlan = (
   siteId: string,

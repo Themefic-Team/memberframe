@@ -235,10 +235,34 @@
   box-shadow: 0 0 0 1px var(--ffmf-color-1), 0 12px 30px rgba(62, 103, 235, 0.15);
 }
 
+/*
+ * 2026-11-12: two columns. Line one: the name (and Best Deal) on the left,
+ * the price paid on the right, centered on each other in every card. Under
+ * the price, right aligned: the compared price struck through, "$20.00 OFF",
+ * then the code note.
+ */
 .ffmf-plan-card .plan-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+
+.ffmf-plan-card .plan-title-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ffmf-plan-card .plan-compare-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .ffmf-plan-card .plan-name {
@@ -248,11 +272,52 @@
 }
 
 .ffmf-plan-card .plan-price {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   color: var(--ffmf-heading);
+  line-height: 1.1;
   display: flex;
   align-items: baseline;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.ffmf-plan-card .plan-compare-price {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ffmf-text-muted);
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.ffmf-plan-card .plan-off-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+[data-framer-theme="light"] .ffmf-plan-card .plan-off-badge {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+  font-weight: 600;
+}
+
+/* The plans loading: the toggle, then two cards. */
+.ffmf-plans-skeleton .kit-skeleton.is-line {
+  height: 40px;
+  border-radius: 12px;
+}
+
+.ffmf-plans-skeleton .kit-skeleton.is-block {
+  min-height: 210px;
+  border-radius: 12px;
 }
 
 .ffmf-plan-card .plan-suffix {
@@ -342,12 +407,6 @@
 
 .ffmf-plan-card.lifetime {
   background: linear-gradient(180deg, var(--ffmf-surface-2) 0%, var(--ffmf-surface-3) 100%);
-}
-
-.ffmf-plan-card.lifetime .lifetime-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .ffmf-plan-card.lifetime .lifetime-save-badge {
@@ -591,4 +650,11 @@
   gap: 4px;
   height: 32px;
   border-radius: 10px;
+}
+
+
+.ffmf-plan-card.lifetime .lifetime-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

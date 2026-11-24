@@ -267,6 +267,7 @@ const Panel: React.FC<{ collapsed: boolean; onToggleCollapse: () => void }> = ({
                 settingsStart={settingsStart}
                 onOpenConnect={openConnect}
                 onOpenGuide={openGuide}
+                onOpenPricing={openSubscription}
                 setupDone={setup.known ? setup.count : null}
                 themePreference={preference}
                 onChangeThemePreference={setPreference}
@@ -316,6 +317,8 @@ const TabContent: React.FC<{
   settingsStart: SettingsView;
   onOpenConnect: () => void;
   onOpenGuide: () => void;
+  /** The plans: the promo card's button after its code is copied (37-promo-campaign-card.md). */
+  onOpenPricing: () => void;
   setupDone: number | null;
   themePreference: ReturnType<typeof useFramerTheme>["preference"];
   onChangeThemePreference: ReturnType<typeof useFramerTheme>["setPreference"];
@@ -329,6 +332,7 @@ const TabContent: React.FC<{
         onOpenPayments={props.onOpenPayments}
         onOpenConnect={props.onOpenConnect}
         onOpenGuide={props.onOpenGuide}
+        onOpenPricing={props.onOpenPricing}
         setupDone={props.setupDone}
       />
     ) : null}

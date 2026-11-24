@@ -1,0 +1,492 @@
+/**
+ * The Stripe checkout dialog, the same design as Hydra Booking's (and Social Share's)
+ * (framer-share-button, features/payment/components/PaymentModal.css), on
+ * this folder's BEAF theme tokens so it follows Framer's light and dark.
+ */
+
+.ffmf-pm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.65);
+  -webkit-backdrop-filter: blur(var(--px-glass-blur-backdrop));
+  backdrop-filter: blur(var(--px-glass-blur-backdrop));
+  animation: ffmf-pm-fade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ffmf-pm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ffmf-pm-rise {
+  from { transform: translateY(14px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.ffmf-pm-card {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  margin: auto;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ffmf-surface-border);
+  border-radius: 14px;
+  background: var(--ffmf-surface);
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font-family: "Inter", sans-serif;
+  animation: ffmf-pm-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-framer-theme="light"] .ffmf-pm-card {
+  box-shadow: 0 20px 48px -10px rgba(15, 23, 42, 0.18), 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* ── Header ── */
+.ffmf-pm-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ffmf-surface-border);
+  background: inherit;
+}
+
+.ffmf-pm-title-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+.ffmf-pm-icon-badge {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(82, 113, 255, 0.25);
+  background: rgba(82, 113, 255, 0.12);
+  color: #5271FF;
+}
+
+.ffmf-pm-icon-badge svg { width: 17px; height: 17px; }
+
+.ffmf-pm-title-stack { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+.ffmf-pm-title {
+  margin: 0;
+  color: var(--ffmf-heading);
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.ffmf-pm-subtitle { color: var(--ffmf-text-muted); font-size: 10px; }
+
+.ffmf-pm-close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ffmf-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ffmf-pm-close svg { width: 15px; height: 15px; }
+.ffmf-pm-close:hover { background: rgba(127, 127, 127, 0.14); color: var(--ffmf-heading); }
+
+/* ── Body ── */
+.ffmf-pm-body { display: flex; flex-direction: column; gap: 12px; padding: 14px; box-sizing: border-box; }
+
+/* ── Plan and price ── */
+.ffmf-pm-summary {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid rgba(82, 113, 255, 0.22);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(82, 113, 255, 0.08) 0%, var(--ffmf-surface-2) 100%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+[data-framer-theme="light"] .ffmf-pm-summary {
+  background: linear-gradient(145deg, rgba(82, 113, 255, 0.05) 0%, #f9fafb 100%);
+  box-shadow: 0 3px 12px rgba(82, 113, 255, 0.05);
+}
+
+.ffmf-pm-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.ffmf-pm-item-name {
+  color: var(--ffmf-heading);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ffmf-pm-item-period { color: var(--ffmf-text-muted); font-size: 11px; }
+
+.ffmf-pm-price-stack { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; flex-shrink: 0; }
+
+.ffmf-pm-price {
+  flex-shrink: 0;
+  color: #5271FF;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum";
+}
+
+.ffmf-pm-price-original {
+  color: var(--ffmf-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.ffmf-pm-price-discounted { color: #10b981; }
+
+/* ── Coupon ── */
+.ffmf-pm-coupon { display: flex; flex-direction: column; gap: 6px; }
+
+.ffmf-pm-coupon-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: #5271FF;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ffmf-pm-coupon-toggle svg { width: 13px; height: 13px; }
+.ffmf-pm-coupon-toggle:hover { text-decoration: underline; }
+
+.ffmf-pm-coupon-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--ffmf-surface-border);
+  border-radius: 8px;
+  background: var(--ffmf-surface-2);
+  transition: border-color 0.15s ease;
+}
+
+.ffmf-pm-coupon-field:focus-within { border-color: #5271FF; }
+.ffmf-pm-coupon-field > svg { width: 13px; height: 13px; flex-shrink: 0; color: var(--ffmf-text-muted); }
+
+.ffmf-pm-coupon-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ffmf-heading);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ffmf-pm-coupon-input::placeholder { color: var(--ffmf-text-muted); font-weight: 400; text-transform: none; }
+
+/* 2026-11-11: no box of its own inside the field. Framer's plugin styles give
+   every input a background, a radius, and a blue ring on focus; the field
+   around it is the only border, and it turns blue on focus instead. */
+.ffmf-pm-coupon-field input.ffmf-pm-coupon-input,
+.ffmf-pm-coupon-field input.ffmf-pm-coupon-input:hover,
+.ffmf-pm-coupon-field input.ffmf-pm-coupon-input:focus,
+.ffmf-pm-coupon-field input.ffmf-pm-coupon-input:focus-visible {
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.ffmf-pm-coupon-apply {
+  height: 26px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: #5271FF;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ffmf-pm-coupon-apply:hover:not(:disabled) { background: #415fd8; }
+.ffmf-pm-coupon-apply:disabled { opacity: 0.5; cursor: not-allowed; }
+.ffmf-pm-coupon-apply svg { width: 12px; height: 12px; }
+
+.ffmf-pm-coupon-error { padding-left: 2px; color: #ef4444; font-size: 11px; line-height: 1.3; }
+
+.ffmf-pm-coupon-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.1);
+  font-size: 11.5px;
+}
+
+.ffmf-pm-coupon-left { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.ffmf-pm-coupon-check { width: 13px; height: 13px; flex-shrink: 0; color: #10b981; }
+.ffmf-pm-coupon-code { color: #10b981; font-weight: 700; letter-spacing: 0.02em; }
+.ffmf-pm-coupon-desc { overflow: hidden; color: var(--ffmf-text-muted); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
+
+.ffmf-pm-coupon-remove {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ffmf-text-muted);
+  cursor: pointer;
+}
+
+.ffmf-pm-coupon-remove svg { width: 12px; height: 12px; }
+.ffmf-pm-coupon-remove:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+/* ── Account ── */
+.ffmf-pm-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--ffmf-surface-border);
+  border-radius: 8px;
+  background: var(--ffmf-surface-2);
+  font-size: 11.5px;
+}
+
+.ffmf-pm-account-label { display: flex; align-items: center; gap: 6px; color: var(--ffmf-text-muted); font-weight: 500; }
+.ffmf-pm-account-label svg { width: 13px; height: 13px; }
+
+.ffmf-pm-account-email {
+  max-width: 175px;
+  overflow: hidden;
+  color: var(--ffmf-heading);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── Payment processing ── */
+.ffmf-pm-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--ffmf-surface-border);
+  border-radius: 8px;
+  background: var(--ffmf-surface-2);
+}
+
+.ffmf-pm-notice svg { width: 18px; height: 18px; flex: none; color: #5271FF; }
+.ffmf-pm-notice p { margin: 0; color: var(--ffmf-text-muted); font-size: 12px; line-height: 1.5; }
+
+.ffmf-pm-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+[data-framer-theme="light"] .ffmf-pm-error { color: #dc2626; }
+
+/* ── Actions ── */
+.ffmf-pm-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 2px; }
+
+.ffmf-pm-cta {
+  width: 100%;
+  height: 36px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #5271FF 0%, #3B51B8 100%);
+  box-shadow: 0 2px 6px -2px rgba(82, 113, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 0.25s ease, transform 0.1s ease;
+}
+
+.ffmf-pm-cta svg { width: 14px; height: 14px; }
+.ffmf-pm-cta:hover { box-shadow: 0 4px 12px -2px rgba(82, 113, 255, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.ffmf-pm-cta:active { background: #3b51b8; transform: scale(0.985); }
+
+.ffmf-pm-secondary {
+  width: 100%;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--ffmf-surface-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ffmf-text-muted);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ffmf-pm-secondary svg { width: 14px; height: 14px; }
+.ffmf-pm-secondary:hover:not(:disabled) { background: rgba(127, 127, 127, 0.1); color: var(--ffmf-heading); }
+.ffmf-pm-secondary:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.ffmf-pm-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ffmf-text-muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.ffmf-pm-dot { opacity: 0.5; }
+
+.ffmf-pm-spin { animation: ffmf-pm-spin 1s linear infinite; }
+@keyframes ffmf-pm-spin { to { transform: rotate(360deg); } }
+
+.ffmf-pm-close:focus-visible,
+.ffmf-pm-coupon-toggle:focus-visible,
+.ffmf-pm-coupon-apply:focus-visible,
+.ffmf-pm-coupon-remove:focus-visible,
+.ffmf-pm-cta:focus-visible,
+.ffmf-pm-secondary:focus-visible {
+  outline: 2px solid #5271FF;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ffmf-pm-backdrop,
+  .ffmf-pm-card { animation: none; }
+  .ffmf-pm-spin { animation-duration: 3s; }
+}
+
+/* ── Payment verified (2026-11-10) ── */
+.ffmf-pm-close--corner { position: absolute; top: 10px; right: 10px; }
+
+.ffmf-pm-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 18px 18px;
+  text-align: center;
+}
+
+.ffmf-pm-success-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  animation: ffmf-pm-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ffmf-pm-success-icon svg { width: 30px; height: 30px; }
+
+.ffmf-pm-success-title {
+  margin: 0;
+  color: var(--ffmf-heading);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ffmf-pm-success-desc {
+  max-width: 270px;
+  margin: 0 0 4px 0;
+  color: var(--ffmf-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ffmf-pm-success-desc strong { color: var(--ffmf-heading); font-weight: 600; }
+
+@keyframes ffmf-pm-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ffmf-pm-success-icon { animation: none; }
+}
+
+/* ── Stripe (MemberFrame): the Payment Element and the pay button, under the summary ── */
+.ffmf-pm-stripe { display: flex; flex-direction: column; gap: 12px; }
+.ffmf-pm-error-text { margin: 0 0 8px 0; }
+.ffmf-pm-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.ffmf-pm-support svg { width: 14px; height: 14px; }

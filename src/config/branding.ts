@@ -28,32 +28,41 @@ export const HELP_LINKS = {
   changelog: BRANDING.changelogUrl,
 } as const;
 
-export type SiblingPluginId = "beaf" | "connectfic" | "crestbar";
+export type SiblingPluginId = "social-share" | "store-locator" | "beaf" | "connectfic" | "crestbar" | "cms-filter" | "formfic" | "chat-bubbles" | "auto-toc";
 
 /**
- * "More from Framefic": sibling plugins only, per the Foundations Content doc.
- * Names, descriptions, logos, and Marketplace links are BEAF's own "More from
- * Framefic" section, so every Framefic plugin lists its siblings the same way.
- * Each logo is a file in `public/`, copied from BEAF.
+ * "More From Framefic": every published Framefic plugin but this one, the
+ * same list Hydra Booking shows (2026-11-24). Each logo is a file in
+ * `public/`, bundled, never loaded from a CDN. `isNew` shows the kit's New badge.
  */
-export const SIBLING_PLUGINS: ReadonlyArray<{
-  id: SiblingPluginId;
-  name: string;
-  description: string;
-  logo: string;
-  href: string;
-}> = [
+export const SIBLING_PLUGINS: ReadonlyArray<{ id: SiblingPluginId; name: string; description: string; logo: string; href: string; isNew?: boolean }> = [
+  {
+    id: "social-share",
+    name: "Social Share",
+    description: "Share buttons for 13+ platforms, with counts and custom styles.",
+    logo: "/SocialShare.svg",
+    href: "https://www.framer.com/marketplace/plugins/social-share/",
+    isNew: true,
+  },
+  {
+    id: "store-locator",
+    name: "Store Locator",
+    description: "Interactive maps, store finder, custom pins, and CMS locations.",
+    logo: "/StoreLocator.png",
+    href: "https://www.framer.com/marketplace/plugins/store-locator/",
+    isNew: true,
+  },
   {
     id: "beaf",
     name: "Before After Images Slider",
-    description: "Advanced image slider fully customizable and responsive",
+    description: "Advanced image slider fully customizable and responsive.",
     logo: "/Beaf.png",
     href: "https://www.framer.com/marketplace/plugins/beaf/",
   },
   {
     id: "connectfic",
     name: "Connectfic",
-    description: "Connect your framer site with shopify store and components",
+    description: "Connect your Framer site with a Shopify store and components.",
     logo: "/Connectfic.png",
     href: "https://www.framer.com/marketplace/plugins/connectfic/",
   },
@@ -63,6 +72,34 @@ export const SIBLING_PLUGINS: ReadonlyArray<{
     description: "Create bars and countdown timers to boost engagement and conversions.",
     logo: "/Crestbar.png",
     href: "https://www.framer.com/community/marketplace/plugins/announcement-bar/",
+  },
+  {
+    id: "cms-filter",
+    name: "CMS Filter",
+    description: "Real time search, multi filters, and animations for Framer CMS.",
+    logo: "/CmsFilter.png",
+    href: "https://www.framer.com/marketplace/plugins/cms-filter/",
+  },
+  {
+    id: "formfic",
+    name: "Formfic",
+    description: "Powerful customizable forms, validation, and multi step workflows.",
+    logo: "/Formfic.png",
+    href: "https://www.framer.com/marketplace/plugins/formfic/",
+  },
+  {
+    id: "chat-bubbles",
+    name: "Chat Bubbles",
+    description: "Interactive floating chat widgets and customer engagement prompts.",
+    logo: "/ChatBubbles.png",
+    href: "https://www.framer.com/marketplace/plugins/chat-bubbles/",
+  },
+  {
+    id: "auto-toc",
+    name: "Auto Table of Contents",
+    description: "Generate a clean, automatic table of contents for blogs and docs.",
+    logo: "/AutoToc.png",
+    href: "https://www.framer.com/marketplace/plugins/auto-table-of-contents/",
   },
 ];
 

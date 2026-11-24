@@ -36,7 +36,7 @@ Where to find it in the app: Settings tab, then Page locks
 
 One-line summary: Add sign in, sign up, password reset, and email code sign in forms in one click.
 
-Description: Members can sign in with a password, with a six-digit code sent to their email, or with Google, Apple, GitHub, or Discord. Every form can sit on the page or open as a popup, and you style it from Framer's right sidebar so it matches your brand. You also choose the password rules once, and every form on your site follows them.
+Description: Members can sign in with a password, with a six-digit code sent to their email, or with Google, Apple, GitHub, or Discord. Every form can sit on the page or open as a popup, and one popup placed in your navigation opens from the menu on every page. You style each form from Framer's right sidebar so it matches your brand, and you choose the password rules once for every form on your site.
 
 Plan: Free trial and every MemberFrame plan
 
@@ -52,11 +52,11 @@ Plan: Free trial and every MemberFrame plan
 
 Where to find it in the app: Builder tab, then Member Pricing
 
-## 6. A member dashboard for self-service
+## 6. A complete member account area
 
-One-line summary: Give members one page to see their plan, change it, pay, and update their profile.
+One-line summary: Give members their own account area for plans, billing, bookmarks, profile, and security.
 
-Description: Members see their tier, their status, their next renewal, and their payment history with receipts. They can upgrade, downgrade, cancel, or resume their plan themselves, which saves you a lot of support messages. They can also fill in the profile questions you ask in Settings.
+Description: The Member Dashboard is a full account area on your own site, with a menu that leads to separate sections for the overview, membership, billing, bookmarks, profile, and security. Members upgrade, downgrade, cancel, or resume their plan, find their receipts, upload a photo, change their password, sign out other devices, and even delete their account themselves, which saves you a lot of support messages. You choose which sections show, and you style every one of them from Framer's right sidebar.
 
 Plan: Free trial and every MemberFrame plan
 
@@ -136,7 +136,7 @@ Where to find it in the app: Settings tab, then Fields
 
 One-line summary: Let members save posts and pages to a personal list they can open from any device.
 
-Description: Put a Bookmark Button on your blog cards or pages and a Bookmarks Tray in your navigation bar. Members save items with one click and find them again in a slide-out drawer. Saved items follow the member across devices because they are stored on their account.
+Description: Put a Bookmark Button on your blog cards or pages and a Bookmarks Tray in your navigation bar. Members save items with one click and find them again in a slide-out drawer or in the **Bookmarks** section of their dashboard. Saved items follow the member across devices because they are stored on their account.
 
 Plan: Free trial and every MemberFrame plan
 
@@ -166,11 +166,31 @@ Where to find it in the app: Settings tab, then Config, then Email
 
 One-line summary: Create your sign in, sign up, reset, dashboard, and pricing pages with one click.
 
-Description: Tick the pages you need and MemberFrame creates them in your project with the right component already on each one. Pages that already exist are skipped, so you never get duplicates. Each page is created at the address you chose in Settings.
+Description: Tick the pages you need and MemberFrame creates them in your project with the right component already on each one, inside your site's own header and footer. The new addresses are saved in Settings for you, so every link and lock points to the right page. Pages that already exist are skipped, so you never get duplicates.
 
 Plan: Free trial and every MemberFrame plan
 
 Where to find it in the app: Builder tab, then Predefined Pages
+
+## 18. A setup guide that tracks your progress
+
+One-line summary: Follow seven clear steps to a working membership, with real progress ticks.
+
+Description: After you sign in, a short guide lists the seven steps a membership site needs, from creating pages to adding your domain. Each step opens the right place in the plugin, and it is only ticked once it is really done in your project. You can open the guide again from the Home tab at any time to see how far you are.
+
+Plan: Free trial and every MemberFrame plan
+
+Where to find it in the app: Home tab, then Setup guide
+
+## 19. Your site, and only your site
+
+One-line summary: MemberFrame only works on the domains you list, so copies of your site stay locked.
+
+Description: You add the domains your site is published on, and MemberFrame checks that each one is a real, published website before saving it. Sign up, sign in, payments, and locked content only work on those domains, so a copied site on another address cannot use your members or payments. Each domain shows whether your live site is working, and new domains MemberFrame sees are offered for one-click adding.
+
+Plan: Free trial and every MemberFrame plan
+
+Where to find it in the app: Account icon, then Profile, then Site Domains
 
 ## Top 5 for the listing
 
@@ -178,4 +198,4 @@ Where to find it in the app: Builder tab, then Predefined Pages
 2. **Take payments with Stripe, Lemon Squeezy, or Razorpay:** buyers choose how to pay.
 3. **Lock pages for members only:** protect any page or a whole section of your site.
 4. **Ready-made sign in and sign up:** passwords, email codes, and social sign in.
-5. **A member dashboard for self-service:** members manage their own plan and billing.
+5. **A complete member account area:** members manage their own plan, billing, profile, and security.

@@ -52,6 +52,6 @@ Buy a tier on your published site in Test mode using a Lemon Squeezy test card. 
 
 ## What to read next
 
-- [How to take payments](../07-how-to-take-payments.md)
+- [How to take payments](../08-how-to-take-payments.md)
 - [Stripe](01-stripe.md)
 - [Razorpay](03-razorpay.md)

@@ -51,6 +51,6 @@ Buy a tier on your published site in Test mode using Razorpay's test payment det
 
 ## What to read next
 
-- [How to take payments](../07-how-to-take-payments.md)
+- [How to take payments](../08-how-to-take-payments.md)
 - [Stripe](01-stripe.md)
 - [Lemon Squeezy](02-lemon-squeezy.md)

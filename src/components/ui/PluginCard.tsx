@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowUpRight } from "lucide-react";
+import { Badge } from "./Badge";
 
 export interface PluginCardProps {
   name: string;
@@ -7,6 +8,8 @@ export interface PluginCardProps {
   /** The sibling plugin's logo glyph, shown on the 44px brand-gradient tile. */
   logo: React.ReactNode;
   href: string;
+  /** A plugin just released: the kit's New badge beside its name (2026-11-10). */
+  isNew?: boolean;
 }
 
 /**
@@ -17,19 +20,22 @@ export interface PluginCardProps {
  * trailing arrow says the card opens the browser, and the accessible name
  * says so too.
  */
-export const PluginCard: React.FC<PluginCardProps> = ({ name, description, logo, href }) => (
+export const PluginCard: React.FC<PluginCardProps> = ({ name, description, logo, href, isNew }) => (
   <a
     className="framefic-card"
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    aria-label={`${name}: ${description}. Opens in your browser`}
+    aria-label={`${name}${isNew ? ", new" : ""}: ${description}. Opens in your browser`}
   >
     <span className="framefic-card-logo" aria-hidden={true}>
       {logo}
     </span>
     <span className="framefic-card-info">
-      <span className="framefic-card-name">{name}</span>
+      <span className="framefic-card-name">
+        {name}
+        {isNew ? <Badge tone="new">New</Badge> : null}
+      </span>
       <span className="framefic-card-desc">{description}</span>
     </span>
     <span className="framefic-card-open" aria-hidden={true}>

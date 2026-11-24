@@ -37,6 +37,6 @@ Buy a tier on your published site with Stripe's test card `4242 4242 4242 4242`,
 
 ## What to read next
 
-- [How to take payments](../07-how-to-take-payments.md)
+- [How to take payments](../08-how-to-take-payments.md)
 - [Lemon Squeezy](02-lemon-squeezy.md)
 - [Razorpay](03-razorpay.md)

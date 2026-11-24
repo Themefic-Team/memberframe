@@ -17,28 +17,29 @@ Rebuild after any change: `npm run docs:user`. The build also checks the writing
 1. [MemberFrame Highlighted Features](source/00-highlighted-features.md)
 2. [Getting Started with MemberFrame](source/01-getting-started.md)
 3. [How to Create Your Account and Start Your Free Trial](source/02-how-to-create-your-account-and-start-your-free-trial.md)
-4. [How to Set Up Your Membership Pages](source/03-how-to-set-up-your-membership-pages.md)
-5. [How to Create Your Member Pages](source/04-how-to-create-your-member-pages.md)
-6. [How to Add and Style a Component](source/05-how-to-add-and-style-a-component.md)
-7. [How to Create and Price Your Tiers](source/06-how-to-create-and-price-your-tiers.md)
-8. [How to Take Payments](source/07-how-to-take-payments.md)
-9. [How to Add Sign In and Sign Up](source/08-how-to-add-sign-in-and-sign-up.md)
-10. [How to Turn On Social Sign In](source/09-how-to-turn-on-social-sign-in.md)
-11. [How to Lock a Page](source/10-how-to-lock-a-page.md)
-12. [How to Lock Part of a Page](source/11-how-to-lock-part-of-a-page.md)
-13. [How to Add a Soft Paywall](source/12-how-to-add-a-soft-paywall.md)
-14. [How to Share a Protected Download](source/13-how-to-share-a-protected-download.md)
-15. [How to Add a Member Dashboard](source/14-how-to-add-a-member-dashboard.md)
-16. [How to Add a Pricing Table](source/15-how-to-add-a-pricing-table.md)
-17. [How to Let Members Save Bookmarks](source/16-how-to-let-members-save-bookmarks.md)
-18. [How to Ask Members Profile Questions](source/17-how-to-ask-members-profile-questions.md)
-19. [How to Manage Your Members](source/18-how-to-manage-your-members.md)
-20. [How to Send Emails from Your Own Address](source/19-how-to-send-emails-from-your-own-address.md)
-21. [How to Send Member Events with Webhooks](source/20-how-to-send-member-events-with-webhooks.md)
-22. [How to Read and Export Your Reports](source/21-how-to-read-and-export-your-reports.md)
-23. [How to Manage Your MemberFrame Plan](source/22-how-to-manage-your-memberframe-plan.md)
-24. [Troubleshooting and FAQ](source/23-troubleshooting-and-faq.md)
-25. Integrations
+4. [How to Add Your Site's Domain](source/03-how-to-add-your-site-domain.md)
+5. [How to Set Up Your Membership Pages](source/04-how-to-set-up-your-membership-pages.md)
+6. [How to Create Your Member Pages](source/05-how-to-create-your-member-pages.md)
+7. [How to Add and Style a Component](source/06-how-to-add-and-style-a-component.md)
+8. [How to Create and Price Your Tiers](source/07-how-to-create-and-price-your-tiers.md)
+9. [How to Take Payments](source/08-how-to-take-payments.md)
+10. [How to Add Sign In and Sign Up](source/09-how-to-add-sign-in-and-sign-up.md)
+11. [How to Turn On Social Sign In](source/10-how-to-turn-on-social-sign-in.md)
+12. [How to Lock a Page](source/11-how-to-lock-a-page.md)
+13. [How to Lock Part of a Page](source/12-how-to-lock-part-of-a-page.md)
+14. [How to Add a Soft Paywall](source/13-how-to-add-a-soft-paywall.md)
+15. [How to Share a Protected Download](source/14-how-to-share-a-protected-download.md)
+16. [How to Add a Member Dashboard](source/15-how-to-add-a-member-dashboard.md)
+17. [How to Add a Pricing Table](source/16-how-to-add-a-pricing-table.md)
+18. [How to Let Members Save Bookmarks](source/17-how-to-let-members-save-bookmarks.md)
+19. [How to Ask Members Profile Questions](source/18-how-to-ask-members-profile-questions.md)
+20. [How to Manage Your Members](source/19-how-to-manage-your-members.md)
+21. [How to Send Emails from Your Own Address](source/20-how-to-send-emails-from-your-own-address.md)
+22. [How to Send Member Events with Webhooks](source/21-how-to-send-member-events-with-webhooks.md)
+23. [How to Read and Export Your Reports](source/22-how-to-read-and-export-your-reports.md)
+24. [How to Manage Your MemberFrame Plan](source/23-how-to-manage-your-memberframe-plan.md)
+25. [Troubleshooting and FAQ](source/24-troubleshooting-and-faq.md)
+26. Integrations
     - [Stripe](source/99-integrations/01-stripe.md)
     - [Lemon Squeezy](source/99-integrations/02-lemon-squeezy.md)
     - [Razorpay](source/99-integrations/03-razorpay.md)
@@ -69,7 +70,10 @@ Use these words, and only these, for these things on every page.
 | Section lock | A lock on chosen layers of a page, picked as a code override in Framer. |
 | Route Shield | The script, added to your site once, that makes page and section locks work. |
 | Soft Paywall | The component that shows the start of an article, then a lock card. |
-| Profile field | A question members answer on their dashboard. |
+| Profile field | A question members answer in the Profile section of their dashboard. |
+| Site Domains | The list in Profile of the domains your site is published on. MemberFrame only works on these. |
+| Setup guide | The seven-step guide that opens after sign in, and from the Home tab. |
+| Section (dashboard) | One part of the Member Dashboard, such as Overview or Security, picked from its menu. |
 | Webhook | A message sent to another service when something happens to a member. |
 | Your MemberFrame plan | The subscription you pay for the plugin: Monthly, Yearly, or Lifetime. |
 | Publish | Framer's Publish button, which updates your live site. |

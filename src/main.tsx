@@ -35,6 +35,7 @@ import "./styles/billing/trial-status-modal.css";
 import "./styles/billing/profile.css";
 import "./styles/billing/subscription.css";
 import "./styles/billing/payment.css";
+import "./styles/billing/payment-modal.css";
 import "./styles/billing/watermark-notice.css";
 import "./styles/billing/components.css";
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   ChevronRight,
   CreditCard,
@@ -24,6 +24,8 @@ import {
 import { BRANDING, HELP_LINKS, SIBLING_PLUGINS } from "../../config/branding";
 import { useConnection } from "../../hooks/useConnection";
 import { SETUP_STEP_IDS } from "../../hooks/useSetupProgress";
+import { useAnnouncement } from "../../hooks/useAnnouncement";
+import { AnnouncementCard, AnnouncementSkeleton } from "../home/AnnouncementCard";
 
 export interface HomeTabProps {
   onOpenBuilder: () => void;
@@ -38,6 +40,8 @@ export interface HomeTabProps {
   onOpenGuide: () => void;
   /** Steps finished, from useSetupProgress; null until the first check answers. */
   setupDone: number | null;
+  /** The plans (Account, Subscription), where the promo card's button leads after the code is copied. */
+  onOpenPricing: () => void;
 }
 
 interface QuickStep {
@@ -107,8 +111,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onOpenConnect,
   onOpenGuide,
   setupDone,
+  onOpenPricing,
 }) => {
   const { state } = useConnection();
+  const announcement = useAnnouncement();
+  const quickStartRef = useRef<HTMLHeadingElement>(null);
   const total = SETUP_STEP_IDS.length;
   const steps: ReadonlyArray<QuickStep> = [
     {
@@ -133,6 +140,22 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   return (
     <div className="home-tab-container">
+      {/* The promo campaign card (37-promo-campaign-card.md), first on Home: set in the backend's env, its window kept in this browser. */}
+      {announcement.status === "loading" ? <AnnouncementSkeleton /> : null}
+      {announcement.status === "open" ? (
+        <AnnouncementCard
+          campaign={announcement.campaign}
+          copied={announcement.copied}
+          remainingMs={announcement.remainingMs}
+          onCopied={announcement.markCopied}
+          onOpenPricing={onOpenPricing}
+          onClose={() => {
+            announcement.close();
+            quickStartRef.current?.focus();
+          }}
+        />
+      ) : null}
+
       {/*
         Only while loading is unknown; "loading" shows nothing rather than
         flashing a warning at a creator who is in fact connected.
@@ -173,7 +196,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       />
 
       <section className="section-group">
-        <h2 className="section-title">Quick Start</h2>
+        <h2 ref={quickStartRef} tabIndex={-1} className="section-title">
+          Quick Start
+        </h2>
         <div className="step-list">
           {state.status === "connected" ? (
             <button type="button" className="step-row" aria-haspopup="dialog" onClick={onOpenGuide}>
@@ -230,6 +255,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               description={plugin.description}
               logo={<img src={plugin.logo} alt="" className="framefic-card-logo-img" />}
               href={plugin.href}
+              isNew={plugin.isNew}
             />
           ))}
         </PluginCardList>

@@ -1080,3 +1080,206 @@
     transform: none;
   }
 }
+
+/* Home promo campaign card (37-promo-campaign-card.md): the same card as Hydra Booking's, every word from the backend's env. */
+.mf-offer {
+  --mf-offer-ink: var(--px-brand-on-primary);
+  --mf-offer-deep: color-mix(in srgb, var(--px-brand-primary) 88%, black);
+  --mf-offer-mid: color-mix(in srgb, var(--px-brand-primary) 92%, black);
+  --mf-offer-glow: color-mix(in srgb, var(--px-brand-on-primary) 12%, transparent);
+  --mf-offer-glow-soft: color-mix(in srgb, var(--px-brand-on-primary) 6%, transparent);
+  --mf-offer-action-bg: color-mix(in srgb, var(--px-brand-primary) 12%, black);
+  --mf-offer-action-hover: color-mix(in srgb, var(--px-brand-primary) 24%, black);
+  --mf-offer-ring: color-mix(in srgb, var(--px-brand-on-primary) 40%, transparent);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(80px, 37%, 120px);
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 168px;
+  padding: var(--space-16);
+  border-radius: var(--radius-16);
+  color: var(--mf-offer-ink);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle 104px at 100% 0%, var(--mf-offer-glow) 0 99%, transparent 100%),
+    radial-gradient(circle 150px at 100% 0%, var(--mf-offer-glow-soft) 0 99%, transparent 100%),
+    radial-gradient(circle 72px at 100% 100%, var(--mf-offer-glow-soft) 0 99%, transparent 100%),
+    linear-gradient(90deg, var(--mf-offer-deep) 0%, var(--mf-offer-mid) 58%, var(--px-brand-primary) 100%);
+  box-shadow: var(--px-shadow-card);
+}
+
+.mf-offer-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* Set on every text element: the panel's own p and label rules would make them grey. */
+.mf-offer-countdown,
+.mf-offer-subtitle,
+.mf-offer-manual,
+.mf-offer-manual label {
+  color: var(--mf-offer-ink);
+}
+
+.mf-offer-countdown {
+  margin: 0 0 var(--space-4) 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.mf-offer-clock {
+  font-variant-numeric: tabular-nums;
+}
+
+.mf-offer-title {
+  margin: 0;
+  color: var(--mf-offer-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.mf-offer-subtitle {
+  margin: var(--space-4) 0 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.mf-offer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  max-width: 100%;
+  min-height: 32px;
+  margin: var(--space-12) 0 0 0;
+  padding: 0 var(--space-12);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--mf-offer-action-bg);
+  color: var(--mf-offer-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.mf-offer-action:hover {
+  background: var(--mf-offer-action-hover);
+}
+
+.mf-offer-action:focus-visible,
+.mf-offer-close:focus-visible,
+.mf-offer-manual-input:focus-visible {
+  outline: 2px solid var(--mf-offer-ink);
+  outline-offset: 2px;
+}
+
+.mf-offer-action-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mf-offer-code {
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mf-offer-action-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.mf-offer-manual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-8) 0 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.mf-offer-manual-input {
+  width: 100%;
+  max-width: 160px;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--mf-offer-ring);
+  border-radius: var(--radius-8);
+  background: var(--mf-offer-action-bg);
+  color: var(--mf-offer-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* The gift's own column, clear of the close button. */
+.mf-offer-art {
+  display: flex;
+  align-self: end;
+  justify-content: center;
+  padding: var(--space-24) 0 0 0;
+}
+
+.mf-offer-art picture {
+  display: block;
+  width: 100%;
+}
+
+.mf-offer-gift {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 196 / 224;
+  object-fit: contain;
+}
+
+.mf-offer-close {
+  position: absolute;
+  top: var(--space-8);
+  right: var(--space-8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--mf-offer-ink);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.mf-offer-close:hover {
+  background: var(--mf-offer-glow);
+}
+
+.mf-offer-close-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* The same footprint while the campaign loads, so Home does not jump. */
+.kit-skeleton.mf-offer-skeleton {
+  min-height: 168px;
+  border-radius: var(--radius-16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-offer-action,
+  .mf-offer-close {
+    transition: none;
+  }
+}

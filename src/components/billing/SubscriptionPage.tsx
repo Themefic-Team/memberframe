@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Ban, X } from "lucide-react";
+import { ArrowLeft, Ban, Check, Loader2, Tag, X } from "lucide-react";
 import { useConnection } from "../../hooks/useConnection";
 import { useLicense } from "../../hooks/useLicense";
 import { failureMessage, type ApiFailure } from "../../services/apiClient";
@@ -39,6 +39,9 @@ const money = (minor: number, currency: string): string => {
   }
 };
 
+/** The last plans the server sent, kept for this panel session: reopening the page shows them at once, no skeleton. */
+let plansCache: PlansResponse | null = null;
+
 /**
  * Manage Subscription. F19: a clone of the BEAF plugin's SubscriptionPage,
  * PaymentPlans, and its payment flow, so every Framefic plugin sells its plans
@@ -50,7 +53,9 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
   const { view, apply, refresh } = useLicense();
   const siteId = connection?.siteId ?? "";
 
-  const [plans, setPlans] = useState<PlansResponse | null>(null);
+  const [plans, setPlans] = useState<PlansResponse | null>(plansCache);
+  /** Until the server answers, the cards are a skeleton: a plan switched off in env never flashes in first. */
+  const [plansLoading, setPlansLoading] = useState(plansCache === null);
   const [showPlans, setShowPlans] = useState(showPlansRequest > 0);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -66,11 +71,23 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
   const [payingPlan, setPayingPlan] = useState<PlanId | null>(null);
   const [isCreatingPayment, setIsCreatingPayment] = useState(false);
   const [checkout, setCheckout] = useState<CheckoutResponse | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
+  /** The plan just bought, for the success dialog: it stays until Continue (as Hydra Booking). */
+  const [successPlan, setSuccessPlan] = useState<PlanId | null>(null);
+  // A code on an upgrade too. The typed code (null: the plan's own, if it has one).
+  const [upgradeCoupon, setUpgradeCoupon] = useState<string | null>(null);
+  const [upgradeCouponDraft, setUpgradeCouponDraft] = useState("");
+  const [upgradeCouponOpen, setUpgradeCouponOpen] = useState(false);
+  const [upgradeCouponError, setUpgradeCouponError] = useState("");
+  const [applyingUpgradeCoupon, setApplyingUpgradeCoupon] = useState(false);
 
   useEffect(() => {
     void fetchPlans().then((result) => {
-      if (result.kind === "ok") setPlans(result.data);
+      if (result.kind === "ok") {
+        plansCache = result.data;
+        setPlans(result.data);
+      }
+      // A failed answer falls back to the built in prices, as before.
+      setPlansLoading(false);
     });
   }, []);
 
@@ -110,13 +127,13 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
       } else {
         await refresh();
       }
+      const bought = payingPlan;
       setCheckout(null);
       setPayingPlan(null);
       setShowPlans(false);
-      setShowSuccess(true);
-      window.setTimeout(() => setShowSuccess(false), 2500);
+      setSuccessPlan(bought ?? "monthly");
     },
-    [apply, refresh, siteId]
+    [apply, refresh, siteId, payingPlan]
   );
 
   const makePayment = async (plan: PlanId) => {
@@ -146,10 +163,31 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
         reportFailure(result, "Could not price the change.");
         return;
       }
+      setUpgradeCoupon(null);
+      setUpgradeCouponDraft("");
+      setUpgradeCouponOpen(false);
+      setUpgradeCouponError("");
       setUpgradePreview(result.data.preview);
       return;
     }
     await makePayment(plan);
+  };
+
+  /** Price the upgrade again with a typed code; refused codes leave the preview as it was. */
+  const applyUpgradeCoupon = async (code: string | null) => {
+    if (!upgradePreview) return;
+    setApplyingUpgradeCoupon(true);
+    setUpgradeCouponError("");
+    const result = await fetchUpgradePreview(siteId, upgradePreview.to, code ?? undefined);
+    setApplyingUpgradeCoupon(false);
+    if (result.kind !== "ok") {
+      setUpgradeCouponError(result.kind === "unavailable" && result.message ? result.message : "Invalid or expired discount code.");
+      return;
+    }
+    setUpgradeCoupon(code);
+    setUpgradeCouponDraft("");
+    setUpgradeCouponOpen(false);
+    setUpgradePreview(result.data.preview);
   };
 
   const handleChangePlan = async () => {
@@ -157,7 +195,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
     setChanging(true);
     setBillingError(null);
     const target = upgradePreview.to;
-    const result = await upgradePlan(siteId, target);
+    const result = await upgradePlan(siteId, target, upgradeCoupon ?? undefined);
     setChanging(false);
     setUpgradePreview(null);
     setShowPlans(false);
@@ -210,8 +248,8 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
   };
 
   const endDate = view?.plan === "lifetime" ? "Never" : formatDate(view?.currentPeriodEnd ?? view?.trialEndsAt ?? null);
-  const showAmount = checkout ? checkout.amountDueMinor / 100 : 0;
-  const showType = payingPlan === "monthly" ? "Monthly" : payingPlan === "yearly" ? "Annually" : "One time";
+  // The plan's own price, struck through in the checkout dialog when a code or a credit lowers it.
+  const listAmountMinor = plans?.plans.find((offer) => offer.id === payingPlan)?.amountMinor ?? null;
 
   return (
     <div className="ffmf-subscription-page">
@@ -226,6 +264,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
         {!hasSubscription || showPlans ? (
           <PaymentPlans
             plans={plans}
+            loading={plansLoading}
             isCreatingPayment={isCreatingPayment || changing}
             payingPlan={payingPlan}
             currentPlan={currentPlan}
@@ -321,6 +360,12 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
                 <span>Unused time credit</span>
                 <strong>-{money(upgradePreview.creditMinor, upgradePreview.currency)}</strong>
               </div>
+              {upgradePreview.couponCode ? (
+                <div className="ffmf-confirm-row">
+                  <span>Discount ({upgradePreview.couponCode})</span>
+                  <strong>{upgradePreview.discountMinor ? `-${money(upgradePreview.discountMinor, upgradePreview.currency)}` : "Applied"}</strong>
+                </div>
+              ) : null}
               <div className="ffmf-confirm-row">
                 <span>Due today</span>
                 <strong>{money(upgradePreview.amountDueMinor, upgradePreview.currency)}</strong>
@@ -329,6 +374,61 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
                 <span>Renews</span>
                 <strong>{upgradePreview.nextRenewal ? formatDate(upgradePreview.nextRenewal) : "Never"}</strong>
               </div>
+            </div>
+            <div className="ffmf-pm-coupon ffmf-confirm-coupon">
+              {upgradeCoupon ? (
+                <div className="ffmf-pm-coupon-pill">
+                  <div className="ffmf-pm-coupon-left">
+                    <Check className="ffmf-pm-coupon-check" aria-hidden={true} />
+                    <span className="ffmf-pm-coupon-code">{upgradeCoupon}</span>
+                  </div>
+                  <button type="button" className="ffmf-pm-coupon-remove" onClick={() => void applyUpgradeCoupon(null)} aria-label="Remove discount" disabled={applyingUpgradeCoupon || changing}>
+                    <X />
+                  </button>
+                </div>
+              ) : !upgradeCouponOpen ? (
+                <button type="button" className="ffmf-pm-coupon-toggle" onClick={() => setUpgradeCouponOpen(true)}>
+                  <Tag aria-hidden={true} />
+                  <span>{upgradePreview.couponCode ? "Have a different code?" : "Have a discount code?"}</span>
+                </button>
+              ) : (
+                <>
+                  <div className="ffmf-pm-coupon-field">
+                    <Tag aria-hidden={true} />
+                    <input
+                      type="text"
+                      className="ffmf-pm-coupon-input"
+                      placeholder="Enter coupon code"
+                      aria-label="Coupon code"
+                      value={upgradeCouponDraft}
+                      onChange={(event) => {
+                        setUpgradeCouponDraft(event.target.value);
+                        if (upgradeCouponError) setUpgradeCouponError("");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && upgradeCouponDraft.trim()) {
+                          event.preventDefault();
+                          void applyUpgradeCoupon(upgradeCouponDraft.trim().toUpperCase());
+                        }
+                      }}
+                      disabled={applyingUpgradeCoupon}
+                    />
+                    <button
+                      type="button"
+                      className="ffmf-pm-coupon-apply"
+                      onClick={() => void applyUpgradeCoupon(upgradeCouponDraft.trim().toUpperCase())}
+                      disabled={applyingUpgradeCoupon || !upgradeCouponDraft.trim()}
+                    >
+                      {applyingUpgradeCoupon ? <Loader2 className="ffmf-pm-spin" aria-label="Applying" /> : "Apply"}
+                    </button>
+                  </div>
+                  {upgradeCouponError ? (
+                    <div className="ffmf-pm-coupon-error" role="alert">
+                      {upgradeCouponError}
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
             <div className="ffmf-confirm-actions">
               <button type="button" className="ffmf-confirm-cancel" onClick={() => setUpgradePreview(null)}>
@@ -458,9 +558,8 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
       <PaymentModal
         isOpen={checkout !== null}
         publishableKey={plans?.publishableKey ?? ""}
-        clientSecret={checkout?.clientSecret ?? null}
-        showAmount={showAmount}
-        showType={showType}
+        checkout={checkout}
+        listAmountMinor={listAmountMinor}
         plan={payingPlan}
         siteId={siteId}
         defaultEmail={connection?.creatorEmail ?? null}
@@ -471,7 +570,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onClose, sho
         onSuccess={finishPayment}
         onCheckoutChange={(next) => setCheckout(next)}
       />
-      <PaymentSuccessModal isOpen={showSuccess} />
+      <PaymentSuccessModal plan={successPlan} onClose={() => setSuccessPlan(null)} />
     </div>
   );
 };
